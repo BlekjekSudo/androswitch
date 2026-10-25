@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.androswitch.conformance" android:versionCode="1" android:versionName="0.1.0">
+  <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="26"/>
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <application android:name="org.androswitch.conformance.Recorder" android:label="AndroSwitch Conformance" android:debuggable="true" android:theme="@android:style/Theme.Material.NoActionBar">
+    <activity android:name="org.androswitch.conformance.MainActivity" android:exported="true">
+      <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
+    </activity>
+    <activity android:name="org.androswitch.conformance.ChildActivity" android:exported="false"/>
+  </application>
+</manifest>

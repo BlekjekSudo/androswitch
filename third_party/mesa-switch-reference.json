@@ -1,0 +1,10 @@
+{
+  "observed_version": "26.2.4",
+  "project": "mesa-switch",
+  "url": "https://github.com/danfromtico/mesa-switch",
+  "schema_version": 1,
+  "note": "Existing AndroSwitch Mesa/EGL remains linked. NVK availability is tested rather than inferred. GitHub API revision lookup timed out and was cancelled; no exact external SDK commit is claimed.",
+  "usage": "Reference only; no driver source or binary incorporated by this suite build",
+  "observed_utc": "2026-10-25T08:46:59.6972165Z",
+  "ref": "main"
+}

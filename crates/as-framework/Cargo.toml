@@ -32,6 +32,11 @@ required-features = ["host"]
 name = "as-corpus"
 path = "src/bin/as-corpus.rs"
 required-features = ["host"]
+
+[[bin]]
+name = "as-conformance"
+path = "src/bin/as-conformance.rs"
+required-features = ["host"]
 [[test]]
 name = "lifecycle"
 path = "tests/lifecycle.rs"
@@ -125,4 +130,9 @@ required-features = ["host"]
 [[test]]
 name = "runtime_resources"
 path = "tests/runtime_resources.rs"
+required-features = ["host"]
+
+[[test]]
+name = "input_connection"
+path = "tests/input_connection.rs"
 required-features = ["host"]

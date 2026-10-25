@@ -3,6 +3,9 @@
 param(
     [Parameter(Mandatory)][ValidateCount(1,16)][string[]]$ApkPaths,
     [string]$Nro='',
+    [ValidateRange(1,100)][int]$LaunchesPerApk=1,
+    [string]$UserDataSeed='',
+    [string[]]$UserDataWatch=@(),
     [string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',
     [string]$RyujinxProfile="$env:APPDATA/Ryujinx",
     [ValidateRange(1000,30000)][int]$StartupWaitMilliseconds=10000,
@@ -59,6 +62,12 @@ try{
 }finally{$stream.Dispose()}
 $commands=[Collections.Generic.List[object]]::new()
 $inputs=[Collections.Generic.List[object]]::new()
+$launches=[Collections.Generic.List[object]]::new()
+$seedFiles=[Collections.Generic.List[object]]::new()
+foreach($relative in $UserDataWatch){
+    if($relative -cnotmatch '^[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+/[A-Za-z0-9_./-]+$' -or $relative.Split('/') -contains '..' -or $relative.Contains('//')){throw 'Invalid relative package userdata watch path'}
+}
+
 $commands.Add(@{kind='frame'})
 for($index=0;$index -lt $files.Count;$index++){
     $commands.Add(@{kind='key';key='right'})
@@ -68,15 +77,42 @@ for($index=0;$index -lt $files.Count;$index++){
     # Keep the explicit application frame visible to the polling recorder
     # before the return path and next launch can clear shared capture names.
     $events=@(@{kind='wait';ms=$StartupWaitMilliseconds},@{kind='frame'},@{kind='wait';ms=2000},@{kind='return_to_launcher'})
-    $commands.Add(@{kind='open';events=$events})
-    $commands.Add(@{kind='frames';count=60})
-    $inputs.Add(@{
+    $input=@{
         index=$index;source=$files[$index].FullName;staged_name=('{0:D4}-external.apk' -f $index)
         bytes=$files[$index].Length;sha256=(Get-FileHash -LiteralPath $files[$index].FullName).Hash.ToLowerInvariant()
-        install_snapshot_step=$installStep;expected_session_id="$id-$($index+1)"
-    })
+        install_snapshot_step=$installStep
+    }
+    $inputs.Add($input)
+    for($attempt=0;$attempt -lt $LaunchesPerApk;$attempt++){
+        $commands.Add(@{kind='open';events=$events})
+        $commands.Add(@{kind='frames';count=60})
+        $entry=@{};foreach($pair in $input.GetEnumerator()){$entry[$pair.Key]=$pair.Value}
+        $entry.expected_session_id="$id-$($launches.Count+1)";$entry.attempt=$attempt
+        $launches.Add($entry)
+    }
 }
 if($commands.Count -gt 256){throw 'Request exceeds the launcher command limit.'}
+
+if($UserDataSeed){
+    $seedRoot=(Get-Item -LiteralPath $UserDataSeed).FullName
+    if(-not(Test-Path -LiteralPath $seedRoot -PathType Container)){throw 'UserDataSeed must be a directory of package-owned test data'}
+    $items=@(Get-Item -LiteralPath $seedRoot)+@(Get-ChildItem -LiteralPath $seedRoot -Recurse -Force)
+    if(@($items|Where-Object {$_.Attributes -band [IO.FileAttributes]::ReparsePoint}).Count){throw 'UserDataSeed links are forbidden'}
+    $bytes=0L
+    foreach($file in @($items|Where-Object {-not $_.PSIsContainer})){
+        if($seedFiles.Count -ge 1024){throw 'Seed file limit exceeded'}
+        $bytes+=$file.Length;if($bytes -gt 16MB){throw 'Seed size limit exceeded'}
+        $relative=[IO.Path]::GetRelativePath($seedRoot,$file.FullName).Replace('\','/')
+        if($relative -notmatch '^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+/' -or $relative.Split('/') -contains '..'){throw 'Seed must begin with a normal package directory'}
+        $target=Join-Path $run "userdata-seed/$relative"
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $target)|Out-Null
+        $hash=(Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant()
+        Copy-Item -LiteralPath $file.FullName -Destination $target
+        if((Get-FileHash -LiteralPath $target).Hash.ToLowerInvariant() -cne $hash){throw 'Seed changed during preparation'}
+        $seedFiles.Add(@{source=$file.FullName;relative=$relative;frozen=$target;bytes=$file.Length;sha256=$hash})
+    }
+}
+
 $request=@{schema_version=1;session_id=$id;commands=@($commands.ToArray())}
 $request|ConvertTo-Json -Depth 20|Set-Content (Join-Path $run 'launcher-test.json') -Encoding utf8NoBOM
 $receipt=@{
@@ -86,7 +122,7 @@ $receipt=@{
     artifact=$artifact;nro_sha256=$nroHash;emulator_path=$emulator;ryujinx_profile=$profile
     emulator_sha256=(Get-FileHash -LiteralPath $emulator).Hash.ToLowerInvariant()
     emulator_version=(Get-Item -LiteralPath $emulator).VersionInfo.ProductVersion
-    sd_result=$sdResult;sd_backup=$backup;inputs=@($inputs.ToArray());commands=$commands.Count
+    sd_result=$sdResult;sd_backup=$backup;inputs=@($inputs.ToArray());launches=@($launches.ToArray());userdata_seed=@($seedFiles.ToArray());commands=$commands.Count
     startup_wait_ms=$StartupWaitMilliseconds;cases=@();sd_original_restore='not_modified'
     emulator_frontend=if($Headless){'headless_sdl2'}else{'desktop'}
     native_trace_requested=[bool]$TraceNative
@@ -192,6 +228,21 @@ function Capture-Session([object]$Session){
     $destination=Join-Path $run "sessions/$($Session.session_id)"
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
     $Session|ConvertTo-Json -Depth 28|Set-Content (Join-Path $destination 'session-report.json') -Encoding utf8NoBOM
+    if($Session.status -ne 'running' -and (& $ownsCapture $false)){
+        foreach($relative in $UserDataWatch){
+            $source=Join-Path $sdRoot "userdata/$relative"
+            if(-not(Test-Path -LiteralPath $source -PathType Leaf)){continue}
+            $check=Get-Item -LiteralPath $source -Force;$linked=$false
+            while($check -and $check.FullName.StartsWith($sdRoot+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){
+                if($check.Attributes -band [IO.FileAttributes]::ReparsePoint){$linked=$true;break};$check=if($check.PSIsContainer){$check.Parent}else{$check.Directory}
+            }
+            if($linked -or (Get-Item -LiteralPath $source).Length -gt 2MB){continue}
+            $target=Join-Path $destination "userdata/$relative";New-Item -ItemType Directory -Force (Split-Path $target)|Out-Null
+            $hash=(Get-FileHash -LiteralPath $source).Hash
+            Copy-Item -LiteralPath $source -Destination $target
+            if(-not(& $ownsCapture $false) -or (Get-FileHash -LiteralPath $target).Hash -cne $hash -or (Get-FileHash -LiteralPath $source).Hash -cne $hash){Remove-Item -LiteralPath $target}
+        }
+    }
     foreach($name in @('memory-admission.json','native-compatibility.json','capture-owner.json','uncaught-exceptions.json')){
         $source=Join-Path $sdRoot "logs/$name"
         if(-not (Test-Path -LiteralPath $source)){continue}
@@ -284,6 +335,13 @@ try{
         if((Get-FileHash -LiteralPath $inputFile.source).Hash.ToLowerInvariant() -ne $inputFile.sha256){throw 'An input APK changed after preparation.'}
         Copy-Item -LiteralPath $inputFile.source -Destination (Join-Path $sdRoot "apks/$($inputFile.staged_name)")
     }
+    foreach($seed in $seedFiles){
+        if((Get-FileHash -LiteralPath $seed.frozen).Hash.ToLowerInvariant() -cne $seed.sha256){throw 'Frozen seed changed'}
+        $destination=[IO.Path]::GetFullPath((Join-Path $sdRoot "userdata/$($seed.relative)"))
+        if(-not $destination.StartsWith([IO.Path]::GetFullPath((Join-Path $sdRoot 'userdata'))+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Seed destination escaped test userdata'}
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $destination)|Out-Null
+        Copy-Item -LiteralPath $seed.frozen -Destination $destination
+    }
     Copy-Item -LiteralPath $artifact -Destination $sdNro
     Copy-Item -LiteralPath (Join-Path $run 'launcher-test.json') -Destination (Join-Path $sdRoot 'runtime/launcher-test.json')
     $receipt.execution_attempted=$true;$receipt.status='attempted';Save-Receipt
@@ -355,7 +413,7 @@ try{
     if($result.snapshots.Count -ne $commands.Count+1){throw 'Launcher snapshot count does not match the prepared command count.'}
     foreach($snapshot in $result.snapshots){if($snapshot.presented_hash -cne $snapshot.shell.frame_hash){throw "Launcher submission mismatch at step $($snapshot.step)."}}
     $cases=[Collections.Generic.List[object]]::new()
-    foreach($inputFile in $inputs){
+    foreach($inputFile in $launches){
         $session=@($result.sessions|Where-Object session_id -eq $inputFile.expected_session_id)|Select-Object -First 1
         $installed=@($result.snapshots|Where-Object step -eq $inputFile.install_snapshot_step)|Select-Object -First 1
         $selected=if($installed){$installed.shell.installed[$installed.shell.selected]}else{$null}
@@ -425,7 +483,7 @@ try{
     if($lock){$lock.Dispose();Remove-Item -LiteralPath $lockPath -ErrorAction SilentlyContinue}
     # A later native fault must not erase an earlier named rejection. These
     # are observations, never invented completed cases or install identities.
-    $observations=@(foreach($inputFile in $inputs){
+    $observations=@(foreach($inputFile in $launches){
         $path=Join-Path $run "sessions/$($inputFile.expected_session_id)/session-report.json"
         if(Test-Path -LiteralPath $path){
             try{

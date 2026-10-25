@@ -1294,6 +1294,8 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             Some(&["Landroid/content/BroadcastReceiver;", "Ljava/lang/Object;"])
         }
         "Landroid/view/inputmethod/BaseInputConnection;" | "Ljava/lang/Runtime;" => Some(OBJECT),
+        "Landroid/text/Selection;" => Some(OBJECT),
+        "Landroid/os/Build;" | "Landroid/os/Build$VERSION;" => Some(OBJECT),
         // M8: FragmentManager legacy (29º gap real) — objeto simples do host.
         "Landroid/app/FragmentManager;" => Some(OBJECT),
         // M8: FragmentTransaction legacy (31º gap real) — ops até o commit.
@@ -1710,6 +1712,22 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
 /// Interfaces de plataforma conhecidas sem DEX (issue #26: check-cast /
 /// instanceof para CharSequence/Comparable/… sobre String/StringBuilder).
 fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
+    // Preserve the actual parent interfaces of the modeled text contracts
+    // before the generic empty root-interface case below.
+    match class {
+        "Landroid/text/Editable;" => {
+            return Some(&[
+                "Landroid/text/GetChars;",
+                "Landroid/text/Spannable;",
+                "Ljava/lang/Appendable;",
+            ])
+        }
+        "Landroid/text/Spannable;" => return Some(&["Landroid/text/Spanned;"]),
+        "Landroid/text/Spanned;" | "Landroid/text/GetChars;" => {
+            return Some(&["Ljava/lang/CharSequence;"])
+        }
+        _ => {}
+    }
     if host_interface_modifiers(class).is_some() {
         return Some(&[]);
     }
@@ -2084,8 +2102,13 @@ pub fn host_class_known(desc: &str) -> bool {
 pub fn host_interface_modifiers(desc: &str) -> Option<u32> {
     match desc {
         "Ljava/lang/reflect/Member;"
+        | "Ljava/lang/Runnable;"
         | "Ljava/lang/reflect/AnnotatedElement;"
         | "Landroid/view/inputmethod/InputConnection;" => Some(0x0601),
+        "Landroid/text/Editable;"
+        | "Landroid/text/Spannable;"
+        | "Landroid/text/Spanned;"
+        | "Landroid/text/GetChars;" => Some(0x0601),
         "Landroid/view/View$OnClickListener;"
         | "Landroid/app/Application$ActivityLifecycleCallbacks;"
         | "Ljava/lang/Thread$UncaughtExceptionHandler;"

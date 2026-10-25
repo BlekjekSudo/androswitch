@@ -297,3 +297,141 @@ fn ordinary_sdk_proof_uses_the_same_singleton_provider_and_shared_vfs() {
         "RUNTIME_PROOF_PASS\nsingleton=true\nfirstAvailableProcessors=6\navailableProcessors=6\n"
     );
 }
+
+#[test]
+fn android_profile_uses_canonical_rooted_fields_and_exact_descriptors() {
+    let mut test = Test::new("original", false);
+    let host = test.app.vm.framework_host().unwrap();
+    let model = host
+        .static_field(
+            &mut test.app.vm,
+            "Landroid/os/Build;",
+            "MODEL",
+            "Ljava/lang/String;",
+        )
+        .unwrap()
+        .unwrap();
+    let reference = model.as_ref().unwrap().unwrap();
+    assert_eq!(
+        test.app.vm.heap.as_str(reference).unwrap(),
+        as_framework::properties::get("ro.product.model").unwrap()
+    );
+    let abi = host
+        .static_field(
+            &mut test.app.vm,
+            "Landroid/os/Build;",
+            "SUPPORTED_ABIS",
+            "[Ljava/lang/String;",
+        )
+        .unwrap()
+        .unwrap();
+    let array = abi.as_ref().unwrap().unwrap();
+    let first = test.app.vm.heap.as_array_elems(array).unwrap().0[0]
+        .as_ref()
+        .unwrap()
+        .unwrap();
+    test.app.vm.gc();
+    assert_eq!(test.app.vm.heap.as_str(first).unwrap(), "arm64-v8a");
+    assert_eq!(
+        host.static_field(
+            &mut test.app.vm,
+            "Landroid/os/Build;",
+            "MODEL",
+            "Ljava/lang/String;"
+        )
+        .unwrap(),
+        Some(model)
+    );
+    assert_eq!(
+        host.static_field(
+            &mut test.app.vm,
+            "Landroid/os/Build;",
+            "SUPPORTED_ABIS",
+            "[Ljava/lang/String;"
+        )
+        .unwrap(),
+        Some(abi)
+    );
+    assert_eq!(
+        host.static_field(&mut test.app.vm, "Landroid/os/Build;", "MODEL", "I")
+            .unwrap(),
+        None
+    );
+    assert_eq!(
+        host.static_field(
+            &mut test.app.vm,
+            "Landroid/os/Build;",
+            "UNKNOWN_FIELD",
+            "Ljava/lang/String;"
+        )
+        .unwrap(),
+        None
+    );
+    let mut other = Test::new("renamed", false);
+    let second_host = other.app.vm.framework_host().unwrap();
+    let second = second_host
+        .static_field(
+            &mut other.app.vm,
+            "Landroid/os/Build;",
+            "SUPPORTED_ABIS",
+            "[Ljava/lang/String;",
+        )
+        .unwrap()
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .unwrap();
+    test.app.vm.heap.array_elems_mut(array).unwrap()[0] = Value::Null;
+    assert_ne!(
+        other.app.vm.heap.as_array_elems(second).unwrap().0[0],
+        Value::Null
+    );
+}
+struct PropertyProvider {
+    android: Weak<Android>,
+    next: Rc<Resources>,
+}
+impl RuntimeResources for PropertyProvider {
+    fn available_processors(&self) -> Result<u32, PlatformError> {
+        Ok(3)
+    }
+    fn system_property(&self, key: &str) -> Result<Option<String>, PlatformError> {
+        self.android
+            .upgrade()
+            .unwrap()
+            .bind_runtime_resources(self.next.clone());
+        if key == "androswitch.host.tick.frequency_hz" {
+            Ok(Some("19200000".into()))
+        } else {
+            Err(PlatformError {
+                code: "ACTUAL_QUERY_ERROR",
+                operation: "system_property",
+                cause: key.into(),
+            })
+        }
+    }
+}
+#[test]
+fn optional_platform_properties_reenter_and_preserve_unknowns_and_actual_errors() {
+    let mut test = Test::new("original", false);
+    let host = test.app.vm.framework_host().unwrap();
+    assert_eq!(host.system_property("missing").unwrap(), None);
+    let provider = Rc::new(PropertyProvider {
+        android: Rc::downgrade(&test.app.android),
+        next: Rc::new(Resources::new(4)),
+    });
+    test.app.android.bind_runtime_resources(provider.clone());
+    assert_eq!(
+        host.system_property("androswitch.host.tick.frequency_hz")
+            .unwrap(),
+        Some("19200000".into())
+    );
+    assert_eq!(
+        host.system_property("androswitch.host.tick.frequency_hz")
+            .unwrap(),
+        None
+    );
+    test.app.android.bind_runtime_resources(provider);
+    code(host.system_property("bad_query"), "ACTUAL_QUERY_ERROR");
+    assert_eq!(test.processors().unwrap(), Value::Int(4));
+}

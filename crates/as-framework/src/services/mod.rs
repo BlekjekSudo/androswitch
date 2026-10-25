@@ -5,8 +5,10 @@ mod bundle;
 mod collections;
 mod communication;
 mod database;
+mod device_info;
 pub(super) mod executors;
 pub(super) mod glsurface;
+mod input_connection;
 mod package;
 mod permissions;
 mod preferences;
@@ -26,6 +28,8 @@ pub(super) struct Services {
     pub(super) timers: timer::Timers,
     pub(super) executors: executors::Executors,
     pub(super) runtime: runtime::Runtime,
+    input_connections: input_connection::InputConnections,
+    device_info: device_info::DeviceInfo,
     package_metadata: package::PackageService,
     reflection_fields: reflection::Fields,
     package: String,
@@ -38,6 +42,7 @@ impl Services {
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
         executors::Executors::metadata(class, name, sig)
+            .or_else(|| input_connection::InputConnections::metadata(class, name, sig))
             .or_else(|| runtime::Runtime::metadata(class, name, sig))
             .or_else(|| package::PackageService::metadata(class, name, sig))
             .or_else(|| reflection::metadata(class, name, sig))
@@ -66,6 +71,8 @@ impl Services {
             timers: Default::default(),
             executors: Default::default(),
             runtime: Default::default(),
+            input_connections: Default::default(),
+            device_info: Default::default(),
             package_metadata: Default::default(),
             reflection_fields: Default::default(),
             package: apk.manifest.package.clone(),
@@ -96,6 +103,9 @@ impl Services {
             .bind_source(self.fs.clone(), apk, path, storage)
     }
     pub(super) fn attach(&self, vm: &mut Engine, class: &str, r: ObjRef) -> Result<bool> {
+        if self.input_connections.attach(vm, class, r)? {
+            return Ok(true);
+        }
         if class == "Landroid/content/pm/PackageInfo;" {
             return Ok(true);
         }
@@ -126,6 +136,12 @@ impl Services {
         name: &str,
         _descriptor: &str,
     ) -> Result<Option<Value>> {
+        if let Some(value) = self
+            .device_info
+            .static_field(vm, class, name, _descriptor)?
+        {
+            return Ok(Some(value));
+        }
         if let Some(value) = self.executors.static_field(vm, class, name, _descriptor)? {
             return Ok(Some(value));
         }
@@ -134,7 +150,7 @@ impl Services {
                 return Ok(Some(Value::Obj(vm.device_class_object(descriptor)?)));
             }
         }
-        if class == "Landroid/os/Build$VERSION;" && name == "SDK_INT" {
+        if class == "Landroid/os/Build$VERSION;" && name == "SDK_INT" && _descriptor == "I" {
             return Ok(Some(Value::Int(crate::properties::sdk_int().ok_or_else(
                 || {
                     error(
@@ -165,6 +181,12 @@ impl Services {
             return Ok(Some(value));
         }
         if let Some(value) = self.runtime.call_static(vm, class, name, sig, args)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = self
+            .input_connections
+            .call_static(vm, class, name, sig, args)?
+        {
             return Ok(Some(value));
         }
         if let Some(value) = self
@@ -256,6 +278,12 @@ impl Services {
         if let Some(value) = self.runtime.call(vm, class, name, sig, r, args)? {
             return Ok(Some(value));
         }
+        if let Some(value) = self
+            .input_connections
+            .call(android, vm, class, name, sig, r, args)?
+        {
+            return Ok(Some(value));
+        }
         if let Some(value) = self.lifecycle_observers.call(vm, name, sig, r, args)? {
             return Ok(Some(value));
         }
@@ -320,6 +348,8 @@ impl Services {
         roots.extend(self.timers.roots());
         roots.extend(self.executors.roots());
         roots.extend(self.runtime.roots());
+        roots.extend(self.input_connections.roots());
+        roots.extend(self.device_info.roots());
         roots
     }
     pub(super) fn references(&self, r: ObjRef) -> Vec<ObjRef> {
@@ -329,6 +359,7 @@ impl Services {
         refs.extend(self.database.references(r));
         refs.extend(self.executors.references(r));
         refs.extend(self.reflection_fields.references(r));
+        refs.extend(self.input_connections.references(r));
         refs
     }
     pub(super) fn collect(&self, marked: &[bool]) {
@@ -342,6 +373,7 @@ impl Services {
         self.preferences.collect(marked);
         self.database.collect(marked);
         self.reflection_fields.collect(marked);
+        self.input_connections.collect(marked);
     }
 }
 fn storage_error(e: as_platform::PlatformError) -> VmExit {

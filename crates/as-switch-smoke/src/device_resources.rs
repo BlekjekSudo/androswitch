@@ -1,13 +1,52 @@
 //! Actual Horizon process capabilities, queried at each Java Runtime call.
-use alloc::{format, rc::Rc};
+use alloc::{format, rc::Rc, string::String};
 use as_platform::{PlatformError, RuntimeResources};
 
 #[allow(unsafe_code)]
 extern "C" {
     fn as_platform_available_processors(value: *mut u32) -> i32;
+    fn as_platform_resource_query(kind: u32, value: *mut u64) -> i32;
 }
 struct HorizonResources;
 impl RuntimeResources for HorizonResources {
+    fn system_property(&self, key: &str) -> Result<Option<String>, PlatformError> {
+        if key == "androswitch.host.os.name" {
+            return Ok(Some("Horizon".into()));
+        }
+        let kind = match key {
+            "androswitch.host.cpu.allowed_mask" => 0,
+            "androswitch.host.cpu.clock_hz" => 1,
+            "androswitch.host.gpu.clock_hz" => 2,
+            "androswitch.host.memory.clock_hz" => 3,
+            "androswitch.host.tick.frequency_hz" => 4,
+            "androswitch.host.os.version" => 5,
+            _ => return Ok(None),
+        };
+        let mut value = 0u64;
+        // SAFETY: C writes one scalar after a successful read-only query. It
+        // closes every acquired service/session and retains no pointer.
+        #[allow(unsafe_code)]
+        let rc = unsafe { as_platform_resource_query(kind, &mut value) };
+        if rc != 0 {
+            return Err(PlatformError {
+                code: "HORIZON_RESOURCE_ERROR",
+                operation: "resource_query",
+                cause: format!("{key}: result={rc:#010x}"),
+            });
+        }
+        Ok(Some(if kind == 0 {
+            format!("{value:#018x}")
+        } else if kind == 5 {
+            format!(
+                "{}.{}.{}",
+                (value >> 24) & 255,
+                (value >> 16) & 255,
+                (value >> 8) & 255
+            )
+        } else {
+            format!("{value}")
+        }))
+    }
     fn available_processors(&self) -> Result<u32, PlatformError> {
         let mut count = 0;
         // SAFETY: C writes this scalar only after a successful process CoreMask

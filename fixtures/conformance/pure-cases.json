@@ -1,0 +1,390 @@
+[
+  {
+    "id": "dex.overflow",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.division",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.shift",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.long",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.loop",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.switch",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.double",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.nan",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.signed-zero",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.cast",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.bounds",
+    "group": "DEX"
+  },
+  {
+    "id": "dex.division-zero",
+    "group": "DEX"
+  },
+  {
+    "id": "text.utf16-length",
+    "group": "Text"
+  },
+  {
+    "id": "text.substring",
+    "group": "Text"
+  },
+  {
+    "id": "text.char-at",
+    "group": "Text"
+  },
+  {
+    "id": "text.equals",
+    "group": "Text"
+  },
+  {
+    "id": "text.builder-char",
+    "group": "Text"
+  },
+  {
+    "id": "text.buffer",
+    "group": "Text"
+  },
+  {
+    "id": "text.utf8",
+    "group": "Text"
+  },
+  {
+    "id": "text.ascii",
+    "group": "Text"
+  },
+  {
+    "id": "text.format",
+    "group": "Text"
+  },
+  {
+    "id": "text.index",
+    "group": "Text"
+  },
+  {
+    "id": "text.replace",
+    "group": "Text"
+  },
+  {
+    "id": "text.starts-ends",
+    "group": "Text"
+  },
+  {
+    "id": "text.null-append",
+    "group": "Text"
+  },
+  {
+    "id": "text.surrogate",
+    "group": "Text"
+  },
+  {
+    "id": "collections.arraylist",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.list-null",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.list-iterator",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.map",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.set",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.cow-snapshot",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.cow-array-copy",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.cow-remove-unsupported",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.boxed-equals",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.arraycopy",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.array-clone",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.abstract-subclass",
+    "group": "Collections"
+  },
+  {
+    "id": "timeunit.ordinal.0",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.ordinal.1",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.ordinal.2",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.ordinal.3",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.ordinal.4",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.ordinal.5",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.ordinal.6",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.nanoseconds.nanoseconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.nanoseconds.seconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.nanoseconds.days",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.microseconds.nanoseconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.microseconds.seconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.microseconds.days",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.milliseconds.nanoseconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.milliseconds.seconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.milliseconds.days",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.seconds.nanoseconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.seconds.seconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.seconds.days",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.minutes.nanoseconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.minutes.seconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.minutes.days",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.hours.nanoseconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.hours.seconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.hours.days",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.days.nanoseconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.days.seconds",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.convert.days.days",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "timeunit.saturation",
+    "group": "TimeUnit"
+  },
+  {
+    "id": "exceptions.throw-catch",
+    "group": "Exceptions"
+  },
+  {
+    "id": "exceptions.finally",
+    "group": "Exceptions"
+  },
+  {
+    "id": "exceptions.null",
+    "group": "Exceptions"
+  },
+  {
+    "id": "exceptions.cast",
+    "group": "Exceptions"
+  },
+  {
+    "id": "exceptions.message",
+    "group": "Exceptions"
+  },
+  {
+    "id": "reflection.name",
+    "group": "Reflection"
+  },
+  {
+    "id": "reflection.interface",
+    "group": "Reflection"
+  },
+  {
+    "id": "reflection.assignable",
+    "group": "Reflection"
+  },
+  {
+    "id": "reflection.field-static",
+    "group": "Reflection"
+  },
+  {
+    "id": "reflection.field-instance",
+    "group": "Reflection"
+  },
+  {
+    "id": "reflection.private",
+    "group": "Reflection"
+  },
+  {
+    "id": "reflection.missing",
+    "group": "Reflection"
+  },
+  {
+    "id": "reflection.widening",
+    "group": "Reflection"
+  },
+  {
+    "id": "reflection.method",
+    "group": "Reflection"
+  },
+  {
+    "id": "threads.initial",
+    "group": "Threads"
+  },
+  {
+    "id": "threads.stored-null",
+    "group": "Threads"
+  },
+  {
+    "id": "threads.remove",
+    "group": "Threads"
+  },
+  {
+    "id": "threads.monitor",
+    "group": "Threads"
+  },
+  {
+    "id": "threads.atomic",
+    "group": "Threads"
+  },
+  {
+    "id": "math.abs.-3",
+    "group": "Math"
+  },
+  {
+    "id": "math.abs.-1",
+    "group": "Math"
+  },
+  {
+    "id": "math.abs.0",
+    "group": "Math"
+  },
+  {
+    "id": "math.abs.1",
+    "group": "Math"
+  },
+  {
+    "id": "math.abs.3",
+    "group": "Math"
+  },
+  {
+    "id": "numbers.hex.0",
+    "group": "Numbers"
+  },
+  {
+    "id": "numbers.hex.1",
+    "group": "Numbers"
+  },
+  {
+    "id": "numbers.hex.127",
+    "group": "Numbers"
+  },
+  {
+    "id": "numbers.hex.128",
+    "group": "Numbers"
+  },
+  {
+    "id": "numbers.hex.255",
+    "group": "Numbers"
+  },
+  {
+    "id": "numbers.hex.32767",
+    "group": "Numbers"
+  }
+]

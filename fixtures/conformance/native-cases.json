@@ -1,0 +1,167 @@
+[
+  {
+    "id": "jni.pointer-width",
+    "group": "JNI",
+    "kind": "contract"
+  },
+  {
+    "id": "jni.mixed-abi",
+    "group": "JNI",
+    "kind": "contract"
+  },
+  {
+    "id": "jni.string-utf8",
+    "group": "JNI",
+    "kind": "contract"
+  },
+  {
+    "id": "jni.array-copyback",
+    "group": "JNI",
+    "kind": "contract"
+  },
+  {
+    "id": "jni.exception",
+    "group": "JNI",
+    "kind": "contract"
+  },
+  {
+    "id": "jni.callback-gc",
+    "group": "JNI",
+    "kind": "contract"
+  },
+  {
+    "id": "jni.local-frame",
+    "group": "JNI",
+    "kind": "contract"
+  },
+  {
+    "id": "jni.thread-attach",
+    "group": "JNI",
+    "kind": "contract"
+  },
+  {
+    "id": "jni.native-file-sharing",
+    "group": "JNI",
+    "kind": "contract"
+  },
+  {
+    "id": "native.monotonic",
+    "group": "Native",
+    "kind": "contract"
+  },
+  {
+    "id": "native.clock-resolution",
+    "group": "Native",
+    "kind": "observation"
+  },
+  {
+    "id": "native.process-cpu-count",
+    "group": "Native",
+    "kind": "observation"
+  },
+  {
+    "id": "native.errno",
+    "group": "Native",
+    "kind": "contract"
+  },
+  {
+    "id": "native.tls",
+    "group": "Native",
+    "kind": "contract"
+  },
+  {
+    "id": "native.malloc-realloc",
+    "group": "Native",
+    "kind": "contract"
+  },
+  {
+    "id": "native.locale-c",
+    "group": "Native",
+    "kind": "contract"
+  },
+  {
+    "id": "native.process-clock",
+    "group": "Native",
+    "kind": "contract"
+  },
+  {
+    "id": "native.abi",
+    "group": "Native",
+    "kind": "observation"
+  },
+  {
+    "id": "gles.vendor",
+    "group": "OpenGL ES",
+    "kind": "observation"
+  },
+  {
+    "id": "gles.renderer",
+    "group": "OpenGL ES",
+    "kind": "observation"
+  },
+  {
+    "id": "gles.version",
+    "group": "OpenGL ES",
+    "kind": "observation"
+  },
+  {
+    "id": "gles.extensions",
+    "group": "OpenGL ES",
+    "kind": "observation"
+  },
+  {
+    "id": "gles.clear-readback",
+    "group": "OpenGL ES",
+    "kind": "contract"
+  },
+  {
+    "id": "gles.shader-valid",
+    "group": "OpenGL ES",
+    "kind": "contract"
+  },
+  {
+    "id": "gles.shader-invalid",
+    "group": "OpenGL ES",
+    "kind": "contract"
+  },
+  {
+    "id": "gles.buffer-roundtrip",
+    "group": "OpenGL ES",
+    "kind": "contract"
+  },
+  {
+    "id": "gles.texture-framebuffer",
+    "group": "OpenGL ES",
+    "kind": "contract"
+  },
+  {
+    "id": "vulkan.loader",
+    "group": "Vulkan",
+    "kind": "observation"
+  },
+  {
+    "id": "vulkan.instance",
+    "group": "Vulkan",
+    "kind": "observation"
+  },
+  {
+    "id": "vulkan.physical-device",
+    "group": "Vulkan",
+    "kind": "observation"
+  },
+  {
+    "id": "vulkan.queue-families",
+    "group": "Vulkan",
+    "kind": "observation"
+  },
+  {
+    "id": "vulkan.logical-device",
+    "group": "Vulkan",
+    "kind": "observation"
+  },
+  {
+    "id": "vulkan.memory-heaps",
+    "group": "Vulkan",
+    "kind": "observation"
+  }
+]

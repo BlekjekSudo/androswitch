@@ -54,6 +54,11 @@ pub trait RuntimeResources {
     /// Positive count of processors available to this process/VM. Query on
     /// each call because platform affinity/resource restrictions may change.
     fn available_processors(&self) -> Result<u32, PlatformError>;
+    /// Optional named host observations. Never substitute Android profile
+    /// fields or guessed hardware values when a query is unavailable.
+    fn system_property(&self, _key: &str) -> Result<Option<String>, PlatformError> {
+        Ok(None)
+    }
 }
 
 /// One real, dedicated serial callback thread per positive opaque token.

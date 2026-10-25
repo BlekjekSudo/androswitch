@@ -9,7 +9,7 @@ RUST_LIBRARY ?= ../../target/switch/aarch64-nintendo-switch-freestanding/release
 SQLITE_SOURCE ?= ../../local-artifacts/dependencies/sqlite
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 CFLAGS := $(ARCH) -D__SWITCH__ -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -I$(DEVKITPRO)/portlibs/switch/include -I../switch-smoke -I../../third_party/android
-OBJECTS := $(addprefix $(OUTPUT_DIR)/,main.o display.o memory.o media.o media_format.o glsurface.o workers.o opensl.o fs.o resource_info.o native.o worker_admission.o native_call.o jni.o bionic_io.o bionic_sync.o bionic_cxx.o bionic_finalize.o bionic_libc.o bionic_locale.o bionic_multibyte.o bionic_random.o bionic_keys.o bionic_log.o bionic_vfs.o missing_import.o sqlite3.o sqlite_memory.o)
+OBJECTS := $(addprefix $(OUTPUT_DIR)/,main.o display.o memory.o media.o media_format.o glsurface.o workers.o opensl.o fs.o resource_info.o resource_extra.o native.o worker_admission.o native_call.o jni.o bionic_io.o bionic_sync.o bionic_cxx.o bionic_finalize.o bionic_libc.o bionic_locale.o bionic_multibyte.o bionic_random.o bionic_keys.o bionic_log.o bionic_vfs.o missing_import.o sqlite3.o sqlite_memory.o)
 SQLITE_FLAGS := -DSQLITE_OS_OTHER=1 -DSQLITE_THREADSAFE=0 -DSQLITE_TEMP_STORE=3 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_OMIT_WAL -DSQLITE_DEFAULT_MEMSTATUS=1 -DSQLITE_DEFAULT_CACHE_SIZE=-1024
 .PHONY: all
 all: $(OUTPUT_DIR)/androswitch.nro

@@ -48,7 +48,11 @@ try {
     $flags = @('-march=armv8-a+crc+crypto','-mtune=cortex-a57','-mtp=soft','-fPIE','-O2','-Wall','-Wextra','-Werror',"-I$LibnxInclude",'-Iplatform/switch-smoke','-c','platform/switch-smoke/resource_info.c')
     Invoke-Check 'target-smoke' $TargetCompiler ($flags + @('-o',(Join-Path $OutputDirectory 'resource-info-smoke.o')))
     Invoke-Check 'target-product' $TargetCompiler ($flags + @('-D__SWITCH__','-o',(Join-Path $OutputDirectory 'resource-info-product.o')))
-    $receipt.sources = @(@('platform/switch-smoke/resource_info.c','platform/switch-smoke/resource_info.h','platform/switch-smoke/tests/resource_info.c','platform/switch-smoke/tests/fake-resources/switch.h','scripts/test-runtime-resources.ps1',"$LibnxInclude/switch/kernel/svc.h") | ForEach-Object {
+    $extraExecutable = Join-Path $OutputDirectory 'resource-extra.exe'
+    Invoke-Check 'extra-host-build' $Compiler @('-std=c11','-O2','-Wall','-Wextra','-Werror','-Iplatform/switch-smoke/tests/fake-extra','platform/switch-smoke/resource_extra.c','platform/switch-smoke/tests/resource_extra.c','-o',$extraExecutable)
+    Invoke-Check 'extra-host-contract' $extraExecutable @()
+    Invoke-Check 'extra-target' $TargetCompiler @('-march=armv8-a+crc+crypto','-mtune=cortex-a57','-mtp=soft','-fPIE','-O2','-Wall','-Wextra','-Werror',"-I$LibnxInclude",'-c','platform/switch-smoke/resource_extra.c','-o',(Join-Path $OutputDirectory 'resource-extra.o'))
+    $receipt.sources = @(@('platform/switch-smoke/resource_extra.c','platform/switch-smoke/tests/resource_extra.c','platform/switch-smoke/tests/fake-extra/switch.h','platform/switch-smoke/resource_info.c','platform/switch-smoke/resource_info.h','platform/switch-smoke/tests/resource_info.c','platform/switch-smoke/tests/fake-resources/switch.h','scripts/test-runtime-resources.ps1',"$LibnxInclude/switch/kernel/svc.h") | ForEach-Object {
         @{path=$_;sha256=(Get-FileHash -LiteralPath $_).Hash.ToLowerInvariant()}
     })
     $receipt.artifacts = @(Get-Item $executable,(Join-Path $OutputDirectory 'resource-info-smoke.o'),(Join-Path $OutputDirectory 'resource-info-product.o') | ForEach-Object {

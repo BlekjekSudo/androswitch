@@ -98,4 +98,11 @@ impl Runtime {
     pub(super) fn roots(&self) -> Vec<ObjRef> {
         self.singleton.get().into_iter().collect()
     }
+    pub(in crate::android) fn system_property(&self, key: &str) -> Result<Option<String>> {
+        let provider = self.resources.borrow().clone();
+        match provider {
+            Some(provider) => provider.system_property(key).map_err(storage_error),
+            None => Ok(None),
+        }
+    }
 }

@@ -13,6 +13,13 @@ See [credits and provenance](CREDITS.md) and [NOTICE](NOTICE.md).
 
 ## Current status
 
+A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
+219 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,
+inspect results and export JSON from one installation. See [scope and actual
+platform observations](docs/CONFORMANCE_SUITE.md); this is not official CTS or
+complete Android coverage.
+
+
 **M9 validation candidate: one `androswitch.nro`, one SD folder.** The console
 installs, updates and launches supported APKs using the shared RustyDroid
 interpreter and native ARM64 backend. Java/Kotlin UI, NativeActivity GLES2,

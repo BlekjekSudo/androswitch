@@ -1329,6 +1329,9 @@ impl Android {
 }
 
 impl FrameworkHost for Android {
+    fn system_property(&self, key: &str) -> Result<Option<String>> {
+        self.services.runtime.system_property(key)
+    }
     fn method_metadata(
         &self,
         class: &str,

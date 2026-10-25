@@ -20,6 +20,9 @@ pub(super) fn metadata(
     if let Some(kind) = Fields::metadata(class, name, sig) {
         return Some(kind);
     }
+    if (class, name, sig) == (CLASS, "isInterface", "()Z") {
+        return Some(rd_vm::framework_host::HostMethodKind::Instance);
+    }
     (class == CLASS
         && name == "forName"
         && matches!(
@@ -179,6 +182,37 @@ pub(super) fn call(
             ("getName", "()Ljava/lang/String;") => string(vm, class_name(&d))?,
             ("isPrimitive", "()Z") => Value::Int((d.len() == 1) as i32),
             ("isArray", "()Z") => Value::Int(d.starts_with('[') as i32),
+            ("isInterface", "()Z") => {
+                if vm.device_class_object(&d)? != r {
+                    return Err(error(
+                        "INVALID_CLASS_METADATA",
+                        "noncanonical Class identity",
+                    ));
+                }
+                let interface = if let Some((_, definition)) = vm.cp.find_class(&d) {
+                    definition.access_flags & 0x200 != 0
+                } else if rd_vm::classpath::host_interface_modifiers(&d).is_some() {
+                    true
+                } else if d.starts_with('[')
+                    || d.len() == 1
+                    || matches!(
+                        d.as_str(),
+                        "Ljava/lang/Object;"
+                            | "Ljava/lang/String;"
+                            | "Ljava/lang/Runtime;"
+                            | "Landroid/view/inputmethod/BaseInputConnection;"
+                            | "Landroid/text/SpannableStringBuilder;"
+                    )
+                {
+                    false
+                } else {
+                    return Err(error(
+                        "API_UNAVAILABLE",
+                        format!("Class.isInterface platform metadata: {d}"),
+                    ));
+                };
+                Value::Int(i32::from(interface))
+            }
             ("isAssignableFrom", "(Ljava/lang/Class;)Z") => {
                 Value::Int(vm.cp.is_subtype(&desc(vm, obj(&args[0])?)?, &d) as i32)
             }

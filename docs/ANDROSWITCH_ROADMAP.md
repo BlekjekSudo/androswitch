@@ -139,3 +139,10 @@ Test SDK/ABI/split policy, malformed inputs, APK identity, DEX arithmetic and
 exceptions, JNI/reentrancy/GC/TLS/thread callbacks, Java/native file sharing,
 OBB streaming, restart/update failure/data retention, switching, UI/input,
 graphics/audio, missing API diagnostics, and lifecycle memory stability.
+
+## Unified development test APK
+
+M9 foundation work now includes the [219-case conformance catalog](CONFORMANCE_SUITE.md)
+in one normal Android SDK/NDK APK, without sensor tests. Host, diagnostic Ryujinx,
+Android reference and physical Switch results remain separate. This catalog
+does not close the independent Mekorama/Candy Crush first-screen gate.

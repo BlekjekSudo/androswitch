@@ -48,6 +48,23 @@ pub(crate) fn call_static(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    let scalar = match (class, name, sig) {
+        ("Ljava/lang/Long;", "toString", "(J)Ljava/lang/String;") => {
+            Some(args[0].as_long()?.to_string())
+        }
+        ("Ljava/lang/Boolean;", "toString", "(Z)Ljava/lang/String;") => Some(
+            if args[0].as_int()? == 0 {
+                "false"
+            } else {
+                "true"
+            }
+            .to_string(),
+        ),
+        _ => None,
+    };
+    if let Some(value) = scalar {
+        return result_text(vm, value);
+    }
     if class == "Ljava/lang/System;"
         && name == "getProperty"
         && matches!(
@@ -63,7 +80,10 @@ pub(crate) fn call_static(
             "line.separator" => Some("\n".to_string()),
             "java.io.tmpdir" => Some(format!("/data/user/0/{}/cache", vm.portable.package)),
             "user.dir" => Some(format!("/data/user/0/{}/files", vm.portable.package)),
-            _ => None,
+            _ => match vm.framework_host() {
+                Some(host) => host.system_property(&key)?,
+                None => None,
+            },
         };
         return match value {
             Some(value) => result_text(vm, value),
@@ -86,6 +106,7 @@ pub(crate) fn call(
         }
         let s = vm.heap.as_str(recv)?.to_string();
         return match (name, sig) {
+            ("isEmpty", "()Z") => Ok(Some(Value::Int(i32::from(s.is_empty())))),
             ("length", "()I") => Ok(Some(Value::Int(s.encode_utf16().count() as i32))),
             ("equals", "(Ljava/lang/Object;)Z") => {
                 let other = args[0].as_ref()?.and_then(|r| vm.heap.as_str(r).ok());

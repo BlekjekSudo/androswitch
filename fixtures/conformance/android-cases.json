@@ -1,0 +1,447 @@
+[
+  {
+    "id": "cpu.available",
+    "group": "CPU",
+    "kind": "observation"
+  },
+  {
+    "id": "cpu.singleton-gc",
+    "group": "CPU",
+    "kind": "contract"
+  },
+  {
+    "id": "host.cpu.allowed_mask",
+    "group": "Horizon",
+    "kind": "observation"
+  },
+  {
+    "id": "host.cpu.clock_hz",
+    "group": "Horizon",
+    "kind": "observation"
+  },
+  {
+    "id": "host.gpu.clock_hz",
+    "group": "Horizon",
+    "kind": "observation"
+  },
+  {
+    "id": "host.memory.clock_hz",
+    "group": "Horizon",
+    "kind": "observation"
+  },
+  {
+    "id": "host.tick.frequency_hz",
+    "group": "Horizon",
+    "kind": "observation"
+  },
+  {
+    "id": "host.os.name",
+    "group": "Horizon",
+    "kind": "observation"
+  },
+  {
+    "id": "host.os.version",
+    "group": "Horizon",
+    "kind": "observation"
+  },
+  {
+    "id": "host.renderer.backend",
+    "group": "Horizon",
+    "kind": "observation"
+  },
+  {
+    "id": "build.model",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.manufacturer",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.brand",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.device",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.product",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.board",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.hardware",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.id",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.display",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.fingerprint",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.type",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.tags",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.user",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.host",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.time",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.abis",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.version.release",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.version.incremental",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.version.codename",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.version.base_os",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.version.security_patch",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.version.sdk",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "build.version.preview",
+    "group": "Android identity",
+    "kind": "observation"
+  },
+  {
+    "id": "clock.wall",
+    "group": "Clock",
+    "kind": "observation"
+  },
+  {
+    "id": "clock.nano",
+    "group": "Clock",
+    "kind": "contract"
+  },
+  {
+    "id": "clock.elapsed",
+    "group": "Clock",
+    "kind": "observation"
+  },
+  {
+    "id": "clock.uptime",
+    "group": "Clock",
+    "kind": "observation"
+  },
+  {
+    "id": "display.metrics",
+    "group": "Display",
+    "kind": "observation"
+  },
+  {
+    "id": "display.configuration",
+    "group": "Display",
+    "kind": "observation"
+  },
+  {
+    "id": "display.rotation",
+    "group": "Display",
+    "kind": "observation"
+  },
+  {
+    "id": "display.requested-orientation",
+    "group": "Display",
+    "kind": "observation"
+  },
+  {
+    "id": "display.landscape",
+    "group": "Display",
+    "kind": "contract"
+  },
+  {
+    "id": "display.portrait",
+    "group": "Display",
+    "kind": "contract"
+  },
+  {
+    "id": "display.window",
+    "group": "Display",
+    "kind": "contract"
+  },
+  {
+    "id": "display.keep-screen-on",
+    "group": "Display",
+    "kind": "contract"
+  },
+  {
+    "id": "package.identity",
+    "group": "Package",
+    "kind": "observation"
+  },
+  {
+    "id": "package.info",
+    "group": "Package",
+    "kind": "observation"
+  },
+  {
+    "id": "package.apk-stream",
+    "group": "Package",
+    "kind": "contract"
+  },
+  {
+    "id": "package.missing",
+    "group": "Package",
+    "kind": "contract"
+  },
+  {
+    "id": "package.assets",
+    "group": "Package",
+    "kind": "contract"
+  },
+  {
+    "id": "storage.write-read",
+    "group": "Storage",
+    "kind": "contract"
+  },
+  {
+    "id": "storage.append",
+    "group": "Storage",
+    "kind": "contract"
+  },
+  {
+    "id": "storage.name-parent",
+    "group": "Storage",
+    "kind": "contract"
+  },
+  {
+    "id": "storage.mkdir",
+    "group": "Storage",
+    "kind": "contract"
+  },
+  {
+    "id": "storage.delete",
+    "group": "Storage",
+    "kind": "contract"
+  },
+  {
+    "id": "storage.random-access",
+    "group": "Storage",
+    "kind": "contract"
+  },
+  {
+    "id": "preferences.int",
+    "group": "Preferences",
+    "kind": "contract"
+  },
+  {
+    "id": "preferences.long",
+    "group": "Preferences",
+    "kind": "contract"
+  },
+  {
+    "id": "preferences.boolean",
+    "group": "Preferences",
+    "kind": "contract"
+  },
+  {
+    "id": "preferences.float",
+    "group": "Preferences",
+    "kind": "contract"
+  },
+  {
+    "id": "preferences.string",
+    "group": "Preferences",
+    "kind": "contract"
+  },
+  {
+    "id": "preferences.remove",
+    "group": "Preferences",
+    "kind": "contract"
+  },
+  {
+    "id": "preferences.clear",
+    "group": "Preferences",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.int",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.long",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.boolean",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.float",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.double",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.byte",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.short",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.char",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.string",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.default",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "bundle.nested",
+    "group": "Bundle",
+    "kind": "contract"
+  },
+  {
+    "id": "ui.view-context",
+    "group": "UI",
+    "kind": "contract"
+  },
+  {
+    "id": "ui.textview",
+    "group": "UI",
+    "kind": "contract"
+  },
+  {
+    "id": "ui.button",
+    "group": "UI",
+    "kind": "contract"
+  },
+  {
+    "id": "ui.input-connection",
+    "group": "Input",
+    "kind": "contract"
+  },
+  {
+    "id": "ui.editable-utf16",
+    "group": "Input",
+    "kind": "contract"
+  },
+  {
+    "id": "sqlite.insert",
+    "group": "SQLite",
+    "kind": "contract"
+  },
+  {
+    "id": "sqlite.rollback",
+    "group": "SQLite",
+    "kind": "contract"
+  },
+  {
+    "id": "sqlite.commit",
+    "group": "SQLite",
+    "kind": "contract"
+  },
+  {
+    "id": "sqlite.bind",
+    "group": "SQLite",
+    "kind": "contract"
+  },
+  {
+    "id": "audio.minimum-buffer",
+    "group": "Audio",
+    "kind": "observation"
+  },
+  {
+    "id": "audio.pcm-write",
+    "group": "Audio",
+    "kind": "contract"
+  },
+  {
+    "id": "activity.roundtrip",
+    "group": "Lifecycle",
+    "kind": "integration"
+  },
+  {
+    "id": "activity.application",
+    "group": "Lifecycle",
+    "kind": "contract"
+  },
+  {
+    "id": "activity.intent",
+    "group": "Lifecycle",
+    "kind": "contract"
+  },
+  {
+    "id": "activity.handler-order",
+    "group": "Lifecycle",
+    "kind": "integration"
+  }
+]

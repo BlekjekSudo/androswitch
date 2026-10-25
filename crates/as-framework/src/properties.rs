@@ -1,5 +1,6 @@
 //! Immutable Android compatibility facts, shared with the native property ABI.
-//! Unknown keys stay absent; host environment and device identity are not read.
+//! Android identity is a declared virtual profile; physical host observations
+//! are separate platform queries. Unknown keys stay absent.
 
 const SOURCE: &str = include_str!("../../../platform/switch-smoke/runtime_properties.inc");
 
@@ -55,15 +56,12 @@ mod tests {
         assert_eq!(get("ro.product.cpu.abi"), Some("arm64-v8a"));
         assert_eq!(get("ro.product.cpu.abilist"), get("ro.product.cpu.abi"));
         assert_eq!(get("ro.product.cpu.abilist64"), get("ro.product.cpu.abi"));
-        for missing in [
-            "",
-            "PATH",
-            "ro.hardware",
-            "ro.build.fingerprint",
-            "ro.build.version.release",
-            "RO.BUILD.VERSION.SDK",
-        ] {
+        for missing in ["", "PATH", "ro.androswitch.missing", "RO.BUILD.VERSION.SDK"] {
             assert_eq!(get(missing), None);
         }
+        assert_eq!(get("ro.androswitch.profile"), Some("api26-v1"));
+        assert_eq!(get("ro.product.model"), Some("AndroSwitch"));
+        assert_eq!(get("ro.build.version.release"), Some("8.0.0"));
+        assert_eq!(get("ro.build.version.security_patch"), Some(""));
     }
 }

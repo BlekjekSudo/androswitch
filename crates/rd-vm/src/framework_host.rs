@@ -1,6 +1,6 @@
 //! Portable framework adapter. Dispatch uses Android descriptors, never APK identity.
 use crate::{Engine, ObjRef, Value, VmExit};
-use alloc::{rc::Rc, vec::Vec};
+use alloc::{rc::Rc, string::String, vec::Vec};
 /// An explicitly implemented host method. This catalog is metadata only:
 /// looking up a method never executes it or implies other overloads exist.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -10,6 +10,9 @@ pub enum HostMethodKind {
     Constructor,
 }
 pub trait FrameworkHost {
+    fn system_property(&self, _key: &str) -> Result<Option<String>, VmExit> {
+        Ok(None)
+    }
     fn method_metadata(
         &self,
         _class: &str,

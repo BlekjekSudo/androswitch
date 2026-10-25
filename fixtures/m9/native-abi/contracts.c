@@ -253,14 +253,13 @@ int main(void) {
       (void *)as_bionic_libc_import("__system_property_get");
   assert(property);
   char property_value[94];
-  const char *property_names[] = {"ro.build.version.sdk", "ro.product.cpu.abi",
-                                  "ro.product.cpu.abilist",
-                                  "ro.product.cpu.abilist64"};
+  const char *property_names[] = {"ro.build.version.sdk", "ro.product.cpu.abi", "ro.product.cpu.abilist", "ro.product.cpu.abilist64", "ro.hardware", "ro.product.model", "ro.build.version.release", "ro.build.fingerprint", "ro.build.version.security_patch", "ro.build.date.utc"};
+  const char *property_expected[] = {"26", "arm64-v8a", "arm64-v8a", "arm64-v8a", "horizon", "AndroSwitch", "8.0.0", "androswitch/horizon/androswitch:8.0.0/AS26/0.1.0:eng/test-keys", "", "0"};
   for (unsigned i = 0; i < sizeof(property_names) / sizeof(*property_names);
        ++i) {
     memset(property_value, 0x5a, sizeof(property_value));
     errno = E2BIG;
-    const char *expected = i ? "arm64-v8a" : "26";
+    const char *expected = property_expected[i];
     assert(property(property_names[i], property_value + 1) ==
            (int)strlen(expected));
     assert(!strcmp(property_value + 1, expected) && errno == E2BIG);
@@ -269,10 +268,7 @@ int main(void) {
   }
   const char *missing_properties[] = {"",
                                       "PATH",
-                                      "ro.hardware",
                                       "ro.serialno",
-                                      "ro.build.fingerprint",
-                                      "ro.build.version.release",
                                       "RO.BUILD.VERSION.SDK"};
   for (unsigned i = 0;
        i < sizeof(missing_properties) / sizeof(*missing_properties); ++i) {
