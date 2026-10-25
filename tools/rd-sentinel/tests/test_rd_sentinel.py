@@ -535,6 +535,66 @@ test vm::stable ... ok
         self.assertEqual(["vm::flaky_case"], summary["flaky_tests"])
         self.assertEqual(["vm::always_bad"], summary["consistent_failures"])
 
+    def test_native_fixtures_built_only_for_native_bearing_test_commands(self):
+        # issue #193: only commands that can execute the rd-ndk native
+        # tests (workspace --all-features, or an explicit native feature)
+        # may trigger the golden/native fixture build.
+        self.assertTrue(
+            CampaignRunner._commands_may_run_native(
+                [("t", ["cargo", "test", "--workspace", "--all-features", "--locked"])]
+            )
+        )
+        self.assertTrue(
+            CampaignRunner._commands_may_run_native(
+                [("t", ["cargo", "test", "-p", "rd-ndk", "--features", "native"])]
+            )
+        )
+        self.assertTrue(
+            CampaignRunner._commands_may_run_native(
+                [("t", ["cargo", "test", "-p", "rd-vm", "--features=jit,native"])]
+            )
+        )
+        self.assertFalse(
+            CampaignRunner._commands_may_run_native(
+                [("t", ["cargo", "test", "-p", "rd-vm", "--locked"])]
+            )
+        )
+        self.assertFalse(
+            CampaignRunner._commands_may_run_native(
+                [("t", ["cargo", "test", "-p", "rd-vm", "--features", "jit"])]
+            )
+        )
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            report = {"bot_version": "1.1.0", "checks": [], "metrics": {}}
+            runner = CampaignRunner(
+                repo=root,
+                report=report,  # type: ignore[arg-type]
+                policy=POLICY,
+                baseline=BASELINE,
+                options=CampaignOptions(output_dir=root / "out"),
+            )
+            calls: list[list[str]] = []
+            runner._run_check = lambda argv, **_kw: calls.append(list(argv))  # type: ignore[method-assign]
+            all_features = [
+                ("t", ["cargo", "test", "--workspace", "--all-features", "--locked"])
+            ]
+            # Missing artifacts -> exactly one recorded build.sh invocation,
+            # even when both core and determinism ask.
+            runner._ensure_native_test_fixtures("core", all_features)
+            runner._ensure_native_test_fixtures("determinism", all_features)
+            self.assertEqual([["bash", "golden/native/build.sh"]], calls)
+
+            # Artifacts already present -> no build is requested at all.
+            artifacts = root / "golden/native/artifacts"
+            artifacts.mkdir(parents=True)
+            for name in ("x86_64.so", "arm64-v8a.so", "armeabi-v7a.so"):
+                (artifacts / name).write_bytes(b"\x7fELF")
+            runner._native_fixtures_ensured = False
+            runner._ensure_native_test_fixtures("core", all_features)
+            self.assertEqual([["bash", "golden/native/build.sh"]], calls)
+
     def test_dynamic_feature_sets_cover_singletons_pairs_and_all(self):
         sets = CampaignRunner._feature_sets_from_names(
             ["default", "jit", "native", "advanced-components"], full=False
