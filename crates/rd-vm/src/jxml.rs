@@ -26,6 +26,12 @@ const ENCODING: &str = "rd_input_source_encoding";
 const CONTENT_HANDLER_FIELD: &str = "rd_sax_content_handler";
 const ERROR_HANDLER_FIELD: &str = "rd_sax_error_handler";
 const LOCATOR_FIELD: &str = "rd_sax_locator";
+const NAMESPACES_FIELD: &str = "rd_sax_namespaces";
+const NS_PREFIXES_FIELD: &str = "rd_sax_ns_prefixes";
+const FEATURE_NAMESPACES: &str = "http://xml.org/sax/features/namespaces";
+const FEATURE_NS_PREFIXES: &str = "http://xml.org/sax/features/namespace-prefixes";
+const XML_NS_URI: &str = "http://www.w3.org/XML/1998/namespace";
+const XMLNS_URI: &str = "http://www.w3.org/2000/xmlns/";
 const MAX_XML_BYTES: usize = 8 * 1024 * 1024;
 const MAX_XML_EVENTS: usize = 100_000;
 const MAX_XML_DEPTH: usize = 256;
@@ -40,7 +46,35 @@ pub(crate) fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if mref_class == DEFAULT_HANDLER && name == "<init>" && sig == "()V" {
+    if mref_class == DEFAULT_HANDLER
+        && matches!(
+            (name, sig),
+            ("<init>", "()V")
+                | ("setDocumentLocator", "(Lorg/xml/sax/Locator;)V")
+                | ("startDocument", "()V")
+                | ("endDocument", "()V")
+                | (
+                    "startPrefixMapping",
+                    "(Ljava/lang/String;Ljava/lang/String;)V"
+                )
+                | ("endPrefixMapping", "(Ljava/lang/String;)V")
+                | (
+                    "startElement",
+                    "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lorg/xml/sax/Attributes;)V"
+                )
+                | (
+                    "endElement",
+                    "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V"
+                )
+                | ("characters", "([CII)V")
+                | ("ignorableWhitespace", "([CII)V")
+                | (
+                    "processingInstruction",
+                    "(Ljava/lang/String;Ljava/lang/String;)V"
+                )
+                | ("skippedEntity", "(Ljava/lang/String;)V")
+        )
+    {
         return Ok(Some(Value::Null));
     }
     if recv_class == DRIVER && mref_class == DRIVER {
@@ -93,7 +127,34 @@ fn driver_intrinsic(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     match (name, sig) {
-        ("<init>", "()V") | ("setFeature", "(Ljava/lang/String;Z)V") => Ok(Some(Value::Null)),
+        ("<init>", "()V") => {
+            set_field(vm, recv, NAMESPACES_FIELD, Value::Int(1))?;
+            set_field(vm, recv, NS_PREFIXES_FIELD, Value::Int(0))?;
+            Ok(Some(Value::Null))
+        }
+        ("setFeature", "(Ljava/lang/String;Z)V") => {
+            let feat = arg_string(vm, args, 0)?;
+            let enabled = int_arg(args, 1) != 0;
+            match feat.as_str() {
+                FEATURE_NAMESPACES => {
+                    set_field(vm, recv, NAMESPACES_FIELD, Value::Int(i32::from(enabled)))?;
+                }
+                FEATURE_NS_PREFIXES => {
+                    set_field(vm, recv, NS_PREFIXES_FIELD, Value::Int(i32::from(enabled)))?;
+                }
+                _ => {}
+            }
+            Ok(Some(Value::Null))
+        }
+        ("getFeature", "(Ljava/lang/String;)Z") => {
+            let feat = arg_string(vm, args, 0)?;
+            let val = match feat.as_str() {
+                FEATURE_NAMESPACES => bool_field(vm, recv, NAMESPACES_FIELD, true),
+                FEATURE_NS_PREFIXES => bool_field(vm, recv, NS_PREFIXES_FIELD, false),
+                _ => false,
+            };
+            Ok(Some(Value::Int(i32::from(val))))
+        }
         ("setContentHandler", "(Lorg/xml/sax/ContentHandler;)V") => {
             set_arg(vm, recv, CONTENT_HANDLER_FIELD, args)
         }
@@ -124,6 +185,13 @@ fn driver_intrinsic(
             Ok(Some(Value::Null))
         }
         _ => Ok(None),
+    }
+}
+
+fn bool_field(vm: &Engine, recv: ObjRef, field: &str, default: bool) -> bool {
+    match vm.heap.get_field(recv, field) {
+        Ok(Value::Int(v)) => v != 0,
+        _ => default,
     }
 }
 
@@ -212,29 +280,17 @@ fn input_source_text(vm: &mut Engine, source: ObjRef) -> Result<String, VmExit> 
 }
 
 fn decode_xml_bytes(bytes: &[u8]) -> Result<String, VmExit> {
-    if bytes.starts_with(&[0xFF, 0xFE]) {
-        let units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect();
-        return String::from_utf16(&units).map_err(|e| {
-            exception(
-                "Lorg/xml/sax/SAXException;",
-                &format!("invalid UTF-16 XML: {e}"),
-            )
-        });
+    if let Some(body) = bytes.strip_prefix(&[0xFF, 0xFE]) {
+        return decode_utf16_xml(body, true);
     }
-    if bytes.starts_with(&[0xFE, 0xFF]) {
-        let units: Vec<u16> = bytes[2..]
-            .chunks_exact(2)
-            .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
-            .collect();
-        return String::from_utf16(&units).map_err(|e| {
-            exception(
-                "Lorg/xml/sax/SAXException;",
-                &format!("invalid UTF-16 XML: {e}"),
-            )
-        });
+    if let Some(body) = bytes.strip_prefix(&[0xFE, 0xFF]) {
+        return decode_utf16_xml(body, false);
+    }
+    if bytes.starts_with(&[b'<', 0x00]) {
+        return decode_utf16_xml(bytes, true);
+    }
+    if bytes.starts_with(&[0x00, b'<']) {
+        return decode_utf16_xml(bytes, false);
     }
     let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
     String::from_utf8(bytes.to_vec()).map_err(|e| {
@@ -245,6 +301,187 @@ fn decode_xml_bytes(bytes: &[u8]) -> Result<String, VmExit> {
     })
 }
 
+fn decode_utf16_xml(body: &[u8], little_endian: bool) -> Result<String, VmExit> {
+    if body.len() % 2 != 0 {
+        return Err(exception(
+            "Lorg/xml/sax/SAXException;",
+            "truncated UTF-16 XML: odd byte count",
+        ));
+    }
+    let units: Vec<u16> = body
+        .chunks_exact(2)
+        .map(|pair| {
+            if little_endian {
+                u16::from_le_bytes([pair[0], pair[1]])
+            } else {
+                u16::from_be_bytes([pair[0], pair[1]])
+            }
+        })
+        .collect();
+    String::from_utf16(&units).map_err(|e| {
+        exception(
+            "Lorg/xml/sax/SAXException;",
+            &format!("invalid UTF-16 XML: {e}"),
+        )
+    })
+}
+
+#[derive(Clone, Debug)]
+struct SaxAttr {
+    uri: String,
+    local: String,
+    qname: String,
+    attr_type: String,
+    value: String,
+}
+
+fn lookup_prefix_uri<'a>(ns_stack: &'a [Vec<(String, String)>], prefix: &str) -> Option<&'a str> {
+    match prefix {
+        "xml" => return Some(XML_NS_URI),
+        "xmlns" => return Some(XMLNS_URI),
+        _ => {}
+    }
+    for scope in ns_stack.iter().rev() {
+        for (p, uri) in scope.iter().rev() {
+            if p == prefix {
+                return if prefix.is_empty() {
+                    Some(uri.as_str())
+                } else if uri.is_empty() {
+                    None
+                } else {
+                    Some(uri.as_str())
+                };
+            }
+        }
+    }
+    if prefix.is_empty() {
+        Some("")
+    } else {
+        None
+    }
+}
+
+fn resolve_element_qname(
+    ns_stack: &[Vec<(String, String)>],
+    qname: &str,
+    namespaces: bool,
+) -> Result<(String, String), VmExit> {
+    if !namespaces {
+        return Ok((String::new(), String::new()));
+    }
+    if let Some((prefix, local)) = qname.split_once(':') {
+        if prefix.is_empty() || local.is_empty() || local.contains(':') {
+            return Err(exception(
+                "Lorg/xml/sax/SAXException;",
+                &format!("malformed QName: {qname}"),
+            ));
+        }
+        let Some(uri) = lookup_prefix_uri(ns_stack, prefix) else {
+            return Err(exception(
+                "Lorg/xml/sax/SAXException;",
+                &format!("unbound namespace prefix '{prefix}' on <{qname}>"),
+            ));
+        };
+        Ok((uri.to_string(), local.to_string()))
+    } else {
+        let uri = lookup_prefix_uri(ns_stack, "").unwrap_or("");
+        Ok((uri.to_string(), qname.to_string()))
+    }
+}
+
+fn resolve_element_attributes(
+    ns_stack: &mut Vec<Vec<(String, String)>>,
+    raw_attrs: &[(String, String)],
+    namespaces: bool,
+    ns_prefixes: bool,
+) -> Result<Vec<SaxAttr>, VmExit> {
+    if !namespaces {
+        ns_stack.push(Vec::new());
+        return Ok(raw_attrs
+            .iter()
+            .map(|(name, value)| SaxAttr {
+                uri: String::new(),
+                local: local_name(name),
+                qname: name.clone(),
+                attr_type: "CDATA".to_string(),
+                value: value.clone(),
+            })
+            .collect());
+    }
+
+    let mut frame = Vec::new();
+    for (name, value) in raw_attrs {
+        if name == "xmlns" {
+            frame.push((String::new(), value.clone()));
+        } else if let Some(prefix) = name.strip_prefix("xmlns:") {
+            if prefix.is_empty() || prefix.contains(':') || prefix == "xml" || prefix == "xmlns" {
+                return Err(exception(
+                    "Lorg/xml/sax/SAXException;",
+                    &format!("invalid namespace declaration '{name}'"),
+                ));
+            }
+            if value.is_empty() {
+                return Err(exception(
+                    "Lorg/xml/sax/SAXException;",
+                    &format!("empty namespace URI for prefix '{prefix}'"),
+                ));
+            }
+            frame.push((prefix.to_string(), value.clone()));
+        }
+    }
+    ns_stack.push(frame);
+
+    let mut resolved = Vec::with_capacity(raw_attrs.len());
+    let mut expanded_names = std::collections::HashSet::new();
+    for (name, value) in raw_attrs {
+        if name == "xmlns" || name.starts_with("xmlns:") {
+            if ns_prefixes {
+                let local = name.strip_prefix("xmlns:").unwrap_or("xmlns").to_string();
+                resolved.push(SaxAttr {
+                    uri: XMLNS_URI.to_string(),
+                    local,
+                    qname: name.clone(),
+                    attr_type: "CDATA".to_string(),
+                    value: value.clone(),
+                });
+            }
+            continue;
+        }
+        let (uri, local) = if let Some((prefix, local)) = name.split_once(':') {
+            if prefix.is_empty() || local.is_empty() || local.contains(':') {
+                return Err(exception(
+                    "Lorg/xml/sax/SAXException;",
+                    &format!("malformed attribute QName '{name}'"),
+                ));
+            }
+            let Some(uri) = lookup_prefix_uri(ns_stack, prefix) else {
+                return Err(exception(
+                    "Lorg/xml/sax/SAXException;",
+                    &format!("unbound namespace prefix '{prefix}' on attribute '{name}'"),
+                ));
+            };
+            (uri.to_string(), local.to_string())
+        } else {
+            // W3C Namespaces in XML §6.2: default namespace never applies to unprefixed attributes.
+            (String::new(), name.clone())
+        };
+        if !uri.is_empty() && !expanded_names.insert((uri.clone(), local.clone())) {
+            return Err(exception(
+                "Lorg/xml/sax/SAXException;",
+                &format!("duplicate namespace-qualified attribute {{{uri}}}{local}"),
+            ));
+        }
+        resolved.push(SaxAttr {
+            uri,
+            local,
+            qname: name.clone(),
+            attr_type: "CDATA".to_string(),
+            value: value.clone(),
+        });
+    }
+    Ok(resolved)
+}
+
 fn parse_to_handler(
     vm: &mut Engine,
     driver: ObjRef,
@@ -253,6 +490,8 @@ fn parse_to_handler(
     xml: &str,
 ) -> Result<(), VmExit> {
     let events = parse_xml(xml).map_err(|e| exception("Lorg/xml/sax/SAXException;", &e))?;
+    let namespaces = bool_field(vm, driver, NAMESPACES_FIELD, true);
+    let ns_prefixes = bool_field(vm, driver, NS_PREFIXES_FIELD, false);
     let locator = vm
         .heap
         .alloc_instance(LOCATOR_IMPL.to_string(), Vec::new())?;
@@ -264,6 +503,20 @@ fn parse_to_handler(
     set_field(vm, locator, "rd_sax_system_id", system_id)?;
     set_field(vm, driver, LOCATOR_FIELD, Value::Obj(locator))?;
 
+    let handler_class = vm.heap.class_of(handler)?.to_string();
+    let has_start_prefix = vm
+        .cp
+        .resolve_method(
+            &handler_class,
+            "startPrefixMapping",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+        )
+        .is_some();
+    let has_end_prefix = vm
+        .cp
+        .resolve_method(&handler_class, "endPrefixMapping", "(Ljava/lang/String;)V")
+        .is_some();
+
     vm.invoke_instance(
         handler,
         "setDocumentLocator",
@@ -271,17 +524,43 @@ fn parse_to_handler(
         &[Value::Obj(locator)],
     )?;
     vm.invoke_instance(handler, "startDocument", "()V", &[])?;
+
+    let mut cursor_byte = 0usize;
+    let mut line = 1i32;
+    let mut column = 1i32;
+    let mut ns_stack: Vec<Vec<(String, String)>> = Vec::new();
+
     for event in events {
-        let (line, column) = line_column(xml, event.offset);
+        advance_line_column(xml, &mut cursor_byte, &mut line, &mut column, event.offset);
         set_field(vm, locator, "rd_sax_line", Value::Int(line))?;
         set_field(vm, locator, "rd_sax_column", Value::Int(column))?;
         match event.kind {
             XmlEventKind::Start { name, attributes } => {
-                let local = local_name(&name);
-                let uri = alloc_string(vm, "")?;
-                let local = alloc_string(vm, local)?;
+                let resolved_attrs = resolve_element_attributes(
+                    &mut ns_stack,
+                    &attributes,
+                    namespaces,
+                    ns_prefixes,
+                )?;
+                if namespaces && has_start_prefix {
+                    if let Some(frame) = ns_stack.last().cloned() {
+                        for (pfx, uri) in frame {
+                            let pfx_v = alloc_string(vm, pfx)?;
+                            let uri_v = alloc_string(vm, uri)?;
+                            vm.invoke_instance(
+                                handler,
+                                "startPrefixMapping",
+                                "(Ljava/lang/String;Ljava/lang/String;)V",
+                                &[Value::Obj(pfx_v), Value::Obj(uri_v)],
+                            )?;
+                        }
+                    }
+                }
+                let (elem_uri, elem_local) = resolve_element_qname(&ns_stack, &name, namespaces)?;
+                let uri = alloc_string(vm, elem_uri)?;
+                let local = alloc_string(vm, elem_local)?;
                 let qname = alloc_string(vm, name)?;
-                let attributes = new_attributes(vm, &attributes)?;
+                let attributes = new_sax_attributes(vm, &resolved_attrs)?;
                 vm.invoke_instance(
                     handler,
                     "startElement",
@@ -295,9 +574,10 @@ fn parse_to_handler(
                 )?;
             }
             XmlEventKind::End { name } => {
-                let local = local_name(&name);
-                let uri = alloc_string(vm, "")?;
-                let local = alloc_string(vm, local)?;
+                let (elem_uri, elem_local) = resolve_element_qname(&ns_stack, &name, namespaces)?;
+                let popped = ns_stack.pop().unwrap_or_default();
+                let uri = alloc_string(vm, elem_uri)?;
+                let local = alloc_string(vm, elem_local)?;
                 let qname = alloc_string(vm, name)?;
                 vm.invoke_instance(
                     handler,
@@ -305,6 +585,17 @@ fn parse_to_handler(
                     "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
                     &[Value::Obj(uri), Value::Obj(local), Value::Obj(qname)],
                 )?;
+                if namespaces && has_end_prefix {
+                    for (pfx, _) in popped.into_iter().rev() {
+                        let pfx_v = alloc_string(vm, pfx)?;
+                        vm.invoke_instance(
+                            handler,
+                            "endPrefixMapping",
+                            "(Ljava/lang/String;)V",
+                            &[Value::Obj(pfx_v)],
+                        )?;
+                    }
+                }
             }
             XmlEventKind::Text(text) if !text.is_empty() => {
                 let chars: Vec<u16> = text.encode_utf16().collect();
@@ -368,7 +659,7 @@ fn attributes_intrinsic(
                 } else {
                     Vec::new()
                 };
-                store_attributes(vm, recv, &copied)?;
+                store_sax_attributes(vm, recv, &copied)?;
                 return Ok(Some(Value::Null));
             }
             _ => return Ok(None),
@@ -423,7 +714,7 @@ fn attributes_intrinsic(
     Ok(Some(value))
 }
 
-fn copy_attributes(vm: &mut Engine, source: ObjRef) -> Result<Vec<(String, String)>, VmExit> {
+fn copy_attributes(vm: &mut Engine, source: ObjRef) -> Result<Vec<SaxAttr>, VmExit> {
     let length = match vm.invoke_instance(source, "getLength", "()I", &[])? {
         Value::Int(n) => n.max(0) as usize,
         _ => 0,
@@ -436,39 +727,65 @@ fn copy_attributes(vm: &mut Engine, source: ObjRef) -> Result<Vec<(String, Strin
     }
     let mut out = Vec::with_capacity(length);
     for index in 0..length {
-        let name = vm.invoke_instance(
-            source,
-            "getQName",
-            "(I)Ljava/lang/String;",
-            &[Value::Int(index as i32)],
-        )?;
-        let value = vm.invoke_instance(
-            source,
-            "getValue",
-            "(I)Ljava/lang/String;",
-            &[Value::Int(index as i32)],
-        )?;
-        let name = value_string(vm, name);
-        let value = value_string(vm, value);
-        out.push((name, value));
+        let idx = [Value::Int(index as i32)];
+        let uri = vm.invoke_instance(source, "getURI", "(I)Ljava/lang/String;", &idx)?;
+        let local = vm.invoke_instance(source, "getLocalName", "(I)Ljava/lang/String;", &idx)?;
+        let qname = vm.invoke_instance(source, "getQName", "(I)Ljava/lang/String;", &idx)?;
+        let attr_type = vm.invoke_instance(source, "getType", "(I)Ljava/lang/String;", &idx)?;
+        let value = vm.invoke_instance(source, "getValue", "(I)Ljava/lang/String;", &idx)?;
+        let qname_str = value_string(vm, qname);
+        let local_str = {
+            let s = value_string(vm, local);
+            if s.is_empty() {
+                local_name(&qname_str)
+            } else {
+                s
+            }
+        };
+        let type_str = {
+            let s = value_string(vm, attr_type);
+            if s.is_empty() {
+                "CDATA".to_string()
+            } else {
+                s
+            }
+        };
+        out.push(SaxAttr {
+            uri: value_string(vm, uri),
+            local: local_str,
+            qname: qname_str,
+            attr_type: type_str,
+            value: value_string(vm, value),
+        });
     }
     Ok(out)
 }
 
+#[cfg(test)]
 fn new_attributes(vm: &mut Engine, pairs: &[(String, String)]) -> Result<ObjRef, VmExit> {
+    let attrs: Vec<SaxAttr> = pairs
+        .iter()
+        .map(|(name, value)| SaxAttr {
+            uri: String::new(),
+            local: local_name(name),
+            qname: name.clone(),
+            attr_type: "CDATA".to_string(),
+            value: value.clone(),
+        })
+        .collect();
+    new_sax_attributes(vm, &attrs)
+}
+
+fn new_sax_attributes(vm: &mut Engine, attrs: &[SaxAttr]) -> Result<ObjRef, VmExit> {
     let object = vm
         .heap
         .alloc_instance(ATTRIBUTES_IMPL.to_string(), Vec::new())?;
-    store_attributes(vm, object, pairs)?;
+    store_sax_attributes(vm, object, attrs)?;
     Ok(object)
 }
 
-fn store_attributes(
-    vm: &mut Engine,
-    object: ObjRef,
-    pairs: &[(String, String)],
-) -> Result<(), VmExit> {
-    if pairs.len() > 4096 {
+fn store_sax_attributes(vm: &mut Engine, object: ObjRef, attrs: &[SaxAttr]) -> Result<(), VmExit> {
+    if attrs.len() > 4096 {
         return Err(exception(
             "Lorg/xml/sax/SAXException;",
             "XML element has too many attributes",
@@ -478,18 +795,23 @@ fn store_attributes(
         vm,
         object,
         "rd_sax_attr_count",
-        Value::Int(pairs.len() as i32),
+        Value::Int(attrs.len() as i32),
     )?;
-    let empty_uri = alloc_string(vm, "")?;
-    let cdata = alloc_string(vm, "CDATA")?;
-    for (index, (name, value)) in pairs.iter().enumerate() {
-        let local = alloc_string(vm, local_name(name))?;
-        let qname = alloc_string(vm, name.clone())?;
-        let value = alloc_string(vm, value.clone())?;
-        set_field(vm, object, &attr_field(index, "uri"), Value::Obj(empty_uri))?;
+    for (index, attr) in attrs.iter().enumerate() {
+        let uri = alloc_string(vm, attr.uri.clone())?;
+        let local = alloc_string(vm, attr.local.clone())?;
+        let qname = alloc_string(vm, attr.qname.clone())?;
+        let attr_type = alloc_string(vm, attr.attr_type.clone())?;
+        let value = alloc_string(vm, attr.value.clone())?;
+        set_field(vm, object, &attr_field(index, "uri"), Value::Obj(uri))?;
         set_field(vm, object, &attr_field(index, "local"), Value::Obj(local))?;
         set_field(vm, object, &attr_field(index, "qname"), Value::Obj(qname))?;
-        set_field(vm, object, &attr_field(index, "type"), Value::Obj(cdata))?;
+        set_field(
+            vm,
+            object,
+            &attr_field(index, "type"),
+            Value::Obj(attr_type),
+        )?;
         set_field(vm, object, &attr_field(index, "value"), Value::Obj(value))?;
     }
     Ok(())
@@ -513,25 +835,29 @@ fn attr_at(vm: &Engine, object: ObjRef, index: i32, field: &str) -> Value {
 
 fn find_attr(vm: &Engine, object: ObjRef, uri: Option<String>, key: String) -> i32 {
     for index in 0..attr_count(vm, object) {
-        let local = vm.heap.get_field(object, &attr_field(index, "local"));
-        let qname = vm.heap.get_field(object, &attr_field(index, "qname"));
-        let attr_uri = vm.heap.get_field(object, &attr_field(index, "uri"));
-        let local_matches = local
-            .ok()
-            .and_then(|v| value_string_ref(vm, v))
-            .is_some_and(|s| s == key);
-        let qname_matches = qname
-            .ok()
-            .and_then(|v| value_string_ref(vm, v))
-            .is_some_and(|s| s == key);
-        let uri_matches = uri.as_ref().map_or(true, |want| {
-            attr_uri
+        if let Some(ref want_uri) = uri {
+            let local = vm.heap.get_field(object, &attr_field(index, "local"));
+            let attr_uri = vm.heap.get_field(object, &attr_field(index, "uri"));
+            let local_matches = local
                 .ok()
                 .and_then(|v| value_string_ref(vm, v))
-                .is_some_and(|s| s == want.as_str())
-        });
-        if uri_matches && (local_matches || qname_matches) {
-            return index as i32;
+                .is_some_and(|s| s == key);
+            let uri_matches = attr_uri
+                .ok()
+                .and_then(|v| value_string_ref(vm, v))
+                .is_some_and(|s| s == want_uri.as_str());
+            if uri_matches && local_matches {
+                return index as i32;
+            }
+        } else {
+            let qname = vm.heap.get_field(object, &attr_field(index, "qname"));
+            let qname_matches = qname
+                .ok()
+                .and_then(|v| value_string_ref(vm, v))
+                .is_some_and(|s| s == key);
+            if qname_matches {
+                return index as i32;
+            }
         }
     }
     -1
@@ -712,8 +1038,7 @@ fn parse_xml(xml: &str) -> Result<Vec<XmlEvent>, String> {
                 return Err("CDATA outside the document element".into());
             }
             let start = offset + 9;
-            let end = find_from(bytes, start, b"]]")
-                .filter(|&end| bytes.get(end + 2) == Some(&b'>'))
+            let end = find_from(bytes, start, b"]]>")
                 .ok_or_else(|| "unterminated CDATA section".to_string())?;
             let text = xml[start..end].to_string();
             push_xml_event(
@@ -853,8 +1178,8 @@ fn parse_xml(xml: &str) -> Result<Vec<XmlEvent>, String> {
         }
     }
 
-    if !stack.is_empty() {
-        return Err(format!("unclosed XML element <{}>", stack.last().unwrap()));
+    if let Some(last) = stack.last() {
+        return Err(format!("unclosed XML element <{last}>"));
     }
     if root_count != 1 {
         return Err("XML document must have exactly one document element".into());
@@ -942,18 +1267,28 @@ fn decode_entities(input: &str) -> Result<String, String> {
     Ok(out)
 }
 
-fn line_column(xml: &str, offset: usize) -> (i32, i32) {
-    let mut line = 1i32;
-    let mut column = 1i32;
-    for ch in xml[..offset.min(xml.len())].chars() {
+fn advance_line_column(
+    xml: &str,
+    cursor: &mut usize,
+    line: &mut i32,
+    column: &mut i32,
+    offset: usize,
+) {
+    let target = offset.min(xml.len());
+    if target < *cursor {
+        *cursor = 0;
+        *line = 1;
+        *column = 1;
+    }
+    for ch in xml[*cursor..target].chars() {
         if ch == '\n' {
-            line = line.saturating_add(1);
-            column = 1;
+            *line = line.saturating_add(1);
+            *column = 1;
         } else {
-            column = column.saturating_add(1);
+            *column = column.saturating_add(1);
         }
     }
-    (line, column)
+    *cursor = target;
 }
 
 #[cfg(test)]

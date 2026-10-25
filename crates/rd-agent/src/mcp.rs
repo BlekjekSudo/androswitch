@@ -1462,7 +1462,16 @@ impl AgentSession {
         let mut eng = if let Some(id) = selected_engine {
             #[cfg(feature = "native-engines")]
             {
-                rd_engine_registry::NativeProcess::from_apk(id, (*resources).clone())?.into_engine()
+                // issue #260: o desc já foi resolvido e validado aqui em cima
+                // (activity explícita não-launcher, alias via #109 ou launcher
+                // default) — repassa o descritor em vez de exigir launcher de
+                // novo, e compartilha o Arc<Apk> em vez de clonar o APK.
+                rd_engine_registry::NativeProcess::from_apk_with_activity(
+                    id,
+                    resources.clone(),
+                    desc,
+                )?
+                .into_engine()
             }
             #[cfg(not(feature = "native-engines"))]
             {
