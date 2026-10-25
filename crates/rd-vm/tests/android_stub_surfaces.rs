@@ -1533,7 +1533,7 @@ fn camera_params_values_and_stream_map_compute_from_explicit_configs() {
         vec![Value::Obj(high_speed)],
     );
     let mut args: Vec<Value> = vec![config_array, min_array, stall_array];
-    args.extend(std::iter::repeat_n(Value::Null, 12));
+    args.extend(std::iter::repeat(Value::Null).take(12));
     args.push(high_speed_array);
     args.push(Value::Null);
     args.push(Value::Int(1));
