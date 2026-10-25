@@ -17045,6 +17045,36 @@ fn sip_without_sip_features_or_service_is_guest_visible() {
         ),
         "Ljava/lang/NullPointerException;",
     );
+    // The same Context dereference drives isVoipSupported/newInstance, and
+    // the Intent helpers dereference their Intent (unlike
+    // isIncomingCallIntent's explicit null guard below).
+    assert_throws(
+        engine.invoke_static(
+            P36C_SIP_MANAGER,
+            "isVoipSupported",
+            "(Landroid/content/Context;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36C_SIP_MANAGER,
+            "newInstance",
+            "(Landroid/content/Context;)Landroid/net/sip/SipManager;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36C_SIP_MANAGER,
+            "getCallId",
+            "(Landroid/content/Intent;)Ljava/lang/String;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
     assert!(engine
         .cp
         .is_subtype(P36C_SIP_EXCEPTION, "Ljava/lang/Exception;"));
