@@ -88,6 +88,12 @@ launches to recover from unsupported runtime APIs:
   -RyujinxProfile <isolated-profile> -AllowDesktopEmulator
 ```
 
+An optional `-ExcludeCases` list writes an explicit app-private control file.
+Every excluded case remains NOT_RUN and is listed in collected evidence. For
+Ryujinx's missing PCV clock service, exclude the three `host.*.clock_hz` IDs;
+leave them enabled for physical-device testing. This does not change runtime
+API behavior.
+
 `-PrepareOnly` creates the request/seed/hash snapshot without launching an
 emulator or changing its SD. The harness retains the original SD, operates on
 its owned emulator process, restores the SD, and preserves raw results. The

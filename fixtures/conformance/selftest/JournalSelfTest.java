@@ -17,6 +17,8 @@ public final class JournalSelfTest {
     }
     if (!bounded)
       throw new AssertionError("bounded reads");
+    if (!Files.hasLine("a\r\nb\n", "b") || Files.hasLine("abc\n", "a"))
+      throw new AssertionError("exact exclusion lines");
     Journal j = new Journal(root);
     if (j.next != 0)
       throw new AssertionError();

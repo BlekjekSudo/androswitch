@@ -100,3 +100,16 @@ unavailable. A VM String cannot yet represent an isolated UTF-16 surrogate;
 editable char access preserves that unit, while unsupported String conversion
 returns an explicit error. Focused SDK/JDK source-model tests run in two
 namespaces; actual Android reference-device comparison remains pending.
+
+## Emulator clock limitation
+
+Ryujinx's profile currently routes the native clock queries to a PCV service
+command it does not implement. NRO21 and NRO22 runs stopped at that emulator
+service, with partial journals preserved and the original SD restored. The
+unknown-version guard is a separate general correction; it does not implement
+Ryujinx's missing service. For corpus progress, the harness can explicitly
+exclude `host.cpu.clock_hz`, `host.gpu.clock_hz` and `host.memory.clock_hz`.
+Those cases remain **NOT_RUN**, with the excluded IDs and seed hashes recorded.
+The ordinary APK accepts an optional app-private `exclude.txt`, one exact case
+ID per line. Physical-device runs without this control file still execute
+all queries. No package/emulator switch is added to the runtime.

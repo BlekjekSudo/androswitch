@@ -23,6 +23,7 @@ public final class MainActivity extends Activity implements View.OnClickListener
     handler = new Handler();
     try {
       journal = new Journal(getFilesDir());
+      exclusions = Files.read(new File(getFilesDir(), "exclude.txt"));
     } catch (IOException e) {
       throw new IllegalStateException(e);
     }
@@ -114,17 +115,27 @@ public final class MainActivity extends Activity implements View.OnClickListener
     running = true;
     handler.post(step);
   }
-  private String filter = "All";
+  private String filter = "All", exclusions = "";
   private final Runnable step = new Runnable() {
     public void run() {
       if (!running || waiting)
         return;
       try {
         int i = journal.next;
-        while (i < Catalog.IDS.length
-            && (journal.results[i] != null
-                || (!filter.equals("All") && !filter.equals(Catalog.GROUPS[i]))))
-          i++;
+        while (i < Catalog.IDS.length) {
+          if (journal.results[i] != null
+              || (!filter.equals("All") && !filter.equals(Catalog.GROUPS[i]))) {
+            i++;
+            continue;
+          }
+          if (Files.hasLine(exclusions, Catalog.IDS[i])) {
+            journal.record(i, "NOT_RUN", 0,
+                "Explicit test-control exclusion (exclude.txt); API was not executed");
+            i++;
+            continue;
+          }
+          break;
+        }
         if (i >= Catalog.IDS.length) {
           running = false;
           journal.next = Catalog.IDS.length;

@@ -6,6 +6,7 @@ param(
     [ValidateRange(1,100)][int]$LaunchesPerApk=1,
     [string]$UserDataSeed='',
     [string[]]$UserDataWatch=@(),
+    [object[]]$SessionEvents=@(),
     [string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',
     [string]$RyujinxProfile="$env:APPDATA/Ryujinx",
     [ValidateRange(1000,30000)][int]$StartupWaitMilliseconds=10000,
@@ -76,7 +77,8 @@ for($index=0;$index -lt $files.Count;$index++){
     $installStep=$commands.Count
     # Keep the explicit application frame visible to the polling recorder
     # before the return path and next launch can clear shared capture names.
-    $events=@(@{kind='wait';ms=$StartupWaitMilliseconds},@{kind='frame'},@{kind='wait';ms=2000},@{kind='return_to_launcher'})
+    [object[]]$events=if($SessionEvents.Count){@($SessionEvents)}else{@(@{kind='wait';ms=$StartupWaitMilliseconds},@{kind='frame'},@{kind='wait';ms=2000},@{kind='return_to_launcher'})}
+    if($events.Count -gt 128 -or ($events|ConvertTo-Json -Depth 16 -Compress).Length -gt 65536){throw 'Session event request exceeds the bounded test protocol'}
     $input=@{
         index=$index;source=$files[$index].FullName;staged_name=('{0:D4}-external.apk' -f $index)
         bytes=$files[$index].Length;sha256=(Get-FileHash -LiteralPath $files[$index].FullName).Hash.ToLowerInvariant()
@@ -125,7 +127,7 @@ $receipt=@{
     sd_result=$sdResult;sd_backup=$backup;inputs=@($inputs.ToArray());launches=@($launches.ToArray());userdata_seed=@($seedFiles.ToArray());commands=$commands.Count
     startup_wait_ms=$StartupWaitMilliseconds;cases=@();sd_original_restore='not_modified'
     emulator_frontend=if($Headless){'headless_sdl2'}else{'desktop'}
-    native_trace_requested=[bool]$TraceNative
+    native_trace_requested=[bool]$TraceNative;custom_session_events=($SessionEvents.Count -gt 0)
     capture_ownership_contract='Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.'
 }
 function Save-Receipt {

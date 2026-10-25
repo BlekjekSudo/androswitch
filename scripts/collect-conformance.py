@@ -43,13 +43,21 @@ for path in sorted((run / 'sessions').glob('*/session-report.json')):
         case = catalog['cases'][index]['id']
     sessions.append(dict(session_id=session['session_id'], status=session['status'],
                          pending_case=case, error=session.get('error'), raw_report=str(path)))
+exclusions = []
+for seed in receipt.get('userdata_seed', []):
+    if seed['relative'].replace('\\','/').endswith('/files/exclude.txt'):
+        raw = Path(seed['frozen']).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == seed['sha256']
+        exclusions.extend(raw.decode('ascii').splitlines())
+for case_id in exclusions:
+    assert next(row for row in journal['cases'] if row['id'] == case_id)['status'] == 'NOT_RUN'
 counts = collections.Counter(row['status'] for row in journal['cases'])
 allowed = {'PASS', 'FAIL', 'UNSUPPORTED', 'BLOCKED', 'NOT_RUN', 'INTERRUPTED', 'ERROR'}
 assert set(counts) <= allowed
 (run / 'conformance-report.json').write_bytes(journal_path.read_bytes())
 summary = dict(schema_version=1, status='observed_catalog_not_compatibility_pass',
                backend='Horizon via diagnostic Ryujinx; not physical hardware or stock Ryujinx',
-               catalog_sha256=digest, total=len(journal['cases']), counts=dict(counts),
+               catalog_sha256=digest, explicit_exclusions=exclusions, total=len(journal['cases']), counts=dict(counts),
                apk_sha256=receipt['inputs'][0]['sha256'], nro_sha256=receipt['nro_sha256'],
                external_status=receipt['status'], original_sd_restore=receipt.get('sd_original_restore'),
                launcher_completed=bool(launcher and launcher['status'] == 'passed_execution'),

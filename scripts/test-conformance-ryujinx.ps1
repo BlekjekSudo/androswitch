@@ -6,6 +6,7 @@ param(
     [string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',
     [string]$RyujinxProfile="$env:APPDATA/Ryujinx",
     [string]$Nro='',
+    [string[]]$ExcludeCases=@(),
     [switch]$PrepareOnly,
     [switch]$AllowDesktopEmulator
 )
@@ -18,6 +19,10 @@ $digest=(Get-FileHash -LiteralPath $catalogPath).Hash.ToLowerInvariant()
 $seed=Join-Path $output ('seeds-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force "$seed/$package/files"|Out-Null
 [IO.File]::WriteAllText("$seed/$package/files/autorun.txt",'1')
+$known=@((Get-Content $catalogPath -Raw|ConvertFrom-Json).cases|ForEach-Object id)
+foreach($caseId in $ExcludeCases){if($caseId -cnotin $known){throw "Unknown excluded case: $caseId"}}
+if($ExcludeCases.Count){[IO.File]::WriteAllText("$seed/$package/files/exclude.txt",($ExcludeCases -join "`n"))}
+
 $watch=@("$package/files/conformance/$($digest.Substring(0,12))/pending.txt")
 $parameters=@{
     ApkPaths=@((Join-Path $output 'AndroSwitchConformance.apk'));LaunchesPerApk=$Launches

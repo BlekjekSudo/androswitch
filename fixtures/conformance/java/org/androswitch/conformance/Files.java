@@ -76,6 +76,18 @@ final class Files {
     }
     return -1;
   }
+  static boolean hasLine(String text, String wanted) {
+    int start = 0;
+    while (start < text.length()) {
+      int end = find(text, '\n', start);
+      if (end < 0)
+        end = text.length();
+      if (clean(slice(text, start, end)).equals(wanted))
+        return true;
+      start = end + 1;
+    }
+    return false;
+  }
   static String resultStatus(String json) {
     String key = "\"status\":\"";
     int at = findText(json, key);
