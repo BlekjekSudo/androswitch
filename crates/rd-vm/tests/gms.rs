@@ -2099,35 +2099,83 @@ fn firebase_auth_state_listener_fires_on_add_and_signin() {
 #[test]
 fn firestore_query_filter_and_snapshot_listener() {
     let mut b = DexBuilder::new();
-    counter_observer_class(&mut b, "LFsLis;", "onEvent",
-        vec!["Ljava/lang/Object;", "Lcom/google/firebase/firestore/FirebaseFirestoreException;"]);
+    counter_observer_class(
+        &mut b,
+        "LFsLis;",
+        "onEvent",
+        vec![
+            "Ljava/lang/Object;",
+            "Lcom/google/firebase/firestore/FirebaseFirestoreException;",
+        ],
+    );
     let mut e = engine_of(&b);
     // Semente: dois utilizadores em Lisboa, um no Porto.
-    for (id, city, age) in [("u1", "Lisboa", 31), ("u2", "Porto", 25), ("u3", "Lisboa", 40)] {
+    for (id, city, age) in [
+        ("u1", "Lisboa", 31),
+        ("u2", "Porto", 25),
+        ("u3", "Lisboa", 40),
+    ] {
         let c = e.heap.alloc_string(city.to_string()).unwrap();
         e.gms_firestore_seed(
             &format!("users/{id}"),
-            vec![("cidade".into(), Value::Obj(c)), ("idade".into(), Value::Int(age))],
+            vec![
+                ("cidade".into(), Value::Obj(c)),
+                ("idade".into(), Value::Int(age)),
+            ],
         );
     }
-    let fs = ov(cs!(e, FIRESTORE, "getInstance",
-        "()Lcom/google/firebase/firestore/FirebaseFirestore;", []).unwrap());
+    let fs = ov(cs!(
+        e,
+        FIRESTORE,
+        "getInstance",
+        "()Lcom/google/firebase/firestore/FirebaseFirestore;",
+        []
+    )
+    .unwrap());
     let coll_name = s(&mut e, "users");
-    let coll = ov(ci!(e, FIRESTORE, "collection",
-        "(Ljava/lang/String;)Lcom/google/firebase/firestore/CollectionReference;", fs, [coll_name]).unwrap());
+    let coll = ov(ci!(
+        e,
+        FIRESTORE,
+        "collection",
+        "(Ljava/lang/String;)Lcom/google/firebase/firestore/CollectionReference;",
+        fs,
+        [coll_name]
+    )
+    .unwrap());
     let field = s(&mut e, "cidade");
     let wanted = s(&mut e, "Lisboa");
-    let query = ov(ci!(e, COLLECTION_REF, "whereEqualTo",
+    let query = ov(ci!(
+        e,
+        COLLECTION_REF,
+        "whereEqualTo",
         "(Ljava/lang/String;Ljava/lang/Object;)Lcom/google/firebase/firestore/Query;",
-        coll, [field, wanted]).unwrap());
-    let t = ov(ci!(e, FS_QUERY, "get", "()Lcom/google/android/gms/tasks/Task;", query, []).unwrap());
+        coll,
+        [field, wanted]
+    )
+    .unwrap());
+    let t = ov(ci!(
+        e,
+        FS_QUERY,
+        "get",
+        "()Lcom/google/android/gms/tasks/Task;",
+        query,
+        []
+    )
+    .unwrap());
     let snap = ov(task_result(&mut e, t));
     assert_eq!(iv(ci!(e, QUERY_SNAP, "size", "()I", snap, []).unwrap()), 2);
 
     // Snapshot listener no documento: dispara ao registar e em cada set.
     let doc_id = s(&mut e, "u1");
-    let doc = ov(ci!(e, COLLECTION_REF, "document",
-        "(Ljava/lang/String;)Lcom/google/firebase/firestore/DocumentReference;", coll, [doc_id]).unwrap());
+    let doc = ov(ci!(
+        e,
+        COLLECTION_REF,
+        "document",
+        "(Ljava/lang/String;)Lcom/google/firebase/firestore/DocumentReference;",
+        coll,
+        [doc_id]
+    )
+    .unwrap());
     let lis = obj(&mut e, "LFsLis;");
     ci!(e, DOC_REF, "addSnapshotListener",
         "(Lcom/google/firebase/firestore/EventListener;)Lcom/google/firebase/firestore/ListenerRegistration;",
@@ -2138,8 +2186,15 @@ fn firestore_query_filter_and_snapshot_listener() {
         let v = s(&mut e, "Braga");
         host_map(&mut e, vec![(k, v)])
     };
-    let set_t = ov(ci!(e, DOC_REF, "set",
-        "(Ljava/lang/Object;)Lcom/google/android/gms/tasks/Task;", doc, [data]).unwrap());
+    let set_t = ov(ci!(
+        e,
+        DOC_REF,
+        "set",
+        "(Ljava/lang/Object;)Lcom/google/android/gms/tasks/Task;",
+        doc,
+        [data]
+    )
+    .unwrap());
     assert_eq!(task_flag(&mut e, set_t, "isSuccessful"), 1);
     assert_eq!(called(&e, "LFsLis;"), 2);
 }
@@ -2147,25 +2202,55 @@ fn firestore_query_filter_and_snapshot_listener() {
 #[test]
 fn billing_product_details_modern_path() {
     let mut b = DexBuilder::new();
-    counter_observer_class(&mut b, "LPurLis2;", "onPurchasesUpdated",
-        vec!["Lcom/android/billingclient/api/BillingResult;", "Ljava/util/List;"]);
-    counter_observer_class(&mut b, "LStateLis2;", "onBillingSetupFinished",
-        vec!["Lcom/android/billingclient/api/BillingResult;"]);
-    counter_observer_class(&mut b, "LPdLis;", "onProductDetailsResponse",
-        vec!["Lcom/android/billingclient/api/BillingResult;", "Ljava/util/List;"]);
+    counter_observer_class(
+        &mut b,
+        "LPurLis2;",
+        "onPurchasesUpdated",
+        vec![
+            "Lcom/android/billingclient/api/BillingResult;",
+            "Ljava/util/List;",
+        ],
+    );
+    counter_observer_class(
+        &mut b,
+        "LStateLis2;",
+        "onBillingSetupFinished",
+        vec!["Lcom/android/billingclient/api/BillingResult;"],
+    );
+    counter_observer_class(
+        &mut b,
+        "LPdLis;",
+        "onProductDetailsResponse",
+        vec![
+            "Lcom/android/billingclient/api/BillingResult;",
+            "Ljava/util/List;",
+        ],
+    );
     let mut e = engine_of(&b);
     e.gms_billing_add_sku("premium", "inapp", "R$ 9,99", 9_990_000, "BRL", "Premium");
 
     let purchases_lis = obj(&mut e, "LPurLis2;");
     let client = billing_client_with_listeners(&mut e, purchases_lis);
     let state_lis = obj(&mut e, "LStateLis2;");
-    ci!(e, BILLING_CLIENT, "startConnection",
+    ci!(
+        e,
+        BILLING_CLIENT,
+        "startConnection",
         "(Lcom/android/billingclient/api/BillingClientStateListener;)V",
-        client, [Value::Obj(state_lis)]).unwrap();
+        client,
+        [Value::Obj(state_lis)]
+    )
+    .unwrap();
 
     // QueryProductDetailsParams.Product.newBuilder().setProductId.setProductType.build()
-    let product_builder = ov(cs!(e, QP_PRODUCT, "newBuilder",
-        "()Lcom/android/billingclient/api/QueryProductDetailsParams$Product$Builder;", []).unwrap());
+    let product_builder = ov(cs!(
+        e,
+        QP_PRODUCT,
+        "newBuilder",
+        "()Lcom/android/billingclient/api/QueryProductDetailsParams$Product$Builder;",
+        []
+    )
+    .unwrap());
     let pid = s(&mut e, "premium");
     ci!(e, QP_PRODUCT_BUILDER, "setProductId",
         "(Ljava/lang/String;)Lcom/android/billingclient/api/QueryProductDetailsParams$Product$Builder;",
@@ -2174,29 +2259,109 @@ fn billing_product_details_modern_path() {
     ci!(e, QP_PRODUCT_BUILDER, "setProductType",
         "(Ljava/lang/String;)Lcom/android/billingclient/api/QueryProductDetailsParams$Product$Builder;",
         product_builder, [ptype]).unwrap();
-    let product = ov(ci!(e, QP_PRODUCT_BUILDER, "build",
-        "()Lcom/android/billingclient/api/QueryProductDetailsParams$Product;", product_builder, []).unwrap());
-    let params_builder = ov(cs!(e, QUERY_PRODUCTS_PARAMS, "newBuilder",
-        "()Lcom/android/billingclient/api/QueryProductDetailsParams$Builder;", []).unwrap());
+    let product = ov(ci!(
+        e,
+        QP_PRODUCT_BUILDER,
+        "build",
+        "()Lcom/android/billingclient/api/QueryProductDetailsParams$Product;",
+        product_builder,
+        []
+    )
+    .unwrap());
+    let params_builder = ov(cs!(
+        e,
+        QUERY_PRODUCTS_PARAMS,
+        "newBuilder",
+        "()Lcom/android/billingclient/api/QueryProductDetailsParams$Builder;",
+        []
+    )
+    .unwrap());
     let products = host_list(&mut e, vec![Value::Obj(product)]);
-    ci!(e, QUERY_PRODUCTS_BUILDER, "setProductList",
+    ci!(
+        e,
+        QUERY_PRODUCTS_BUILDER,
+        "setProductList",
         "(Ljava/util/List;)Lcom/android/billingclient/api/QueryProductDetailsParams$Builder;",
-        params_builder, [products]).unwrap();
-    let params = ov(ci!(e, QUERY_PRODUCTS_BUILDER, "build",
-        "()Lcom/android/billingclient/api/QueryProductDetailsParams;", params_builder, []).unwrap());
+        params_builder,
+        [products]
+    )
+    .unwrap();
+    let params = ov(ci!(
+        e,
+        QUERY_PRODUCTS_BUILDER,
+        "build",
+        "()Lcom/android/billingclient/api/QueryProductDetailsParams;",
+        params_builder,
+        []
+    )
+    .unwrap());
     let pd_listener = obj(&mut e, "LPdLis;");
     ci!(e, BILLING_CLIENT, "queryProductDetailsAsync",
         "(Lcom/android/billingclient/api/QueryProductDetailsParams;Lcom/android/billingclient/api/ProductDetailsResponseListener;)V",
         client, [Value::Obj(params), Value::Obj(pd_listener)]).unwrap();
     assert_eq!(called(&e, "LPdLis;"), 1);
 
-    let pd = *e.fw.gms.product_details_objs.keys().next().expect("ProductDetails cunhado");
-    assert_eq!(svm!(e, ci!(e, PRODUCT_DETAILS, "getProductId", "()Ljava/lang/String;", pd, []).unwrap()), "premium");
-    assert_eq!(svm!(e, ci!(e, PRODUCT_DETAILS, "getTitle", "()Ljava/lang/String;", pd, []).unwrap()), "Premium");
-    let offer = ov(ci!(e, PRODUCT_DETAILS, "getOneTimePurchaseOfferDetails",
-        "()Lcom/android/billingclient/api/ProductDetails$OneTimePurchaseOfferDetails;", pd, []).unwrap());
-    assert_eq!(svm!(e, ci!(e, "Lcom/android/billingclient/api/ProductDetails$OneTimePurchaseOfferDetails;",
-        "getFormattedPrice", "()Ljava/lang/String;", offer, []).unwrap()), "R$ 9,99");
+    let pd = *e
+        .fw
+        .gms
+        .product_details_objs
+        .keys()
+        .next()
+        .expect("ProductDetails cunhado");
+    assert_eq!(
+        svm!(
+            e,
+            ci!(
+                e,
+                PRODUCT_DETAILS,
+                "getProductId",
+                "()Ljava/lang/String;",
+                pd,
+                []
+            )
+            .unwrap()
+        ),
+        "premium"
+    );
+    assert_eq!(
+        svm!(
+            e,
+            ci!(
+                e,
+                PRODUCT_DETAILS,
+                "getTitle",
+                "()Ljava/lang/String;",
+                pd,
+                []
+            )
+            .unwrap()
+        ),
+        "Premium"
+    );
+    let offer = ov(ci!(
+        e,
+        PRODUCT_DETAILS,
+        "getOneTimePurchaseOfferDetails",
+        "()Lcom/android/billingclient/api/ProductDetails$OneTimePurchaseOfferDetails;",
+        pd,
+        []
+    )
+    .unwrap());
+    assert_eq!(
+        svm!(
+            e,
+            ci!(
+                e,
+                "Lcom/android/billingclient/api/ProductDetails$OneTimePurchaseOfferDetails;",
+                "getFormattedPrice",
+                "()Ljava/lang/String;",
+                offer,
+                []
+            )
+            .unwrap()
+        ),
+        "R$ 9,99"
+    );
 }
 
 // ── Ponta a ponta: bytecode DEX chama o shim pelo dispatch real ─────────
@@ -2213,18 +2378,44 @@ fn dex_bytecode_calls_gms_through_full_dispatch() {
     let p_messaging = b.proto_idx("Lcom/google/firebase/messaging/FirebaseMessaging;", vec![]);
     let p_task = b.proto_idx("Lcom/google/android/gms/tasks/Task;", vec![]);
     let p_bool = b.proto_idx("Z", vec![]);
-    let p_avail = b.proto_idx("Lcom/google/android/gms/common/GoogleApiAvailability;", vec![]);
+    let p_avail = b.proto_idx(
+        "Lcom/google/android/gms/common/GoogleApiAvailability;",
+        vec![],
+    );
     let p_avail_check = b.proto_idx("I", vec!["Landroid/content/Context;".to_string()]);
 
-    let m_fm = b.method_idx("Lcom/google/firebase/messaging/FirebaseMessaging;", p_messaging, "getInstance");
-    let m_token = b.method_idx("Lcom/google/firebase/messaging/FirebaseMessaging;", p_task, "getToken");
-    let m_ok = b.method_idx("Lcom/google/android/gms/tasks/Task;", p_bool, "isSuccessful");
-    let m_ga = b.method_idx("Lcom/google/android/gms/common/GoogleApiAvailability;", p_avail, "getInstance");
+    let m_fm = b.method_idx(
+        "Lcom/google/firebase/messaging/FirebaseMessaging;",
+        p_messaging,
+        "getInstance",
+    );
+    let m_token = b.method_idx(
+        "Lcom/google/firebase/messaging/FirebaseMessaging;",
+        p_task,
+        "getToken",
+    );
+    let m_ok = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_bool,
+        "isSuccessful",
+    );
+    let m_ga = b.method_idx(
+        "Lcom/google/android/gms/common/GoogleApiAvailability;",
+        p_avail,
+        "getInstance",
+    );
     let m_check = b.method_idx(
-        "Lcom/google/android/gms/common/GoogleApiAvailability;", p_avail_check,
-        "isGooglePlayServicesAvailable");
+        "Lcom/google/android/gms/common/GoogleApiAvailability;",
+        p_avail_check,
+        "isGooglePlayServicesAvailable",
+    );
 
-    b.direct(probe, "run", "V", vec![], ACC_PUBLIC | ACC_STATIC,
+    b.direct(
+        probe,
+        "run",
+        "V",
+        vec![],
+        ACC_PUBLIC | ACC_STATIC,
         Some(b.code(4, 0, 2, {
             let mut u = op35c(0x71, 0, m_fm, [0, 0, 0, 0, 0]); // invoke-static getInstance
             u.extend(op11x(0x0C, 0)); // move-result-object v0
@@ -2241,20 +2432,27 @@ fn dex_bytecode_calls_gms_through_full_dispatch() {
             u.extend(op21c(0x67, 2, f_code)); // sput v2, code
             u.extend(op10x(0x0E)); // return-void
             u
-        })));
+        })),
+    );
     let _ = p_void;
 
     let mut e = engine_of(&b);
-    e.invoke_static("LProbe;", "run", "()V", &[]).expect("Probe.run executa");
+    e.invoke_static("LProbe;", "run", "()V", &[])
+        .expect("Probe.run executa");
     let get = |e: &Engine, name: &str| match e.statics.get(&("LProbe;".into(), name.into())) {
         Some(Value::Int(n)) => *n,
         other => panic!("static {name}: {other:?}"),
     };
-    assert_eq!(get(&e, "result"), 1, "Task do token concluiu com sucesso via DEX");
+    assert_eq!(
+        get(&e, "result"),
+        1,
+        "Task do token concluiu com sucesso via DEX"
+    );
     assert_eq!(get(&e, "code"), 0, "disponibilidade SUCCESS via DEX");
 
     // Programado pelo hospedeiro, o mesmo bytecode vê SERVICE_MISSING.
     e.gms_set_availability(1);
-    e.invoke_static("LProbe;", "run", "()V", &[]).expect("Probe.run outra vez");
+    e.invoke_static("LProbe;", "run", "()V", &[])
+        .expect("Probe.run outra vez");
     assert_eq!(get(&e, "code"), 1);
 }
