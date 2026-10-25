@@ -1332,6 +1332,9 @@ pub(crate) fn instance_intrinsic(
     if let Some(v) = color_filter(vm, recv_class, name, recv, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = xfermode(vm, recv_class, name, recv, args)? {
+        return Ok(Some(v));
+    }
     let host_ref = GFX_PREFIXES.iter().any(|p| mref_class.starts_with(p));
     let insets_ref = recv_class == PLATFORM_INSETS || mref_class == PLATFORM_INSETS;
     if !host_ref && !insets_ref && !vm.gfx.objs.contains_key(&recv) {
@@ -4041,6 +4044,35 @@ fn color_filter(
         }
         _ => return Ok(None),
     }))
+}
+
+/// `Xfermode` value classes: `PorterDuffXfermode` (API 1) and
+/// `BlendModeXfermode` (API 29). Both store the transfer mode in the
+/// `rd_mode` heap field; the rasterizer reads it back from the paint's
+/// stored "Xfermode" object (`snap`) — CLEAR (ordinal 0) clears to
+/// transparent. AOSP exposes no getters (the class is opaque to apps), so
+/// only the constructors are modelled.
+///
+/// **Deviation:** the rasterizer only special-cases CLEAR; other modes are
+/// recorded but not rendered.
+fn xfermode(
+    vm: &mut Engine,
+    recv_class: &str,
+    name: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    const MODES: [&str; 2] = [
+        "Landroid/graphics/PorterDuffXfermode;",
+        "Landroid/graphics/BlendModeXfermode;",
+    ];
+    if !MODES.contains(&recv_class) || name != "<init>" {
+        return Ok(None);
+    }
+    if let Some(mode) = args.first() {
+        crate::err::put_field_result(vm.heap.put_field(recv, "rd_mode", mode.clone()))?;
+    }
+    Ok(Some(Value::Null))
 }
 
 include!("screen_model.rs");
