@@ -26,10 +26,13 @@ pub(crate) struct Observer {
 }
 
 fn root_of(vm: &Engine, mut v: ObjRef) -> ObjRef {
-    while let Some(HostObj::View {
-        parent: Some(p), ..
-    }) = vm.fw.get(v)
-    {
+    for _ in 0..=crate::framework::MAX_VIEW_DEPTH {
+        let Some(HostObj::View {
+            parent: Some(p), ..
+        }) = vm.fw.get(v)
+        else {
+            break;
+        };
         v = *p;
     }
     v

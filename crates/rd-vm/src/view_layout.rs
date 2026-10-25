@@ -123,12 +123,12 @@ pub(crate) fn layout(
         .and_then(|p| bounds(vm, p))
         .map(|(x, y, ..)| (x, y))
         .unwrap_or((0, 0));
-    let (nw, nh) = ((r - l).max(0), (b - t).max(0));
+    let (nw, nh) = (r.saturating_sub(l).max(0), b.saturating_sub(t).max(0));
     // views laid out by the guest: window position = parent origin + frame
     let (ax, ay) = if prop(vm, v, "rd_host_root").is_some() {
         (l, t)
     } else {
-        (px + l, py + t)
+        (px.saturating_add(l), py.saturating_add(t))
     };
     if let Some(HostObj::View { x, y, w, h, .. }) = vm.fw.objects.get_mut(&v) {
         *x = ax;
@@ -365,11 +365,13 @@ pub(crate) fn static_intrinsic(
         (_, "combineMeasuredStates") if is_view_class => Value::Int(a(0) | a(1)),
         (_, "generateViewId") if is_view_class => {
             let k = ("Lrd/View;".to_string(), "next_id".to_string());
-            let n = match vm.statics.get(&k) {
-                Some(Value::Int(i)) => *i,
+            let raw = match vm.statics.get(&k) {
+                Some(Value::Int(i)) if *i >= 1 => *i,
                 _ => 1,
             };
-            vm.statics.insert(k, Value::Int(n + 1));
+            let n = if raw > 0x00ff_ffff { 1 } else { raw };
+            let next = if n >= 0x00ff_ffff { 1 } else { n + 1 };
+            vm.statics.insert(k, Value::Int(next));
             Value::Int(n)
         }
         (VIEW_CONFIG, "get") => {
@@ -1333,12 +1335,12 @@ pub(crate) fn instance_intrinsic(
             let horiz = name == "offsetLeftAndRight";
             let key = if horiz { "rd_l" } else { "rd_t" };
             let cur = prop(vm, recv, key).unwrap_or(if horiz { x } else { y });
-            set_prop(vm, recv, key, cur + d);
+            set_prop(vm, recv, key, cur.saturating_add(d));
             if let Some(HostObj::View { x, y, .. }) = vm.fw.objects.get_mut(&recv) {
                 if horiz {
-                    *x += d;
+                    *x = x.saturating_add(d);
                 } else {
-                    *y += d;
+                    *y = y.saturating_add(d);
                 }
             }
             Value::Null
@@ -1348,7 +1350,7 @@ pub(crate) fn instance_intrinsic(
                 prop(vm, recv, "rd_l").unwrap_or(x),
                 prop(vm, recv, "rd_t").unwrap_or(y),
             );
-            let (mut fl, mut ft, mut fr, mut fb) = (l, t, l + w, t + h);
+            let (mut fl, mut ft, mut fr, mut fb) = (l, t, l.saturating_add(w), t.saturating_add(h));
             match name {
                 "setLeft" => fl = a(0),
                 "setTop" => ft = a(0),
@@ -1360,8 +1362,8 @@ pub(crate) fn instance_intrinsic(
         }
         ("getLeft", "()I") => Value::Int(prop(vm, recv, "rd_l").unwrap_or(x)),
         ("getTop", "()I") => Value::Int(prop(vm, recv, "rd_t").unwrap_or(y)),
-        ("getRight", "()I") => Value::Int(prop(vm, recv, "rd_l").unwrap_or(x) + w),
-        ("getBottom", "()I") => Value::Int(prop(vm, recv, "rd_t").unwrap_or(y) + h),
+        ("getRight", "()I") => Value::Int(prop(vm, recv, "rd_l").unwrap_or(x).saturating_add(w)),
+        ("getBottom", "()I") => Value::Int(prop(vm, recv, "rd_t").unwrap_or(y).saturating_add(h)),
         ("getLocationInWindow" | "getLocationOnScreen", "([I)V") => {
             if let Some(Value::Obj(arr)) = args.first() {
                 if let Ok(e) = vm.heap.array_elems_mut(*arr) {
@@ -1500,15 +1502,12 @@ pub(crate) fn instance_intrinsic(
         }
         ("addViewInLayout", _) => {
             // ViewGroup.addViewInLayout(child, index, params[, preventRequestLayout])
-            let child = args.first().cloned().unwrap_or(Value::Null);
-            crate::framework::call_host_instance(
-                vm,
-                "Landroid/view/ViewGroup;",
-                "addView",
-                "(Landroid/view/View;)V",
-                recv,
-                &[child],
-            )?;
+            let prevent = args
+                .get(3)
+                .and_then(|v| v.as_int().ok())
+                .map(|i| i != 0)
+                .unwrap_or(false);
+            crate::framework::host_add_view(vm, recv, sig, args, prevent)?;
             Value::Int(1)
         }
         _ => return Ok(None),
@@ -1626,12 +1625,25 @@ impl Engine {
                 continue;
             };
             let (w, h) = (
-                if w > 0 { w } else { fw_ - x },
-                if h > 0 { h } else { fh_ - y },
+                if w > 0 {
+                    w
+                } else {
+                    fw_.saturating_sub(x).max(0)
+                },
+                if h > 0 {
+                    h
+                } else {
+                    fh_.saturating_sub(y).max(0)
+                },
             );
-            measure(self, *v, EXACTLY | w, EXACTLY | h)?;
+            measure(
+                self,
+                *v,
+                EXACTLY | (w.max(0) & 0x3fff_ffff),
+                EXACTLY | (h.max(0) & 0x3fff_ffff),
+            )?;
             set_prop(self, *v, "rd_host_root", 1);
-            layout(self, *v, x, y, x + w, y + h)?;
+            layout(self, *v, x, y, x.saturating_add(w), y.saturating_add(h))?;
         }
         // 1b. dialog windows above the activity (WindowManager z-order)
         for (dlg, root) in dialogs {
@@ -1652,10 +1664,9 @@ impl Engine {
             _ => AT_MOST | max,
         };
         measure(self, root, spec(lw, fw_), spec(lh, fh_))?;
-        let mw = prop(self, root, "MeasuredWidth").unwrap_or(fw_) & 0x00ff_ffff;
-        let mh = prop(self, root, "MeasuredHeight").unwrap_or(fh_) & 0x00ff_ffff;
-        let (mw, mh) = (mw.min(fw_), mh.min(fh_));
-        let (x, y) = ((fw_ - mw) / 2, (fh_ - mh) / 2);
+        let mw = (prop(self, root, "MeasuredWidth").unwrap_or(fw_) & 0x00ff_ffff).clamp(0, fw_);
+        let mh = (prop(self, root, "MeasuredHeight").unwrap_or(fh_) & 0x00ff_ffff).clamp(0, fh_);
+        let (x, y) = (fw_.saturating_sub(mw) / 2, fh_.saturating_sub(mh) / 2);
         if std::env::var("RD_TRACE_DRAW").is_ok() {
             let kids = match self.fw.get(root) {
                 Some(HostObj::View { children, .. }) => children.len(),
@@ -1667,7 +1678,7 @@ impl Engine {
             );
         }
         set_prop(self, root, "rd_host_root", 1);
-        layout(self, root, x, y, x + mw, y + mh)
+        layout(self, root, x, y, x.saturating_add(mw), y.saturating_add(mh))
     }
 
     pub(crate) fn collect_dex_roots(&self, v: ObjRef, out: &mut Vec<ObjRef>, depth: usize) {
@@ -1804,16 +1815,32 @@ fn truthy(v: Option<Value>) -> bool {
     matches!(v, Some(Value::Int(i)) if i != 0)
 }
 
+/// Maximum host-driven recursion depth for `dispatch_touch` / `host_dispatch_touch`
+/// and `host_dispatch_draw` across nested ViewGroups.
+const MAX_VIEW_DISPATCH_DEPTH: usize = 64;
+
 /// Delivers `ev` (in `v`'s local coordinates) to `v` the way
 /// `ViewRootImpl` does: a DEX `dispatchTouchEvent` override runs first,
 /// otherwise the AOSP ViewGroup/View logic below.
 pub(crate) fn dispatch_touch(vm: &mut Engine, v: ObjRef, ev: ObjRef) -> Result<bool, VmExit> {
-    if let Some(r) =
-        crate::jcollections::guest_call(vm, v, "dispatchTouchEvent", TOUCH_SIG, &[Value::Obj(ev)])?
-    {
-        return Ok(truthy(Some(r)));
+    if vm.fw.view_dispatch_depth >= MAX_VIEW_DISPATCH_DEPTH {
+        return Ok(false);
     }
-    host_dispatch_touch(vm, v, ev)
+    vm.fw.view_dispatch_depth += 1;
+    let res = (|| {
+        if let Some(r) = crate::jcollections::guest_call(
+            vm,
+            v,
+            "dispatchTouchEvent",
+            TOUCH_SIG,
+            &[Value::Obj(ev)],
+        )? {
+            return Ok(truthy(Some(r)));
+        }
+        host_dispatch_touch_inner(vm, v, ev)
+    })();
+    vm.fw.view_dispatch_depth = vm.fw.view_dispatch_depth.saturating_sub(1);
+    res
 }
 
 /// AOSP ViewGroup.dispatchTouchEvent / View.dispatchTouchEvent (stateless):
@@ -1823,6 +1850,16 @@ pub(crate) fn dispatch_touch(vm: &mut Engine, v: ObjRef, ev: ObjRef) -> Result<b
 /// position (no persistent touch target), which matches taps and
 /// in-bounds gestures.
 pub(crate) fn host_dispatch_touch(vm: &mut Engine, v: ObjRef, ev: ObjRef) -> Result<bool, VmExit> {
+    if vm.fw.view_dispatch_depth >= MAX_VIEW_DISPATCH_DEPTH {
+        return Ok(false);
+    }
+    vm.fw.view_dispatch_depth += 1;
+    let res = host_dispatch_touch_inner(vm, v, ev);
+    vm.fw.view_dispatch_depth = vm.fw.view_dispatch_depth.saturating_sub(1);
+    res
+}
+
+fn host_dispatch_touch_inner(vm: &mut Engine, v: ObjRef, ev: ObjRef) -> Result<bool, VmExit> {
     let Some(HostObj::View {
         x: px,
         y: py,
@@ -1856,7 +1893,10 @@ pub(crate) fn host_dispatch_touch(vm: &mut Engine, v: ObjRef, ev: ObjRef) -> Res
             if vis != crate::framework::Vis::Visible {
                 continue;
             }
-            let (l, t) = ((cx - px) as f32, (cy - py) as f32);
+            let (l, t) = (
+                (cx as i64 - px as i64) as f32,
+                (cy as i64 - py as i64) as f32,
+            );
             if ex < l || ey < t || ex >= l + w as f32 || ey >= t + h as f32 {
                 continue;
             }
@@ -1973,21 +2013,29 @@ fn view_post(vm: &mut Engine, r: ObjRef, delay_ms: u64) -> Result<(), VmExit> {
 /// AOSP ViewGroup.dispatchDraw: each child in order through the
 /// (overridable) `drawChild(Canvas, View, long)`.
 fn host_dispatch_draw(vm: &mut Engine, recv: ObjRef, c: ObjRef) -> Result<(), VmExit> {
-    let kids = match vm.fw.get(recv) {
-        Some(HostObj::View { children, .. }) => children.clone(),
-        _ => Vec::new(),
-    };
-    for child in kids {
-        let over = crate::jcollections::guest_call(
-            vm,
-            recv,
-            "drawChild",
-            "(Landroid/graphics/Canvas;Landroid/view/View;J)Z",
-            &[Value::Obj(c), Value::Obj(child), Value::Long(0)],
-        )?;
-        if over.is_none() {
-            host_draw_child(vm, c, child)?;
-        }
+    if vm.fw.view_dispatch_depth >= MAX_VIEW_DISPATCH_DEPTH {
+        return Ok(());
     }
-    Ok(())
+    vm.fw.view_dispatch_depth += 1;
+    let res = (|| {
+        let kids = match vm.fw.get(recv) {
+            Some(HostObj::View { children, .. }) => children.clone(),
+            _ => Vec::new(),
+        };
+        for child in kids {
+            let over = crate::jcollections::guest_call(
+                vm,
+                recv,
+                "drawChild",
+                "(Landroid/graphics/Canvas;Landroid/view/View;J)Z",
+                &[Value::Obj(c), Value::Obj(child), Value::Long(0)],
+            )?;
+            if over.is_none() {
+                host_draw_child(vm, c, child)?;
+            }
+        }
+        Ok(())
+    })();
+    vm.fw.view_dispatch_depth = vm.fw.view_dispatch_depth.saturating_sub(1);
+    res
 }
