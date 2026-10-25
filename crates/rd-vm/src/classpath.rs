@@ -2113,6 +2113,50 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Throwable;",
             "Ljava/lang/Object;",
         ]),
+        // Appendix C Batch 36-H bounded Wi-Fi / IPsec-IKE slices.
+        "Landroid/net/wifi/WifiManager;"
+        | "Landroid/net/wifi/WifiInfo;"
+        | "Landroid/net/wifi/ScanResult;"
+        | "Landroid/net/wifi/WifiSsid;"
+        | "Landroid/net/ipsec/ike/SaProposal;"
+        | "Landroid/net/ipsec/ike/SaProposal$Builder;"
+        | "Landroid/net/ipsec/ike/IkeTrafficSelector;"
+        | "Landroid/net/ipsec/ike/IkeIdentification;"
+        | "Landroid/net/ipsec/ike/ChildSessionParams;"
+        | "Landroid/net/ipsec/ike/ChildSessionParams$Builder;"
+        | "Landroid/util/Pair;"
+        | "Ljava/net/InetAddress;" => Some(OBJECT),
+        "Landroid/net/wifi/SupplicantState;" | "Landroid/net/NetworkInfo$DetailedState;" => {
+            Some(&["Ljava/lang/Enum;", "Ljava/lang/Object;"])
+        }
+        "Landroid/net/ipsec/ike/IkeSaProposal;" | "Landroid/net/ipsec/ike/ChildSaProposal;" => {
+            Some(&["Landroid/net/ipsec/ike/SaProposal;", "Ljava/lang/Object;"])
+        }
+        "Landroid/net/ipsec/ike/IkeSaProposal$Builder;"
+        | "Landroid/net/ipsec/ike/ChildSaProposal$Builder;" => Some(&[
+            "Landroid/net/ipsec/ike/SaProposal$Builder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/net/ipsec/ike/IkeFqdnIdentification;"
+        | "Landroid/net/ipsec/ike/IkeRfc822AddrIdentification;"
+        | "Landroid/net/ipsec/ike/IkeKeyIdIdentification;"
+        | "Landroid/net/ipsec/ike/IkeIpv4AddrIdentification;" => Some(&[
+            "Landroid/net/ipsec/ike/IkeIdentification;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/net/ipsec/ike/TransportModeChildSessionParams;"
+        | "Landroid/net/ipsec/ike/TunnelModeChildSessionParams;" => Some(&[
+            "Landroid/net/ipsec/ike/ChildSessionParams;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/net/ipsec/ike/TransportModeChildSessionParams$Builder;"
+        | "Landroid/net/ipsec/ike/TunnelModeChildSessionParams$Builder;" => Some(&[
+            "Landroid/net/ipsec/ike/ChildSessionParams$Builder;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/net/Inet4Address;" | "Ljava/net/Inet6Address;" => {
+            Some(&["Ljava/net/InetAddress;", "Ljava/lang/Object;"])
+        }
         _ => None,
     }
 }
@@ -2768,6 +2812,10 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         | "Landroid/app/admin/SystemUpdatePolicy$ValidationFailedException;" => {
             Some(&["Landroid/os/Parcelable;"])
         }
+        // Interfaces in the Batch 36-H bounded slices.
+        "Landroid/net/wifi/WifiInfo;"
+        | "Landroid/net/wifi/ScanResult;"
+        | "Landroid/net/wifi/WifiSsid;" => Some(&["Landroid/os/Parcelable;"]),
         _ => None,
     }
 }

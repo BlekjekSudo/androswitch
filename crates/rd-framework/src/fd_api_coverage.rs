@@ -700,7 +700,12 @@ mod tests {
             );
         }
         let counts = table.status_counts();
-        assert!(counts["not_implemented"] > counts["supported"]);
+        // Conservatism is measured against `partial`, not `not_implemented`:
+        // the advance-all program intentionally drives not_implemented to
+        // zero with bounded, tested slices, while `supported` must stay the
+        // rare class-narrow claim enforced above.
+        assert!(counts["supported"] <= counts["partial"]);
+        assert!(counts["supported"] <= 8);
     }
 
     #[test]

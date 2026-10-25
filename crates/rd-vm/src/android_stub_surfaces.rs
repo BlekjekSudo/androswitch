@@ -458,6 +458,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial36g_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36h_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -635,6 +638,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial36g_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36h_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -743,6 +749,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial36g_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial36h_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -50004,4 +50013,1496 @@ fn p36g_dpm_instance(
         }
         _ => return Ok(None),
     }))
+}
+
+// Appendix C Batch 36-H: android.net.wifi + android.net.ipsec.ike.
+//
+// Wi-Fi device profile: the VM feature set declares `android.hardware.wifi`
+// (see android_pm.rs), so per AOSP `WifiFrameworkInitializer` a WifiManager
+// must exist; the bounded profile models a present-but-disabled radio.
+// Every WifiManager answer below is the documented disabled-state service
+// result, not a fabricated network: state DISABLED, third-party toggle
+// denied (API 29+ behavior), a default WifiInfo (no connection), and no
+// visible or configured networks. P2P/aware/rtt/scanning managers,
+// configuration mutation, suggestions, hotspots and supplicant events
+// remain unimplemented.
+//
+// ScanResult/WifiSsid/SupplicantState/WifiInfo reproduce AOSP 14 pure value
+// semantics (band/channel conversions, SSID byte/text/hex rules, state
+// predicates, default-construction values) from
+// platform/packages/modules/Wifi @ android-14.0.0_r1.
+//
+// IPsec IKE reproduces AOSP 14 pure builder/value validation from
+// platform/packages/modules/IPsec @ android-14.0.0_r1: SaProposal algorithm
+// ids, key-length rules, AEAD mixing, Ike/Child build requirements,
+// traffic-selector ranges, identification values and child session params.
+// No IKE negotiation, socket, key exchange or IPsec transform application
+// is emulated.
+const P36H_WIFI_MANAGER: &str = "Landroid/net/wifi/WifiManager;";
+const P36H_WIFI_INFO: &str = "Landroid/net/wifi/WifiInfo;";
+const P36H_SCAN_RESULT: &str = "Landroid/net/wifi/ScanResult;";
+const P36H_WIFI_SSID: &str = "Landroid/net/wifi/WifiSsid;";
+const P36H_SUPPLICANT: &str = "Landroid/net/wifi/SupplicantState;";
+const P36H_DETAILED_STATE: &str = "Landroid/net/NetworkInfo$DetailedState;";
+const P36H_SA_PROPOSAL: &str = "Landroid/net/ipsec/ike/SaProposal;";
+const P36H_IKE_PROPOSAL: &str = "Landroid/net/ipsec/ike/IkeSaProposal;";
+const P36H_IKE_BUILDER: &str = "Landroid/net/ipsec/ike/IkeSaProposal$Builder;";
+const P36H_CHILD_PROPOSAL: &str = "Landroid/net/ipsec/ike/ChildSaProposal;";
+const P36H_CHILD_BUILDER: &str = "Landroid/net/ipsec/ike/ChildSaProposal$Builder;";
+const P36H_TS: &str = "Landroid/net/ipsec/ike/IkeTrafficSelector;";
+const P36H_ID_FQDN: &str = "Landroid/net/ipsec/ike/IkeFqdnIdentification;";
+const P36H_ID_RFC822: &str = "Landroid/net/ipsec/ike/IkeRfc822AddrIdentification;";
+const P36H_ID_KEYID: &str = "Landroid/net/ipsec/ike/IkeKeyIdIdentification;";
+const P36H_ID_IPV4: &str = "Landroid/net/ipsec/ike/IkeIpv4AddrIdentification;";
+const P36H_CHILD_PARAMS: &str = "Landroid/net/ipsec/ike/ChildSessionParams;";
+const P36H_TRANSPORT_PARAMS: &str = "Landroid/net/ipsec/ike/TransportModeChildSessionParams;";
+const P36H_TUNNEL_PARAMS: &str = "Landroid/net/ipsec/ike/TunnelModeChildSessionParams;";
+const P36H_TRANSPORT_BUILDER: &str =
+    "Landroid/net/ipsec/ike/TransportModeChildSessionParams$Builder;";
+const P36H_TUNNEL_BUILDER: &str = "Landroid/net/ipsec/ike/TunnelModeChildSessionParams$Builder;";
+const P36H_PAIR: &str = "Landroid/util/Pair;";
+
+const P36H_SUPPLICANT_NAMES: [&str; 13] = [
+    "DISCONNECTED",
+    "INTERFACE_DISABLED",
+    "INACTIVE",
+    "SCANNING",
+    "AUTHENTICATING",
+    "ASSOCIATING",
+    "ASSOCIATED",
+    "FOUR_WAY_HANDSHAKE",
+    "GROUP_HANDSHAKE",
+    "COMPLETED",
+    "DORMANT",
+    "UNINITIALIZED",
+    "INVALID",
+];
+
+// WifiInfo$DetailedState is NetworkInfo$DetailedState in the public API.
+fn p36h_detailed_state(vm: &mut Engine, supplicant: &str) -> Result<Value, VmExit> {
+    // AOSP WifiInfo.getDetailedStateOf mapping.
+    let (name, ordinal) = match supplicant {
+        "DISCONNECTED" | "INTERFACE_DISABLED" | "DORMANT" => ("DISCONNECTED", 8),
+        "INACTIVE" | "UNINITIALIZED" => ("IDLE", 0),
+        "SCANNING" => ("SCANNING", 1),
+        "AUTHENTICATING" | "ASSOCIATING" | "ASSOCIATED" => ("CONNECTING", 2),
+        "FOUR_WAY_HANDSHAKE" | "GROUP_HANDSHAKE" => ("AUTHENTICATING", 3),
+        "COMPLETED" => ("OBTAINING_IPADDR", 4),
+        // INVALID and any unknown name fall back to FAILED like the
+        // EnumMap default branch in AOSP.
+        _ => ("FAILED", 9),
+    };
+    enum_value(vm, P36H_DETAILED_STATE, name, ordinal)
+}
+
+fn p36h_enum_name(vm: &Engine, value: Option<&Value>) -> Option<String> {
+    match value {
+        Some(Value::Obj(r)) => field_str(vm, *r, "rd_name"),
+        _ => None,
+    }
+}
+
+fn p36h_supplicant(vm: &mut Engine, name: &str) -> Result<Value, VmExit> {
+    let ordinal = P36H_SUPPLICANT_NAMES
+        .iter()
+        .position(|n| *n == name)
+        .unwrap_or(11) as i32;
+    enum_value(vm, P36H_SUPPLICANT, name, ordinal)
+}
+
+fn p36h_bytes(vm: &Engine, value: Option<&Value>) -> Vec<u8> {
+    match value {
+        Some(v) => p49_byte_values(vm, v),
+        None => Vec::new(),
+    }
+}
+
+// WifiSsid.decodeSsid: strict UTF-8 with a 32-char output buffer; malformed
+// input yields null, overflow yields the first 32 decoded chars.
+fn p36h_ssid_utf8_text(bytes: &[u8]) -> Option<String> {
+    std::str::from_utf8(bytes)
+        .ok()
+        .map(|s| s.chars().take(32).collect::<String>())
+}
+
+fn p36h_new_wifi_ssid(vm: &mut Engine, bytes: Vec<u8>) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, P36H_WIFI_SSID, Vec::new())?;
+    let arr = p49_new_byte_array(vm, &bytes)?;
+    put(vm, r, "mBytes", arr)?;
+    Ok(Value::Obj(r))
+}
+
+fn p36h_hex_encode(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        out.push_str(&format!("{b:02x}"));
+    }
+    out
+}
+
+fn p36h_hex_decode(text: &str) -> Result<Vec<u8>, VmExit> {
+    let chars: Vec<char> = text.chars().collect();
+    if chars.len() % 2 != 0 {
+        return Err(iae("Odd number of hex characters".to_string()));
+    }
+    let mut out = Vec::with_capacity(chars.len() / 2);
+    let mut i = 0;
+    while i < chars.len() {
+        let hi = chars[i].to_digit(16);
+        let lo = chars[i + 1].to_digit(16);
+        match (hi, lo) {
+            (Some(h), Some(l)) => out.push((h * 16 + l) as u8),
+            _ => return Err(iae("Invalid hex character".to_string())),
+        }
+        i += 2;
+    }
+    Ok(out)
+}
+
+fn p36h_default_wifi_info(vm: &mut Engine) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, P36H_WIFI_INFO, Vec::new())?;
+    let state = p36h_supplicant(vm, "UNINITIALIZED")?;
+    put(vm, r, "mSupplicantState", state)?;
+    put(vm, r, "mNetworkId", Value::Int(-1))?;
+    put(vm, r, "mRssi", Value::Int(-127))?;
+    put(vm, r, "mLinkSpeed", Value::Int(-1))?;
+    put(vm, r, "mFrequency", Value::Int(-1))?;
+    put(vm, r, "mSecurityType", Value::Int(-1))?;
+    put(vm, r, "mSubscriptionId", Value::Int(-1))?;
+    let mac = jstr(vm, "02:00:00:00:00:00")?;
+    put(vm, r, "mMacAddress", mac)?;
+    Ok(Value::Obj(r))
+}
+
+// ScanResult band helpers (AOSP ScanResult + WifiScanner band constants).
+fn p36h_is_24ghz(freq: i32) -> bool {
+    (2412..=2484).contains(&freq)
+}
+fn p36h_is_5ghz(freq: i32) -> bool {
+    (5160..=5885).contains(&freq)
+}
+fn p36h_is_6ghz(freq: i32) -> bool {
+    (5955..=7115).contains(&freq) || freq == 5935
+}
+fn p36h_is_60ghz(freq: i32) -> bool {
+    (58320..=70200).contains(&freq)
+}
+
+fn partial36h_host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    if owner == P36H_SUPPLICANT {
+        if let Some(pos) = P36H_SUPPLICANT_NAMES.iter().position(|n| *n == field) {
+            return Ok(Some(enum_value(vm, P36H_SUPPLICANT, field, pos as i32)?));
+        }
+        return Ok(None);
+    }
+    let v = match (owner, field) {
+        (P36H_WIFI_MANAGER, "WIFI_STATE_DISABLING") => Value::Int(0),
+        (P36H_WIFI_MANAGER, "WIFI_STATE_DISABLED") => Value::Int(1),
+        (P36H_WIFI_MANAGER, "WIFI_STATE_ENABLING") => Value::Int(2),
+        (P36H_WIFI_MANAGER, "WIFI_STATE_ENABLED") => Value::Int(3),
+        (P36H_WIFI_MANAGER, "WIFI_STATE_UNKNOWN") => Value::Int(4),
+        (P36H_WIFI_MANAGER, "UNKNOWN_SSID") => return Ok(Some(jstr(vm, "<unknown ssid>")?)),
+        (P36H_WIFI_INFO, "LINK_SPEED_UNITS") => return Ok(Some(jstr(vm, "Mbps")?)),
+        (P36H_WIFI_INFO, "FREQUENCY_UNITS") => return Ok(Some(jstr(vm, "MHz")?)),
+        (P36H_WIFI_INFO, "INVALID_RSSI") => Value::Int(-127),
+        (P36H_WIFI_INFO, "LINK_SPEED_UNKNOWN") => Value::Int(-1),
+        (P36H_SCAN_RESULT, "UNSPECIFIED") => Value::Int(-1),
+        (P36H_SCAN_RESULT, "CHANNEL_WIDTH_20MHZ") => Value::Int(0),
+        (P36H_SCAN_RESULT, "CHANNEL_WIDTH_40MHZ") => Value::Int(1),
+        (P36H_SCAN_RESULT, "CHANNEL_WIDTH_80MHZ") => Value::Int(2),
+        (P36H_SCAN_RESULT, "CHANNEL_WIDTH_160MHZ") => Value::Int(3),
+        (P36H_SCAN_RESULT, "CHANNEL_WIDTH_80MHZ_PLUS_MHZ") => Value::Int(4),
+        (P36H_SCAN_RESULT, "CHANNEL_WIDTH_320MHZ") => Value::Int(5),
+        (P36H_SCAN_RESULT, "WIFI_BAND_UNSPECIFIED") => Value::Int(0),
+        (P36H_SCAN_RESULT, "WIFI_BAND_24_GHZ") => Value::Int(1),
+        (P36H_SCAN_RESULT, "WIFI_BAND_5_GHZ") => Value::Int(2),
+        (P36H_SCAN_RESULT, "WIFI_BAND_6_GHZ") => Value::Int(8),
+        (P36H_SCAN_RESULT, "WIFI_BAND_60_GHZ") => Value::Int(16),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn partial36h_wifi_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (class, name, sig) {
+        // WifiManager pure statics.
+        (P36H_WIFI_MANAGER, "calculateSignalLevel", "(II)I") => {
+            let rssi = iarg(args, 0);
+            let levels = iarg(args, 1);
+            // MIN_RSSI=-100, MAX_RSSI=-55 (AOSP WifiManager).
+            Value::Int(if rssi <= -100 {
+                0
+            } else if rssi >= -55 {
+                levels - 1
+            } else {
+                (rssi + 100) * (levels - 1) / 45
+            })
+        }
+        (P36H_WIFI_MANAGER, "compareSignalLevel", "(II)I") => {
+            Value::Int(iarg(args, 0) - iarg(args, 1))
+        }
+        (P36H_WIFI_MANAGER, "getMaxNumberOfNetworkSuggestionsPerApp", "(Z)I") => {
+            Value::Int(if iarg(args, 0) != 0 { 256 } else { 1024 })
+        }
+        // WifiInfo.getDetailedStateOf (hidden static).
+        (
+            P36H_WIFI_INFO,
+            "getDetailedStateOf",
+            "(Landroid/net/wifi/SupplicantState;)Landroid/net/NetworkInfo$DetailedState;",
+        ) => {
+            let sname = p36h_enum_name(vm, args.first()).ok_or_else(|| npe("supplicantState"))?;
+            p36h_detailed_state(vm, &sname)?
+        }
+        // SupplicantState predicates.
+        (P36H_SUPPLICANT, "isValidState", "(Landroid/net/wifi/SupplicantState;)Z") => {
+            // AOSP: state != UNINITIALIZED && state != INVALID (null passes).
+            let sname = p36h_enum_name(vm, args.first());
+            bool_value(!matches!(
+                sname.as_deref(),
+                Some("UNINITIALIZED") | Some("INVALID")
+            ))
+        }
+        (P36H_SUPPLICANT, "isHandshakeState", "(Landroid/net/wifi/SupplicantState;)Z") => {
+            let sname = p36h_enum_name(vm, args.first()).ok_or_else(|| npe("state"))?;
+            bool_value(matches!(
+                sname.as_str(),
+                "AUTHENTICATING"
+                    | "ASSOCIATING"
+                    | "ASSOCIATED"
+                    | "FOUR_WAY_HANDSHAKE"
+                    | "GROUP_HANDSHAKE"
+            ))
+        }
+        (P36H_SUPPLICANT, "isConnecting", "(Landroid/net/wifi/SupplicantState;)Z") => {
+            let sname = p36h_enum_name(vm, args.first()).ok_or_else(|| npe("state"))?;
+            bool_value(matches!(
+                sname.as_str(),
+                "AUTHENTICATING"
+                    | "ASSOCIATING"
+                    | "ASSOCIATED"
+                    | "FOUR_WAY_HANDSHAKE"
+                    | "GROUP_HANDSHAKE"
+                    | "COMPLETED"
+            ))
+        }
+        (P36H_SUPPLICANT, "isDriverActive", "(Landroid/net/wifi/SupplicantState;)Z") => {
+            let sname = p36h_enum_name(vm, args.first()).ok_or_else(|| npe("state"))?;
+            bool_value(matches!(
+                sname.as_str(),
+                "DISCONNECTED"
+                    | "DORMANT"
+                    | "INACTIVE"
+                    | "AUTHENTICATING"
+                    | "ASSOCIATING"
+                    | "ASSOCIATED"
+                    | "SCANNING"
+                    | "FOUR_WAY_HANDSHAKE"
+                    | "GROUP_HANDSHAKE"
+                    | "COMPLETED"
+            ))
+        }
+        // ScanResult band predicates and conversions.
+        (P36H_SCAN_RESULT, "is24GHz", "(I)Z") => bool_value(p36h_is_24ghz(iarg(args, 0))),
+        (P36H_SCAN_RESULT, "is5GHz", "(I)Z") => bool_value(p36h_is_5ghz(iarg(args, 0))),
+        (P36H_SCAN_RESULT, "is6GHz", "(I)Z") => bool_value(p36h_is_6ghz(iarg(args, 0))),
+        (P36H_SCAN_RESULT, "is60GHz", "(I)Z") => bool_value(p36h_is_60ghz(iarg(args, 0))),
+        (P36H_SCAN_RESULT, "is6GHzPsc", "(I)Z") => {
+            let f = iarg(args, 0);
+            bool_value(p36h_is_6ghz(f) && f >= 5975 && (f - 5975) % 80 == 0)
+        }
+        (P36H_SCAN_RESULT, "convertChannelToFrequencyMhzIfSupported", "(II)I") => {
+            let channel = iarg(args, 0);
+            let band = iarg(args, 1);
+            Value::Int(match band {
+                1 if (1..=14).contains(&channel) => {
+                    if channel == 14 {
+                        2484
+                    } else {
+                        (channel - 1) * 5 + 2412
+                    }
+                }
+                2 if (32..=177).contains(&channel) => (channel - 32) * 5 + 5160,
+                8 if (1..=233).contains(&channel) => {
+                    if channel == 2 {
+                        5935
+                    } else {
+                        (channel - 1) * 5 + 5955
+                    }
+                }
+                16 if (1..=6).contains(&channel) => (channel - 1) * 2160 + 58320,
+                _ => -1,
+            })
+        }
+        (P36H_SCAN_RESULT, "convertFrequencyMhzToChannelIfSupported", "(I)I") => {
+            let f = iarg(args, 0);
+            Value::Int(if f == 2484 {
+                14
+            } else if p36h_is_24ghz(f) {
+                (f - 2412) / 5 + 1
+            } else if p36h_is_5ghz(f) {
+                (f - 5160) / 5 + 32
+            } else if f == 5935 {
+                2
+            } else if p36h_is_6ghz(f) {
+                (f - 5955) / 5 + 1
+            } else if p36h_is_60ghz(f) {
+                (f - 58320) / 2160 + 1
+            } else {
+                -1
+            })
+        }
+        (P36H_SCAN_RESULT, "toBand", "(I)I") => {
+            let f = iarg(args, 0);
+            Value::Int(if p36h_is_24ghz(f) {
+                1
+            } else if p36h_is_5ghz(f) {
+                2
+            } else if p36h_is_6ghz(f) {
+                8
+            } else if p36h_is_60ghz(f) {
+                16
+            } else {
+                0
+            })
+        }
+        (P36H_SCAN_RESULT, "getBandFromOpClass", "(II)I") => {
+            let op_class = iarg(args, 0);
+            let channel = iarg(args, 1);
+            Value::Int(match op_class {
+                81..=84 if (1..=14).contains(&channel) => 1,
+                115..=130 if (32..=177).contains(&channel) => 2,
+                131..=137 if (1..=233).contains(&channel) => 8,
+                _ => 0,
+            })
+        }
+        // WifiSsid factories.
+        (P36H_WIFI_SSID, "fromBytes", "([B)Landroid/net/wifi/WifiSsid;") => {
+            let bytes = match args.first() {
+                Some(v) if !matches!(v, Value::Null) => p36h_bytes(vm, Some(v)),
+                _ => Vec::new(),
+            };
+            p36h_new_wifi_ssid(vm, bytes)?
+        }
+        (
+            P36H_WIFI_SSID,
+            "fromUtf8Text",
+            "(Ljava/lang/CharSequence;)Landroid/net/wifi/WifiSsid;",
+        ) => {
+            let bytes = match opt_str(vm, args.first()) {
+                Some(t) => t.into_bytes(),
+                None => Vec::new(),
+            };
+            p36h_new_wifi_ssid(vm, bytes)?
+        }
+        (P36H_WIFI_SSID, "fromString", "(Ljava/lang/String;)Landroid/net/wifi/WifiSsid;") => {
+            // AOSP WifiSsid.fromString is hidden: quoted text is UTF-8,
+            // otherwise the string is hex-encoded bytes.
+            let text = opt_str(vm, args.first()).unwrap_or_default();
+            let bytes = if text.len() >= 2 && text.starts_with('"') && text.ends_with('"') {
+                text.as_bytes()[1..text.len() - 1].to_vec()
+            } else {
+                p36h_hex_decode(&text)?
+            };
+            p36h_new_wifi_ssid(vm, bytes)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn partial36h_wifi_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (recv_class, name, sig) {
+        // Present-but-disabled radio profile (see batch header).
+        (
+            P36H_WIFI_MANAGER,
+            "<init>",
+            "(Landroid/content/Context;Landroid/net/wifi/IWifiManager;Landroid/os/Looper;)V",
+        ) => {
+            if let Some(ctx) = args.first() {
+                put(vm, recv, "mContext", ctx.clone())?;
+            }
+            Value::Null
+        }
+        (P36H_WIFI_MANAGER, "getWifiState", "()I") => Value::Int(1), // WIFI_STATE_DISABLED
+        (P36H_WIFI_MANAGER, "isWifiEnabled", "()Z") => bool_value(false),
+        // Since Android 10 apps cannot toggle Wi-Fi; the call is denied.
+        (P36H_WIFI_MANAGER, "setWifiEnabled", "(Z)Z") => bool_value(false),
+        (P36H_WIFI_MANAGER, "getConnectionInfo", "()Landroid/net/wifi/WifiInfo;") => {
+            p36h_default_wifi_info(vm)?
+        }
+        (P36H_WIFI_MANAGER, "getScanResults", "()Ljava/util/List;") => {
+            p49_list_value(vm, Vec::new())?
+        }
+        (P36H_WIFI_MANAGER, "startScan", "()Z") => bool_value(false),
+        (P36H_WIFI_MANAGER, "startScan", "(Landroid/os/WorkSource;)Z") => bool_value(false),
+        (P36H_WIFI_MANAGER, "getConfiguredNetworks", "()Ljava/util/List;") => {
+            p49_list_value(vm, Vec::new())?
+        }
+        (P36H_WIFI_MANAGER, "getMaxNumberOfNetworkSuggestionsPerApp", "()I") => {
+            // The VM profile is not a low-RAM device.
+            Value::Int(1024)
+        }
+        (P36H_WIFI_MANAGER, "calculateSignalLevel", "(I)I") => {
+            // Deprecated instance form uses RSSI_LEVELS=5.
+            let rssi = iarg(args, 0);
+            Value::Int(if rssi <= -100 {
+                0
+            } else if rssi >= -55 {
+                4
+            } else {
+                (rssi + 100) * 4 / 45
+            })
+        }
+        // WifiInfo default construction + getters.
+        (P36H_WIFI_INFO, "<init>", "()V") => {
+            let state = p36h_supplicant(vm, "UNINITIALIZED")?;
+            put(vm, recv, "mSupplicantState", state)?;
+            put(vm, recv, "mNetworkId", Value::Int(-1))?;
+            put(vm, recv, "mRssi", Value::Int(-127))?;
+            put(vm, recv, "mLinkSpeed", Value::Int(-1))?;
+            put(vm, recv, "mFrequency", Value::Int(-1))?;
+            put(vm, recv, "mSecurityType", Value::Int(-1))?;
+            put(vm, recv, "mSubscriptionId", Value::Int(-1))?;
+            let mac = jstr(vm, "02:00:00:00:00:00")?;
+            put(vm, recv, "mMacAddress", mac)?;
+            Value::Null
+        }
+        (P36H_WIFI_INFO, "getSSID", "()Ljava/lang/String;") => {
+            let text = match field_obj(vm, recv, "mWifiSsid") {
+                Some(ssid) => {
+                    let bytes = p36h_bytes(vm, Some(&get(vm, ssid, "mBytes")));
+                    match p36h_ssid_utf8_text(&bytes) {
+                        Some(t) if !t.is_empty() => format!("\"{t}\""),
+                        _ => "<unknown ssid>".to_string(),
+                    }
+                }
+                None => "<unknown ssid>".to_string(),
+            };
+            jstr(vm, text)?
+        }
+        (P36H_WIFI_INFO, "getBSSID", "()Ljava/lang/String;") => get(vm, recv, "mBSSID"),
+        (P36H_WIFI_INFO, "getNetworkId", "()I") => {
+            let v = get(vm, recv, "mNetworkId");
+            if matches!(v, Value::Null) {
+                Value::Int(-1)
+            } else {
+                v
+            }
+        }
+        (P36H_WIFI_INFO, "getSupplicantState", "()Landroid/net/wifi/SupplicantState;") => {
+            let v = get(vm, recv, "mSupplicantState");
+            if matches!(v, Value::Null) {
+                p36h_supplicant(vm, "UNINITIALIZED")?
+            } else {
+                v
+            }
+        }
+        (P36H_WIFI_INFO, "getDetailedState", "()Landroid/net/NetworkInfo$DetailedState;") => {
+            let sname = p36h_enum_name(vm, Some(&get(vm, recv, "mSupplicantState")))
+                .unwrap_or_else(|| "UNINITIALIZED".to_string());
+            p36h_detailed_state(vm, &sname)?
+        }
+        (P36H_WIFI_INFO, "getFrequency", "()I") => {
+            let v = get(vm, recv, "mFrequency");
+            if matches!(v, Value::Null) {
+                Value::Int(-1)
+            } else {
+                v
+            }
+        }
+        (P36H_WIFI_INFO, "getMacAddress", "()Ljava/lang/String;") => {
+            let v = get(vm, recv, "mMacAddress");
+            if matches!(v, Value::Null) {
+                jstr(vm, "02:00:00:00:00:00")?
+            } else {
+                v
+            }
+        }
+        (P36H_WIFI_INFO, "getIpAddress", "()I") => {
+            // Default WifiInfo has no InetAddress: AOSP returns 0.
+            match field_obj(vm, recv, "mIpAddress") {
+                Some(addr) => match vm.invoke_instance(addr, "getAddress", "()[B", &[]) {
+                    Ok(bytes_value) => {
+                        let bytes = p36h_bytes(vm, Some(&bytes_value));
+                        if bytes.len() == 4 {
+                            Value::Int(
+                                bytes[0] as i32
+                                    | (bytes[1] as i32) << 8
+                                    | (bytes[2] as i32) << 16
+                                    | (bytes[3] as i32) << 24,
+                            )
+                        } else {
+                            Value::Int(0)
+                        }
+                    }
+                    Err(_) => Value::Int(0),
+                },
+                None => Value::Int(0),
+            }
+        }
+        (P36H_WIFI_INFO, "getRssi", "()I") => {
+            let v = get(vm, recv, "mRssi");
+            if matches!(v, Value::Null) {
+                Value::Int(-127)
+            } else {
+                v
+            }
+        }
+        (P36H_WIFI_INFO, "getLinkSpeed", "()I") => {
+            let v = get(vm, recv, "mLinkSpeed");
+            if matches!(v, Value::Null) {
+                Value::Int(-1)
+            } else {
+                v
+            }
+        }
+        (P36H_WIFI_INFO, "getTxLinkSpeedMbps", "()I") => {
+            Value::Int(field_int(vm, recv, "mTxLinkSpeed"))
+        }
+        (P36H_WIFI_INFO, "getRxLinkSpeedMbps", "()I") => {
+            Value::Int(field_int(vm, recv, "mRxLinkSpeed"))
+        }
+        (P36H_WIFI_INFO, "getMaxSupportedTxLinkSpeedMbps", "()I") => {
+            Value::Int(field_int(vm, recv, "mMaxSupportedTxLinkSpeed"))
+        }
+        (P36H_WIFI_INFO, "getMaxSupportedRxLinkSpeedMbps", "()I") => {
+            Value::Int(field_int(vm, recv, "mMaxSupportedRxLinkSpeed"))
+        }
+        (P36H_WIFI_INFO, "getWifiSsid", "()Landroid/net/wifi/WifiSsid;") => {
+            get(vm, recv, "mWifiSsid")
+        }
+        (P36H_WIFI_INFO, "getHiddenSSID", "()Z") => {
+            bool_value(field_bool(vm, recv, "mIsHiddenSsid"))
+        }
+        (P36H_WIFI_INFO, "is24GHz", "()Z") => {
+            bool_value(p36h_is_24ghz(field_int(vm, recv, "mFrequency")))
+        }
+        (P36H_WIFI_INFO, "is5GHz", "()Z") => {
+            bool_value(p36h_is_5ghz(field_int(vm, recv, "mFrequency")))
+        }
+        (P36H_WIFI_INFO, "is6GHz", "()Z") => {
+            bool_value(p36h_is_6ghz(field_int(vm, recv, "mFrequency")))
+        }
+        (P36H_WIFI_INFO, "getMeteredHint", "()Z") => {
+            bool_value(field_bool(vm, recv, "mMeteredHint"))
+        }
+        (P36H_WIFI_INFO, "isEphemeral", "()Z") => bool_value(field_bool(vm, recv, "mEphemeral")),
+        (P36H_WIFI_INFO, "isTrusted", "()Z") => bool_value(field_bool(vm, recv, "mTrusted")),
+        (P36H_WIFI_INFO, "isRestricted", "()Z") => bool_value(field_bool(vm, recv, "mRestricted")),
+        (P36H_WIFI_INFO, "isOemPaid", "()Z") => bool_value(field_bool(vm, recv, "mOemPaid")),
+        (P36H_WIFI_INFO, "isOemPrivate", "()Z") => bool_value(field_bool(vm, recv, "mOemPrivate")),
+        (P36H_WIFI_INFO, "isCarrierMerged", "()Z") => {
+            bool_value(field_bool(vm, recv, "mCarrierMerged"))
+        }
+        (P36H_WIFI_INFO, "isOsuAp", "()Z") => bool_value(field_bool(vm, recv, "mOsuAp")),
+        (P36H_WIFI_INFO, "isPasspointAp", "()Z") => bool_value(
+            field_obj(vm, recv, "mFqdn").is_some()
+                && field_obj(vm, recv, "mProviderFriendlyName").is_some(),
+        ),
+        (P36H_WIFI_INFO, "describeContents", "()I") => Value::Int(0),
+        // WifiSsid instance surface.
+        (P36H_WIFI_SSID, "getBytes", "()[B") => {
+            let bytes = p36h_bytes(vm, Some(&get(vm, recv, "mBytes")));
+            p49_new_byte_array(vm, &bytes)?
+        }
+        (P36H_WIFI_SSID, "getUtf8Text", "()Ljava/lang/CharSequence;") => {
+            let bytes = p36h_bytes(vm, Some(&get(vm, recv, "mBytes")));
+            match p36h_ssid_utf8_text(&bytes) {
+                Some(t) => jstr(vm, t)?,
+                None => Value::Null,
+            }
+        }
+        (P36H_WIFI_SSID, "toString", "()Ljava/lang/String;") => {
+            let bytes = p36h_bytes(vm, Some(&get(vm, recv, "mBytes")));
+            let text = match p36h_ssid_utf8_text(&bytes) {
+                Some(t) if !t.is_empty() => format!("\"{t}\""),
+                _ => p36h_hex_encode(&bytes),
+            };
+            jstr(vm, text)?
+        }
+        (P36H_WIFI_SSID, "equals", "(Ljava/lang/Object;)Z") => {
+            let mine = p36h_bytes(vm, Some(&get(vm, recv, "mBytes")));
+            let eq = match oarg(args, 0) {
+                Some(other) if class_of(vm, other) == P36H_WIFI_SSID => {
+                    mine == p36h_bytes(vm, Some(&get(vm, other, "mBytes")))
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        (P36H_WIFI_SSID, "hashCode", "()I") => {
+            let bytes = p36h_bytes(vm, Some(&get(vm, recv, "mBytes")));
+            // java.util.Arrays.hashCode(byte[])
+            let mut h: i32 = 1;
+            for b in &bytes {
+                h = h.wrapping_mul(31).wrapping_add(*b as i8 as i32);
+            }
+            Value::Int(h)
+        }
+        (P36H_WIFI_SSID, "describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+// ---- IPsec IKE (Batch 36-H) ----
+
+// SaProposal algorithm id spaces (AOSP SaProposal).
+const P36H_ENCR_IDS: [i32; 7] = [3, 12, 13, 18, 19, 20, 28];
+const P36H_CHILD_ENCR_IDS: [i32; 6] = [12, 13, 18, 19, 20, 28];
+const P36H_INTEG_IDS: [i32; 7] = [0, 2, 5, 8, 12, 13, 14];
+const P36H_PRF_IDS: [i32; 6] = [2, 4, 5, 6, 7, 8];
+const P36H_DH_IDS: [i32; 7] = [0, 2, 5, 14, 15, 16, 31];
+
+fn p36h_is_aead(algorithm: i32) -> bool {
+    matches!(algorithm, 18 | 19 | 20 | 28)
+}
+
+// IkeSaPayload.EncryptionTransform key-length validation.
+fn p36h_validate_encryption(algorithm: i32, key_length: i32) -> Result<(), VmExit> {
+    match algorithm {
+        3 | 28 => {
+            if key_length != 0 {
+                return Err(iae(format!(
+                    "Must not set Key Length value for this Encryption Algorithm ID: {algorithm}"
+                )));
+            }
+        }
+        12 | 13 | 18 | 19 | 20 => {
+            if key_length == 0 {
+                return Err(iae(format!(
+                    "Must set Key Length value for this Encryption Algorithm ID: {algorithm}"
+                )));
+            }
+            if !matches!(key_length, 128 | 192 | 256) {
+                return Err(iae(format!(
+                    "Invalid key length for this Encryption Algorithm ID: {algorithm}"
+                )));
+            }
+        }
+        _ => {
+            return Err(iae(format!(
+                "Unsupported Encryption Algorithm ID: {algorithm}"
+            )))
+        }
+    }
+    Ok(())
+}
+
+fn p36h_box_int(vm: &mut Engine, v: i32) -> Result<Value, VmExit> {
+    Ok(Value::Obj(crate::boxes::box_value(
+        vm,
+        "Ljava/lang/Integer;",
+        Value::Int(v),
+    )?))
+}
+
+fn p36h_int_list_value(vm: &mut Engine, ints: &[i32]) -> Result<Value, VmExit> {
+    let mut elems = Vec::with_capacity(ints.len());
+    for i in ints {
+        elems.push(p36h_box_int(vm, *i)?);
+    }
+    p49_list_value(vm, elems)
+}
+
+fn p36h_int_set_value(vm: &mut Engine, ints: &[i32]) -> Result<Value, VmExit> {
+    let mut elems = Vec::with_capacity(ints.len());
+    for i in ints {
+        elems.push(p36h_box_int(vm, *i)?);
+    }
+    Ok(Value::Obj(new_collection(
+        vm,
+        "Ljava/util/HashSet;",
+        elems,
+    )?))
+}
+
+fn p36h_read_ints(vm: &Engine, value: &Value) -> Vec<i32> {
+    collection_items(vm, Some(value))
+        .iter()
+        .map(|v| af_value_unbox(vm, v).as_int().unwrap_or(0))
+        .collect()
+}
+
+fn p36h_pair(vm: &mut Engine, first: i32, second: i32) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, P36H_PAIR, Vec::new())?;
+    let f = p36h_box_int(vm, first)?;
+    put(vm, r, "first", f)?;
+    let s = p36h_box_int(vm, second)?;
+    put(vm, r, "second", s)?;
+    Ok(Value::Obj(r))
+}
+
+fn p36h_read_pairs(vm: &Engine, value: &Value) -> Vec<(i32, i32)> {
+    collection_items(vm, Some(value))
+        .iter()
+        .map(|v| match v {
+            Value::Obj(r) => (
+                af_value_unbox(vm, &get(vm, *r, "first"))
+                    .as_int()
+                    .unwrap_or(0),
+                af_value_unbox(vm, &get(vm, *r, "second"))
+                    .as_int()
+                    .unwrap_or(0),
+            ),
+            _ => (0, 0),
+        })
+        .collect()
+}
+
+fn p36h_is_inet4(vm: &Engine, value: Option<&Value>) -> bool {
+    match value {
+        Some(Value::Obj(r)) => vm
+            .cp
+            .is_subtype(&class_of(vm, *r), "Ljava/net/Inet4Address;"),
+        _ => false,
+    }
+}
+
+fn p36h_is_inet6(vm: &Engine, value: Option<&Value>) -> bool {
+    match value {
+        Some(Value::Obj(r)) => vm
+            .cp
+            .is_subtype(&class_of(vm, *r), "Ljava/net/Inet6Address;"),
+        _ => false,
+    }
+}
+
+fn p36h_inet_bytes(vm: &mut Engine, value: &Value) -> Option<Vec<u8>> {
+    match value {
+        Value::Obj(r) => match vm.invoke_instance(*r, "getAddress", "()[B", &[]) {
+            Ok(v) if !matches!(v, Value::Null) => Some(p36h_bytes(vm, Some(&v))),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn p36h_inet_equal(vm: &mut Engine, a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Obj(x), Value::Obj(y)) if x == y => true,
+        (Value::Obj(_), Value::Obj(_)) => match (p36h_inet_bytes(vm, a), p36h_inet_bytes(vm, b)) {
+            (Some(x), Some(y)) => x == y,
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn partial36h_ike_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (class, name, sig) {
+        (P36H_SA_PROPOSAL, "getSupportedDhGroups", "()Ljava/util/Set;") => {
+            p36h_int_set_value(vm, &P36H_DH_IDS)?
+        }
+        (P36H_IKE_PROPOSAL, "getSupportedEncryptionAlgorithms", "()Ljava/util/Set;") => {
+            p36h_int_set_value(vm, &P36H_ENCR_IDS)?
+        }
+        (P36H_IKE_PROPOSAL, "getSupportedIntegrityAlgorithms", "()Ljava/util/Set;") => {
+            p36h_int_set_value(vm, &P36H_INTEG_IDS)?
+        }
+        (P36H_IKE_PROPOSAL, "getSupportedPseudorandomFunctions", "()Ljava/util/Set;") => {
+            p36h_int_set_value(vm, &P36H_PRF_IDS)?
+        }
+        (P36H_CHILD_PROPOSAL, "getSupportedEncryptionAlgorithms", "()Ljava/util/Set;") => {
+            // Derived from IPsec algorithms available on Android 14: AES
+            // modes and ChaCha20-Poly1305 (3DES has no IPsec transform).
+            p36h_int_set_value(vm, &P36H_CHILD_ENCR_IDS)?
+        }
+        (P36H_CHILD_PROPOSAL, "getSupportedIntegrityAlgorithms", "()Ljava/util/Set;") => {
+            p36h_int_set_value(vm, &P36H_INTEG_IDS)?
+        }
+        (P36H_SA_PROPOSAL, "getEncryptionAlgorithmString", "(I)Ljava/lang/String;") => {
+            let a = iarg(args, 0);
+            let s = match a {
+                3 => "ENCR_3DES".to_string(),
+                12 => "ENCR_AES_CBC".to_string(),
+                13 => "ENCR_AES_CTR".to_string(),
+                18 => "ENCR_AES_GCM_8".to_string(),
+                19 => "ENCR_AES_GCM_12".to_string(),
+                20 => "ENCR_AES_GCM_16".to_string(),
+                28 => "ENCR_CHACHA20_POLY1305".to_string(),
+                _ => format!("ENC_Unknown_{a}"),
+            };
+            jstr(vm, s)?
+        }
+        (P36H_SA_PROPOSAL, "getPseudorandomFunctionString", "(I)Ljava/lang/String;") => {
+            let a = iarg(args, 0);
+            let s = match a {
+                2 => "PRF_HMAC_SHA1".to_string(),
+                4 => "PRF_AES128_XCBC".to_string(),
+                5 => "PRF_HMAC_SHA2_256".to_string(),
+                6 => "PRF_HMAC_SHA2_384".to_string(),
+                7 => "PRF_HMAC_SHA2_512".to_string(),
+                8 => "PRF_AES128_CMAC".to_string(),
+                _ => format!("PRF_Unknown_{a}"),
+            };
+            jstr(vm, s)?
+        }
+        (P36H_SA_PROPOSAL, "getIntegrityAlgorithmString", "(I)Ljava/lang/String;") => {
+            let a = iarg(args, 0);
+            let s = match a {
+                0 => "AUTH_NONE".to_string(),
+                2 => "AUTH_HMAC_SHA1_96".to_string(),
+                5 => "AUTH_AES_XCBC_96".to_string(),
+                8 => "AUTH_AES_CMAC_96".to_string(),
+                12 => "AUTH_HMAC_SHA2_256_128".to_string(),
+                13 => "AUTH_HMAC_SHA2_384_192".to_string(),
+                14 => "AUTH_HMAC_SHA2_512_256".to_string(),
+                _ => format!("AUTH_Unknown_{a}"),
+            };
+            jstr(vm, s)?
+        }
+        (P36H_SA_PROPOSAL, "getDhGroupString", "(I)Ljava/lang/String;") => {
+            let a = iarg(args, 0);
+            let s = match a {
+                0 => "DH_NONE".to_string(),
+                2 => "DH_1024_BIT_MODP".to_string(),
+                5 => "DH_1536_BIT_MODP".to_string(),
+                14 => "DH_2048_BIT_MODP".to_string(),
+                15 => "DH_3072_BIT_MODP".to_string(),
+                16 => "DH_4096_BIT_MODP".to_string(),
+                31 => "DH_GROUP_CURVE_25519".to_string(),
+                _ => format!("DH_Unknown_{a}"),
+            };
+            jstr(vm, s)?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36h_builder_init(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    for f in ["rd_enc", "rd_integ", "rd_dh", "rd_prf"] {
+        let empty = p49_list_value(vm, Vec::new())?;
+        put(vm, recv, f, empty)?;
+    }
+    put(vm, recv, "rd_has_aead", Value::Int(-1))?;
+    Ok(())
+}
+
+fn p36h_append_int_unique(
+    vm: &mut Engine,
+    recv: ObjRef,
+    field: &str,
+    value: i32,
+) -> Result<(), VmExit> {
+    let mut ints = p36h_read_ints(vm, &get(vm, recv, field));
+    if !ints.contains(&value) {
+        ints.push(value);
+    }
+    let list = p36h_int_list_value(vm, &ints)?;
+    put(vm, recv, field, list)
+}
+
+fn p36h_proposal_builder(
+    vm: &mut Engine,
+    recv_class: &str,
+    name: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let is_child = recv_class == P36H_CHILD_BUILDER;
+    let this = Value::Obj(recv);
+    let v = match name {
+        "<init>" => {
+            p36h_builder_init(vm, recv)?;
+            Value::Null
+        }
+        "addEncryptionAlgorithm" => {
+            let algorithm = iarg(args, 0);
+            let key_length = iarg(args, 1);
+            if is_child && !P36H_CHILD_ENCR_IDS.contains(&algorithm) {
+                return Err(iae(format!(
+                    "Encryption algorithm not supported for Child SA: {algorithm}"
+                )));
+            }
+            p36h_validate_encryption(algorithm, key_length)?;
+            let is_aead = p36h_is_aead(algorithm);
+            let has_aead = field_int(vm, recv, "rd_has_aead");
+            if has_aead != -1 && (has_aead == 1) != is_aead {
+                return Err(iae(
+                    "Invalid SA Proposal: Proposal cannot has both normal ciphers and combined-mode ciphers."
+                        .to_string(),
+                ));
+            }
+            let mut pairs = p36h_read_pairs(vm, &get(vm, recv, "rd_enc"));
+            if !pairs.contains(&(algorithm, key_length)) {
+                pairs.push((algorithm, key_length));
+            }
+            let mut elems = Vec::with_capacity(pairs.len());
+            for (a, k) in pairs {
+                elems.push(p36h_pair(vm, a, k)?);
+            }
+            let list = p49_list_value(vm, elems)?;
+            put(vm, recv, "rd_enc", list)?;
+            put(
+                vm,
+                recv,
+                "rd_has_aead",
+                Value::Int(if is_aead { 1 } else { 0 }),
+            )?;
+            this
+        }
+        "addIntegrityAlgorithm" => {
+            let algorithm = iarg(args, 0);
+            if !P36H_INTEG_IDS.contains(&algorithm) {
+                return Err(iae(format!(
+                    "Unsupported Integrity Algorithm ID: {algorithm}"
+                )));
+            }
+            p36h_append_int_unique(vm, recv, "rd_integ", algorithm)?;
+            this
+        }
+        "addDhGroup" => {
+            let group = iarg(args, 0);
+            if !P36H_DH_IDS.contains(&group) {
+                return Err(iae(format!("Unsupported DH Group ID: {group}")));
+            }
+            p36h_append_int_unique(vm, recv, "rd_dh", group)?;
+            this
+        }
+        "addPseudorandomFunction" => {
+            if is_child {
+                return Ok(None);
+            }
+            let prf = iarg(args, 0);
+            if !P36H_PRF_IDS.contains(&prf) {
+                return Err(iae(format!("Unsupported Pseudorandom Function ID: {prf}")));
+            }
+            p36h_append_int_unique(vm, recv, "rd_prf", prf)?;
+            this
+        }
+        "build" => {
+            let enc = p36h_read_pairs(vm, &get(vm, recv, "rd_enc"));
+            if enc.is_empty() {
+                return Err(iae(
+                    "SA Proposal requires at least one encryption algorithm.".to_string(),
+                ));
+            }
+            let has_aead = field_int(vm, recv, "rd_has_aead") == 1;
+            let integ = p36h_read_ints(vm, &get(vm, recv, "rd_integ"));
+            let dh = p36h_read_ints(vm, &get(vm, recv, "rd_dh"));
+            let proposal_class = if is_child {
+                // AOSP ChildSaProposal.build: AEAD proposals may only carry
+                // INTEGRITY_ALGORITHM_NONE (or no explicit integrity).
+                if has_aead && integ.iter().any(|a| *a != 0) {
+                    return Err(iae(
+                        "Invalid SA Proposal: integrity algorithm must not be set for AEAD ciphers."
+                            .to_string(),
+                    ));
+                }
+                P36H_CHILD_PROPOSAL
+            } else {
+                let prfs = p36h_read_ints(vm, &get(vm, recv, "rd_prf"));
+                if prfs.is_empty() {
+                    return Err(iae(
+                        "IKE SA Proposal requires at least one pseudorandom function.".to_string(),
+                    ));
+                }
+                if integ.is_empty() && !has_aead {
+                    return Err(iae(
+                        "IKE SA Proposal requires at least one integrity algorithm.".to_string(),
+                    ));
+                }
+                if integ.iter().any(|a| (*a == 0) != has_aead) {
+                    return Err(iae(
+                        "Invalid SA Proposal: INTEGRITY_ALGORITHM_NONE is only valid for AEAD ciphers."
+                            .to_string(),
+                    ));
+                }
+                if dh.is_empty() {
+                    return Err(iae(
+                        "IKE SA Proposal requires at least one DH group.".to_string()
+                    ));
+                }
+                if dh.contains(&0) {
+                    return Err(iae(
+                        "IKE SA Proposal must not use DH_GROUP_NONE.".to_string()
+                    ));
+                }
+                P36H_IKE_PROPOSAL
+            };
+            let proposal = alloc_obj(vm, proposal_class, Vec::new())?;
+            for f in ["rd_enc", "rd_integ", "rd_dh", "rd_prf"] {
+                let items = collection_items(vm, Some(&get(vm, recv, f)));
+                let snapshot = p49_list_value(vm, items)?;
+                put(vm, proposal, f, snapshot)?;
+            }
+            Value::Obj(proposal)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36h_proposal_getters(
+    vm: &mut Engine,
+    name: &str,
+    recv: ObjRef,
+) -> Result<Option<Value>, VmExit> {
+    let field = match name {
+        "getEncryptionAlgorithms" => "rd_enc",
+        "getIntegrityAlgorithms" => "rd_integ",
+        "getDhGroups" => "rd_dh",
+        "getPseudorandomFunctions" => "rd_prf",
+        _ => return Ok(None),
+    };
+    let items = collection_items(vm, Some(&get(vm, recv, field)));
+    Ok(Some(p49_list_value(vm, items)?))
+}
+
+fn p36h_ts_init(
+    vm: &mut Engine,
+    recv: ObjRef,
+    ts_type: i32,
+    start_port: i32,
+    end_port: i32,
+    starting: Value,
+    ending: Value,
+) -> Result<Value, VmExit> {
+    // AOSP IkeTrafficSelector validation order: type/family, address range,
+    // then port range.
+    let selector_length = match ts_type {
+        7 => {
+            if !p36h_is_inet4(vm, Some(&starting)) || !p36h_is_inet4(vm, Some(&ending)) {
+                return Err(iae(
+                    "Invalid IPv4 address range for IPv4 Traffic Selector.".to_string()
+                ));
+            }
+            16
+        }
+        8 => {
+            if !p36h_is_inet6(vm, Some(&starting)) || !p36h_is_inet6(vm, Some(&ending)) {
+                return Err(iae(
+                    "Invalid IPv6 address range for IPv6 Traffic Selector.".to_string()
+                ));
+            }
+            40
+        }
+        _ => return Err(iae("Unrecognized Traffic Selector type.".to_string())),
+    };
+    if let (Some(s), Some(e)) = (p36h_inet_bytes(vm, &starting), p36h_inet_bytes(vm, &ending)) {
+        if s > e {
+            return Err(iae("Received invalid address range.".to_string()));
+        }
+    }
+    if !(0..=65535).contains(&start_port)
+        || !(0..=65535).contains(&end_port)
+        || start_port > end_port
+    {
+        return Err(iae(format!(
+            "Invalid port range. startPort: {start_port} endPort: {end_port}"
+        )));
+    }
+    put(vm, recv, "tsType", Value::Int(ts_type))?;
+    put(vm, recv, "ipProtocolId", Value::Int(0))?;
+    put(vm, recv, "selectorLength", Value::Int(selector_length))?;
+    put(vm, recv, "startPort", Value::Int(start_port))?;
+    put(vm, recv, "endPort", Value::Int(end_port))?;
+    put(vm, recv, "startingAddress", starting)?;
+    put(vm, recv, "endingAddress", ending)?;
+    Ok(Value::Null)
+}
+
+fn p36h_traffic_selector(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(IILjava/net/InetAddress;Ljava/net/InetAddress;)V") => {
+            let starting = args.get(2).cloned().unwrap_or(Value::Null);
+            let ts_type = if p36h_is_inet4(vm, Some(&starting)) {
+                7
+            } else {
+                8
+            };
+            p36h_ts_init(
+                vm,
+                recv,
+                ts_type,
+                iarg(args, 0),
+                iarg(args, 1),
+                starting,
+                args.get(3).cloned().unwrap_or(Value::Null),
+            )?
+        }
+        ("<init>", "(IIILjava/net/InetAddress;Ljava/net/InetAddress;)V") => p36h_ts_init(
+            vm,
+            recv,
+            iarg(args, 0),
+            iarg(args, 1),
+            iarg(args, 2),
+            args.get(3).cloned().unwrap_or(Value::Null),
+            args.get(4).cloned().unwrap_or(Value::Null),
+        )?,
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(other) if class_of(vm, other) == P36H_TS => {
+                    field_int(vm, recv, "tsType") == field_int(vm, other, "tsType")
+                        && field_int(vm, recv, "ipProtocolId")
+                            == field_int(vm, other, "ipProtocolId")
+                        && field_int(vm, recv, "startPort") == field_int(vm, other, "startPort")
+                        && field_int(vm, recv, "endPort") == field_int(vm, other, "endPort")
+                        && p36h_inet_equal(
+                            vm,
+                            &get(vm, recv, "startingAddress"),
+                            &get(vm, other, "startingAddress"),
+                        )
+                        && p36h_inet_equal(
+                            vm,
+                            &get(vm, recv, "endingAddress"),
+                            &get(vm, other, "endingAddress"),
+                        )
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36h_identification(
+    vm: &mut Engine,
+    recv_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let arg0 = args.first().cloned().unwrap_or(Value::Null);
+    let v = match (recv_class, name, sig) {
+        (P36H_ID_FQDN, "<init>", "(Ljava/lang/String;)V") => {
+            let text = req_str(vm, args, 0, "fqdn")?;
+            if !text.is_ascii() {
+                return Err(iae("Non US-ASCII character set used".to_string()));
+            }
+            put(vm, recv, "idType", Value::Int(2))?;
+            put(vm, recv, "fqdn", arg0)?;
+            Value::Null
+        }
+        (P36H_ID_FQDN, "<init>", "([B)V") => {
+            if matches!(arg0, Value::Null) {
+                return Err(npe("fqdnBytes"));
+            }
+            let text: String = p36h_bytes(vm, Some(&arg0))
+                .iter()
+                .map(|b| if *b < 128 { *b as char } else { '\u{FFFD}' })
+                .collect();
+            put(vm, recv, "idType", Value::Int(2))?;
+            let s = jstr(vm, text)?;
+            put(vm, recv, "fqdn", s)?;
+            Value::Null
+        }
+        (P36H_ID_RFC822, "<init>", "(Ljava/lang/String;)V") => {
+            put(vm, recv, "idType", Value::Int(3))?;
+            put(vm, recv, "rfc822Name", arg0)?;
+            Value::Null
+        }
+        (P36H_ID_RFC822, "<init>", "([B)V") => {
+            if matches!(arg0, Value::Null) {
+                return Err(npe("rfc822NameBytes"));
+            }
+            let text = String::from_utf8_lossy(&p36h_bytes(vm, Some(&arg0))).into_owned();
+            put(vm, recv, "idType", Value::Int(3))?;
+            let s = jstr(vm, text)?;
+            put(vm, recv, "rfc822Name", s)?;
+            Value::Null
+        }
+        (P36H_ID_KEYID, "<init>", "([B)V") => {
+            put(vm, recv, "idType", Value::Int(11))?;
+            put(vm, recv, "keyId", arg0)?;
+            Value::Null
+        }
+        (P36H_ID_IPV4, "<init>", "(Ljava/net/Inet4Address;)V") => {
+            put(vm, recv, "idType", Value::Int(1))?;
+            put(vm, recv, "ipv4Address", arg0)?;
+            Value::Null
+        }
+        (_, "equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(other) if class_of(vm, other) == recv_class => match recv_class {
+                    P36H_ID_FQDN => field_str(vm, recv, "fqdn") == field_str(vm, other, "fqdn"),
+                    P36H_ID_RFC822 => {
+                        field_str(vm, recv, "rfc822Name") == field_str(vm, other, "rfc822Name")
+                    }
+                    P36H_ID_KEYID => {
+                        p36h_bytes(vm, Some(&get(vm, recv, "keyId")))
+                            == p36h_bytes(vm, Some(&get(vm, other, "keyId")))
+                    }
+                    P36H_ID_IPV4 => p36h_inet_equal(
+                        vm,
+                        &get(vm, recv, "ipv4Address"),
+                        &get(vm, other, "ipv4Address"),
+                    ),
+                    _ => false,
+                },
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36h_default_ts(vm: &mut Engine, ts_type: i32) -> Result<Value, VmExit> {
+    let addr_class = if ts_type == 7 {
+        "Ljava/net/Inet4Address;"
+    } else {
+        "Ljava/net/Inet6Address;"
+    };
+    let start = alloc_obj(vm, addr_class, Vec::new())?;
+    let end = alloc_obj(vm, addr_class, Vec::new())?;
+    let ts = alloc_obj(vm, P36H_TS, Vec::new())?;
+    vm.invoke_instance(
+        ts,
+        "<init>",
+        "(IIILjava/net/InetAddress;Ljava/net/InetAddress;)V",
+        &[
+            Value::Int(ts_type),
+            Value::Int(0),
+            Value::Int(65535),
+            Value::Obj(start),
+            Value::Obj(end),
+        ],
+    )?;
+    Ok(Value::Obj(ts))
+}
+
+fn p36h_params_builder_init(
+    vm: &mut Engine,
+    recv: ObjRef,
+    source: Option<ObjRef>,
+) -> Result<(), VmExit> {
+    for f in ["rd_in_ts", "rd_out_ts", "rd_proposals"] {
+        let items = match source {
+            Some(src) => collection_items(vm, Some(&get(vm, src, f))),
+            None => Vec::new(),
+        };
+        let list = p49_list_value(vm, items)?;
+        put(vm, recv, f, list)?;
+    }
+    let (hard, soft) = match source {
+        Some(src) => (field_int(vm, src, "rd_hard"), field_int(vm, src, "rd_soft")),
+        None => (7200, 3600),
+    };
+    put(vm, recv, "rd_hard", Value::Int(hard))?;
+    put(vm, recv, "rd_soft", Value::Int(soft))?;
+    Ok(())
+}
+
+fn p36h_append_value(
+    vm: &mut Engine,
+    recv: ObjRef,
+    field: &str,
+    value: Value,
+) -> Result<(), VmExit> {
+    let mut items = collection_items(vm, Some(&get(vm, recv, field)));
+    items.push(value);
+    let list = p49_list_value(vm, items)?;
+    put(vm, recv, field, list)
+}
+
+fn p36h_params_builder(
+    vm: &mut Engine,
+    recv_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let this = Value::Obj(recv);
+    let v = match name {
+        "<init>" if sig == "()V" => {
+            p36h_params_builder_init(vm, recv, None)?;
+            Value::Null
+        }
+        "<init>" => {
+            // Copy constructor from an existing params instance.
+            let src = oarg(args, 0).ok_or_else(|| npe("childParams was null"))?;
+            p36h_params_builder_init(vm, recv, Some(src))?;
+            Value::Null
+        }
+        "addChildSaProposal" | "addSaProposal" => {
+            let proposal = args
+                .first()
+                .cloned()
+                .filter(|v| !matches!(v, Value::Null))
+                .ok_or_else(|| npe("Required argument not provided"))?;
+            p36h_append_value(vm, recv, "rd_proposals", proposal)?;
+            this
+        }
+        "addInboundTrafficSelectors" => {
+            let ts = args
+                .first()
+                .cloned()
+                .filter(|v| !matches!(v, Value::Null))
+                .ok_or_else(|| npe("Required argument not provided"))?;
+            p36h_append_value(vm, recv, "rd_in_ts", ts)?;
+            this
+        }
+        "addOutboundTrafficSelectors" => {
+            let ts = args
+                .first()
+                .cloned()
+                .filter(|v| !matches!(v, Value::Null))
+                .ok_or_else(|| npe("Required argument not provided"))?;
+            p36h_append_value(vm, recv, "rd_out_ts", ts)?;
+            this
+        }
+        "setLifetimeSeconds" => {
+            let hard = iarg(args, 0);
+            let soft = iarg(args, 1);
+            // ChildSessionParams lifetime bounds: hard in [300, 14400],
+            // soft >= 120, hard - soft >= 60.
+            if !(300..=14400).contains(&hard) || soft < 120 || hard - soft < 60 {
+                return Err(iae("Invalid lifetime value".to_string()));
+            }
+            put(vm, recv, "rd_hard", Value::Int(hard))?;
+            put(vm, recv, "rd_soft", Value::Int(soft))?;
+            this
+        }
+        "build" => {
+            let mut in_ts = collection_items(vm, Some(&get(vm, recv, "rd_in_ts")));
+            let mut out_ts = collection_items(vm, Some(&get(vm, recv, "rd_out_ts")));
+            if in_ts.is_empty() {
+                in_ts.push(p36h_default_ts(vm, 7)?);
+                in_ts.push(p36h_default_ts(vm, 8)?);
+            }
+            if out_ts.is_empty() {
+                out_ts.push(p36h_default_ts(vm, 7)?);
+                out_ts.push(p36h_default_ts(vm, 8)?);
+            }
+            let proposals = collection_items(vm, Some(&get(vm, recv, "rd_proposals")));
+            if proposals.is_empty() {
+                return Err(iae(
+                    "ChildSessionParams requires at least one Child SA proposal.".to_string(),
+                ));
+            }
+            let params_class = if recv_class == P36H_TRANSPORT_BUILDER {
+                P36H_TRANSPORT_PARAMS
+            } else {
+                P36H_TUNNEL_PARAMS
+            };
+            let params = alloc_obj(vm, params_class, Vec::new())?;
+            let in_list = p49_list_value(vm, in_ts)?;
+            put(vm, params, "rd_in_ts", in_list)?;
+            let out_list = p49_list_value(vm, out_ts)?;
+            put(vm, params, "rd_out_ts", out_list)?;
+            let proposal_list = p49_list_value(vm, proposals)?;
+            put(vm, params, "rd_proposals", proposal_list)?;
+            put(vm, params, "rd_hard", get(vm, recv, "rd_hard"))?;
+            put(vm, params, "rd_soft", get(vm, recv, "rd_soft"))?;
+            Value::Obj(params)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36h_params_getters(vm: &mut Engine, name: &str, recv: ObjRef) -> Result<Option<Value>, VmExit> {
+    let v = match name {
+        "getInboundTrafficSelectors" => {
+            let items = collection_items(vm, Some(&get(vm, recv, "rd_in_ts")));
+            p49_list_value(vm, items)?
+        }
+        "getOutboundTrafficSelectors" => {
+            let items = collection_items(vm, Some(&get(vm, recv, "rd_out_ts")));
+            p49_list_value(vm, items)?
+        }
+        "getSaProposals" | "getChildSaProposals" => {
+            let items = collection_items(vm, Some(&get(vm, recv, "rd_proposals")));
+            p49_list_value(vm, items)?
+        }
+        "getHardLifetimeSeconds" => Value::Int(field_int(vm, recv, "rd_hard")),
+        "getSoftLifetimeSeconds" => Value::Int(field_int(vm, recv, "rd_soft")),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn partial36h_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if let Some(v) = partial36h_wifi_static(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    partial36h_ike_static(vm, class, name, sig, args)
+}
+
+fn partial36h_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    _mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if let Some(v) = partial36h_wifi_instance(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    if recv_class == P36H_SCAN_RESULT && name == "<init>" {
+        return Ok(Some(Value::Null));
+    }
+    if recv_class == P36H_IKE_BUILDER || recv_class == P36H_CHILD_BUILDER {
+        return p36h_proposal_builder(vm, recv_class, name, recv, args);
+    }
+    if matches!(
+        recv_class,
+        P36H_IKE_PROPOSAL | P36H_CHILD_PROPOSAL | P36H_SA_PROPOSAL
+    ) {
+        return p36h_proposal_getters(vm, name, recv);
+    }
+    if recv_class == P36H_TS {
+        return p36h_traffic_selector(vm, name, sig, recv, args);
+    }
+    if matches!(
+        recv_class,
+        P36H_ID_FQDN | P36H_ID_RFC822 | P36H_ID_KEYID | P36H_ID_IPV4
+    ) {
+        return p36h_identification(vm, recv_class, name, sig, recv, args);
+    }
+    if recv_class == P36H_TRANSPORT_BUILDER || recv_class == P36H_TUNNEL_BUILDER {
+        return p36h_params_builder(vm, recv_class, name, sig, recv, args);
+    }
+    if matches!(
+        recv_class,
+        P36H_CHILD_PARAMS | P36H_TRANSPORT_PARAMS | P36H_TUNNEL_PARAMS
+    ) {
+        return p36h_params_getters(vm, name, recv);
+    }
+    Ok(None)
 }

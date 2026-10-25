@@ -706,15 +706,15 @@ key_apis = ["android.net.http.SslError.getPrimaryError", "android.net.http.SslEr
 id = "android-net-wifi"
 prefix = "android.net.wifi"
 domain = "net"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-net"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "M10"
-notes = "WifiManager scan/connection state and Wi-Fi P2P/Aware/RTT are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "The VM device profile advertises android.hardware.wifi, so Context WIFI_SERVICE returns a WifiManager for a present-but-disabled radio: DISABLED state, API 29+ third-party toggle denial, a default (not-connected) WifiInfo, and no scan results or configured networks. Pure AOSP 14 value semantics are guest-visible: WifiManager signal-level math and suggestion limits, WifiInfo default getters and detailed-state mapping, ScanResult band predicates and channel/frequency/op-class conversions, SupplicantState predicates, and WifiSsid byte/UTF-8/hex factories with equals/hashCode. Scan delivery, network configuration/suggestion/specifier mutation, connection lifecycle, WifiP2pManager/WifiAwareManager/WifiRttManager/WifiScanner services, hotspot/SoftAp, MLO links, and supplicant events are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-net-wifi"
-key_apis = ["android.net.wifi.WifiManager.getConnectionInfo", "android.net.wifi.WifiManager.startScan"]
+key_apis = ["android.net.wifi.WifiManager.getConnectionInfo", "android.net.wifi.WifiManager.calculateSignalLevel", "android.net.wifi.WifiInfo.getDetailedState", "android.net.wifi.ScanResult.convertChannelToFrequencyMhzIfSupported", "android.net.wifi.WifiSsid.fromUtf8Text"]
 
 [[surface]]
 id = "android-net-nsd"
@@ -748,15 +748,15 @@ key_apis = ["android.net.sip.SipManager.newInstance", "android.net.sip.SipManage
 id = "android-net-ipsec-ike"
 prefix = "android.net.ipsec.ike"
 domain = "net"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-net"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "IKEv2/IPsec tunnel APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "AOSP 14 IPsec value/builder validation is guest-visible without any VPN stack: SaProposal/IkeSaProposal/ChildSaProposal builders enforce algorithm ids, AES key-length rules (3DES/ChaCha must not set a length), AEAD-vs-normal mixing rejection, IKE PRF/integrity/DH requirements (INTEGRITY_ALGORITHM_NONE only for AEAD, DH_GROUP_NONE rejected), Child SA supported-algorithm filtering, supported-algorithm sets and algorithm string forms; IkeTrafficSelector enforces address-family/type, selector lengths and port ranges; IkeFqdn/IkeRfc822Addr/IkeKeyId/IkeIpv4Addr identifications validate and store their values; Transport/TunnelModeChildSessionParams builders apply proposal requirements, default full-range traffic selectors, lifetime bounds and copy-construction. IkeSession negotiation, sockets, key exchange, kernel XFRM transforms, IkeSessionParams/TunnelConnectionParams plumbing, and persistable-bundle round trips are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-net-ipsec-ike"
-key_apis = ["android.net.ipsec.ike.IkeSession"]
+key_apis = ["android.net.ipsec.ike.IkeSaProposal.Builder.build", "android.net.ipsec.ike.ChildSaProposal.Builder.addEncryptionAlgorithm", "android.net.ipsec.ike.IkeTrafficSelector", "android.net.ipsec.ike.TransportModeChildSessionParams.Builder.build", "android.net.ipsec.ike.IkeFqdnIdentification"]
 
 # ===================== Media =====================
 [[surface]]

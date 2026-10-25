@@ -19250,3 +19250,1152 @@ fn device_policy_no_service_and_system_update_policy_are_guest_visible() {
         Value::Null
     );
 }
+
+// ---- Appendix C Batch 36-H: android.net.wifi + android.net.ipsec.ike ----
+
+const P36H_WIFI_MANAGER: &str = "Landroid/net/wifi/WifiManager;";
+const P36H_SCAN_RESULT: &str = "Landroid/net/wifi/ScanResult;";
+const P36H_WIFI_SSID: &str = "Landroid/net/wifi/WifiSsid;";
+const P36H_SUPPLICANT: &str = "Landroid/net/wifi/SupplicantState;";
+const P36H_SA_PROPOSAL: &str = "Landroid/net/ipsec/ike/SaProposal;";
+const P36H_IKE_PROPOSAL: &str = "Landroid/net/ipsec/ike/IkeSaProposal;";
+const P36H_IKE_BUILDER: &str = "Landroid/net/ipsec/ike/IkeSaProposal$Builder;";
+const P36H_CHILD_PROPOSAL: &str = "Landroid/net/ipsec/ike/ChildSaProposal;";
+const P36H_CHILD_BUILDER: &str = "Landroid/net/ipsec/ike/ChildSaProposal$Builder;";
+const P36H_TS: &str = "Landroid/net/ipsec/ike/IkeTrafficSelector;";
+const P36H_ID_FQDN: &str = "Landroid/net/ipsec/ike/IkeFqdnIdentification;";
+const P36H_ID_RFC822: &str = "Landroid/net/ipsec/ike/IkeRfc822AddrIdentification;";
+const P36H_ID_KEYID: &str = "Landroid/net/ipsec/ike/IkeKeyIdIdentification;";
+const P36H_ID_IPV4: &str = "Landroid/net/ipsec/ike/IkeIpv4AddrIdentification;";
+const P36H_TRANSPORT_BUILDER: &str =
+    "Landroid/net/ipsec/ike/TransportModeChildSessionParams$Builder;";
+const P36H_TUNNEL_BUILDER: &str = "Landroid/net/ipsec/ike/TunnelModeChildSessionParams$Builder;";
+const P36H_IAE: &str = "Ljava/lang/IllegalArgumentException;";
+const P36H_NPE: &str = "Ljava/lang/NullPointerException;";
+const P36H_INTS2: &str = "(II)I";
+
+fn p36h_size(engine: &mut Engine, value: Value) -> Value {
+    let list = object(value);
+    call(engine, list, "size", "()I", &[])
+}
+
+fn p36h_int_value(engine: &mut Engine, value: Value) -> Value {
+    let boxed = object(value);
+    call(engine, boxed, "intValue", "()I", &[])
+}
+
+fn p36h_supplicant(engine: &mut Engine, name: &str) -> Value {
+    let state = instance(engine, P36H_SUPPLICANT);
+    let label = text(engine, name);
+    engine.heap.put_field(state, "rd_name", label).unwrap();
+    Value::Obj(state)
+}
+
+#[test]
+fn wifi_disabled_profile_and_value_classes_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+    let service_name = text(&mut engine, "wifi");
+    let manager = object(call(
+        &mut engine,
+        context,
+        "getSystemService",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+        &[service_name],
+    ));
+    assert_eq!(
+        call(&mut engine, manager, "getWifiState", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, manager, "isWifiEnabled", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "setWifiEnabled",
+            "(Z)Z",
+            &[Value::Int(1)]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, manager, "startScan", "()Z", &[]),
+        Value::Int(0)
+    );
+    let scans = call(
+        &mut engine,
+        manager,
+        "getScanResults",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, scans), Value::Int(0));
+    let configured = call(
+        &mut engine,
+        manager,
+        "getConfiguredNetworks",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, configured), Value::Int(0));
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getMaxNumberOfNetworkSuggestionsPerApp",
+            "()I",
+            &[]
+        ),
+        Value::Int(1024)
+    );
+
+    // Pure WifiManager statics.
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_WIFI_MANAGER,
+            "calculateSignalLevel",
+            P36H_INTS2,
+            &[Value::Int(-100), Value::Int(5)]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_WIFI_MANAGER,
+            "calculateSignalLevel",
+            P36H_INTS2,
+            &[Value::Int(-55), Value::Int(5)]
+        ),
+        Value::Int(4)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_WIFI_MANAGER,
+            "calculateSignalLevel",
+            P36H_INTS2,
+            &[Value::Int(-78), Value::Int(5)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_WIFI_MANAGER,
+            "compareSignalLevel",
+            P36H_INTS2,
+            &[Value::Int(3), Value::Int(7)]
+        ),
+        Value::Int(-4)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_WIFI_MANAGER,
+            "getMaxNumberOfNetworkSuggestionsPerApp",
+            "(Z)I",
+            &[Value::Int(1)]
+        ),
+        Value::Int(256)
+    );
+
+    // Default (not-connected) WifiInfo.
+    let info = object(call(
+        &mut engine,
+        manager,
+        "getConnectionInfo",
+        "()Landroid/net/wifi/WifiInfo;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(&mut engine, info, "getSSID", "()Ljava/lang/String;", &[]),
+        "<unknown ssid>"
+    );
+    assert_eq!(
+        call(&mut engine, info, "getBSSID", "()Ljava/lang/String;", &[]),
+        Value::Null
+    );
+    assert_eq!(
+        call(&mut engine, info, "getNetworkId", "()I", &[]),
+        Value::Int(-1)
+    );
+    assert_eq!(
+        call(&mut engine, info, "getRssi", "()I", &[]),
+        Value::Int(-127)
+    );
+    assert_eq!(
+        call(&mut engine, info, "getLinkSpeed", "()I", &[]),
+        Value::Int(-1)
+    );
+    assert_eq!(
+        call(&mut engine, info, "getFrequency", "()I", &[]),
+        Value::Int(-1)
+    );
+    assert_eq!(
+        call(&mut engine, info, "getTxLinkSpeedMbps", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            info,
+            "getMacAddress",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "02:00:00:00:00:00"
+    );
+    assert_eq!(
+        call(&mut engine, info, "getIpAddress", "()I", &[]),
+        Value::Int(0)
+    );
+    let supplicant = object(call(
+        &mut engine,
+        info,
+        "getSupplicantState",
+        "()Landroid/net/wifi/SupplicantState;",
+        &[],
+    ));
+    assert_eq!(
+        text_of(&engine, &field(&engine, supplicant, "rd_name")),
+        "UNINITIALIZED"
+    );
+    let detailed = object(call(
+        &mut engine,
+        info,
+        "getDetailedState",
+        "()Landroid/net/NetworkInfo$DetailedState;",
+        &[],
+    ));
+    assert_eq!(
+        text_of(&engine, &field(&engine, detailed, "rd_name")),
+        "IDLE"
+    );
+
+    // WifiSsid value semantics.
+    let ssid_text = text(&mut engine, "RustyDroid");
+    let ssid = object(call_static(
+        &mut engine,
+        P36H_WIFI_SSID,
+        "fromUtf8Text",
+        "(Ljava/lang/CharSequence;)Landroid/net/wifi/WifiSsid;",
+        &[ssid_text],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            ssid,
+            "getUtf8Text",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "RustyDroid"
+    );
+    assert_eq!(
+        call_text(&mut engine, ssid, "toString", "()Ljava/lang/String;", &[]),
+        "\"RustyDroid\""
+    );
+    let ssid_bytes = call(&mut engine, ssid, "getBytes", "()[B", &[]);
+    assert_eq!(
+        byte_array_values(&engine, &ssid_bytes),
+        b"RustyDroid".to_vec()
+    );
+    let raw = byte_array(&mut engine, &[0xff, 0x00]);
+    let binary_ssid = object(call_static(
+        &mut engine,
+        P36H_WIFI_SSID,
+        "fromBytes",
+        "([B)Landroid/net/wifi/WifiSsid;",
+        &[raw],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            binary_ssid,
+            "getUtf8Text",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            binary_ssid,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "ff00"
+    );
+    let quoted = text(&mut engine, "\"abc\"");
+    let from_string = object(call_static(
+        &mut engine,
+        P36H_WIFI_SSID,
+        "fromString",
+        "(Ljava/lang/String;)Landroid/net/wifi/WifiSsid;",
+        &[quoted],
+    ));
+    let abc_text = text(&mut engine, "abc");
+    let from_utf8 = object(call_static(
+        &mut engine,
+        P36H_WIFI_SSID,
+        "fromUtf8Text",
+        "(Ljava/lang/CharSequence;)Landroid/net/wifi/WifiSsid;",
+        &[abc_text],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            from_string,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(from_utf8)]
+        ),
+        Value::Int(1)
+    );
+    let bad_hex = text(&mut engine, "zz");
+    assert_throws(
+        engine.invoke_static(
+            P36H_WIFI_SSID,
+            "fromString",
+            "(Ljava/lang/String;)Landroid/net/wifi/WifiSsid;",
+            &[bad_hex],
+        ),
+        P36H_IAE,
+    );
+
+    // SupplicantState predicates.
+    let completed = p36h_supplicant(&mut engine, "COMPLETED");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SUPPLICANT,
+            "isValidState",
+            "(Landroid/net/wifi/SupplicantState;)Z",
+            &[completed]
+        ),
+        Value::Int(1)
+    );
+    let uninitialized = p36h_supplicant(&mut engine, "UNINITIALIZED");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SUPPLICANT,
+            "isValidState",
+            "(Landroid/net/wifi/SupplicantState;)Z",
+            &[uninitialized]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SUPPLICANT,
+            "isValidState",
+            "(Landroid/net/wifi/SupplicantState;)Z",
+            &[Value::Null]
+        ),
+        Value::Int(1)
+    );
+    let associated = p36h_supplicant(&mut engine, "ASSOCIATED");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SUPPLICANT,
+            "isHandshakeState",
+            "(Landroid/net/wifi/SupplicantState;)Z",
+            &[associated]
+        ),
+        Value::Int(1)
+    );
+    let completed2 = p36h_supplicant(&mut engine, "COMPLETED");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SUPPLICANT,
+            "isHandshakeState",
+            "(Landroid/net/wifi/SupplicantState;)Z",
+            &[completed2]
+        ),
+        Value::Int(0)
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36H_SUPPLICANT,
+            "isHandshakeState",
+            "(Landroid/net/wifi/SupplicantState;)Z",
+            &[Value::Null],
+        ),
+        P36H_NPE,
+    );
+    let iface_disabled = p36h_supplicant(&mut engine, "INTERFACE_DISABLED");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SUPPLICANT,
+            "isDriverActive",
+            "(Landroid/net/wifi/SupplicantState;)Z",
+            &[iface_disabled]
+        ),
+        Value::Int(0)
+    );
+
+    // ScanResult band/channel conversions.
+    let conv = |engine: &mut Engine, channel: i32, band: i32| {
+        call_static(
+            engine,
+            P36H_SCAN_RESULT,
+            "convertChannelToFrequencyMhzIfSupported",
+            P36H_INTS2,
+            &[Value::Int(channel), Value::Int(band)],
+        )
+    };
+    assert_eq!(conv(&mut engine, 6, 1), Value::Int(2437));
+    assert_eq!(conv(&mut engine, 14, 1), Value::Int(2484));
+    assert_eq!(conv(&mut engine, 36, 2), Value::Int(5180));
+    assert_eq!(conv(&mut engine, 2, 8), Value::Int(5935));
+    assert_eq!(conv(&mut engine, 1, 16), Value::Int(58320));
+    assert_eq!(conv(&mut engine, 99, 1), Value::Int(-1));
+    let to_channel = |engine: &mut Engine, freq: i32| {
+        call_static(
+            engine,
+            P36H_SCAN_RESULT,
+            "convertFrequencyMhzToChannelIfSupported",
+            "(I)I",
+            &[Value::Int(freq)],
+        )
+    };
+    assert_eq!(to_channel(&mut engine, 2437), Value::Int(6));
+    assert_eq!(to_channel(&mut engine, 2484), Value::Int(14));
+    assert_eq!(to_channel(&mut engine, 5180), Value::Int(36));
+    assert_eq!(to_channel(&mut engine, 5935), Value::Int(2));
+    assert_eq!(to_channel(&mut engine, 999), Value::Int(-1));
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SCAN_RESULT,
+            "is6GHzPsc",
+            "(I)Z",
+            &[Value::Int(5975)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SCAN_RESULT,
+            "is6GHzPsc",
+            "(I)Z",
+            &[Value::Int(5980)]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SCAN_RESULT,
+            "toBand",
+            "(I)I",
+            &[Value::Int(5955)]
+        ),
+        Value::Int(8)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SCAN_RESULT,
+            "toBand",
+            "(I)I",
+            &[Value::Int(100)]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36H_SCAN_RESULT,
+            "getBandFromOpClass",
+            P36H_INTS2,
+            &[Value::Int(131), Value::Int(1)]
+        ),
+        Value::Int(8)
+    );
+}
+
+fn p36h_ike_builder(engine: &mut Engine) -> ObjRef {
+    p49_new(engine, P36H_IKE_BUILDER, "()V", &[])
+}
+
+fn p36h_child_proposal(engine: &mut Engine) -> ObjRef {
+    let builder = p49_new(engine, P36H_CHILD_BUILDER, "()V", &[]);
+    call(
+        engine,
+        builder,
+        "addEncryptionAlgorithm",
+        "(II)Landroid/net/ipsec/ike/ChildSaProposal$Builder;",
+        &[Value::Int(20), Value::Int(256)],
+    );
+    object(call(
+        engine,
+        builder,
+        "build",
+        "()Landroid/net/ipsec/ike/ChildSaProposal;",
+        &[],
+    ))
+}
+
+#[test]
+fn ike_sa_proposal_builders_validate_like_aosp() {
+    let mut engine = engine_of(&DexBuilder::new());
+
+    // Happy-path IKE proposal: AES-CBC-256 + HMAC-SHA2-256 + PRF SHA2-256 + DH 14.
+    let builder = p36h_ike_builder(&mut engine);
+    let chained = call(
+        &mut engine,
+        builder,
+        "addEncryptionAlgorithm",
+        "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(12), Value::Int(256)],
+    );
+    assert_eq!(chained, Value::Obj(builder));
+    call(
+        &mut engine,
+        builder,
+        "addIntegrityAlgorithm",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(12)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "addPseudorandomFunction",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(5)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "addDhGroup",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(14)],
+    );
+    let proposal = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/net/ipsec/ike/IkeSaProposal;",
+        &[],
+    ));
+    let enc = call(
+        &mut engine,
+        proposal,
+        "getEncryptionAlgorithms",
+        "()Ljava/util/List;",
+        &[],
+    );
+    let pair = object(p49_list_get(&mut engine, enc, 0));
+    let first = field(&engine, pair, "first");
+    assert_eq!(p36h_int_value(&mut engine, first), Value::Int(12));
+    let second = field(&engine, pair, "second");
+    assert_eq!(p36h_int_value(&mut engine, second), Value::Int(256));
+    let integ = call(
+        &mut engine,
+        proposal,
+        "getIntegrityAlgorithms",
+        "()Ljava/util/List;",
+        &[],
+    );
+    let integ0 = p49_list_get(&mut engine, integ, 0);
+    assert_eq!(p36h_int_value(&mut engine, integ0), Value::Int(12));
+    let prfs = call(
+        &mut engine,
+        proposal,
+        "getPseudorandomFunctions",
+        "()Ljava/util/List;",
+        &[],
+    );
+    let prf0 = p49_list_get(&mut engine, prfs, 0);
+    assert_eq!(p36h_int_value(&mut engine, prf0), Value::Int(5));
+    let dhs = call(
+        &mut engine,
+        proposal,
+        "getDhGroups",
+        "()Ljava/util/List;",
+        &[],
+    );
+    let dh0 = p49_list_get(&mut engine, dhs, 0);
+    assert_eq!(p36h_int_value(&mut engine, dh0), Value::Int(14));
+
+    // Key-length and algorithm-id validation.
+    let b = p36h_ike_builder(&mut engine);
+    assert_throws(
+        engine.invoke_instance(
+            b,
+            "addEncryptionAlgorithm",
+            "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+            &[Value::Int(12), Value::Int(64)],
+        ),
+        P36H_IAE,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            b,
+            "addEncryptionAlgorithm",
+            "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+            &[Value::Int(3), Value::Int(128)],
+        ),
+        P36H_IAE,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            b,
+            "addEncryptionAlgorithm",
+            "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+            &[Value::Int(99), Value::Int(0)],
+        ),
+        P36H_IAE,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            b,
+            "addIntegrityAlgorithm",
+            "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+            &[Value::Int(99)],
+        ),
+        P36H_IAE,
+    );
+    // Mixing AEAD with a normal cipher is rejected when the second is added.
+    call(
+        &mut engine,
+        b,
+        "addEncryptionAlgorithm",
+        "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(12), Value::Int(128)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            b,
+            "addEncryptionAlgorithm",
+            "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+            &[Value::Int(20), Value::Int(256)],
+        ),
+        P36H_IAE,
+    );
+
+    // IKE build requirements.
+    let no_prf = p36h_ike_builder(&mut engine);
+    call(
+        &mut engine,
+        no_prf,
+        "addEncryptionAlgorithm",
+        "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(12), Value::Int(128)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            no_prf,
+            "build",
+            "()Landroid/net/ipsec/ike/IkeSaProposal;",
+            &[],
+        ),
+        P36H_IAE,
+    );
+    // AEAD requires INTEGRITY_ALGORITHM_NONE (or none recorded).
+    let aead = p36h_ike_builder(&mut engine);
+    call(
+        &mut engine,
+        aead,
+        "addEncryptionAlgorithm",
+        "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(20), Value::Int(256)],
+    );
+    call(
+        &mut engine,
+        aead,
+        "addIntegrityAlgorithm",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(12)],
+    );
+    call(
+        &mut engine,
+        aead,
+        "addPseudorandomFunction",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(5)],
+    );
+    call(
+        &mut engine,
+        aead,
+        "addDhGroup",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(14)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            aead,
+            "build",
+            "()Landroid/net/ipsec/ike/IkeSaProposal;",
+            &[],
+        ),
+        P36H_IAE,
+    );
+    // DH_GROUP_NONE is invalid for IKE proposals.
+    let dh_none = p36h_ike_builder(&mut engine);
+    call(
+        &mut engine,
+        dh_none,
+        "addEncryptionAlgorithm",
+        "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(20), Value::Int(128)],
+    );
+    call(
+        &mut engine,
+        dh_none,
+        "addPseudorandomFunction",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(5)],
+    );
+    call(
+        &mut engine,
+        dh_none,
+        "addDhGroup",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(0)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            dh_none,
+            "build",
+            "()Landroid/net/ipsec/ike/IkeSaProposal;",
+            &[],
+        ),
+        P36H_IAE,
+    );
+
+    // Child proposals: 3DES has no IPsec transform; AEAD child needs no DH.
+    let child = p49_new(&mut engine, P36H_CHILD_BUILDER, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            child,
+            "addEncryptionAlgorithm",
+            "(II)Landroid/net/ipsec/ike/ChildSaProposal$Builder;",
+            &[Value::Int(3), Value::Int(0)],
+        ),
+        P36H_IAE,
+    );
+    let child_proposal = p36h_child_proposal(&mut engine);
+    let child_enc = call(
+        &mut engine,
+        child_proposal,
+        "getEncryptionAlgorithms",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, child_enc), Value::Int(1));
+
+    // Supported-algorithm sets and string forms.
+    let ike_supported = call_static(
+        &mut engine,
+        P36H_IKE_PROPOSAL,
+        "getSupportedEncryptionAlgorithms",
+        "()Ljava/util/Set;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, ike_supported), Value::Int(7));
+    let child_supported = call_static(
+        &mut engine,
+        P36H_CHILD_PROPOSAL,
+        "getSupportedEncryptionAlgorithms",
+        "()Ljava/util/Set;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, child_supported), Value::Int(6));
+    let dh_supported = call_static(
+        &mut engine,
+        P36H_SA_PROPOSAL,
+        "getSupportedDhGroups",
+        "()Ljava/util/Set;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, dh_supported), Value::Int(7));
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P36H_SA_PROPOSAL,
+            "getEncryptionAlgorithmString",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(12)]
+        ),
+        "ENCR_AES_CBC"
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P36H_SA_PROPOSAL,
+            "getEncryptionAlgorithmString",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(77)]
+        ),
+        "ENC_Unknown_77"
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P36H_SA_PROPOSAL,
+            "getDhGroupString",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(31)]
+        ),
+        "DH_GROUP_CURVE_25519"
+    );
+}
+
+#[test]
+fn ike_traffic_selectors_and_identifications_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    assert!(engine
+        .cp
+        .is_subtype("Ljava/net/Inet4Address;", "Ljava/net/InetAddress;"));
+    let v4_start = instance(&mut engine, "Ljava/net/Inet4Address;");
+    let v4_end = instance(&mut engine, "Ljava/net/Inet4Address;");
+    let ts = p49_new(
+        &mut engine,
+        P36H_TS,
+        "(IILjava/net/InetAddress;Ljava/net/InetAddress;)V",
+        &[
+            Value::Int(0),
+            Value::Int(65535),
+            Value::Obj(v4_start),
+            Value::Obj(v4_end),
+        ],
+    );
+    assert_eq!(field(&engine, ts, "tsType"), Value::Int(7));
+    assert_eq!(field(&engine, ts, "selectorLength"), Value::Int(16));
+    assert_eq!(field(&engine, ts, "startPort"), Value::Int(0));
+    assert_eq!(field(&engine, ts, "endPort"), Value::Int(65535));
+
+    let bad_ports = instance(&mut engine, P36H_TS);
+    assert_throws(
+        engine.invoke_instance(
+            bad_ports,
+            "<init>",
+            "(IILjava/net/InetAddress;Ljava/net/InetAddress;)V",
+            &[
+                Value::Int(100),
+                Value::Int(50),
+                Value::Obj(v4_start),
+                Value::Obj(v4_end),
+            ],
+        ),
+        P36H_IAE,
+    );
+    let v6_start = instance(&mut engine, "Ljava/net/Inet6Address;");
+    let v6_end = instance(&mut engine, "Ljava/net/Inet6Address;");
+    let mixed = instance(&mut engine, P36H_TS);
+    assert_throws(
+        engine.invoke_instance(
+            mixed,
+            "<init>",
+            "(IILjava/net/InetAddress;Ljava/net/InetAddress;)V",
+            &[
+                Value::Int(0),
+                Value::Int(10),
+                Value::Obj(v4_start),
+                Value::Obj(v6_start),
+            ],
+        ),
+        P36H_IAE,
+    );
+    let v6_ts = p49_new(
+        &mut engine,
+        P36H_TS,
+        "(IILjava/net/InetAddress;Ljava/net/InetAddress;)V",
+        &[
+            Value::Int(443),
+            Value::Int(443),
+            Value::Obj(v6_start),
+            Value::Obj(v6_end),
+        ],
+    );
+    assert_eq!(field(&engine, v6_ts, "tsType"), Value::Int(8));
+    assert_eq!(field(&engine, v6_ts, "selectorLength"), Value::Int(40));
+
+    let ts_copy = p49_new(
+        &mut engine,
+        P36H_TS,
+        "(IILjava/net/InetAddress;Ljava/net/InetAddress;)V",
+        &[
+            Value::Int(0),
+            Value::Int(65535),
+            Value::Obj(v4_start),
+            Value::Obj(v4_end),
+        ],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            ts,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(ts_copy)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            ts,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(v6_ts)]
+        ),
+        Value::Int(0)
+    );
+
+    // Identifications.
+    let fqdn_name = text(&mut engine, "vpn.example.com");
+    let fqdn = p49_new(
+        &mut engine,
+        P36H_ID_FQDN,
+        "(Ljava/lang/String;)V",
+        &[fqdn_name],
+    );
+    assert_eq!(
+        text_of(&engine, &field(&engine, fqdn, "fqdn")),
+        "vpn.example.com"
+    );
+    assert_eq!(field(&engine, fqdn, "idType"), Value::Int(2));
+    let unicode_name = text(&mut engine, "exämple.com");
+    let bad_fqdn = instance(&mut engine, P36H_ID_FQDN);
+    assert_throws(
+        engine.invoke_instance(bad_fqdn, "<init>", "(Ljava/lang/String;)V", &[unicode_name]),
+        P36H_IAE,
+    );
+    let fqdn_bytes = byte_array(&mut engine, b"ike.example.org");
+    let fqdn2 = p49_new(&mut engine, P36H_ID_FQDN, "([B)V", &[fqdn_bytes]);
+    assert_eq!(
+        text_of(&engine, &field(&engine, fqdn2, "fqdn")),
+        "ike.example.org"
+    );
+
+    let key_bytes = byte_array(&mut engine, &[1, 2, 3]);
+    let key_id = p49_new(&mut engine, P36H_ID_KEYID, "([B)V", &[key_bytes]);
+    assert_eq!(field(&engine, key_id, "idType"), Value::Int(11));
+    assert_eq!(
+        byte_array_values(&engine, &field(&engine, key_id, "keyId")),
+        vec![1, 2, 3]
+    );
+    let key_bytes2 = byte_array(&mut engine, &[1, 2, 3]);
+    let key_id2 = p49_new(&mut engine, P36H_ID_KEYID, "([B)V", &[key_bytes2]);
+    assert_eq!(
+        call(
+            &mut engine,
+            key_id,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(key_id2)]
+        ),
+        Value::Int(1)
+    );
+
+    let mail = text(&mut engine, "user@example.com");
+    let rfc822 = p49_new(
+        &mut engine,
+        P36H_ID_RFC822,
+        "(Ljava/lang/String;)V",
+        &[mail],
+    );
+    assert_eq!(
+        text_of(&engine, &field(&engine, rfc822, "rfc822Name")),
+        "user@example.com"
+    );
+    let ipv4_id = p49_new(
+        &mut engine,
+        P36H_ID_IPV4,
+        "(Ljava/net/Inet4Address;)V",
+        &[Value::Obj(v4_start)],
+    );
+    assert_eq!(field(&engine, ipv4_id, "ipv4Address"), Value::Obj(v4_start));
+}
+
+#[test]
+fn child_session_params_builders_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let proposal = p36h_child_proposal(&mut engine);
+
+    let builder = p49_new(&mut engine, P36H_TRANSPORT_BUILDER, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "build",
+            "()Landroid/net/ipsec/ike/TransportModeChildSessionParams;",
+            &[],
+        ),
+        P36H_IAE,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "addChildSaProposal",
+            "(Landroid/net/ipsec/ike/ChildSaProposal;)Landroid/net/ipsec/ike/TransportModeChildSessionParams$Builder;",
+            &[Value::Null],
+        ),
+        P36H_NPE,
+    );
+    call(
+        &mut engine,
+        builder,
+        "addChildSaProposal",
+        "(Landroid/net/ipsec/ike/ChildSaProposal;)Landroid/net/ipsec/ike/TransportModeChildSessionParams$Builder;",
+        &[Value::Obj(proposal)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "setLifetimeSeconds",
+            "(II)Landroid/net/ipsec/ike/TransportModeChildSessionParams$Builder;",
+            &[Value::Int(100), Value::Int(50)],
+        ),
+        P36H_IAE,
+    );
+    call(
+        &mut engine,
+        builder,
+        "setLifetimeSeconds",
+        "(II)Landroid/net/ipsec/ike/TransportModeChildSessionParams$Builder;",
+        &[Value::Int(3600), Value::Int(1800)],
+    );
+    let params = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/net/ipsec/ike/TransportModeChildSessionParams;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, params, "getHardLifetimeSeconds", "()I", &[]),
+        Value::Int(3600)
+    );
+    assert_eq!(
+        call(&mut engine, params, "getSoftLifetimeSeconds", "()I", &[]),
+        Value::Int(1800)
+    );
+    let proposals = call(
+        &mut engine,
+        params,
+        "getChildSaProposals",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, proposals), Value::Int(1));
+    // Default traffic selectors (IPv4 + IPv6 full ranges) were inserted.
+    let inbound = call(
+        &mut engine,
+        params,
+        "getInboundTrafficSelectors",
+        "()Ljava/util/List;",
+        &[],
+    );
+    let inbound0 = object(p49_list_get(&mut engine, inbound.clone(), 0));
+    assert_eq!(field(&engine, inbound0, "tsType"), Value::Int(7));
+    let inbound1 = object(p49_list_get(&mut engine, inbound, 1));
+    assert_eq!(field(&engine, inbound1, "tsType"), Value::Int(8));
+
+    // Tunnel builder keeps an explicitly configured selector and defaults.
+    let v4_start = instance(&mut engine, "Ljava/net/Inet4Address;");
+    let v4_end = instance(&mut engine, "Ljava/net/Inet4Address;");
+    let selector = p49_new(
+        &mut engine,
+        P36H_TS,
+        "(IILjava/net/InetAddress;Ljava/net/InetAddress;)V",
+        &[
+            Value::Int(443),
+            Value::Int(443),
+            Value::Obj(v4_start),
+            Value::Obj(v4_end),
+        ],
+    );
+    let tunnel = p49_new(&mut engine, P36H_TUNNEL_BUILDER, "()V", &[]);
+    call(
+        &mut engine,
+        tunnel,
+        "addChildSaProposal",
+        "(Landroid/net/ipsec/ike/ChildSaProposal;)Landroid/net/ipsec/ike/TunnelModeChildSessionParams$Builder;",
+        &[Value::Obj(proposal)],
+    );
+    call(
+        &mut engine,
+        tunnel,
+        "addInboundTrafficSelectors",
+        "(Landroid/net/ipsec/ike/IkeTrafficSelector;)Landroid/net/ipsec/ike/TunnelModeChildSessionParams$Builder;",
+        &[Value::Obj(selector)],
+    );
+    let tunnel_params = object(call(
+        &mut engine,
+        tunnel,
+        "build",
+        "()Landroid/net/ipsec/ike/TunnelModeChildSessionParams;",
+        &[],
+    ));
+    let tunnel_in = call(
+        &mut engine,
+        tunnel_params,
+        "getInboundTrafficSelectors",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, tunnel_in), Value::Int(1));
+    assert_eq!(
+        call(
+            &mut engine,
+            tunnel_params,
+            "getHardLifetimeSeconds",
+            "()I",
+            &[]
+        ),
+        Value::Int(7200)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            tunnel_params,
+            "getSoftLifetimeSeconds",
+            "()I",
+            &[]
+        ),
+        Value::Int(3600)
+    );
+
+    // Copy constructor carries proposals and lifetimes.
+    let copied_builder = p49_new(
+        &mut engine,
+        P36H_TRANSPORT_BUILDER,
+        "(Landroid/net/ipsec/ike/TransportModeChildSessionParams;)V",
+        &[Value::Obj(params)],
+    );
+    let copied = object(call(
+        &mut engine,
+        copied_builder,
+        "build",
+        "()Landroid/net/ipsec/ike/TransportModeChildSessionParams;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, copied, "getHardLifetimeSeconds", "()I", &[]),
+        Value::Int(3600)
+    );
+    let copied_proposals = call(
+        &mut engine,
+        copied,
+        "getChildSaProposals",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, copied_proposals), Value::Int(1));
+}
