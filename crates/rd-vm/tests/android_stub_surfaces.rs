@@ -5505,6 +5505,43 @@ fn euicc_info_and_disabled_manager_are_guest_visible() {
         ),
         Value::Int(0)
     );
+    // The disabled branch returns before touching its arguments: a null
+    // country is still just "not supported" and a null country list is
+    // silently ignored, matching AOSP's isEnabled()-first ordering.
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isSupportedCountry",
+            "(Ljava/lang/String;)Z",
+            &[Value::Null],
+        ),
+        Value::Int(0)
+    );
+    call(
+        &mut engine,
+        manager,
+        "setSupportedCountries",
+        "(Ljava/util/List;)V",
+        &[Value::Null],
+    );
+    // isSimPortAvailable is the exception: AOSP dereferences the absent
+    // IEuiccController without an isEnabled() guard.
+    assert_throws(
+        engine.invoke_instance(manager, "isSimPortAvailable", "(I)Z", &[Value::Int(0)]),
+        "Ljava/lang/NullPointerException;",
+    );
+    // The public constructor dereferences its Context immediately.
+    let bare_manager = instance(&mut engine, "Landroid/telephony/euicc/EuiccManager;");
+    assert_throws(
+        engine.invoke_instance(
+            bare_manager,
+            "<init>",
+            "(Landroid/content/Context;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
     let for_card = object(call(
         &mut engine,
         manager,
@@ -6361,6 +6398,25 @@ fn mtp_object_info_and_unopened_device_are_guest_visible() {
         call(&mut engine, info, "getCompressedSizeLong", "()J", &[]),
         Value::Long(0xffff_ffff)
     );
+    // AOSP's 32-bit getter runs Preconditions.checkState(size >= 0): the
+    // unsigned value above Integer.MAX_VALUE is only visible via the Long
+    // variant, and the int getter must fail instead of returning -1.
+    assert_throws(
+        engine.invoke_instance(info, "getCompressedSize", "()I", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    // longToUint32 validates on the RHS before the (already-consumed)
+    // builder's null mObjectInfo is stored through, so a negative value is
+    // an IllegalArgumentException even after build().
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "setCompressedSize",
+            "(J)Landroid/mtp/MtpObjectInfo$Builder;",
+            &[Value::Long(-1)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
     assert_eq!(
         call(
             &mut engine,
@@ -6767,6 +6823,71 @@ fn fingerprint_absent_service_and_values_are_guest_visible() {
     assert_eq!(
         call(&mut engine, result, "isStrongBiometric", "()Z", &[]),
         Value::Int(1)
+    );
+
+    // The three-argument Fingerprint constructor leaves the group id at
+    // its field default, identifier setters mutate in place.
+    let plain_name = text(&mut engine, "left thumb");
+    let plain = p49_new(
+        &mut engine,
+        "Landroid/hardware/fingerprint/Fingerprint;",
+        "(Ljava/lang/CharSequence;IJ)V",
+        &[plain_name, Value::Int(5), Value::Long(6)],
+    );
+    assert_eq!(
+        call(&mut engine, plain, "getGroupId", "()I", &[]),
+        Value::Int(0)
+    );
+    let renamed = text(&mut engine, "renamed");
+    call(
+        &mut engine,
+        plain,
+        "setName",
+        "(Ljava/lang/CharSequence;)V",
+        std::slice::from_ref(&renamed),
+    );
+    call(
+        &mut engine,
+        plain,
+        "setDeviceId",
+        "(J)V",
+        &[Value::Long(77)],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            plain,
+            "getName",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "renamed"
+    );
+    assert_eq!(
+        call(&mut engine, plain, "getDeviceId", "()J", &[]),
+        Value::Long(77)
+    );
+    // AOSP's CryptoObject constructors store the wrapper unchecked, so a
+    // null cipher yields null typed getters and opId 0, not an exception.
+    let null_crypto = p49_new(
+        &mut engine,
+        "Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;",
+        "(Ljavax/crypto/Cipher;)V",
+        &[Value::Null],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            null_crypto,
+            "getCipher",
+            "()Ljavax/crypto/Cipher;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(&mut engine, null_crypto, "getOpId", "()J", &[]),
+        Value::Long(0)
     );
 }
 
@@ -7987,6 +8108,27 @@ fn midi_no_device_profile_values_and_receiver_are_guest_visible() {
     );
     let stored = field(&engine, manager, "rd_device_callbacks");
     assert_eq!(p57_collection_size(&mut engine, stored), 0);
+    // AOSP stores listeners in a ConcurrentHashMap keyed by callback, so a
+    // null callback fails on both unregister (remove) and the transport
+    // overload's Objects.requireNonNull(executor) fires before anything else.
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "unregisterDeviceCallback",
+            "(Landroid/media/midi/MidiManager$DeviceCallback;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "registerDeviceCallback",
+            "(ILjava/util/concurrent/Executor;Landroid/media/midi/MidiManager$DeviceCallback;)V",
+            &[Value::Int(1), Value::Null, Value::Obj(callback)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
 
     let bundle = p49_new(&mut engine, "Landroid/os/Bundle;", "()V", &[]);
     let input_names = p57_string_array(&mut engine, &["in-a", "in-b"]);
@@ -8109,6 +8251,41 @@ fn midi_no_device_profile_values_and_receiver_are_guest_visible() {
         call_text(&mut engine, info, "toString", "()Ljava/lang/String;", &[])
             .starts_with("MidiDeviceInfo[mType=2,mInputPortCount=2,mOutputPortCount=1,")
     );
+    // AOSP's toString first calls mProperties.getString(...) to force
+    // unparcelling, so a device info built with null properties fails
+    // instead of rendering.
+    assert_throws(
+        engine.invoke_instance(same_id, "toString", "()Ljava/lang/String;", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+    // getPorts indexes the caller-supplied names arrays directly, so a
+    // names array shorter than the declared port count is out of bounds.
+    let short_input_names = p57_string_array(&mut engine, &["only-one"]);
+    let short_names_info = p49_new(
+        &mut engine,
+        info_class,
+        info_sig,
+        &[
+            Value::Int(1),
+            Value::Int(7),
+            Value::Int(2),
+            Value::Int(0),
+            short_input_names,
+            Value::Null,
+            Value::Obj(bundle),
+            Value::Int(0),
+            Value::Int(0),
+        ],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            short_names_info,
+            "getPorts",
+            "()[Landroid/media/midi/MidiDeviceInfo$PortInfo;",
+            &[],
+        ),
+        "Ljava/lang/ArrayIndexOutOfBoundsException;",
+    );
 
     call(
         &mut engine,
@@ -8146,6 +8323,16 @@ fn midi_no_device_profile_values_and_receiver_are_guest_visible() {
         field(&engine, receiver, "rd_last_timestamp"),
         Value::Long(99)
     );
+    // A zero-count send never enters AOSP's chunking loop.
+    let empty_message = byte_array(&mut engine, &[0x80]);
+    call(
+        &mut engine,
+        receiver,
+        "send",
+        "([BIIJ)V",
+        &[empty_message, Value::Int(0), Value::Int(0), Value::Long(7)],
+    );
+    assert_eq!(field(&engine, receiver, "rd_send_calls"), Value::Int(2));
     call(&mut engine, receiver, "flush", "()V", &[]);
     assert_eq!(field(&engine, receiver, "rd_flushed"), Value::Int(1));
 }
@@ -9475,6 +9662,18 @@ fn quicksettings_tile_and_unbound_service_are_guest_visible() {
         ),
         "Ljava/lang/NullPointerException;",
     );
+    let bind_intent = p41_intent(&mut engine, "android.service.quicksettings.action.QS_TILE");
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(bind_intent)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_eq!(field(&engine, service, "mService"), Value::Null);
+    assert_eq!(field(&engine, service, "mTileToken"), Value::Null);
 }
 
 #[test]
@@ -9610,6 +9809,43 @@ fn wallpaper_engine_unattached_state_and_defaults_are_guest_visible() {
     assert_eq!(
         call(&mut engine, wallpaper, "isInAmbientMode", "()Z", &[]),
         Value::Int(1)
+    );
+    call(
+        &mut engine,
+        wallpaper,
+        "setZoom",
+        "(F)V",
+        &[Value::Float(0.0)],
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "getZoom", "()F", &[]),
+        Value::Float(0.0),
+        "ambient setZoom(0) silently resets the previous zoom"
+    );
+    call(
+        &mut engine,
+        wallpaper,
+        "setZoom",
+        "(F)V",
+        &[Value::Float(0.5)],
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "getZoom", "()F", &[]),
+        Value::Float(0.5)
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "shouldZoomOutWallpaper", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            wallpaper,
+            "shouldWaitForEngineShown",
+            "()Z",
+            &[]
+        ),
+        Value::Int(0)
     );
     call(
         &mut engine,
@@ -9816,6 +10052,27 @@ fn dream_service_unattached_state_and_finish_are_guest_visible() {
     call(&mut engine, dream, "wakeUp", "()V", &[]);
     call(&mut engine, dream, "finish", "()V", &[]);
     call(&mut engine, dream, "onDreamingStopped", "()V", &[]);
+
+    let doze_dream = p41_new(&mut engine, P41_DREAM_SERVICE, "()V", &[]);
+    engine
+        .heap
+        .put_field(doze_dream, "mCanDoze", Value::Int(1))
+        .unwrap();
+    call(&mut engine, doze_dream, "startDozing", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, doze_dream, "isDozing", "()Z", &[]),
+        Value::Int(1),
+        "updateDoze returns early without a dream token"
+    );
+    assert_throws(
+        engine.invoke_instance(doze_dream, "stopDozing", "()V", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_eq!(
+        call(&mut engine, doze_dream, "isDozing", "()Z", &[]),
+        Value::Int(0),
+        "AOSP clears mDozing before dereferencing the absent IDreamManager"
+    );
 
     assert_eq!(
         call_static(
@@ -10375,6 +10632,40 @@ fn media_browser_root_result_and_unconnected_service_are_guest_visible() {
     assert_eq!(
         call(&mut engine, item_result, "isDone", "()Z", &[]),
         Value::Int(1)
+    );
+    assert_throws(
+        engine.invoke_instance(item_result, "detach", "()V", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    let children_parent = text(&mut engine, "library-root");
+    let children_options = p41_bundle(&mut engine);
+    let children_debug = text(&mut engine, "load-children-options");
+    let children_result = p41_new(
+        &mut engine,
+        P41_MEDIA_RESULT,
+        "(Landroid/service/media/MediaBrowserService;Ljava/lang/Object;)V",
+        &[Value::Obj(service), children_debug],
+    );
+    assert!(
+        engine
+            .invoke_instance(
+                service,
+                "onLoadChildren",
+                "(Ljava/lang/String;Landroid/service/media/MediaBrowserService$Result;Landroid/os/Bundle;)V",
+                &[
+                    children_parent,
+                    Value::Obj(children_result),
+                    Value::Obj(children_options),
+                ],
+            )
+            .is_err(),
+        "the exact abstract service has no two-argument onLoadChildren implementation"
+    );
+    assert_eq!(field(&engine, children_result, "mFlags"), Value::Int(1));
+    assert_eq!(
+        call(&mut engine, children_result, "isDone", "()Z", &[]),
+        Value::Int(0)
     );
 
     let parent = text(&mut engine, "library-root");
@@ -15968,17 +16259,25 @@ fn identity_without_credstore_is_guest_visible() {
         );
     }
     // AOSP looks up the missing binder before it ever dereferences the
-    // Context, so even a null Context returns the documented null.
-    assert_eq!(
-        call_static(
-            &mut engine,
-            P36A_IDENTITY_STORE,
-            "getInstance",
-            "(Landroid/content/Context;)Landroid/security/identity/IdentityCredentialStore;",
-            &[Value::Null],
-        ),
-        Value::Null
-    );
+    // Context, so even a null Context returns the documented null. Both
+    // factories and the Credstore subclass entry points share that path.
+    for class in [
+        P36A_IDENTITY_STORE,
+        "Landroid/security/identity/CredstoreIdentityCredentialStore;",
+    ] {
+        for method in ["getInstance", "getDirectAccessInstance"] {
+            assert_eq!(
+                call_static(
+                    &mut engine,
+                    class,
+                    method,
+                    "(Landroid/content/Context;)Landroid/security/identity/IdentityCredentialStore;",
+                    &[Value::Null],
+                ),
+                Value::Null
+            );
+        }
+    }
 
     // The public base-class presentation-session implementation is the
     // documented UnsupportedOperationException.
@@ -16174,6 +16473,61 @@ fn legacy_camera_without_a_camera_and_values_are_guest_visible() {
         ),
         Value::Int(1)
     );
+
+    // Size.equals compares only width/height; the synthetic enclosing
+    // Camera of the non-static inner class is ignored, so sizes from two
+    // different (uninitialized) cameras can still be equal.
+    let other_camera = object(call_static(
+        &mut engine,
+        P36B_CAMERA,
+        "openUninitialized",
+        "()Landroid/hardware/Camera;",
+        &[],
+    ));
+    let cross_size = p49_new(
+        &mut engine,
+        P36B_CAMERA_SIZE,
+        "(Landroid/hardware/Camera;II)V",
+        &[Value::Obj(other_camera), Value::Int(640), Value::Int(480)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            size,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(cross_size)],
+        ),
+        Value::Int(1)
+    );
+    // Area.equals short-circuits a null rect on either side.
+    let rect = p49_new(&mut engine, "Landroid/graphics/Rect;", "()V", &[]);
+    let rect_area = p49_new(
+        &mut engine,
+        P36B_CAMERA_AREA,
+        "(Landroid/graphics/Rect;I)V",
+        &[Value::Obj(rect), Value::Int(37)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            area,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(rect_area)],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            rect_area,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(area)],
+        ),
+        Value::Int(0)
+    );
 }
 
 #[test]
@@ -16245,6 +16599,38 @@ fn nfc_without_nfc_feature_or_service_is_guest_visible() {
             &[Value::Null],
         ),
         "Ljava/lang/NullPointerException;",
+    );
+
+    // The deprecated no-arg overload takes getNfcAdapter(null)'s first
+    // branch: a cached null-context adapter even with no NFC hardware.
+    let legacy = call_static(
+        &mut engine,
+        P36B_NFC_ADAPTER,
+        "getDefaultAdapter",
+        "()Landroid/nfc/NfcAdapter;",
+        &[],
+    );
+    let legacy_adapter = object(legacy.clone());
+    assert_eq!(
+        call(
+            &mut engine,
+            legacy_adapter,
+            "getContext",
+            "()Landroid/content/Context;",
+            &[],
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36B_NFC_ADAPTER,
+            "getDefaultAdapter",
+            "()Landroid/nfc/NfcAdapter;",
+            &[],
+        ),
+        legacy,
+        "the null-context adapter is a process singleton in AOSP"
     );
 }
 
@@ -16655,6 +17041,36 @@ fn sip_without_sip_features_or_service_is_guest_visible() {
             P36C_SIP_MANAGER,
             "isApiSupported",
             "(Landroid/content/Context;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    // The same Context dereference drives isVoipSupported/newInstance, and
+    // the Intent helpers dereference their Intent (unlike
+    // isIncomingCallIntent's explicit null guard below).
+    assert_throws(
+        engine.invoke_static(
+            P36C_SIP_MANAGER,
+            "isVoipSupported",
+            "(Landroid/content/Context;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36C_SIP_MANAGER,
+            "newInstance",
+            "(Landroid/content/Context;)Landroid/net/sip/SipManager;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36C_SIP_MANAGER,
+            "getCallId",
+            "(Landroid/content/Intent;)Ljava/lang/String;",
             &[Value::Null],
         ),
         "Ljava/lang/NullPointerException;",
