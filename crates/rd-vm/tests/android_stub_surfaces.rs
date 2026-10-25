@@ -26352,3 +26352,108 @@ fn graphics_matrix_audit_fixes_are_guest_visible() {
         "Ljava/lang/ArrayIndexOutOfBoundsException;",
     );
 }
+
+#[test]
+fn color_drawable_alpha_opacity_and_csl_default_follow_aosp() {
+    let mut engine = engine_of(&DexBuilder::new());
+    const CD: &str = "Landroid/graphics/drawable/ColorDrawable;";
+    let cd = instance(&mut engine, CD);
+    let base = Value::Int(0x8060_4020u32 as i32);
+    call(
+        &mut engine,
+        cd,
+        "<init>",
+        "(I)V",
+        std::slice::from_ref(&base),
+    );
+    assert_eq!(
+        call(&mut engine, cd, "getColor", "()I", &[]),
+        Value::Int(0x8060_4020u32 as i32)
+    );
+    assert_eq!(
+        call(&mut engine, cd, "getAlpha", "()I", &[]),
+        Value::Int(0x80)
+    );
+    assert_eq!(
+        call(&mut engine, cd, "getOpacity", "()I", &[]),
+        Value::Int(-3)
+    );
+    // setAlpha(255) leaves the combined alpha at the base 0x80.
+    call(&mut engine, cd, "setAlpha", "(I)V", &[Value::Int(255)]);
+    assert_eq!(
+        call(&mut engine, cd, "getAlpha", "()I", &[]),
+        Value::Int(0x80)
+    );
+    // setAlpha(0) makes it fully transparent.
+    call(&mut engine, cd, "setAlpha", "(I)V", &[Value::Int(0)]);
+    assert_eq!(call(&mut engine, cd, "getAlpha", "()I", &[]), Value::Int(0));
+    assert_eq!(
+        call(&mut engine, cd, "getOpacity", "()I", &[]),
+        Value::Int(-2)
+    );
+    // An opaque colour is OPAQUE.
+    call(
+        &mut engine,
+        cd,
+        "setColor",
+        "(I)V",
+        &[Value::Int(0xFF11_2233u32 as i32)],
+    );
+    assert_eq!(
+        call(&mut engine, cd, "getOpacity", "()I", &[]),
+        Value::Int(-1)
+    );
+    // Java int arithmetic wraps for out-of-contract alpha values; the
+    // host must reproduce the wrapped colour instead of panicking.
+    call(&mut engine, cd, "setAlpha", "(I)V", &[Value::Int(i32::MAX)]);
+    assert_eq!(
+        call(&mut engine, cd, "getAlpha", "()I", &[]),
+        Value::Int(254)
+    );
+    assert_eq!(
+        call(&mut engine, cd, "getColor", "()I", &[]),
+        Value::Int(0xFE11_2233u32 as i32)
+    );
+    call(&mut engine, cd, "setAlpha", "(I)V", &[Value::Int(i32::MIN)]);
+    assert_eq!(call(&mut engine, cd, "getAlpha", "()I", &[]), Value::Int(0));
+    assert_eq!(
+        call(&mut engine, cd, "getColor", "()I", &[]),
+        Value::Int(0x0011_2233)
+    );
+
+    // ColorStateList: the LAST empty spec provides the default colour.
+    const CSL: &str = "Landroid/content/res/ColorStateList;";
+    let csl = instance(&mut engine, CSL);
+    let s0 = int_array(&mut engine, &[]);
+    let s1 = int_array(&mut engine, &[7]);
+    let s2 = int_array(&mut engine, &[]);
+    let states = object_array(&mut engine, "[[I", vec![s0, s1, s2]);
+    let colors = int_array(&mut engine, &[10, 20, 30]);
+    call(&mut engine, csl, "<init>", "([[I[I)V", &[states, colors]);
+    assert_eq!(
+        call(&mut engine, csl, "getDefaultColor", "()I", &[]),
+        Value::Int(30)
+    );
+
+    // RippleDrawable rejects a null color.
+    const RD: &str = "Landroid/graphics/drawable/RippleDrawable;";
+    let ripple = instance(&mut engine, RD);
+    assert_throws(
+        engine.invoke_instance(
+            ripple,
+            "<init>",
+            "(Landroid/content/res/ColorStateList;Landroid/graphics/drawable/Drawable;Landroid/graphics/drawable/Drawable;)V",
+            &[Value::Null, Value::Null, Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            ripple,
+            "setColor",
+            "(Landroid/content/res/ColorStateList;)V",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+}
