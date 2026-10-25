@@ -255,23 +255,42 @@ impl Runtime {
         self.write(address, &value.to_le_bytes()[..self.abi.pointer_size()])
     }
     pub fn c_string(&mut self, address: u64) -> Result<Vec<u8>> {
+        self.read_c_string(address, 1024 * 1024, true)
+    }
+    pub fn c_string_bounded(&mut self, address: u64, max_bytes: usize) -> Result<Vec<u8>> {
+        if max_bytes == 0 {
+            return Ok(Vec::new());
+        }
+        let require_nul = max_bytes > 1024 * 1024;
+        self.read_c_string(address, max_bytes.min(1024 * 1024), require_nul)
+    }
+    fn read_c_string(&mut self, address: u64, limit: usize, require_nul: bool) -> Result<Vec<u8>> {
         if address == 0 {
             return Err(RdError::new("NATIVE_MEMORY", "null C string"));
         }
         let mut s = Vec::new();
-        while s.len() < 1024 * 1024 {
-            let chunk = 256usize.min(4096 - (address + s.len() as u64) as usize % 4096);
-            let b = self.read(address + s.len() as u64, chunk)?;
+        while s.len() < limit {
+            let cur = address
+                .checked_add(s.len() as u64)
+                .ok_or_else(|| RdError::new("NATIVE_MEMORY", "C string address overflow"))?;
+            let page_rem = 4096 - (cur as usize % 4096);
+            let rem = limit - s.len();
+            let chunk = 256usize.min(page_rem).min(rem);
+            let b = self.read(cur, chunk)?;
             if let Some(n) = b.iter().position(|c| *c == 0) {
                 s.extend_from_slice(&b[..n]);
                 return Ok(s);
             }
-            s.extend(b);
+            s.extend_from_slice(&b);
         }
-        Err(RdError::new(
-            "NATIVE_MEMORY",
-            "unterminated C string exceeds 1 MiB",
-        ))
+        if require_nul {
+            Err(RdError::new(
+                "NATIVE_MEMORY",
+                "unterminated C string exceeds 1 MiB",
+            ))
+        } else {
+            Ok(s)
+        }
     }
     pub fn allocate(&mut self, size: usize) -> Result<u64> {
         let size = (size.max(1) as u64)
@@ -299,12 +318,12 @@ impl Runtime {
     pub fn symbol(&self, name: &str) -> Option<u64> {
         self.libraries
             .values()
-            .find_map(|l| l.elf.symbol(name).map(|v| l.base + v))
+            .find_map(|l| l.elf.symbol(name).and_then(|v| l.base.checked_add(v)))
     }
     pub fn library_symbol(&self, library: &str, name: &str) -> Option<u64> {
         self.libraries
             .get(library)
-            .and_then(|l| l.elf.symbol(name).map(|v| l.base + v))
+            .and_then(|l| l.elf.symbol(name).and_then(|v| l.base.checked_add(v)))
     }
     pub fn is_loaded(&self, name: &str) -> bool {
         self.libraries.contains_key(name)
@@ -329,8 +348,11 @@ impl Runtime {
             }
             let base = self.next_base;
             let size = elf.memory_size.max(4096);
+            let step = size
+                .checked_add(65536)
+                .ok_or_else(|| RdError::new("NATIVE_OOM", "ELF base overflow"))?;
             let next = base
-                .checked_add(size + 65536)
+                .checked_add(step)
                 .ok_or_else(|| RdError::new("NATIVE_OOM", "ELF base overflow"))?;
             if next > 0x20000000 {
                 return Err(RdError::new(
@@ -341,8 +363,14 @@ impl Runtime {
             self.map(base, size)?;
             self.next_base = next;
             for s in &elf.segments {
+                let seg_base = base
+                    .checked_add(s.address)
+                    .ok_or_else(|| RdError::new("INVALID_ELF", "segment address overflow"))?;
                 for (i, chunk) in s.bytes.chunks(8 * 1024 * 1024).enumerate() {
-                    self.write(base + s.address + (i * 8 * 1024 * 1024) as u64, chunk)?;
+                    let dst = seg_base
+                        .checked_add((i * 8 * 1024 * 1024) as u64)
+                        .ok_or_else(|| RdError::new("INVALID_ELF", "segment write overflow"))?;
+                    self.write(dst, chunk)?;
                 }
             }
             for dep in &elf.needed {
@@ -360,7 +388,10 @@ impl Runtime {
                 if r.kind == 0 {
                     continue;
                 }
-                let target = l.base + r.offset;
+                let target = l
+                    .base
+                    .checked_add(r.offset)
+                    .ok_or_else(|| RdError::new("INVALID_ELF", "relocation offset overflow"))?;
                 let add = match r.addend {
                     Some(a) => a as u64,
                     None => self.read_word(target)?,
@@ -384,7 +415,9 @@ impl Runtime {
                             RdError::new("INVALID_ELF", "relocation missing symbol")
                         })?;
                     let resolved = if s.defined {
-                        l.base + s.value
+                        l.base
+                            .checked_add(s.value)
+                            .ok_or_else(|| RdError::new("INVALID_ELF", "symbol value overflow"))?
                     } else if let Some(v) = self.symbol(&s.name) {
                         v
                     } else if builtin_import(&s.name) {
@@ -395,7 +428,7 @@ impl Runtime {
                         self.data_import(&s.name, s.size)?
                     } else {
                         // Lazy binding like bionic: an unimplemented import
-                        // fails with a typed NOT_IMPLEMENTED only when called.
+                        // fails when called at its trap slot.
                         self.import(&s.name)?
                     };
                     // GLOB_DAT/JUMP_SLOT do not add the implicit GOT contents on ARM/x86.
@@ -415,12 +448,37 @@ impl Runtime {
         for n in added.iter().rev() {
             let l = self.libraries[n].clone();
             if let Some(a) = l.elf.init {
-                init.push(l.base + a);
+                let fn_ptr = l
+                    .base
+                    .checked_add(a)
+                    .ok_or_else(|| RdError::new("INVALID_ELF", "DT_INIT address overflow"))?;
+                init.push(fn_ptr);
             }
             if let Some((a, count)) = l.elf.init_array {
+                let arr_base = l
+                    .base
+                    .checked_add(a)
+                    .ok_or_else(|| RdError::new("INVALID_ELF", "init_array address overflow"))?;
                 for i in 0..count {
-                    let p = self.read_word(l.base + a + (i * self.abi.pointer_size()) as u64)?;
+                    let elem_off = (i as u64)
+                        .checked_mul(self.abi.pointer_size() as u64)
+                        .and_then(|v| arr_base.checked_add(v))
+                        .ok_or_else(|| RdError::new("INVALID_ELF", "init_array entry overflow"))?;
+                    let p = self.read_word(elem_off)?;
                     if p != 0 && p != u64::MAX && p != u32::MAX as u64 {
+                        let p_addr = if self.abi == Abi::Arm { p & !1 } else { p };
+                        let valid_target = self.libraries.values().any(|lib| {
+                            lib.base
+                                .checked_add(lib.elf.memory_size.max(4096))
+                                .map(|end| p_addr >= lib.base && p_addr < end)
+                                .unwrap_or(false)
+                        });
+                        if !valid_target {
+                            return Err(RdError::new(
+                                "INVALID_ELF",
+                                "init_array entry points outside loaded ELF segments",
+                            ));
+                        }
                         init.push(p);
                     }
                 }
@@ -519,9 +577,15 @@ impl Runtime {
         if let Some(v) = t.args.get(index) {
             Ok(*v)
         } else {
-            let offset = (index - t.args.len()) * self.abi.pointer_size()
-                + if self.abi == Abi::X86_64 { 8 } else { 0 };
-            self.read_word(t.sp + offset as u64)
+            let extra = index
+                .checked_sub(t.args.len())
+                .and_then(|d| d.checked_mul(self.abi.pointer_size()))
+                .and_then(|b| b.checked_add(if self.abi == Abi::X86_64 { 8 } else { 0 }))
+                .ok_or_else(|| RdError::new("NATIVE_MEMORY", "stack argument offset overflow"))?;
+            let addr =
+                t.sp.checked_add(extra as u64)
+                    .ok_or_else(|| RdError::new("NATIVE_MEMORY", "stack pointer overflow"))?;
+            self.read_word(addr)
         }
     }
     /// libm subset. x86_64/AArch64 pass floats in XMM/V registers; Android
@@ -625,13 +689,18 @@ impl Runtime {
             a.push(self.raw_argument(t, i)?);
         }
         let value = match name {
-            "malloc" => self.allocate(a[0] as usize)?,
+            "malloc" => {
+                let sz = usize::try_from(a[0])
+                    .map_err(|_| RdError::new("NATIVE_OOM", "malloc overflow"))?;
+                self.allocate(sz)?
+            }
             "calloc" => {
                 let n = a[0]
                     .checked_mul(a[1])
+                    .and_then(|v| usize::try_from(v).ok())
                     .ok_or_else(|| RdError::new("NATIVE_OOM", "calloc overflow"))?;
-                let p = self.allocate(n as usize)?;
-                self.write(p, &vec![0; n as usize])?;
+                let p = self.allocate(n)?;
+                self.write(p, &vec![0; n])?;
                 p
             }
             "free" | "__cxa_finalize" => 0,
@@ -652,8 +721,13 @@ impl Runtime {
                 a[0]
             }
             "memcmp" => {
-                let x = self.read(a[0], a[2] as usize)?;
-                let y = self.read(a[1], a[2] as usize)?;
+                let n = usize::try_from(a[2])
+                    .map_err(|_| RdError::new("NATIVE_MEMORY", "memcmp exceeds 16 MiB limit"))?;
+                if n > 16 * 1024 * 1024 {
+                    return Err(RdError::new("NATIVE_MEMORY", "memcmp exceeds 16 MiB limit"));
+                }
+                let x = self.read(a[0], n)?;
+                let y = self.read(a[1], n)?;
                 x.iter()
                     .zip(y.iter())
                     .find_map(|(x, y)| {
@@ -736,23 +810,38 @@ impl Runtime {
                 t[..end].parse::<i64>().unwrap_or(0) as i32 as i64 as u64
             }
             "memchr" | "wmemchr" => {
-                let w = if name == "wmemchr" { 4 } else { 1 };
-                let n = usize::try_from(a[2]).map_err(ioerr)?;
-                if n > 16 * 1024 * 1024 {
+                let w = if name == "wmemchr" { 4usize } else { 1usize };
+                let n = usize::try_from(a[2])
+                    .map_err(|_| RdError::new("NATIVE_MEMORY", "memchr exceeds limit"))?;
+                let byte_len = n
+                    .checked_mul(w)
+                    .ok_or_else(|| RdError::new("NATIVE_MEMORY", "memchr exceeds limit"))?;
+                if byte_len > 16 * 1024 * 1024 {
                     return Err(RdError::new("NATIVE_MEMORY", "memchr exceeds limit"));
                 }
-                let b = self.read(a[0], n * w)?;
+                let b = self.read(a[0], byte_len)?;
                 let pos = if w == 1 {
                     b.iter().position(|x| *x == a[1] as u8)
                 } else {
                     b.chunks_exact(4)
                         .position(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]) == a[1] as u32)
                 };
-                pos.map(|i| a[0] + (i * w) as u64).unwrap_or(0)
+                match pos {
+                    Some(i) => a[0]
+                        .checked_add((i * w) as u64)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "memchr pointer overflow"))?,
+                    None => 0,
+                }
             }
             "wcslen" => {
                 let mut n = 0u64;
-                while self.read(a[0] + n * 4, 4)? != [0, 0, 0, 0] {
+                loop {
+                    let addr = a[0]
+                        .checked_add(n * 4)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "wcslen pointer overflow"))?;
+                    if self.read(addr, 4)? == [0, 0, 0, 0] {
+                        break;
+                    }
                     n += 1;
                     if n > 4 * 1024 * 1024 {
                         return Err(RdError::new("NATIVE_MEMORY", "wcslen exceeds limit"));
@@ -761,11 +850,9 @@ impl Runtime {
                 n
             }
             "strncmp" => {
-                let n = usize::try_from(a[2]).map_err(ioerr)?;
-                let mut x = self.c_string(a[0])?;
-                let mut y = self.c_string(a[1])?;
-                x.truncate(n);
-                y.truncate(n);
+                let n = usize::try_from(a[2]).unwrap_or(usize::MAX);
+                let x = self.c_string_bounded(a[0], n)?;
+                let y = self.c_string_bounded(a[1], n)?;
                 match x.cmp(&y) {
                     std::cmp::Ordering::Less => (-1i64) as u64,
                     std::cmp::Ordering::Equal => 0,
@@ -774,10 +861,15 @@ impl Runtime {
             }
             "posix_memalign" => {
                 let align = a[1];
-                if !align.is_power_of_two() || align > 65536 {
+                let min_align = self.abi.pointer_size() as u64;
+                if align < min_align || !align.is_power_of_two() || align > 65536 {
                     22 // EINVAL
                 } else {
-                    let p = self.allocate((a[2] + align) as usize)?;
+                    let req = a[2]
+                        .checked_add(align)
+                        .and_then(|v| usize::try_from(v).ok())
+                        .ok_or_else(|| RdError::new("NATIVE_OOM", "posix_memalign overflow"))?;
+                    let p = self.allocate(req)?;
                     let aligned = (p + align - 1) & !(align - 1);
                     self.write_word(a[0], aligned)?;
                     0
@@ -804,10 +896,12 @@ impl Runtime {
                 if n.is_empty() {
                     a[0]
                 } else {
-                    h.windows(n.len())
-                        .position(|w| w == n.as_slice())
-                        .map(|i| a[0] + i as u64)
-                        .unwrap_or(0)
+                    match h.windows(n.len()).position(|w| w == n.as_slice()) {
+                        Some(i) => a[0].checked_add(i as u64).ok_or_else(|| {
+                            RdError::new("NATIVE_MEMORY", "strstr pointer overflow")
+                        })?,
+                        None => 0,
+                    }
                 }
             }
             "getauxval" => match a[0] & 0xffff_ffff {
@@ -823,22 +917,29 @@ impl Runtime {
                 let s = self.c_string(a[0])?;
                 let c = a[1] as u8;
                 if c == 0 {
-                    a[0] + s.len() as u64
+                    a[0].checked_add(s.len() as u64)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "strchr pointer overflow"))?
                 } else {
                     let pos = if name != "strrchr" {
                         s.iter().position(|b| *b == c)
                     } else {
                         s.iter().rposition(|b| *b == c)
                     };
-                    pos.map(|i| a[0] + i as u64).unwrap_or(0)
+                    match pos {
+                        Some(i) => a[0].checked_add(i as u64).ok_or_else(|| {
+                            RdError::new("NATIVE_MEMORY", "strchr pointer overflow")
+                        })?,
+                        None => 0,
+                    }
                 }
             }
             "strncpy" => {
-                let n = usize::try_from(a[2]).map_err(ioerr)?;
+                let n = usize::try_from(a[2])
+                    .map_err(|_| RdError::new("NATIVE_MEMORY", "strncpy exceeds limit"))?;
                 if n > 16 * 1024 * 1024 {
                     return Err(RdError::new("NATIVE_MEMORY", "strncpy exceeds limit"));
                 }
-                let mut s = self.c_string(a[1])?;
+                let mut s = self.c_string_bounded(a[1], n)?;
                 s.truncate(n);
                 s.resize(n, 0);
                 self.write(a[0], &s)?;
@@ -852,6 +953,8 @@ impl Runtime {
                 n
             }
             "realloc" => {
+                let req = usize::try_from(a[1])
+                    .map_err(|_| RdError::new("NATIVE_OOM", "realloc overflow"))?;
                 let old = if a[0] == 0 {
                     0
                 } else {
@@ -859,8 +962,8 @@ impl Runtime {
                         RdError::new("NATIVE_MEMORY", "realloc of unknown pointer")
                     })?
                 };
-                let p = self.allocate(a[1] as usize)?;
-                let n = old.min(a[1] as usize);
+                let p = self.allocate(req)?;
+                let n = old.min(req);
                 if n > 0 {
                     let b = self.read(a[0], n)?;
                     self.write(p, &b)?;
@@ -1071,7 +1174,7 @@ impl Runtime {
                     let lo = self.raw_argument(t, *i)?;
                     let hi = self.raw_argument(t, *i + 1)?;
                     *i += 2;
-                    return Ok(lo | (hi << 32));
+                    return Ok((lo & 0xffff_ffff) | (hi << 32));
                 }
                 let v = self.raw_argument(t, *i)?;
                 *i += 1;
@@ -1081,12 +1184,17 @@ impl Runtime {
                 gp, overflow, save, ..
             }) => {
                 if *gp < 48 {
-                    let v = self.read_word(*save + *gp)?;
+                    let addr = save
+                        .checked_add(*gp)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "va_list pointer overflow"))?;
+                    let v = self.read_word(addr)?;
                     *gp += 8;
                     Ok(v)
                 } else {
                     let v = self.read_word(*overflow)?;
-                    *overflow += 8;
+                    *overflow = overflow
+                        .checked_add(8)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "va_list pointer overflow"))?;
                     Ok(v)
                 }
             }
@@ -1102,20 +1210,34 @@ impl Runtime {
                     Ok(v)
                 } else {
                     let v = self.read_word(*stack)?;
-                    *stack += 8;
+                    *stack = stack
+                        .checked_add(8)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "va_list pointer overflow"))?;
                     Ok(v)
                 }
             }
             VaSource::List(VaList::Arm { next }) => {
                 if wide {
-                    *next = (*next + 7) & !7;
-                    let lo = self.read_word(*next)?;
-                    let hi = self.read_word(*next + 4)?;
-                    *next += 8;
-                    Ok(lo | (hi << 32))
+                    let aligned = next
+                        .checked_add(7)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "va_list pointer overflow"))?
+                        & !7;
+                    let hi_addr = aligned
+                        .checked_add(4)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "va_list pointer overflow"))?;
+                    let after = aligned
+                        .checked_add(8)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "va_list pointer overflow"))?;
+                    let lo = self.read_word(aligned)?;
+                    let hi = self.read_word(hi_addr)?;
+                    *next = after;
+                    Ok((lo & 0xffff_ffff) | (hi << 32))
                 } else {
+                    let after = next
+                        .checked_add(4)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "va_list pointer overflow"))?;
                     let v = self.read_word(*next)?;
-                    *next += 4;
+                    *next = after;
                     Ok(v)
                 }
             }
@@ -1168,12 +1290,17 @@ impl Runtime {
                 fp, overflow, save, ..
             }) => {
                 if *fp < 176 {
-                    let v = self.read_word(*save + *fp)?;
+                    let addr = save
+                        .checked_add(*fp)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "va_list pointer overflow"))?;
+                    let v = self.read_word(addr)?;
                     *fp += 16;
                     v
                 } else {
                     let v = self.read_word(*overflow)?;
-                    *overflow += 8;
+                    *overflow = overflow
+                        .checked_add(8)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "va_list pointer overflow"))?;
                     v
                 }
             }
@@ -1189,7 +1316,9 @@ impl Runtime {
                     v
                 } else {
                     let v = self.read_word(*stack)?;
-                    *stack += 8;
+                    *stack = stack
+                        .checked_add(8)
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "va_list pointer overflow"))?;
                     v
                 }
             }
@@ -1200,11 +1329,18 @@ impl Runtime {
     /// printf subset: flags `-0+ #`, width, precision, `hh h l ll z j t`,
     /// conversions `d i u x X o c s p f F e E g G %`.
     fn format(&mut self, fmt: &[u8], t: &Trap, src: &mut VaSource) -> Result<Vec<u8>> {
+        const MAX_FORMAT_BYTES: usize = 1024 * 1024;
         let mut out = Vec::new();
         let mut i = 0;
         while i < fmt.len() {
             if fmt[i] != b'%' {
                 out.push(fmt[i]);
+                if out.len() > MAX_FORMAT_BYTES {
+                    return Err(RdError::new(
+                        "NATIVE_MEMORY",
+                        "formatted output exceeds 1 MiB",
+                    ));
+                }
                 i += 1;
                 continue;
             }
@@ -1212,12 +1348,14 @@ impl Runtime {
             let mut left = false;
             let mut zero = false;
             let mut plus = false;
+            let mut space = false;
             let mut alt = false;
             while i < fmt.len() && b"-0+ #".contains(&fmt[i]) {
                 match fmt[i] {
                     b'-' => left = true,
                     b'0' => zero = true,
                     b'+' => plus = true,
+                    b' ' => space = true,
                     b'#' => alt = true,
                     _ => {}
                 }
@@ -1225,77 +1363,190 @@ impl Runtime {
             }
             let mut width = 0usize;
             if i < fmt.len() && fmt[i] == b'*' {
-                width = self.next_arg(t, src, false)? as i32 as usize;
+                let w = self.next_arg(t, src, false)? as i32;
+                if w < 0 {
+                    left = true;
+                    width = w.unsigned_abs() as usize;
+                } else {
+                    width = w as usize;
+                }
+                if width > MAX_FORMAT_BYTES {
+                    return Err(RdError::new(
+                        "NATIVE_MEMORY",
+                        "printf field width exceeds 1 MiB",
+                    ));
+                }
                 i += 1;
-            }
-            while i < fmt.len() && fmt[i].is_ascii_digit() {
-                width = width * 10 + usize::from(fmt[i] - b'0');
-                i += 1;
+            } else {
+                while i < fmt.len() && fmt[i].is_ascii_digit() {
+                    width = width
+                        .checked_mul(10)
+                        .and_then(|v| v.checked_add(usize::from(fmt[i] - b'0')))
+                        .ok_or_else(|| RdError::new("NATIVE_MEMORY", "printf width overflow"))?;
+                    if width > MAX_FORMAT_BYTES {
+                        return Err(RdError::new(
+                            "NATIVE_MEMORY",
+                            "printf field width exceeds 1 MiB",
+                        ));
+                    }
+                    i += 1;
+                }
             }
             let mut precision = None;
             if i < fmt.len() && fmt[i] == b'.' {
                 i += 1;
-                let mut p = 0usize;
                 if i < fmt.len() && fmt[i] == b'*' {
-                    p = self.next_arg(t, src, false)? as i32 as usize;
+                    let p = self.next_arg(t, src, false)? as i32;
                     i += 1;
+                    if p >= 0 {
+                        precision = Some(p as usize);
+                    }
+                } else {
+                    let mut p = 0usize;
+                    while i < fmt.len() && fmt[i].is_ascii_digit() {
+                        p = p
+                            .checked_mul(10)
+                            .and_then(|v| v.checked_add(usize::from(fmt[i] - b'0')))
+                            .unwrap_or(MAX_FORMAT_BYTES + 1);
+                        i += 1;
+                    }
+                    precision = Some(p);
                 }
-                while i < fmt.len() && fmt[i].is_ascii_digit() {
-                    p = p * 10 + usize::from(fmt[i] - b'0');
-                    i += 1;
-                }
-                precision = Some(p);
             }
-            let mut longs = 0;
+            let mut l_count = 0usize;
+            let mut intmax = false;
             while i < fmt.len() && b"hlzjtL".contains(&fmt[i]) {
-                if matches!(fmt[i], b'l' | b'z' | b'j' | b't') {
-                    longs += 1;
+                match fmt[i] {
+                    b'l' => l_count += 1,
+                    b'j' => intmax = true,
+                    b'z' | b't' if self.abi != Abi::Arm => l_count = l_count.max(1),
+                    _ => {}
                 }
                 i += 1;
             }
             let Some(&conv) = fmt.get(i) else { break };
             i += 1;
-            let wide = longs >= 2 || (longs == 1 && self.abi != Abi::Arm);
+            let wide = intmax || l_count >= 2 || (l_count == 1 && self.abi != Abi::Arm);
+            let mut zero_handled = false;
             let body: Vec<u8> = match conv {
-                b'%' => b"%".to_vec(),
+                b'%' => {
+                    width = 0;
+                    b"%".to_vec()
+                }
                 b'd' | b'i' => {
+                    zero_handled = true;
                     let raw = self.next_arg(t, src, wide)?;
                     let v = if wide {
                         raw as i64
                     } else {
                         i64::from(raw as i32)
                     };
-                    let mut s = v.to_string();
-                    if plus && v >= 0 {
-                        s.insert(0, '+');
+                    let sign: &[u8] = if v < 0 {
+                        b"-"
+                    } else if plus {
+                        b"+"
+                    } else if space {
+                        b" "
+                    } else {
+                        b""
+                    };
+                    let mut digits = v.unsigned_abs().to_string().into_bytes();
+                    if let Some(prec) = precision {
+                        if prec > MAX_FORMAT_BYTES {
+                            return Err(RdError::new(
+                                "NATIVE_MEMORY",
+                                "printf precision exceeds 1 MiB",
+                            ));
+                        }
+                        if prec == 0 && v == 0 {
+                            digits.clear();
+                        } else if digits.len() < prec {
+                            let mut padded = vec![b'0'; prec - digits.len()];
+                            padded.extend_from_slice(&digits);
+                            digits = padded;
+                        }
+                    } else if zero && !left && sign.len() + digits.len() < width {
+                        let mut padded = vec![b'0'; width - sign.len() - digits.len()];
+                        padded.extend_from_slice(&digits);
+                        digits = padded;
                     }
-                    s.into_bytes()
+                    let mut res = Vec::with_capacity(sign.len() + digits.len());
+                    res.extend_from_slice(sign);
+                    res.extend_from_slice(&digits);
+                    res
                 }
                 b'u' | b'x' | b'X' | b'o' => {
+                    zero_handled = true;
                     let raw = self.next_arg(t, src, wide)?;
                     let v = if wide { raw } else { raw & 0xffff_ffff };
-                    match conv {
+                    let mut digits = match conv {
                         b'u' => v.to_string(),
                         b'x' => format!("{v:x}"),
                         b'X' => format!("{v:X}"),
                         _ => format!("{v:o}"),
                     }
-                    .into_bytes()
+                    .into_bytes();
+                    let prefix: &[u8] = if alt && v != 0 {
+                        match conv {
+                            b'x' => b"0x",
+                            b'X' => b"0X",
+                            b'o' => b"0",
+                            _ => b"",
+                        }
+                    } else {
+                        b""
+                    };
+                    if let Some(prec) = precision {
+                        if prec > MAX_FORMAT_BYTES {
+                            return Err(RdError::new(
+                                "NATIVE_MEMORY",
+                                "printf precision exceeds 1 MiB",
+                            ));
+                        }
+                        if prec == 0 && v == 0 {
+                            digits = if conv == b'o' && alt {
+                                b"0".to_vec()
+                            } else {
+                                Vec::new()
+                            };
+                        } else {
+                            let eff_prec = if conv == b'o' && alt {
+                                prec.saturating_sub(1)
+                            } else {
+                                prec
+                            };
+                            if digits.len() < eff_prec {
+                                let mut padded = vec![b'0'; eff_prec - digits.len()];
+                                padded.extend_from_slice(&digits);
+                                digits = padded;
+                            }
+                        }
+                    } else if zero && !left && prefix.len() + digits.len() < width {
+                        let mut padded = vec![b'0'; width - prefix.len() - digits.len()];
+                        padded.extend_from_slice(&digits);
+                        digits = padded;
+                    }
+                    let mut res = Vec::with_capacity(prefix.len() + digits.len());
+                    res.extend_from_slice(prefix);
+                    res.extend_from_slice(&digits);
+                    res
                 }
                 b'p' => {
                     format!("0x{:x}", self.next_arg(t, src, self.abi != Abi::Arm)?).into_bytes()
                 }
                 b'f' | b'F' | b'e' | b'E' | b'g' | b'G' => {
+                    zero_handled = true;
                     let v = self.next_fp_arg(t, src)?;
                     let mut body = c_float(v, conv, precision.unwrap_or(6), alt);
-                    if plus && !body.starts_with('-') {
-                        body.insert(0, '+');
+                    if !body.starts_with('-') {
+                        if plus {
+                            body.insert(0, '+');
+                        } else if space {
+                            body.insert(0, ' ');
+                        }
                     }
-                    if zero && !left && !v.is_finite() {
-                        zero = false;
-                    }
-                    if zero && !left && body.len() < width {
-                        let sign = usize::from(body.starts_with(['-', '+']));
+                    if zero && !left && v.is_finite() && body.len() < width {
+                        let sign = usize::from(body.starts_with(['-', '+', ' ']));
                         let pad = "0".repeat(width - body.len());
                         body.insert_str(sign, &pad);
                     }
@@ -1304,15 +1555,17 @@ impl Runtime {
                 b'c' => vec![self.next_arg(t, src, false)? as u8],
                 b's' => {
                     let p = self.next_arg(t, src, self.abi != Abi::Arm)?;
-                    let mut s = if p == 0 {
-                        b"(null)".to_vec()
+                    if p == 0 {
+                        let mut s = b"(null)".to_vec();
+                        if let Some(n) = precision {
+                            s.truncate(n);
+                        }
+                        s
+                    } else if let Some(n) = precision {
+                        self.c_string_bounded(p, n)?
                     } else {
                         self.c_string(p)?
-                    };
-                    if let Some(n) = precision {
-                        s.truncate(n);
                     }
-                    s
                 }
                 other => {
                     return Err(RdError::new(
@@ -1321,15 +1574,25 @@ impl Runtime {
                     ))
                 }
             };
+            let field_len = body.len().max(width);
+            if out
+                .len()
+                .checked_add(field_len)
+                .map(|total| total > MAX_FORMAT_BYTES)
+                .unwrap_or(true)
+            {
+                return Err(RdError::new(
+                    "NATIVE_MEMORY",
+                    "formatted output exceeds 1 MiB",
+                ));
+            }
             if body.len() < width {
-                let pad = vec![
-                    if zero && !left && conv != b's' {
-                        b'0'
-                    } else {
-                        b' '
-                    };
-                    width - body.len()
-                ];
+                let pad_byte = if !zero_handled && zero && !left && conv != b's' {
+                    b'0'
+                } else {
+                    b' '
+                };
+                let pad = vec![pad_byte; width - body.len()];
                 if left {
                     out.extend(&body);
                     out.extend(pad);
@@ -1339,12 +1602,6 @@ impl Runtime {
                 }
             } else {
                 out.extend(&body);
-            }
-            if out.len() > 1024 * 1024 {
-                return Err(RdError::new(
-                    "NATIVE_MEMORY",
-                    "formatted output exceeds 1 MiB",
-                ));
             }
         }
         Ok(out)
@@ -1457,23 +1714,51 @@ fn builtin_import(n: &str) -> bool {
             | "calloc"
             | "free"
             | "realloc"
+            | "posix_memalign"
             | "memcpy"
             | "memmove"
             | "memset"
             | "memcmp"
+            | "memchr"
+            | "wmemchr"
             | "strlen"
+            | "wcslen"
             | "strcmp"
+            | "strncmp"
             | "strcpy"
             | "strncpy"
             | "strdup"
+            | "strstr"
             | "strchr"
             | "strrchr"
+            | "__strchr_chk"
             | "__strlen_chk"
             | "__memcpy_chk"
             | "__memmove_chk"
             | "__memset_chk"
+            | "snprintf"
+            | "sprintf"
+            | "__sprintf_chk"
+            | "__snprintf_chk"
+            | "vsnprintf"
+            | "vsprintf"
+            | "__vsprintf_chk"
+            | "__vsnprintf_chk"
+            | "asprintf"
+            | "vasprintf"
+            | "fprintf"
+            | "vfprintf"
+            | "fputs"
+            | "puts"
+            | "printf"
+            | "vprintf"
+            | "fwrite"
+            | "fputc"
+            | "putchar"
+            | "fflush"
             | "__android_log_write"
             | "__android_log_print"
+            | "__android_log_vprint"
             | "abort"
             | "__stack_chk_fail"
             | "__assert2"
@@ -1486,17 +1771,34 @@ fn builtin_import(n: &str) -> bool {
             | "__errno"
             | "atoi"
             | "__system_property_get"
+            | "getauxval"
             | "getenv"
             | "getpid"
             | "gettid"
             | "getpagesize"
+            | "getrlimit"
+            | "setrlimit"
             | "pthread_key_create"
+            | "pthread_key_delete"
             | "pthread_getspecific"
             | "pthread_setspecific"
             | "pthread_mutex_lock"
             | "pthread_mutex_unlock"
             | "pthread_mutex_init"
             | "pthread_mutex_destroy"
+            | "pthread_rwlock_rdlock"
+            | "pthread_rwlock_wrlock"
+            | "pthread_rwlock_unlock"
+            | "pthread_rwlock_init"
+            | "pthread_rwlock_destroy"
+            | "pthread_cond_broadcast"
+            | "pthread_cond_signal"
+            | "pthread_cond_init"
+            | "pthread_cond_destroy"
+            | "newlocale"
+            | "uselocale"
+            | "duplocale"
+            | "freelocale"
             | "close"
             | "ioctl"
             | "setsockopt"
@@ -1504,6 +1806,45 @@ fn builtin_import(n: &str) -> bool {
             | "read"
             | "write"
             | "fcntl"
+            | "syscall"
+            | "fmodf"
+            | "atan2f"
+            | "powf"
+            | "hypotf"
+            | "fmod"
+            | "atan2"
+            | "pow"
+            | "hypot"
+            | "sqrtf"
+            | "floorf"
+            | "ceilf"
+            | "roundf"
+            | "fabsf"
+            | "expf"
+            | "logf"
+            | "sinf"
+            | "cosf"
+            | "tanf"
+            | "atanf"
+            | "truncf"
+            | "log10f"
+            | "sqrt"
+            | "floor"
+            | "ceil"
+            | "round"
+            | "fabs"
+            | "exp"
+            | "log"
+            | "sin"
+            | "cos"
+            | "tan"
+            | "atan"
+            | "trunc"
+            | "log10"
+            | "lroundf"
+            | "llroundf"
+            | "lround"
+            | "llround"
     )
 }
 
@@ -1539,5 +1880,424 @@ mod float_format_tests {
         assert_eq!(c_float(12.5_f64, b'f', 1, false), "12.5");
         assert_eq!(c_float(f64::NAN, b'F', 6, false), "NAN");
         assert_eq!(c_float(f64::NEG_INFINITY, b'f', 6, false), "-inf");
+    }
+}
+
+#[cfg(test)]
+mod p0_242_255_tests {
+    use super::*;
+
+    const MOCK_WORKER: &str = r#"
+import json, sys
+mem = {}
+mapped = []
+pending_trap = None
+
+def is_mapped(addr, size):
+    if size == 0:
+        return True
+    end = addr + size
+    cur = addr
+    while cur < end:
+        ok = False
+        for a, s in mapped:
+            if a <= cur < a + s:
+                cur = min(end, a + s)
+                ok = True
+                break
+        if not ok:
+            return False
+    return True
+
+def send(v):
+    sys.stdout.write(json.dumps(v) + "\n")
+    sys.stdout.flush()
+
+for raw in sys.stdin:
+    q = json.loads(raw)
+    op = q["op"]
+    if op == "init":
+        send({"version": 1})
+    elif op == "map":
+        mapped.append((int(q["address"]), int(q["size"])))
+        send({"event": "ok"})
+    elif op == "write":
+        addr = int(q["address"])
+        data = bytes.fromhex(q["hex"])
+        if not is_mapped(addr, len(data)):
+            send({"event": "error", "code": "NATIVE_FAULT", "cause": "unmapped write"})
+        else:
+            for idx, b in enumerate(data):
+                mem[addr + idx] = b
+            send({"event": "ok"})
+    elif op == "read":
+        addr = int(q["address"])
+        sz = int(q["size"])
+        if not is_mapped(addr, sz):
+            send({"event": "error", "code": "NATIVE_FAULT", "cause": "unmapped read"})
+        else:
+            out = bytes(mem.get(addr + idx, 0) for idx, _ in enumerate(range(sz)))
+            send({"event": "ok", "hex": out.hex()})
+"#;
+
+    fn mock_runtime(abi: Abi) -> Result<Runtime> {
+        let mut child = Command::new("python3")
+            .arg("-u")
+            .arg("-c")
+            .arg(MOCK_WORKER)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .map_err(ioerr)?;
+        let input = child
+            .stdin
+            .take()
+            .ok_or_else(|| ioerr("mock stdin unavailable"))?;
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| ioerr("mock stdout unavailable"))?;
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let mut r = BufReader::new(stdout);
+            loop {
+                let mut line = String::new();
+                match r.read_line(&mut line) {
+                    Ok(0) => break,
+                    Ok(_) => {
+                        let parsed =
+                            serde_json::from_str::<Value>(&line).map_err(|e| e.to_string());
+                        if tx.send(parsed).is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(e.to_string()));
+                        break;
+                    }
+                }
+            }
+        });
+        let mut rt = Runtime {
+            child,
+            input,
+            output: rx,
+            abi,
+            libraries: BTreeMap::new(),
+            imports: BTreeMap::new(),
+            import_names: BTreeMap::new(),
+            next_base: 0x10000000,
+            arena_used: 0,
+            instructions: 0,
+            logs: Vec::new(),
+            allocations: 0,
+            sizes: BTreeMap::new(),
+            data_imports: BTreeMap::new(),
+            errno: 0,
+            tls_keys: BTreeMap::new(),
+            missing_imports: BTreeSet::new(),
+        };
+        let hello = rt.request(json!({"op":"init","abi":abi.android_name()}))?;
+        assert_eq!(hello["version"], 1);
+        rt.map(ARENA, ARENA_SIZE)?;
+        rt.map(ENV, 0x10000)?;
+        Ok(rt)
+    }
+
+    fn build_weak_import_elf(weak_syms: &[&str], bad_init_ptr: Option<u64>) -> Vec<u8> {
+        let mut d = vec![0u8; 0x2000];
+        d[0..4].copy_from_slice(b"\x7fELF");
+        d[4] = 2; // ELF64
+        d[5] = 1; // LE
+        d[6] = 1; // v1
+        d[16..18].copy_from_slice(&3u16.to_le_bytes()); // ET_DYN
+        d[18..20].copy_from_slice(&62u16.to_le_bytes()); // EM_X86_64
+        d[20..24].copy_from_slice(&1u32.to_le_bytes());
+        d[32..40].copy_from_slice(&64u64.to_le_bytes()); // e_phoff
+        d[52..54].copy_from_slice(&64u16.to_le_bytes());
+        d[54..56].copy_from_slice(&56u16.to_le_bytes()); // e_phentsize
+        d[56..58].copy_from_slice(&2u16.to_le_bytes()); // 2 phdrs: PT_LOAD + PT_DYNAMIC
+
+        // PHDR 0: PT_LOAD covering 0x0..0x2000
+        let p0 = 64usize;
+        d[p0..p0 + 4].copy_from_slice(&1u32.to_le_bytes());
+        d[p0 + 4..p0 + 8].copy_from_slice(&7u32.to_le_bytes());
+        d[p0 + 32..p0 + 40].copy_from_slice(&0x2000u64.to_le_bytes());
+        d[p0 + 40..p0 + 48].copy_from_slice(&0x2000u64.to_le_bytes());
+        d[p0 + 48..p0 + 56].copy_from_slice(&0x1000u64.to_le_bytes());
+
+        // Layout inside 0x0..0x2000:
+        // 0x200: dynstr
+        // 0x400: dynsym
+        // 0x700: rela.plt (JUMP_SLOT = 7) into GOT at 0x1000 + i*8
+        // 0x900: init_array (optional 1 entry)
+        // 0xa00: PT_DYNAMIC
+        let mut strtab = vec![0u8];
+        let mut name_offs = Vec::new();
+        for s in weak_syms {
+            name_offs.push(strtab.len() as u32);
+            strtab.extend_from_slice(s.as_bytes());
+            strtab.push(0);
+        }
+        d[0x200..0x200 + strtab.len()].copy_from_slice(&strtab);
+
+        // Symbol 0 = STN_UNDEF; Symbols 1..=N = STB_WEAK (2<<4) | STT_FUNC (2) = 0x22, shndx = 0
+        for (idx, &noff) in name_offs.iter().enumerate() {
+            let sym_off = 0x400 + (idx + 1) * 24;
+            d[sym_off..sym_off + 4].copy_from_slice(&noff.to_le_bytes());
+            d[sym_off + 4] = 0x22;
+            let rela_off = 0x700 + idx * 24;
+            let got_va = 0x1000u64 + (idx as u64) * 8;
+            let r_info = (((idx + 1) as u64) << 32) | 7u64; // R_X86_64_JUMP_SLOT
+            d[rela_off..rela_off + 8].copy_from_slice(&got_va.to_le_bytes());
+            d[rela_off + 8..rela_off + 16].copy_from_slice(&r_info.to_le_bytes());
+        }
+
+        let mut dyn_entries: Vec<(u64, u64)> = vec![
+            (5, 0x200),                         // DT_STRTAB
+            (10, strtab.len() as u64),          // DT_STRSZ
+            (6, 0x400),                         // DT_SYMTAB
+            (11, 24),                           // DT_SYMENT
+            (7, 0x700),                         // DT_RELA
+            (8, (weak_syms.len() * 24) as u64), // DT_RELASZ
+            (9, 24),                            // DT_RELAENT
+        ];
+        if let Some(ptr) = bad_init_ptr {
+            d[0x900..0x908].copy_from_slice(&ptr.to_le_bytes());
+            dyn_entries.push((25, 0x900)); // DT_INIT_ARRAY
+            dyn_entries.push((27, 8)); // DT_INIT_ARRAYSZ
+        }
+        dyn_entries.push((0, 0));
+
+        let dyn_bytes = dyn_entries.len() * 16;
+        for (i, (tag, val)) in dyn_entries.iter().enumerate() {
+            let o = 0xa00 + i * 16;
+            d[o..o + 8].copy_from_slice(&tag.to_le_bytes());
+            d[o + 8..o + 16].copy_from_slice(&val.to_le_bytes());
+        }
+
+        let p1 = 64 + 56;
+        d[p1..p1 + 4].copy_from_slice(&2u32.to_le_bytes()); // PT_DYNAMIC
+        d[p1 + 4..p1 + 8].copy_from_slice(&6u32.to_le_bytes());
+        d[p1 + 8..p1 + 16].copy_from_slice(&0xa00u64.to_le_bytes());
+        d[p1 + 16..p1 + 24].copy_from_slice(&0xa00u64.to_le_bytes());
+        d[p1 + 32..p1 + 40].copy_from_slice(&(dyn_bytes as u64).to_le_bytes());
+        d[p1 + 40..p1 + 48].copy_from_slice(&(dyn_bytes as u64).to_le_bytes());
+        d
+    }
+
+    #[test]
+    fn p0_255_printf_width_precision_sign_and_arm32_intmax() -> Result<()> {
+        let mut rt = mock_runtime(Abi::X86_64)?;
+        let hi = rt.alloc_bytes(b"hi\0")?;
+
+        // Negative dynamic width `%*s` with -8 -> left-justified width 8 (no ~18 EiB OOM abort!)
+        let t_neg_w = Trap {
+            slot: 0,
+            args: vec![(-8i32 as u32) as u64, hi],
+            fp: Vec::new(),
+            sp: 0,
+        };
+        let mut src = VaSource::Direct(0, 0);
+        assert_eq!(rt.format(b"%*s", &t_neg_w, &mut src)?, b"hi      ");
+
+        // Dynamic width i32::MIN or > 1 MiB -> structured NATIVE_MEMORY error, never OOM
+        for bad_w in [i32::MIN, -2_000_000, 2_000_000] {
+            let t_bad = Trap {
+                slot: 0,
+                args: vec![(bad_w as u32) as u64, hi],
+                fp: Vec::new(),
+                sp: 0,
+            };
+            let mut s = VaSource::Direct(0, 0);
+            let res = rt.format(b"%*s", &t_bad, &mut s);
+            assert!(matches!(res, Err(ref e) if e.code == "NATIVE_MEMORY"));
+        }
+
+        // Literal huge/overflowing width -> structured NATIVE_MEMORY error
+        let t_empty = Trap {
+            slot: 0,
+            args: vec![hi],
+            fp: Vec::new(),
+            sp: 0,
+        };
+        let mut s_ovf = VaSource::Direct(0, 0);
+        let res_ovf = rt.format(b"%99999999999999999999999999s", &t_empty, &mut s_ovf);
+        assert!(matches!(res_ovf, Err(ref e) if e.code == "NATIVE_MEMORY"));
+
+        // Negative dynamic precision `%.*s` with -1 -> treated as omitted per C99
+        let hello = rt.alloc_bytes(b"hello\0")?;
+        let t_neg_p = Trap {
+            slot: 0,
+            args: vec![(-1i32 as u32) as u64, hello],
+            fp: Vec::new(),
+            sp: 0,
+        };
+        let mut s_np = VaSource::Direct(0, 0);
+        assert_eq!(rt.format(b"%.*s", &t_neg_p, &mut s_np)?, b"hello");
+
+        // Zero-padded negative signed int `%05d` on -42 -> "-0042" (never "00-42")
+        let t_sign = Trap {
+            slot: 0,
+            args: vec![(-42i64) as u64, 42, 0xab],
+            fp: Vec::new(),
+            sp: 0,
+        };
+        let mut s_sign = VaSource::Direct(0, 0);
+        assert_eq!(
+            rt.format(b"%05d|%+05d|%#08x", &t_sign, &mut s_sign)?,
+            b"-0042|+0042|0x0000ab"
+        );
+
+        // ARM32 (`armeabi-v7a`) `%jd` (`intmax_t` is 64-bit even on ILP32!)
+        let mut arm_rt = mock_runtime(Abi::Arm)?;
+        let ok_ptr = arm_rt.alloc_bytes(b"ok\0")?;
+        let val64: i64 = -0x1234_5678_9abc_def0;
+        let lo = (val64 as u64) & 0xffff_ffff;
+        let hi_word = ((val64 as u64) >> 32) & 0xffff_ffff;
+        // Start Direct at index 1 (odd!) to verify AAPCS32 even-register pair alignment -> r2:r3, then r4 for `%s`!
+        let t_arm = Trap {
+            slot: 0,
+            args: vec![0xdead, 0xbeef, lo, hi_word, ok_ptr],
+            fp: Vec::new(),
+            sp: 0,
+        };
+        let mut s_arm = VaSource::Direct(1, 0);
+        assert_eq!(
+            arm_rt.format(b"%jd|%s", &t_arm, &mut s_arm)?,
+            format!("{val64}|ok").into_bytes()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn p0_255_bounded_reads_near_unmapped_page_and_libc_guards() -> Result<()> {
+        let mut rt = mock_runtime(Abi::X86_64)?;
+        // Map single page 0x3000_0000..0x3000_1000; 0x3000_1000 is unmapped!
+        rt.map(0x3000_0000, 0x1000)?;
+        let edge = 0x3000_0ffb;
+        rt.write(edge, b"ABCDE")?;
+        let other = rt.alloc_bytes(b"ABCDE\0")?;
+        let dst = rt.allocate(16)?;
+        rt.map(0x6000_0000, 0x1000)?; // dummy stack for raw_argument
+
+        // strncmp(edge, other, 5) must NOT read 0x3000_1000
+        let t_cmp = Trap {
+            slot: 0,
+            args: vec![edge, other, 5, 0, 0, 0],
+            fp: Vec::new(),
+            sp: 0x6000_0100,
+        };
+        assert_eq!(rt.libc("strncmp", &t_cmp)?.bits, 0);
+
+        // strncpy(dst, edge, 5) must NOT read 0x3000_1000
+        let t_cpy = Trap {
+            slot: 0,
+            args: vec![dst, edge, 5, 0, 0, 0],
+            fp: Vec::new(),
+            sp: 0x6000_0100,
+        };
+        assert_eq!(rt.libc("strncpy", &t_cpy)?.bits, dst);
+        assert_eq!(rt.read(dst, 5)?, b"ABCDE");
+
+        // snprintf(dst, 16, "%.*s", 5, edge) must NOT read 0x3000_1000
+        let fmt_ptr = rt.alloc_bytes(b"%.*s\0")?;
+        let t_snp = Trap {
+            slot: 0,
+            args: vec![dst, 16, fmt_ptr, 5, edge, 0],
+            fp: Vec::new(),
+            sp: 0x6000_0100,
+        };
+        assert_eq!(rt.libc("snprintf", &t_snp)?.bits, 5);
+        assert_eq!(rt.read(dst, 6)?, b"ABCDE\0");
+
+        // memcmp > 16 MiB rejected cleanly
+        let t_memcmp = Trap {
+            slot: 0,
+            args: vec![other, other, 16 * 1024 * 1024 + 1, 0, 0, 0],
+            fp: Vec::new(),
+            sp: 0x6000_0100,
+        };
+        assert!(matches!(
+            rt.libc("memcmp", &t_memcmp),
+            Err(ref e) if e.code == "NATIVE_MEMORY"
+        ));
+
+        // posix_memalign: align < sizeof(void*) -> EINVAL (22); size near u64::MAX -> NATIVE_OOM (no panic)
+        let out_ptr = rt.allocate(8)?;
+        for bad_align in [1u64, 2, 4] {
+            let t_align = Trap {
+                slot: 0,
+                args: vec![out_ptr, bad_align, 32, 0, 0, 0],
+                fp: Vec::new(),
+                sp: 0x6000_0100,
+            };
+            assert_eq!(rt.libc("posix_memalign", &t_align)?.bits, 22);
+        }
+        let t_ovf = Trap {
+            slot: 0,
+            args: vec![out_ptr, 16, u64::MAX - 4, 0, 0, 0],
+            fp: Vec::new(),
+            sp: 0x6000_0100,
+        };
+        assert!(matches!(
+            rt.libc("posix_memalign", &t_ovf),
+            Err(ref e) if e.code == "NATIVE_OOM"
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn p0_255_weak_builtin_imports_and_p0_242_pointer_overflow_guards() -> Result<()> {
+        let mut rt = mock_runtime(Abi::X86_64)?;
+        let syms = [
+            "getauxval",
+            "posix_memalign",
+            "snprintf",
+            "fmodf",
+            "pthread_rwlock_rdlock",
+        ];
+        let elf_bytes = build_weak_import_elf(&syms, None);
+        let mut avail = BTreeMap::new();
+        avail.insert("libweak.so".to_string(), elf_bytes);
+        let init = rt.load("libweak.so", &avail)?;
+        assert!(init.is_empty());
+
+        // Every weak symbol implemented by libc/libm must bind to a TRAPS trampoline, never 0!
+        for (idx, sym) in syms.iter().enumerate() {
+            let got_slot = rt.read_word(0x10000000 + 0x1000 + (idx as u64) * 8)?;
+            assert!(
+                got_slot >= TRAPS,
+                "weak builtin {sym} resolved to {got_slot:#x}"
+            );
+        }
+
+        // #242: c_string and raw_argument near u64::MAX return structured errors without overflow panics
+        rt.map(u64::MAX - 7, 8)?;
+        rt.write(u64::MAX - 7, b"abcdefgh")?;
+        assert!(matches!(
+            rt.c_string(u64::MAX - 7),
+            Err(ref e) if e.code == "NATIVE_MEMORY"
+        ));
+        let t_sp = Trap {
+            slot: 0,
+            args: vec![1, 2],
+            fp: Vec::new(),
+            sp: u64::MAX - 4,
+        };
+        assert!(matches!(
+            rt.raw_argument(&t_sp, 5),
+            Err(ref e) if e.code == "NATIVE_MEMORY"
+        ));
+
+        // #242: init_array entry pointing into ARENA (outside ELF segments) is rejected during load()
+        let bad_init_elf = build_weak_import_elf(&[], Some(ARENA));
+        avail.insert("libbadinit.so".to_string(), bad_init_elf);
+        assert!(matches!(
+            rt.load("libbadinit.so", &avail),
+            Err(ref e) if e.code == "INVALID_ELF"
+        ));
+        Ok(())
     }
 }
