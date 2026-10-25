@@ -347,10 +347,50 @@ fn rfc822_tokenizer_parses_names_addresses_and_comments() {
             tokenizer,
             "findTokenStart",
             "(Ljava/lang/CharSequence;I)I",
-            &[token_text, Value::Int(len)],
+            &[token_text.clone(), Value::Int(len)],
         ),
         Value::Int(5)
     );
+
+    // Deep audit: AOSP cursor bounds. findTokenStart past the end
+    // walks into charAt(len + 1); findTokenEnd with a negative
+    // cursor indexes charAt(-1); a past-the-end findTokenEnd cursor
+    // is returned untouched, and a negative findTokenStart is 0.
+    let short = text(&mut engine, "a@b");
+    for (call_name, cursor) in [("findTokenStart", 99), ("findTokenEnd", -1)] {
+        match engine.invoke_instance(
+            tokenizer,
+            call_name,
+            "(Ljava/lang/CharSequence;I)I",
+            &[short.clone(), Value::Int(cursor)],
+        ) {
+            Err(rd_vm::err::VmExit::Exception(t)) => {
+                assert_eq!(t.class, "Ljava/lang/StringIndexOutOfBoundsException;")
+            }
+            other => panic!("expected StringIndexOutOfBoundsException, got {other:?}"),
+        }
+    }
+    assert_eq!(
+        call(
+            &mut engine,
+            tokenizer,
+            "findTokenEnd",
+            "(Ljava/lang/CharSequence;I)I",
+            &[short.clone(), Value::Int(99)],
+        ),
+        Value::Int(99)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            tokenizer,
+            "findTokenStart",
+            "(Ljava/lang/CharSequence;I)I",
+            &[short, Value::Int(-1)],
+        ),
+        Value::Int(0)
+    );
+    let _ = token_text;
 }
 
 fn interpolation(
