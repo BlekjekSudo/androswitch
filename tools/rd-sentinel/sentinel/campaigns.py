@@ -381,6 +381,7 @@ class CampaignRunner:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self._release_binary: Path | None = None
         self._debug_binary: Path | None = None
+        self._native_fixtures_ensured = False
         self._used_check_ids = {str(c.get("id")) for c in report.get("checks", []) if isinstance(c, Mapping)}
 
     # ------------------------------------------------------------------ util
@@ -747,6 +748,57 @@ class CampaignRunner:
                 )
         return commands
 
+    @staticmethod
+    def _commands_may_run_native(commands: Sequence[tuple[str, list[str]]]) -> bool:
+        for _title, argv in commands:
+            if "--all-features" in argv:
+                return True
+            for index, arg in enumerate(argv):
+                features: str | None = None
+                if arg == "--features" and index + 1 < len(argv):
+                    features = argv[index + 1]
+                elif arg.startswith("--features="):
+                    features = arg.split("=", 1)[1]
+                if features and "native" in features.split(","):
+                    return True
+        return False
+
+    def _ensure_native_test_fixtures(
+        self, component: str, commands: Sequence[tuple[str, list[str]]]
+    ) -> None:
+        """Build the golden/native .so fixtures before native tests run.
+
+        Issue #193: deep/nightly profiles run
+        ``cargo test --workspace --all-features``, which enables the
+        ``rd-ndk`` native tests. Those tests read the three-ABI fixtures
+        under ``golden/native/artifacts/`` (gitignored, built from source by
+        ``golden/native/build.sh`` — ordinary CI builds them, Sentinel
+        never did), so every Sentinel run failed 3 tests on missing files.
+        Build them once, as a recorded required check: if the cross
+        compilers are missing the check fails visibly (fail closed) instead
+        of silently skipping native evidence. Workflows are responsible
+        for installing gcc-aarch64-linux-gnu/gcc-arm-linux-gnueabihf and
+        unicorn; this helper is the fail-closed backstop for any other
+        way the campaign gets launched.
+        """
+
+        if self._native_fixtures_ensured or not self._commands_may_run_native(commands):
+            return
+        self._native_fixtures_ensured = True
+        artifacts = self.repo / "golden/native/artifacts"
+        if all(
+            (artifacts / name).is_file()
+            for name in ("x86_64.so", "arm64-v8a.so", "armeabi-v7a.so")
+        ):
+            return
+        self._run_check(
+            ["bash", "golden/native/build.sh"],
+            check_id=f"{component}-native-fixtures",
+            title="Build golden/native three-ABI fixtures for rd-ndk native tests",
+            component=component,
+            timeout=1800,
+        )
+
     def _component_core(self) -> None:
         paths = self._changed_paths()
         if any(p.startswith("tools/rd-sentinel/") for p in paths) or self._profile() in {"nightly", "weekly", "deep"}:
@@ -789,6 +841,7 @@ class CampaignRunner:
                 required=False,
             )
             return
+        self._ensure_native_test_fixtures("core", commands)
         for title, argv in commands:
             self._run_check(
                 argv,
@@ -1036,6 +1089,7 @@ class CampaignRunner:
             repetitions = int(self._cfg("repeat_targeted_tests", 3))
         commands = self._test_commands_for_packages(self._targeted_packages())
         repeat_commands = commands[:6]
+        self._ensure_native_test_fixtures("determinism", repeat_commands)
         if repeat_commands:
             for title, argv in repeat_commands:
                 self._repeat_command(
