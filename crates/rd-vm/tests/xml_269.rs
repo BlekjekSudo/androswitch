@@ -410,50 +410,154 @@ fn issue_269_incremental_line_column_handles_many_events_linearly() {
         0x0001,
         Some(loc_code),
     );
+    b.r#virtual(
+        h,
+        "startDocument",
+        "V",
+        vec![],
+        0x0001,
+        Some(b.code(1, 1, 0, op10x(0x0e))),
+    );
+    b.r#virtual(
+        h,
+        "endDocument",
+        "V",
+        vec![],
+        0x0001,
+        Some(b.code(1, 1, 0, op10x(0x0e))),
+    );
+    let noop5 = b.code(5, 5, 0, op10x(0x0e));
+    b.r#virtual(
+        h,
+        "startElement",
+        "V",
+        vec![STRING, STRING, STRING, ATTRIBUTES],
+        0x0001,
+        Some(noop5),
+    );
+    let noop4 = b.code(4, 4, 0, op10x(0x0e));
+    b.r#virtual(
+        h,
+        "endElement",
+        "V",
+        vec![STRING, STRING, STRING],
+        0x0001,
+        Some(noop4),
+    );
+    b.r#virtual(
+        h,
+        "characters",
+        "V",
+        vec!["[C", "I", "I"],
+        0x0001,
+        Some(b.code(4, 4, 0, op10x(0x0e))),
+    );
     let dex = rd_dex::Dex::parse(b.finish()).unwrap();
 
     let cfg = VmConfig {
-        fuel: 100_000_000,
+        fuel: 200_000_000,
         ..VmConfig::default()
     };
-    let mut vm = Engine::new(vec![dex], cfg);
-    let handler = vm.new_instance("LNoopHandler;").unwrap();
-    vm.invoke_instance(handler, "<init>", "()V", &[]).unwrap();
-
-    // 15,000 lines * 2 events (`Start` + `End`) = ~30,000 events; quadratic `O(N * E)`
-    // would scan > 1.8e9 chars, whereas incremental cursor finishes in milliseconds.
-    let mut xml = String::from("<root>\n");
-    for _ in 0..15_000 {
-        xml.push_str("  <item/>\n");
-    }
-    xml.push_str("</root>");
-
-    let t0 = Instant::now();
-    parse_bytes_with_driver(&mut vm, handler, xml.as_bytes()).unwrap();
-    let elapsed = t0.elapsed();
-    assert!(
-        elapsed.as_secs_f64() < 5.0,
-        "expected linear-time SAX parse, took {elapsed:?}"
-    );
-
-    let loc = match vm.heap.get_field(handler, "locator").unwrap() {
-        Value::Obj(r) => r,
-        other => panic!("locator: {other:?}"),
+    let build_xml = |n: usize| -> String {
+        let pad = "x".repeat(120);
+        let mut s = String::with_capacity(n * 140 + 32);
+        s.push_str("<root>\n");
+        for _ in 0..n {
+            s.push_str("<!--");
+            s.push_str(&pad);
+            s.push_str("--><i/>\n");
+        }
+        s.push_str("</root>");
+        s
     };
-    assert_eq!(
-        vm.invoke_instance(loc, "getLineNumber", "()I", &[])
+    // Feed both documents via `apk:/...` systemId so byte-by-byte InputStream.read()
+    // dispatch does not mask parser complexity: N=1,500 vs 4N=6,000 lines gives
+    // t(4N)/t(N) ~ 4x with the incremental O(N) cursor vs ~ 14-16x with quadratic rescan.
+    let xml_n = build_xml(500);
+    let xml_4n = build_xml(2_000);
+    let apk_bytes = common::apkfix::build_apk(
+        "xml.t",
+        "LNoopHandler;",
+        common::apkfix::ArscFix::new().build(),
+        vec![
+            ("assets/n.xml", xml_n.into_bytes()),
+            ("assets/4n.xml", xml_4n.into_bytes()),
+        ],
+    );
+
+    let run_once = |entry_url: &str| -> (f64, i32, i32) {
+        let mut vm = Engine::new(vec![dex.clone()], cfg.clone());
+        vm.set_resources(rd_apk::Apk::from_bytes(apk_bytes.clone()).unwrap());
+        let handler = vm.new_instance("LNoopHandler;").unwrap();
+        vm.invoke_instance(handler, "<init>", "()V", &[]).unwrap();
+        let sys_id = vm.heap.alloc_string(entry_url.to_string()).unwrap();
+        let src = vm
+            .heap
+            .alloc_instance(INPUT_SOURCE.to_string(), Vec::new())
+            .unwrap();
+        vm.invoke_instance(
+            src,
+            "<init>",
+            "(Ljava/lang/String;)V",
+            &[Value::Obj(sys_id)],
+        )
+        .unwrap();
+        let driver = vm
+            .heap
+            .alloc_instance(DRIVER.to_string(), Vec::new())
+            .unwrap();
+        vm.invoke_instance(driver, "<init>", "()V", &[]).unwrap();
+        vm.invoke_instance(
+            driver,
+            "setContentHandler",
+            "(Lorg/xml/sax/ContentHandler;)V",
+            &[Value::Obj(handler)],
+        )
+        .unwrap();
+
+        let t0 = Instant::now();
+        vm.invoke_instance(
+            driver,
+            "parse",
+            "(Lorg/xml/sax/InputSource;)V",
+            &[Value::Obj(src)],
+        )
+        .unwrap();
+        let dt = t0.elapsed().as_secs_f64();
+        let loc = match vm.heap.get_field(handler, "locator").unwrap() {
+            Value::Obj(r) => r,
+            other => panic!("locator: {other:?}"),
+        };
+        let line = vm
+            .invoke_instance(loc, "getLineNumber", "()I", &[])
             .unwrap()
             .as_int()
-            .unwrap(),
-        15_002
-    );
-    assert_eq!(
-        vm.invoke_instance(loc, "getColumnNumber", "()I", &[])
+            .unwrap();
+        let col = vm
+            .invoke_instance(loc, "getColumnNumber", "()I", &[])
             .unwrap()
             .as_int()
-            .unwrap(),
-        1
+            .unwrap();
+        (dt, line, col)
+    };
+
+    let _ = run_once("apk:/assets/n.xml");
+    let mut best_n = f64::INFINITY;
+    let mut best_4n = f64::INFINITY;
+    let mut last_pos = (0, 0);
+    for _ in 0..3 {
+        let (tn, _, _) = run_once("apk:/assets/n.xml");
+        best_n = best_n.min(tn);
+        let (t4, line, col) = run_once("apk:/assets/4n.xml");
+        best_4n = best_4n.min(t4);
+        last_pos = (line, col);
+    }
+    let ratio = best_4n / best_n.max(1e-6);
+    assert!(
+        ratio < 8.0,
+        "expected linear scaling t(4N)/t(N) < 8.0 (linear ~4x, quadratic ~16x), got {ratio:.2} (tN={best_n:.4}s, t4N={best_4n:.4}s)"
     );
+    assert_eq!(last_pos, (2_002, 1));
 }
 
 #[test]
