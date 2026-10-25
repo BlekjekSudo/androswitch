@@ -214,6 +214,9 @@ jobs:
       - run: cargo check --workspace
       - run: cargo check -p rd-vm --features jit --locked
       - run: cargo check --workspace --all-features --locked
+      # issue #265: tests/, benches/, examples/ and #[cfg(test)] must also
+      # build on the MSRV (std::iter::repeat_n, 1.82, slipped into a test).
+      - run: cargo check --workspace --all-targets --all-features --locked
 
   fuzz-build:
     name: Fuzz targets build (nightly)
