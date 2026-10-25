@@ -907,19 +907,24 @@ fn audio_record_call(
             };
             let cls = vm.heap.class_of(dst).ok().unwrap_or("").to_string();
             if cls == "Ljava/nio/ByteBuffer;" {
-                let req_bytes = int_arg(args, 1).max(0) as usize;
-                let mut chunk = vec![0u8; req_bytes];
-                let avail = vm.fw.vdev.audio.pcm_input_queue.len().min(req_bytes);
-                if avail > 0 {
-                    chunk[..avail].copy_from_slice(&vm.fw.vdev.audio.pcm_input_queue[..avail]);
-                    vm.fw.vdev.audio.pcm_input_queue.drain(..avail);
+                let raw_req = int_arg(args, 1);
+                if raw_req < 0 {
+                    return Ok(Some(Value::Int(-2)));
                 }
+                let req_bytes = raw_req as usize;
                 if let Some(Value::Obj(arr)) = get_field(vm, dst, "rd_buf") {
                     let cap = array_len(vm, arr).unwrap_or(0);
                     let n = req_bytes.min(cap);
+                    let avail = vm.fw.vdev.audio.pcm_input_queue.len().min(n);
+                    let mut drained = Vec::with_capacity(avail);
+                    if avail > 0 {
+                        drained.extend_from_slice(&vm.fw.vdev.audio.pcm_input_queue[..avail]);
+                        vm.fw.vdev.audio.pcm_input_queue.drain(..avail);
+                    }
                     let elems = vm.heap.array_elems_mut(arr)?;
-                    for i in 0..n {
-                        elems[i] = Value::Int(i32::from(chunk[i] as i8));
+                    for (i, slot) in elems.iter_mut().take(n).enumerate() {
+                        let b = drained.get(i).copied().unwrap_or(0);
+                        *slot = Value::Int(i32::from(b as i8));
                     }
                     put_field(vm, dst, "rd_pos", Value::Int(0))?;
                     put_field(vm, dst, "rd_limit", Value::Int(n as i32))?;
@@ -930,23 +935,30 @@ fn audio_record_call(
                 }
                 return Ok(Some(Value::Int(0)));
             }
-            let off = int_arg(args, 1).max(0) as usize;
-            let count = int_arg(args, 2).max(0) as usize;
+            let off_raw = int_arg(args, 1);
+            let count_raw = int_arg(args, 2);
+            if off_raw < 0 || count_raw < 0 {
+                return Ok(Some(Value::Int(-2)));
+            }
+            let off = off_raw as usize;
+            let count = count_raw as usize;
             let arr_len = array_len(vm, dst)?;
-            if off + count > arr_len {
+            if off.checked_add(count).map_or(true, |end| end > arr_len) {
                 return Ok(Some(Value::Int(-2)));
             }
             if cls == "[S" {
-                let bytes_needed = count * 2;
-                let mut raw = vec![0u8; bytes_needed];
+                let bytes_needed = count.saturating_mul(2);
                 let avail = vm.fw.vdev.audio.pcm_input_queue.len().min(bytes_needed);
+                let mut raw = Vec::with_capacity(avail);
                 if avail > 0 {
-                    raw[..avail].copy_from_slice(&vm.fw.vdev.audio.pcm_input_queue[..avail]);
+                    raw.extend_from_slice(&vm.fw.vdev.audio.pcm_input_queue[..avail]);
                     vm.fw.vdev.audio.pcm_input_queue.drain(..avail);
                 }
                 let elems = vm.heap.array_elems_mut(dst)?;
                 for i in 0..count {
-                    let sample = i16::from_le_bytes([raw[i * 2], raw[i * 2 + 1]]);
+                    let lo = raw.get(i * 2).copied().unwrap_or(0);
+                    let hi = raw.get(i * 2 + 1).copied().unwrap_or(0);
+                    let sample = i16::from_le_bytes([lo, hi]);
                     elems[off + i] = Value::Int(i32::from(sample));
                 }
                 if let Some(st) = vm.fw.vdev.audio_records.get_mut(&recv) {
@@ -954,15 +966,16 @@ fn audio_record_call(
                 }
                 Ok(Some(Value::Int(count as i32)))
             } else {
-                let mut raw = vec![0u8; count];
                 let avail = vm.fw.vdev.audio.pcm_input_queue.len().min(count);
+                let mut raw = Vec::with_capacity(avail);
                 if avail > 0 {
-                    raw[..avail].copy_from_slice(&vm.fw.vdev.audio.pcm_input_queue[..avail]);
+                    raw.extend_from_slice(&vm.fw.vdev.audio.pcm_input_queue[..avail]);
                     vm.fw.vdev.audio.pcm_input_queue.drain(..avail);
                 }
                 let elems = vm.heap.array_elems_mut(dst)?;
                 for i in 0..count {
-                    elems[off + i] = Value::Int(i32::from(raw[i] as i8));
+                    let b = raw.get(i).copied().unwrap_or(0);
+                    elems[off + i] = Value::Int(i32::from(b as i8));
                 }
                 if let Some(st) = vm.fw.vdev.audio_records.get_mut(&recv) {
                     st.bytes_read += count as u64;
@@ -1035,30 +1048,54 @@ fn audio_track_call(
             };
             let cls = vm.heap.class_of(src).ok().unwrap_or("").to_string();
             if cls == "Ljava/nio/ByteBuffer;" {
-                let n = int_arg(args, 1).max(0) as usize;
-                let pos = get_int_field(vm, src, "rd_pos", 0) as usize;
+                let n_raw = int_arg(args, 1);
+                if n_raw < 0 {
+                    return Ok(Some(Value::Int(-2)));
+                }
+                let req = n_raw as usize;
+                let pos_raw = get_int_field(vm, src, "rd_pos", 0);
                 let mut preview = Vec::new();
+                let mut actual = 0usize;
                 if let Some(Value::Obj(arr)) = get_field(vm, src, "rd_buf") {
                     let bytes = read_byte_array(vm, arr)?;
-                    let end = (pos + n).min(bytes.len());
-                    preview.extend_from_slice(&bytes[pos..end.min(pos + 64)]);
+                    let limit_raw = get_int_field(vm, src, "rd_limit", bytes.len() as i32);
+                    let pos = (pos_raw.max(0) as usize).min(bytes.len());
+                    let lim = (limit_raw.max(0) as usize).min(bytes.len()).max(pos);
+                    let end = pos.saturating_add(req).min(lim);
+                    actual = end.saturating_sub(pos);
+                    let prev_end = end.min(pos.saturating_add(64));
+                    preview.extend_from_slice(&bytes[pos..prev_end]);
                     put_field(vm, src, "rd_pos", Value::Int(end as i32))?;
                 }
                 if let Some(t) = vm.fw.vdev.audio_tracks.get_mut(&recv) {
-                    t.bytes_written += n as u64;
+                    t.bytes_written += actual as u64;
                     t.last_samples_preview = preview;
                 }
-                return Ok(Some(Value::Int(n as i32)));
+                return Ok(Some(Value::Int(actual as i32)));
             }
-            let off = int_arg(args, 1).max(0) as usize;
-            let count = int_arg(args, 2).max(0) as usize;
-            let bytes_written = if cls == "[S" { count * 2 } else { count };
+            let off_raw = int_arg(args, 1);
+            let count_raw = int_arg(args, 2);
+            if off_raw < 0 || count_raw < 0 {
+                return Ok(Some(Value::Int(-2)));
+            }
+            let off = off_raw as usize;
+            let count = count_raw as usize;
+            let arr_len = array_len(vm, src)?;
+            if off.checked_add(count).map_or(true, |end| end > arr_len) {
+                return Ok(Some(Value::Int(-2)));
+            }
+            let bytes_written = if cls == "[S" {
+                count.saturating_mul(2)
+            } else {
+                count
+            };
             if cls == "[B" {
                 let bytes = read_byte_array(vm, src)?;
                 let end = (off + count).min(bytes.len());
+                let prev_end = end.min(off.saturating_add(64));
                 if let Some(t) = vm.fw.vdev.audio_tracks.get_mut(&recv) {
                     t.bytes_written += (end.saturating_sub(off)) as u64;
-                    t.last_samples_preview = bytes[off..end.min(off + 64)].to_vec();
+                    t.last_samples_preview = bytes[off..prev_end].to_vec();
                 }
             } else if let Some(t) = vm.fw.vdev.audio_tracks.get_mut(&recv) {
                 t.bytes_written += bytes_written as u64;

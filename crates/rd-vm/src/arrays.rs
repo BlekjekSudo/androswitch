@@ -4,8 +4,8 @@
 //!
 //! Object elements use their real Java semantics through guest calls:
 //! - `equals`/`hashCode`/`compareTo` run the DEX override if the class
-//!   declares one. Strings and boxes are compared by value, and other
-//!   objects fall back to identity.
+//!   declares one, or the host implementation (`Uri`, `UUID`, `BigDecimal`,
+//!   collections, maps, Strings, boxes, …), falling back to identity.
 //! - `sort(T[], Comparator)` calls `Comparator.compare`. The sort is a
 //!   stable merge sort, matching TimSort's stability guarantee, and a
 //!   comparator exception propagates.
@@ -16,12 +16,36 @@
 //! - ArrayIndexOutOfBoundsException;
 //! - IllegalArgumentException for `from > to`.
 
+use std::collections::HashSet;
+
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::{ElemKind, ObjRef};
 use crate::value::Value;
 
 const ARRAYS: &str = "Ljava/util/Arrays;";
+
+/// Maximum host->host reentrant call depth (`object_to_string`, `obj_equals`,
+/// `obj_hash`, nested collections/maps) before throwing a catchable guest
+/// `StackOverflowError` instead of exhausting the native Rust thread stack
+/// (unoptimized debug frames of `instance_intrinsic_dispatch` are ~50 KiB).
+const MAX_HOST_REENTRANT_DEPTH: usize = 16;
+
+pub(crate) fn with_host_reentrant<T, F>(vm: &mut Engine, f: F) -> Result<T, VmExit>
+where
+    F: FnOnce(&mut Engine) -> Result<T, VmExit>,
+{
+    if vm.host_reentrant_depth >= MAX_HOST_REENTRANT_DEPTH {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/StackOverflowError;",
+            "host reentrant call depth exceeded",
+        )));
+    }
+    vm.host_reentrant_depth += 1;
+    let res = f(vm);
+    vm.host_reentrant_depth = vm.host_reentrant_depth.saturating_sub(1);
+    res
+}
 
 fn exc(c: &str, m: impl Into<String>) -> VmExit {
     VmExit::Exception(Throwable::new(c, m))
@@ -43,6 +67,48 @@ fn default_of(k: ElemKind) -> Value {
     }
 }
 
+fn normalize_elem_for_desc(desc: &str, v: &Value) -> Result<Value, VmExit> {
+    Ok(match desc {
+        "[Z" => Value::Int(i32::from(v.as_int()? != 0)),
+        "[B" => Value::Int(i32::from(v.as_int()? as i8)),
+        "[S" => Value::Int(i32::from(v.as_int()? as i16)),
+        "[C" => Value::Int(i32::from(v.as_int()? as u16)),
+        _ => v.clone(),
+    })
+}
+
+/// Charge `vm.heap` for `new_len` elements **before** allocating or resizing
+/// any host `Vec<Value>`, preventing multi-GiB host `abort()` on huge sizes
+/// such as `Arrays.copyOf(a, Integer.MAX_VALUE)`.
+fn alloc_array_resized(
+    vm: &mut Engine,
+    desc: &str,
+    k: ElemKind,
+    new_len: usize,
+    prefix: &[Value],
+) -> Result<Value, VmExit> {
+    let elem_class = if k == ElemKind::Obj {
+        desc.strip_prefix('[').unwrap_or(desc).to_string()
+    } else {
+        desc.to_string()
+    };
+    let r = vm
+        .heap
+        .alloc_array(k, new_len, &elem_class)
+        .map_err(crate::err::oom_throwable)?;
+    let copy_len = prefix.len().min(new_len);
+    let fill = default_of(k);
+    let slot = vm
+        .heap
+        .array_elems_mut(r)
+        .map_err(|e| VmExit::from(crate::err::vm_error("INVALID_FORMAT", e)))?;
+    slot.clear();
+    slot.reserve(new_len);
+    slot.extend_from_slice(&prefix[..copy_len]);
+    slot.resize(new_len, fill);
+    Ok(Value::Obj(r))
+}
+
 pub(crate) fn new_array(
     vm: &mut Engine,
     desc: &str,
@@ -55,7 +121,10 @@ pub(crate) fn new_array(
     } else {
         desc.to_string()
     };
-    let r = vm.heap.alloc_array(k, items.len(), &elem_class)?;
+    let r = vm
+        .heap
+        .alloc_array(k, items.len(), &elem_class)
+        .map_err(crate::err::oom_throwable)?;
     let slot = vm
         .heap
         .array_elems_mut(r)
@@ -72,26 +141,39 @@ fn arr_arg(args: &[Value], i: usize) -> Result<ObjRef, VmExit> {
     }
 }
 
-/// Guest `a.equals(b)`.
+/// Guest `a.equals(b)` supporting DEX overrides, host classes (`Uri`, `UUID`,
+/// `BigDecimal`, collections, maps, …), Strings, primitive boxes, and identity.
 pub(crate) fn obj_equals(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, VmExit> {
+    let is_null = |v: &Value| matches!(v, Value::Null);
+    if is_null(a) || is_null(b) {
+        return Ok(is_null(a) && is_null(b));
+    }
     if crate::intrinsics::values_equal(&vm.heap, a, b)? {
         return Ok(true);
     }
     let (Value::Obj(x), Value::Obj(_)) = (a, b) else {
         return Ok(false);
     };
-    let class = vm.heap.class_of(*x)?.to_string();
-    if let Some((d, def, m)) = vm
-        .cp
-        .resolve_method(&class, "equals", "(Ljava/lang/Object;)Z")
-    {
-        let r = vm.call(d, def, &m, vec![a.clone(), b.clone()])?;
-        return Ok(matches!(r, Value::Int(v) if v != 0));
+    // Fast-reject String and primitive boxes that already ran through values_equal
+    if vm.heap.as_str(*x).is_ok() {
+        return Ok(false);
     }
-    Ok(false)
+    let class = vm.heap.class_of(*x)?.to_string();
+    if crate::boxes::kind(&class).is_some() {
+        return Ok(false);
+    }
+    with_host_reentrant(vm, |vm| {
+        let res = vm.invoke_instance(
+            *x,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            std::slice::from_ref(b),
+        )?;
+        Ok(matches!(res, Value::Int(v) if v != 0))
+    })
 }
 
-/// Guest `o.hashCode()` (0 for null).
+/// Guest `o.hashCode()` (0 for null), dispatching DEX overrides and host classes.
 pub(crate) fn obj_hash(vm: &mut Engine, v: &Value) -> Result<i32, VmExit> {
     let Value::Obj(r) = v else { return Ok(0) };
     if let Ok(s) = vm.heap.as_str(*r) {
@@ -104,10 +186,12 @@ pub(crate) fn obj_hash(vm: &mut Engine, v: &Value) -> Result<i32, VmExit> {
         let inner = vm.heap.get_field(*r, "value").unwrap_or(Value::Int(0));
         return Ok(prim_hash(k, &inner));
     }
-    if let Some((d, def, m)) = vm.cp.resolve_method(&class, "hashCode", "()I") {
-        return Ok(vm.call(d, def, &m, vec![v.clone()])?.as_int().unwrap_or(0));
-    }
-    Ok(*r as i32)
+    with_host_reentrant(vm, |vm| {
+        Ok(vm
+            .invoke_instance(*r, "hashCode", "()I", &[])?
+            .as_int()
+            .unwrap_or(0))
+    })
 }
 
 fn prim_hash(k: char, v: &Value) -> i32 {
@@ -165,7 +249,13 @@ fn prim_eq(a: &Value, b: &Value) -> bool {
     }
 }
 
-fn elem_to_string(vm: &mut Engine, desc: &str, v: &Value, deep: bool) -> Result<String, VmExit> {
+fn elem_to_string(
+    vm: &mut Engine,
+    desc: &str,
+    v: &Value,
+    deep: bool,
+    deja_vu: &mut HashSet<ObjRef>,
+) -> Result<String, VmExit> {
     Ok(match v {
         Value::Null => "null".into(),
         Value::Int(x) => match desc {
@@ -180,7 +270,11 @@ fn elem_to_string(vm: &mut Engine, desc: &str, v: &Value, deep: bool) -> Result<
         Value::Double(d) => crate::numerics::java_double_to_string(*d, false),
         Value::Obj(r) => {
             if deep && vm.heap.as_array_elems(*r).is_ok() {
-                array_to_string(vm, *r, true)?
+                if deja_vu.contains(r) {
+                    "[...]".into()
+                } else {
+                    array_to_string_inner(vm, *r, true, deja_vu)?
+                }
             } else {
                 crate::intrinsics::object_to_string(vm, *r)?
             }
@@ -189,13 +283,41 @@ fn elem_to_string(vm: &mut Engine, desc: &str, v: &Value, deep: bool) -> Result<
     })
 }
 
+fn array_to_string_inner(
+    vm: &mut Engine,
+    r: ObjRef,
+    deep: bool,
+    deja_vu: &mut HashSet<ObjRef>,
+) -> Result<String, VmExit> {
+    with_host_reentrant(vm, |vm| {
+        let (items, _, desc) = elems(vm, r)?;
+        if deep {
+            deja_vu.insert(r);
+        }
+        let mut parts = Vec::with_capacity(items.len());
+        let mut err = None;
+        for v in &items {
+            match elem_to_string(vm, &desc, v, deep, deja_vu) {
+                Ok(s) => parts.push(s),
+                Err(e) => {
+                    err = Some(e);
+                    break;
+                }
+            }
+        }
+        if deep {
+            deja_vu.remove(&r);
+        }
+        if let Some(e) = err {
+            return Err(e);
+        }
+        Ok(format!("[{}]", parts.join(", ")))
+    })
+}
+
 fn array_to_string(vm: &mut Engine, r: ObjRef, deep: bool) -> Result<String, VmExit> {
-    let (items, _, desc) = elems(vm, r)?;
-    let mut parts = Vec::with_capacity(items.len());
-    for v in &items {
-        parts.push(elem_to_string(vm, &desc, v, deep)?);
-    }
-    Ok(format!("[{}]", parts.join(", ")))
+    let mut deja_vu = HashSet::new();
+    array_to_string_inner(vm, r, deep, &mut deja_vu)
 }
 
 /// Compare two elements: Comparator if given, else natural ordering.
@@ -207,19 +329,30 @@ pub(crate) fn compare(
 ) -> Result<i32, VmExit> {
     if let Some(Value::Obj(c)) = cmp {
         let class = vm.heap.class_of(*c)?.to_string();
-        let Some((d, def, m)) =
+        if let Some((d, def, m)) =
             vm.cp
                 .resolve_method(&class, "compare", "(Ljava/lang/Object;Ljava/lang/Object;)I")
-        else {
-            return Err(exc(
-                "Ljava/lang/AbstractMethodError;",
-                format!("{class}.compare"),
-            ));
-        };
-        return Ok(vm
-            .call(d, def, &m, vec![Value::Obj(*c), a.clone(), b.clone()])?
-            .as_int()
-            .unwrap_or(0));
+        {
+            return Ok(vm
+                .call(d, def, &m, vec![Value::Obj(*c), a.clone(), b.clone()])?
+                .as_int()
+                .unwrap_or(0));
+        }
+        if let Some(v) = crate::intrinsics::call_instance_intrinsic_mref(
+            vm,
+            &class,
+            &class,
+            "compare",
+            "(Ljava/lang/Object;Ljava/lang/Object;)I",
+            *c,
+            &[a.clone(), b.clone()],
+        )? {
+            return Ok(v.as_int().unwrap_or(0));
+        }
+        return Err(exc(
+            "Ljava/lang/AbstractMethodError;",
+            format!("{class}.compare"),
+        ));
     }
     match (a, b) {
         (Value::Int(x), Value::Int(y)) => Ok(x.cmp(y) as i32),
@@ -240,19 +373,33 @@ pub(crate) fn compare(
                 );
                 return compare(vm, None, &p, &q);
             }
-            match vm
-                .cp
-                .resolve_method(&class, "compareTo", "(Ljava/lang/Object;)I")
+            if let Some((d, def, m)) =
+                vm.cp
+                    .resolve_method(&class, "compareTo", "(Ljava/lang/Object;)I")
             {
-                Some((d, def, m)) => Ok(vm
+                return Ok(vm
                     .call(d, def, &m, vec![a.clone(), b.clone()])?
                     .as_int()
-                    .unwrap_or(0)),
-                None => Err(exc(
-                    "Ljava/lang/ClassCastException;",
-                    format!("{class} cannot be cast to java.lang.Comparable"),
-                )),
+                    .unwrap_or(0));
             }
+            let typed_sig = format!("({class})I");
+            for cand_sig in ["(Ljava/lang/Object;)I", typed_sig.as_str()] {
+                if let Some(v) = crate::intrinsics::call_instance_intrinsic_mref(
+                    vm,
+                    &class,
+                    &class,
+                    "compareTo",
+                    cand_sig,
+                    *x,
+                    std::slice::from_ref(b),
+                )? {
+                    return Ok(v.as_int().unwrap_or(0));
+                }
+            }
+            Err(exc(
+                "Ljava/lang/ClassCastException;",
+                format!("{class} cannot be cast to java.lang.Comparable"),
+            ))
         }
         (Value::Null, _) | (_, Value::Null) => Err(exc(
             "Ljava/lang/NullPointerException;",
@@ -335,17 +482,22 @@ pub(crate) fn static_intrinsic(
     };
     Ok(Some(match name {
         "copyOf" => {
+            if args.len() == 3 && matches!(args.get(2), Some(Value::Null)) {
+                return Err(exc("Ljava/lang/NullPointerException;", "newType is null"));
+            }
             let a = arr_arg(args, 0)?;
             let n = int(1);
             if n < 0 {
                 return Err(exc("Ljava/lang/NegativeArraySizeException;", n.to_string()));
             }
-            let (mut items, k, desc) = elems(vm, a)?;
+            let (items, k, desc) = elems(vm, a)?;
             let desc = class_desc(vm, args.get(2)).unwrap_or(desc);
-            items.resize(n as usize, default_of(k));
-            new_array(vm, &desc, k, items)?
+            alloc_array_resized(vm, &desc, k, n as usize, &items)?
         }
         "copyOfRange" => {
+            if args.len() == 4 && matches!(args.get(3), Some(Value::Null)) {
+                return Err(exc("Ljava/lang/NullPointerException;", "newType is null"));
+            }
             let a = arr_arg(args, 0)?;
             let (items, k, desc) = elems(vm, a)?;
             let (from, to) = (int(1), int(2));
@@ -362,19 +514,22 @@ pub(crate) fn static_intrinsic(
                 ));
             }
             let desc = class_desc(vm, args.get(3)).unwrap_or(desc);
-            let mut out: Vec<Value> = items[from as usize..(to as usize).min(items.len())].to_vec();
-            out.resize((to - from) as usize, default_of(k));
-            new_array(vm, &desc, k, out)?
+            let from_u = from as usize;
+            let new_len = (i64::from(to) - i64::from(from)) as usize;
+            let copy_end = (to as usize).min(items.len());
+            alloc_array_resized(vm, &desc, k, new_len, &items[from_u..copy_end])?
         }
         "fill" => {
             let a = arr_arg(args, 0)?;
             let len = vm.heap.as_array_elems(a)?.0.len();
-            let (from, to, v) = if args.len() == 4 {
+            let desc = vm.heap.class_of(a)?.to_string();
+            let (from, to, raw_v) = if args.len() == 4 {
                 let (f, t) = check_range(len, int(1), int(2))?;
-                (f, t, args[3].clone())
+                (f, t, &args[3])
             } else {
-                (0, len, args[1].clone())
+                (0, len, &args[1])
             };
+            let v = normalize_elem_for_desc(&desc, raw_v)?;
             let slot = vm
                 .heap
                 .array_elems_mut(a)
