@@ -22,6 +22,7 @@ mod device_workers;
 pub mod jni_constructor;
 pub mod jni_exceptions;
 pub mod jni_objects;
+pub mod jni_static_fields;
 #[cfg(target_os = "horizon")]
 mod launcher;
 pub mod native_probe;

@@ -29,7 +29,7 @@ static uint64_t inode(const char *path) {
     result = (result ^ (unsigned char)*path) * 1099511628211ull;
   return result ? result : 1;
 }
-static int stat_path(const char *path, AsGuestStat *out) {
+int as_bionic_stat_path(const char *path, AsGuestStat *out) {
   uint64_t metadata[3];
   if (!out) {
     errno = EFAULT;
@@ -60,7 +60,7 @@ static int access_path(const char *path, int mode) {
     return -1;
   }
   AsGuestStat metadata;
-  if (stat_path(path, &metadata))
+  if (as_bionic_stat_path(path, &metadata))
     return -1;
   unsigned permissions = mode << 6;
   if ((metadata.mode & permissions) != permissions) {
@@ -107,7 +107,7 @@ static int scan_directory(const char *path, AsGuestDirent ***out,
   }
   *out = NULL;
   AsGuestStat metadata;
-  if (stat_path(path, &metadata))
+  if (as_bionic_stat_path(path, &metadata))
     return -1;
   if ((metadata.mode & 0170000) != 0040000) {
     errno = ENOTDIR;
@@ -198,9 +198,9 @@ static int scan_directory(const char *path, AsGuestDirent ***out,
   if (!strcmp(name, n))                                                        \
   return (uint64_t)(f)
 uint64_t as_bionic_vfs_import(const char *name) {
-  API("stat", stat_path);
-  API("stat64", stat_path);
-  API("lstat", stat_path);
+  API("stat", as_bionic_stat_path);
+  API("stat64", as_bionic_stat_path);
+  API("lstat", as_bionic_stat_path);
   API("access", access_path);
   API("remove", remove_path);
   API("rename", rename_path);

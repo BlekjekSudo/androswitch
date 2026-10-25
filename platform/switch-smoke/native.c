@@ -9,6 +9,7 @@
 #include "bionic_errno.h"
 #include "bionic_finalize.h"
 #include "bionic_locale.h"
+#include "bionic_memory.h"
 #include <errno.h>
 #include <malloc.h>
 #include <math.h>
@@ -791,6 +792,17 @@ void as_cxx_wake(void) { condvarWakeAll(&cxx_condition); }
 uint64_t as_cxx_thread(void) { return guest_pthread_self(); }
 void *as_cxx_allocate(size_t size) { return guest_malloc(size); }
 void as_cxx_deallocate(void *pointer) { guest_free(pointer); }
+void *as_guest_memory_allocate(size_t length) { return memalign(4096, length); }
+int as_guest_memory_permission(void *address, size_t length, int protection) {
+  Permission permission = protection == 3 ? Perm_Rw : protection == 1 ? Perm_R : Perm_None;
+  Result rc = svcSetMemoryPermission(address, length, permission);
+  if (R_FAILED(rc)) { errno = EACCES; return -1; }
+  return 0;
+}
+void as_guest_memory_release(void *address, size_t length) {
+  (void)length;
+  free(address);
+}
 void as_cxx_trap(int error) { as_native_trap(error); }
 int as_cxx_invoke(uint64_t function, uint64_t argument) {
   AsNativeCall frame = {0};
@@ -1034,6 +1046,8 @@ int as_native_reset(void) {
   }
   while (guest_allocations)
     guest_free(guest_allocations->pointer);
+  reset_phase("native_reset_anonymous_memory");
+  if (as_bionic_memory_reset()) return -EIO;
   extern void as_bionic_io_reset(void);
   as_bionic_io_reset();
   extern void as_native_missing_reset(void);
@@ -1113,6 +1127,8 @@ uint64_t as_native_import(const char *name) {
   extern uint64_t as_bionic_log_import(const char *);
   extern uint64_t as_bionic_libc_import(const char *);
   uint64_t address = as_bionic_dlfcn_import(name);
+  if (!address)
+    address = as_bionic_memory_import(name);
   if (!address)
     address = as_bionic_libc_import(name);
   if (!address)

@@ -13,6 +13,8 @@ if($LASTEXITCODE){throw 'Communication resource compilation failed'}
 $sources=@(Get-ChildItem $source -Recurse -Filter '*.java' -File | ForEach-Object FullName)
 & javac --release 8 -g:none -cp $androidJar -d "$output/classes" @sources
 if($LASTEXITCODE){throw 'Communication fixture Java compilation failed'}
+& java -cp "$output/classes;$androidJar" org.androswitch.contracts.PairCases | Set-Content "$output/string-hash-oracle.txt" -Encoding utf8NoBOM
+if($LASTEXITCODE){throw 'String hash JVM oracle failed'}
 $classes=@(Get-ChildItem "$output/classes" -Recurse -Filter '*.class' -File | ForEach-Object FullName)
 & "$tools/d8.bat" --min-api 26 --lib $androidJar --output "$output/dex" @classes
 if($LASTEXITCODE){throw 'Communication fixture DEX compilation failed'}

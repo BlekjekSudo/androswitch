@@ -48,7 +48,7 @@ fn kind(vm: &Engine, class: &str) -> Option<&'static str> {
     }
     None
 }
-fn equals(vm: &mut Engine, left: &Value, right: &Value) -> Result<bool> {
+pub(super) fn equals(vm: &mut Engine, left: &Value, right: &Value) -> Result<bool> {
     if left == right {
         return Ok(true);
     }

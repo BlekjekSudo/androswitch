@@ -134,3 +134,74 @@ fn numeric_slots_keep_identity_reject_bad_descriptors_and_follow_gc() {
         assert!(vm.invoke_instance(object, "get", get, &[]).is_err());
     }
 }
+
+#[test]
+fn atomic_reference_matches_jvm_and_releases_replaced_gc_edges() {
+    let mut vm = vm();
+    let oracle = std::fs::read_to_string(root().join("reference-oracle.tsv")).unwrap();
+    assert_eq!(oracle.lines().count(), 14);
+    const CLASS: &str = "Lorg/androswitch/vm/ReferenceFixture;";
+    const ATOMIC: &str = "Ljava/util/concurrent/atomic/AtomicReference;";
+    for _ in 0..2 {
+        for line in oracle.lines() {
+            let row: Vec<_> = line.split('\t').collect();
+            let text = row[0] == "text";
+            let sig = if text {
+                "(I)Ljava/lang/String;"
+            } else {
+                "(I)I"
+            };
+            let result = vm
+                .invoke_static(CLASS, row[0], sig, &[Value::Int(row[1].parse().unwrap())])
+                .unwrap();
+            let actual = if text {
+                vm.heap
+                    .as_str(result.as_ref().unwrap().unwrap())
+                    .unwrap()
+                    .to_string()
+            } else {
+                result.as_int().unwrap().to_string()
+            };
+            assert_eq!(actual, row[2], "{line}");
+        }
+        vm.gc();
+    }
+    let atomic = vm
+        .invoke_static(
+            CLASS,
+            "make",
+            "()Ljava/util/concurrent/atomic/AtomicReference;",
+            &[],
+        )
+        .unwrap();
+    let r = atomic.as_ref().unwrap().unwrap();
+    vm.statics
+        .insert(("LRoot;".into(), "reference".into()), atomic);
+    let item = vm
+        .invoke_instance(r, "get", "()Ljava/lang/Object;", &[])
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .unwrap();
+    vm.gc();
+    assert_eq!(vm.heap.get_field(item, "n").unwrap().as_int().unwrap(), 31);
+    assert!(vm
+        .invoke_instance(r, "set", "(Ljava/lang/Object;)V", &[Value::Int(5)])
+        .is_err());
+    assert_eq!(
+        vm.invoke_instance(r, "get", "()Ljava/lang/Object;", &[])
+            .unwrap(),
+        Value::Obj(item)
+    );
+    assert!(vm
+        .invoke_instance(r, "getOpaque", "()Ljava/lang/Object;", &[])
+        .is_err());
+    vm.invoke_instance(r, "set", "(Ljava/lang/Object;)V", &[Value::Null])
+        .unwrap();
+    vm.gc();
+    assert_eq!(vm.heap.class_of(item).unwrap(), rd_vm::gc::FREED_CLASS);
+    assert!(vm.cp.is_subtype(ATOMIC, "Ljava/io/Serializable;"));
+    vm.statics.clear();
+    vm.gc();
+    assert_eq!(vm.heap.class_of(r).unwrap(), rd_vm::gc::FREED_CLASS);
+}

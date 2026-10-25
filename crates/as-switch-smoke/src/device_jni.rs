@@ -394,6 +394,33 @@ impl Session {
                     )
                     .map_err(jni)
             }
+            34 => {
+                let class = self.class(vm, a)?;
+                let name = cstr(b)?;
+                let signature = cstr(c)?;
+                if length != 1 {
+                    return Err(error("API_UNAVAILABLE", "JNI instance field lookup"));
+                }
+                crate::jni_static_fields::id(vm, &self.refs, thread(), &class, &name, &signature)
+            }
+            35 => {
+                let class = self.class(vm, a)?;
+                crate::jni_static_fields::get(vm, &self.refs, thread(), &class, b, c as u8)
+            }
+            36 => {
+                if data.is_null() || length != 8 {
+                    return Err(error("JNI_FIELD_ARGUMENT", "expected scalar field bits"));
+                }
+                let class = self.class(vm, a)?;
+                let bytes = read_slice::<u8>(data, 8)?;
+                let bits = u64::from_le_bytes(
+                    bytes
+                        .try_into()
+                        .map_err(|_| error("JNI_FIELD_ARGUMENT", "field width"))?,
+                );
+                crate::jni_static_fields::set(vm, &self.refs, thread(), &class, b, c as u8, bits)?;
+                Ok(0)
+            }
             3 => {
                 let class = self.class(vm, a)?;
                 if length > 1024 {

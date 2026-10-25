@@ -4,6 +4,10 @@ const CLASS: &str = "Ljava/lang/Class;";
 const METHOD: &str = "Ljava/lang/reflect/Method;";
 mod class_for_name;
 mod fields;
+mod instantiate;
+pub(super) fn initialize_class(vm: &mut Engine, class: &str) -> Result<()> {
+    class_for_name::initialize_class(vm, class)
+}
 pub(super) use fields::Fields;
 pub(super) fn link_class(
     vm: &Engine,
@@ -20,7 +24,9 @@ pub(super) fn metadata(
     if let Some(kind) = Fields::metadata(class, name, sig) {
         return Some(kind);
     }
-    if (class, name, sig) == (CLASS, "isInterface", "()Z") {
+    if (class, name, sig) == (CLASS, "isInterface", "()Z")
+        || (class, name, sig) == (CLASS, "newInstance", "()Ljava/lang/Object;")
+    {
         return Some(rd_vm::framework_host::HostMethodKind::Instance);
     }
     (class == CLASS
@@ -179,6 +185,7 @@ pub(super) fn call(
     if actual == CLASS {
         let d = desc(vm, r)?;
         let value = match (name, sig) {
+            ("newInstance", "()Ljava/lang/Object;") => instantiate::call(vm, r, &d)?,
             ("getName", "()Ljava/lang/String;") => string(vm, class_name(&d))?,
             ("isPrimitive", "()Z") => Value::Int((d.len() == 1) as i32),
             ("isArray", "()Z") => Value::Int(d.starts_with('[') as i32),

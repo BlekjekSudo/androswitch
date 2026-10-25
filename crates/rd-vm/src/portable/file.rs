@@ -117,6 +117,11 @@ pub(crate) fn call(
         return match (name, sig) {
             ("isEmpty", "()Z") => Ok(Some(Value::Int(i32::from(s.is_empty())))),
             ("length", "()I") => Ok(Some(Value::Int(s.encode_utf16().count() as i32))),
+            ("hashCode", "()I") => Ok(Some(Value::Int(
+                s.encode_utf16().fold(0i32, |hash, unit| {
+                    hash.wrapping_mul(31).wrapping_add(i32::from(unit))
+                }),
+            ))),
             ("equals", "(Ljava/lang/Object;)Z") => {
                 let other = args[0].as_ref()?.and_then(|r| vm.heap.as_str(r).ok());
                 Ok(Some(Value::Int((other == Some(s.as_str())) as i32)))

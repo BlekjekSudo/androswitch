@@ -14,6 +14,141 @@ use std::{
 };
 const CASES: &str = "Lorg/androswitch/references/ClassReferenceCases;";
 const CLASS: &str = "Ljava/lang/Class;";
+#[test]
+fn static_field_ids_use_declarations_real_initializers_shared_dex_storage_and_gc_roots() {
+    use as_switch_smoke::jni_static_fields as fields;
+    const BASE: &str = "Lorg/androswitch/references/StaticFieldCases$Parent;";
+    const CHILD: &str = "Lorg/androswitch/references/StaticFieldCases$Child;";
+    const FIELD_CASES: &str = "Lorg/androswitch/references/StaticFieldCases;";
+    for fixture in ["objects", "renamed"] {
+        let mut h = Harness::new(fixture);
+        assert_eq!(
+            h.app
+                .vm
+                .invoke_static(FIELD_CASES, "initialized", "()I", &[])
+                .unwrap(),
+            Value::Int(0)
+        );
+        for (name, sig, kind, expected, changed) in [
+            ("z", "Z", b'Z', 1, 1),
+            ("b", "B", b'B', (-113i32) as u32 as u64, 9),
+            ("c", "C", b'C', 65530, 65),
+            ("s", "S", b'S', (-23456i32) as u32 as u64, (-7i64) as u64),
+            ("i", "I", b'I', (-17i32) as u32 as u64, 42),
+            ("j", "J", b'J', 0x123456789abcdef, (-0x123456789i64) as u64),
+            (
+                "f",
+                "F",
+                b'F',
+                1.25f32.to_bits() as u64,
+                (-2.5f32).to_bits() as u64,
+            ),
+            ("d", "D", b'D', (-3.5f64).to_bits(), 6.25f64.to_bits()),
+        ] {
+            let id = fields::id(&mut h.app.vm, &h.refs, 10, CHILD, name, sig).unwrap();
+            assert_eq!(
+                fields::get(&mut h.app.vm, &h.refs, 10, CHILD, id, kind).unwrap(),
+                expected,
+                "{name}"
+            );
+            assert_eq!(
+                h.app
+                    .vm
+                    .invoke_static(FIELD_CASES, "initialized", "()I", &[])
+                    .unwrap(),
+                Value::Int(11)
+            );
+            fields::set(&mut h.app.vm, &h.refs, 10, CHILD, id, kind, changed).unwrap();
+            assert!(
+                fields::get(&mut h.app.vm, &h.refs, 10, "Ljava/lang/Object;", id, kind).is_err()
+            );
+        }
+        let id = fields::id(
+            &mut h.app.vm,
+            &h.refs,
+            10,
+            BASE,
+            "reference",
+            "Ljava/lang/Object;",
+        )
+        .unwrap();
+        let object = h.app.vm.heap.alloc_string("retained".into()).unwrap();
+        let local = h
+            .refs
+            .borrow_mut()
+            .local(10, Handle::Object(object))
+            .unwrap();
+        fields::set(&mut h.app.vm, &h.refs, 10, CHILD, id, b'L', local).unwrap();
+        h.op(15, local, 0).unwrap();
+        h.app.vm.gc();
+        let output = fields::get(&mut h.app.vm, &h.refs, 20, BASE, id, b'L').unwrap();
+        assert_eq!(objects::object(&h.refs, 20, output).unwrap(), object);
+        assert_eq!(
+            h.app
+                .vm
+                .invoke_static(FIELD_CASES, "changed", "()I", &[])
+                .unwrap(),
+            Value::Int(1)
+        );
+        h.host.thread.set(20);
+        h.op(15, output, 0).unwrap();
+        h.app
+            .vm
+            .invoke_static(FIELD_CASES, "release", "()V", &[])
+            .unwrap();
+        h.app.vm.gc();
+        assert_eq!(
+            h.app.vm.heap.class_of(object).unwrap(),
+            rd_vm::gc::FREED_CLASS
+        );
+        assert!(
+            matches!(fields::id(&mut h.app.vm,&h.refs,20,BASE,"i","J"),Err(VmExit::Exception(e)) if e.class=="Ljava/lang/NoSuchFieldError;")
+        );
+        assert!(
+            matches!(fields::id(&mut h.app.vm,&h.refs,20,"Lorg/androswitch/references/StaticFieldCases$InstanceShadow;","i","I"),Err(VmExit::Exception(e)) if e.class=="Ljava/lang/NoSuchFieldError;")
+        );
+        let hidden = fields::id(&mut h.app.vm, &h.refs, 20, BASE, "hidden", "I").unwrap();
+        assert_eq!(
+            fields::get(&mut h.app.vm, &h.refs, 20, BASE, hidden, b'I').unwrap(),
+            73
+        );
+    }
+}
+#[test]
+fn static_platform_field_catalog_is_descriptor_exact_and_writes_stay_unavailable() {
+    use as_switch_smoke::jni_static_fields as fields;
+    let mut h = Harness::new("objects");
+    for (class, name, sig, kind) in [
+        ("Landroid/os/Build$VERSION;", "SDK_INT", "I", b'I'),
+        ("Landroid/os/Build;", "MODEL", "Ljava/lang/String;", b'L'),
+        ("Ljava/lang/Integer;", "TYPE", "Ljava/lang/Class;", b'L'),
+    ] {
+        let id = fields::id(&mut h.app.vm, &h.refs, 10, class, name, sig).unwrap();
+        let value = fields::get(&mut h.app.vm, &h.refs, 10, class, id, kind).unwrap();
+        assert_ne!(value, 0);
+        assert!(
+            matches!(fields::set(&mut h.app.vm,&h.refs,10,class,id,kind,0),Err(VmExit::Error(e))if e.code=="API_UNAVAILABLE")
+        );
+        assert!(fields::get(
+            &mut h.app.vm,
+            &h.refs,
+            10,
+            class,
+            id,
+            if kind == b'I' { b'F' } else { b'I' }
+        )
+        .is_err());
+    }
+    for (class, name, sig) in [
+        ("Landroid/os/Build;", "MODEL", "Ljava/lang/Object;"),
+        ("Ljava/lang/Integer;", "TYPE", "I"),
+        ("Landroid/os/Build$VERSION;", "SDK_INT", "J"),
+    ] {
+        assert!(
+            matches!(fields::id(&mut h.app.vm,&h.refs,10,class,name,sig),Err(VmExit::Exception(e))if e.class=="Ljava/lang/NoSuchFieldError;")
+        );
+    }
+}
 static SERIAL: AtomicU64 = AtomicU64::new(0);
 struct Host {
     refs: Rc<RefCell<References>>,

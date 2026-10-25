@@ -3,6 +3,59 @@ use as_platform::{host::HostPlatform, host_fs::HostFileSystem};
 use rd_vm::{Value, VmExit};
 use std::{path::PathBuf, rc::Rc};
 const PROBE: &str = "Lorg/androswitch/contracts/CommunicationActivity;";
+#[test]
+fn local_binder_returns_real_sdk_owners_and_retains_only_gc_reachable_edges() {
+    const BINDER_CASES: &str = "Lorg/androswitch/contracts/LocalBinderCases;";
+    for package in [
+        "org.fixture.communication",
+        "net.example.renamedcommunication",
+    ] {
+        let (mut app, _) = app_package(package);
+        assert_eq!(
+            app.vm
+                .invoke_static(BINDER_CASES, "proof", "()I", &[])
+                .unwrap(),
+            Value::Int(1)
+        );
+        let binder = app
+            .vm
+            .invoke_static(BINDER_CASES, "make", "()Landroid/os/Binder;", &[])
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        app.vm.gc();
+        let owner = app
+            .vm
+            .invoke_static(
+                BINDER_CASES,
+                "query",
+                "(Ljava/lang/String;)Landroid/os/IInterface;",
+                &[Value::StrPlaceholder("contract.echo".into())],
+            )
+            .unwrap();
+        assert_eq!(owner, Value::Obj(binder));
+        assert!(
+            app.vm
+                .invoke_instance(
+                    binder,
+                    "transact",
+                    "(ILandroid/os/Parcel;Landroid/os/Parcel;I)Z",
+                    &[Value::Int(1), Value::Null, Value::Null, Value::Int(0)]
+                )
+                .is_err(),
+            "remote/Parcel dispatch is not simulated"
+        );
+        app.vm
+            .invoke_static(BINDER_CASES, "clear", "()V", &[])
+            .unwrap();
+        app.vm.gc();
+        assert_eq!(
+            app.vm.heap.class_of(binder).unwrap(),
+            rd_vm::gc::FREED_CLASS
+        );
+    }
+}
 #[allow(clippy::assertions_on_constants)]
 fn app() -> (App, PathBuf) {
     app_package("org.fixture.communication")
@@ -387,5 +440,47 @@ fn unsupported_broadcast_routes_reject_before_partial_delivery_or_intent_mutatio
                 .clone();
             assert_eq!(text(&app, events), "original:".repeat((mode + 1) as usize));
         }
+    }
+}
+
+#[test]
+fn pair_components_use_real_identity_value_callbacks_and_gc_in_two_packages() {
+    const PAIRS: &str = "Lorg/androswitch/contracts/PairCases;";
+    for package in [
+        "org.fixture.communication",
+        "net.example.renamedcommunication",
+    ] {
+        let (mut app, _) = app_package(package);
+        assert_eq!(
+            app.vm.invoke_static(PAIRS, "proof", "()I", &[]).unwrap(),
+            Value::Int(0)
+        );
+        let pair = app
+            .vm
+            .invoke_static(PAIRS, "get", "()Landroid/util/Pair;", &[])
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        let first = app
+            .vm
+            .heap
+            .get_field(pair, "first")
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        app.vm.gc();
+        assert_ne!(app.vm.heap.class_of(first).unwrap(), rd_vm::gc::FREED_CLASS);
+        assert_eq!(
+            app.vm
+                .invoke_instance(pair, "hashCode", "()I", &[])
+                .unwrap(),
+            Value::Int(14)
+        );
+        app.vm.invoke_static(PAIRS, "clear", "()V", &[]).unwrap();
+        app.vm.gc();
+        assert_eq!(app.vm.heap.class_of(pair).unwrap(), rd_vm::gc::FREED_CLASS);
+        assert_eq!(app.vm.heap.class_of(first).unwrap(), rd_vm::gc::FREED_CLASS);
     }
 }

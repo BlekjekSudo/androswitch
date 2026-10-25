@@ -10,6 +10,7 @@ typedef struct {
   int64_t blocks, access_time[2], modify_time[2], change_time[2];
   uint32_t unused[2];
 } AsGuestStat;
+int as_bionic_stat_path(const char *path, AsGuestStat *out);
 typedef struct {
   uint64_t inode;
   int64_t offset;

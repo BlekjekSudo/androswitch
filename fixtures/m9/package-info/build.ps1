@@ -8,6 +8,8 @@ New-Item -ItemType Directory -Force -Path "$output/classes","$output/dex","$outp
 $sources=@(Get-ChildItem "$PSScriptRoot/java" -Recurse -Filter '*.java' -File|ForEach-Object FullName)
 & javac --release 8 -g:none -cp $androidJar -d "$output/classes" @sources
 if($LASTEXITCODE){throw 'Package metadata Java compilation failed'}
+& java '-Dfile.encoding=UTF-8' -cp "$output/classes" org.androswitch.contracts.LocaleCases | Set-Content "$output/locale-oracle.tsv" -Encoding utf8NoBOM
+if($LASTEXITCODE){throw 'Locale JVM oracle failed'}
 $classes=@(Get-ChildItem "$output/classes" -Recurse -Filter '*.class' -File|ForEach-Object FullName)
 & "$tools/d8.bat" --min-api 26 --lib $androidJar --output "$output/dex" @classes
 if($LASTEXITCODE){throw 'Package metadata DEX compilation failed'}

@@ -2,8 +2,10 @@
  * AndroSwitch contributors, MIT OR Apache-2.0. */
 #include "bionic_cxx.h"
 #include "bionic_errno.h"
+#include "bionic_vfs.h"
 #include "native.h"
 #include <errno.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -14,9 +16,17 @@ extern int64_t as_guest_fs(uint32_t, const char *, uint64_t, uint8_t *, size_t,
 typedef struct GuestFile {
   char *path;
   uint64_t position;
-  int readable, writable, eof, error;
+  int readable, writable, eof, error, descriptor, append;
   struct GuestFile *next;
 } GuestFile;
+static GuestFile *guest_fopen(const char *, const char *);
+static GuestFile *guest_freopen(const char *, const char *, GuestFile *);
+static int guest_fclose(GuestFile *);
+static size_t guest_fread(void *, size_t, size_t, GuestFile *);
+static size_t guest_fwrite(const void *, size_t, size_t, GuestFile *);
+static int guest_fseek(GuestFile *, int64_t, int);
+static int64_t guest_ftell(GuestFile *);
+static int next_descriptor = 3;
 /* API 26 Bionic's opaque LP64 FILE stride is 152 bytes. Legacy NDK headers
  * form &__sF[1/2] directly, while API 23+ imports pointer-valued stdout/stderr.
  * These are identity tokens only: no Bionic FILE is cast to a newlib FILE.
@@ -49,7 +59,7 @@ static int64_t operation(uint32_t op, const char *path, uint64_t offset,
     errno = as_errno_from_android((int)-rc);
   return rc;
 }
-static GuestFile *guest_fopen(const char *path, const char *mode) {
+static GuestFile *guest_fopen_impl(const char *path, const char *mode) {
   int read = mode[0] == 'r' || strchr(mode, '+'),
       write = mode[0] == 'w' || mode[0] == 'a' || strchr(mode, '+');
   if (!strchr("rwa", mode[0])) {
@@ -75,13 +85,22 @@ static GuestFile *guest_fopen(const char *path, const char *mode) {
   file->position = (uint64_t)position;
   file->readable = read;
   file->writable = write;
+  file->append = mode[0] == 'a';
   as_cxx_lock();
+  if (next_descriptor == INT_MAX) {
+    as_cxx_unlock();
+    free(file->path);
+    free(file);
+    errno = EMFILE;
+    return NULL;
+  }
+  file->descriptor = next_descriptor++;
   file->next = files;
   files = file;
   as_cxx_unlock();
   return file;
 }
-static size_t guest_fread(void *bytes, size_t size, size_t count,
+static size_t guest_fread_impl(void *bytes, size_t size, size_t count,
                           GuestFile *file) {
   file = redirected(file);
   if (!size || !count)
@@ -93,7 +112,7 @@ static size_t guest_fread(void *bytes, size_t size, size_t count,
     errno = standard_closed[standard] || standard ? EBADF : ENOTSUP;
     return 0;
   }
-  if (!file->readable || count > SIZE_MAX / size) {
+  if (file->descriptor < 0 || !file->readable || count > SIZE_MAX / size) {
     file->error = 1;
     errno = EBADF;
     return 0;
@@ -109,7 +128,7 @@ static size_t guest_fread(void *bytes, size_t size, size_t count,
     file->eof = 1;
   return (size_t)n / size;
 }
-static size_t guest_fwrite(const void *bytes, size_t size, size_t count,
+static size_t guest_fwrite_impl(const void *bytes, size_t size, size_t count,
                            GuestFile *file) {
   file = redirected(file);
   if (!size || !count)
@@ -126,10 +145,15 @@ static size_t guest_fwrite(const void *bytes, size_t size, size_t count,
       standard_errors[standard] = 1;
     return wrote;
   }
-  if (!file->writable || count > SIZE_MAX / size) {
+  if (file->descriptor < 0 || !file->writable || count > SIZE_MAX / size) {
     file->error = 1;
     errno = EBADF;
     return 0;
+  }
+  if (file->append) {
+    int64_t end = operation(103, file->path, 0, NULL, 0, 0);
+    if (end < 0) { file->error = 1; return 0; }
+    file->position = (uint64_t)end;
   }
   int64_t n = operation(102, file->path, file->position, (void *)bytes,
                         size * count, 0);
@@ -148,12 +172,13 @@ static int guest_fputc(int byte, GuestFile *file) {
   uint8_t value = (uint8_t)byte;
   return guest_fwrite(&value, 1, 1, file) == 1 ? value : EOF;
 }
-static int guest_fseek(GuestFile *file, int64_t offset, int origin) {
+static int guest_fseek_impl(GuestFile *file, int64_t offset, int origin) {
   file = redirected(file);
   if (standard_index(file) >= 0) {
     errno = ESPIPE;
     return -1;
   }
+  if (file->descriptor < 0) { errno = EBADF; return -1; }
   int64_t base = 0;
   if (origin == SEEK_CUR)
     base = (int64_t)file->position;
@@ -165,7 +190,7 @@ static int guest_fseek(GuestFile *file, int64_t offset, int origin) {
     errno = EINVAL;
     return -1;
   }
-  if ((offset < 0 && base < -offset) ||
+  if ((offset < 0 && (uint64_t)base < (uint64_t)(-(offset + 1)) + 1) ||
       (offset > 0 && base > INT64_MAX - offset)) {
     errno = EINVAL;
     return -1;
@@ -174,12 +199,13 @@ static int guest_fseek(GuestFile *file, int64_t offset, int origin) {
   file->eof = 0;
   return 0;
 }
-static int64_t guest_ftell(GuestFile *file) {
+static int64_t guest_ftell_impl(GuestFile *file) {
   file = redirected(file);
   if (standard_index(file) >= 0) {
     errno = ESPIPE;
     return -1;
   }
+  if (file->descriptor < 0) { errno = EBADF; return -1; }
   return (int64_t)file->position;
 }
 static void guest_rewind(GuestFile *file) {
@@ -201,7 +227,7 @@ static int guest_fflush(GuestFile *file) {
                                      : fflush(standard == 1 ? stdout : stderr);
   return 0;
 } /* VFS writes commit synchronously. */
-static int guest_fclose(GuestFile *file) {
+static int guest_fclose_impl(GuestFile *file) {
   if (!file) {
     errno = EINVAL;
     return EOF;
@@ -226,11 +252,13 @@ static int guest_fclose(GuestFile *file) {
   if (*link)
     *link = file->next;
   as_cxx_unlock();
+  int closed = file->descriptor < 0;
   free(file->path);
   free(file);
+  if (closed) { errno = EBADF; return EOF; }
   return 0;
 }
-static GuestFile *guest_freopen(const char *path, const char *mode,
+static GuestFile *guest_freopen_impl(const char *path, const char *mode,
                                 GuestFile *file) {
   if (!file) {
     errno = EINVAL;
@@ -269,6 +297,7 @@ static GuestFile *guest_freopen(const char *path, const char *mode,
   return file;
 }
 void as_bionic_io_reset(void) {
+  next_descriptor = 3;
   memset(standard_redirect, 0, sizeof(standard_redirect));
   memset(standard_closed, 0, sizeof(standard_closed));
   memset(standard_errors, 0, sizeof(standard_errors));
@@ -353,11 +382,19 @@ uint64_t as_bionic_io_data(const char *name) {
       return (uint64_t)&standard_pointers[i];
   return 0;
 }
+#include "bionic_descriptors.inc"
 uint64_t as_bionic_io_import(const char *name) {
   struct {
     const char *name;
     void *function;
-  } imports[] = {{"fopen", guest_fopen},     {"fopen64", guest_fopen},
+  } imports[] = {{"fileno", guest_fileno}, {"fileno_unlocked", guest_fileno},
+                 {"read", guest_read}, {"write", guest_write},
+                 {"pread", guest_pread}, {"pread64", guest_pread},
+                 {"pwrite", guest_pwrite}, {"pwrite64", guest_pwrite},
+                 {"lseek", guest_lseek}, {"lseek64", guest_lseek},
+                 {"fstat", guest_fstat}, {"fstat64", guest_fstat},
+                 {"close", guest_close},
+                 {"fopen", guest_fopen},     {"fopen64", guest_fopen},
                  {"fclose", guest_fclose},   {"freopen", guest_freopen},
                  {"fread", guest_fread},     {"fwrite", guest_fwrite},
                  {"fgetc", guest_fgetc},     {"getc", guest_fgetc},

@@ -20,7 +20,7 @@ else
 MESA_LIBRARIES := -lEGL -lGLESv2 -lglapi -ldrm_nouveau
 endif
 CFLAGS := $(ARCH) $(MESA_CFLAGS) -D__SWITCH__ -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -I$(DEVKITPRO)/portlibs/switch/include -I../switch-smoke -I../../third_party/android
-OBJECTS := $(addprefix $(OUTPUT_DIR)/,main.o display.o cpu_time.o vulkan_bridge.o memory.o media.o media_format.o glsurface.o workers.o opensl.o fs.o resource_info.o resource_extra.o native.o worker_admission.o native_call.o jni.o bionic_io.o bionic_sync.o bionic_cxx.o bionic_finalize.o bionic_libc.o bionic_dlfcn.o bionic_locale.o bionic_multibyte.o bionic_random.o bionic_keys.o bionic_log.o bionic_vfs.o missing_import.o sqlite3.o sqlite_memory.o)
+OBJECTS := $(addprefix $(OUTPUT_DIR)/,main.o display.o cpu_time.o vulkan_bridge.o memory.o media.o media_format.o glsurface.o workers.o opensl.o fs.o resource_info.o resource_extra.o native.o worker_admission.o native_call.o jni.o bionic_io.o bionic_sync.o bionic_cxx.o bionic_finalize.o bionic_libc.o bionic_memory.o bionic_dlfcn.o bionic_locale.o bionic_multibyte.o bionic_random.o bionic_keys.o bionic_log.o bionic_vfs.o missing_import.o sqlite3.o sqlite_memory.o)
 SQLITE_FLAGS := -DSQLITE_OS_OTHER=1 -DSQLITE_THREADSAFE=0 -DSQLITE_TEMP_STORE=3 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_OMIT_WAL -DSQLITE_DEFAULT_MEMSTATUS=1 -DSQLITE_DEFAULT_CACHE_SIZE=-1024
 .PHONY: all
 all: $(OUTPUT_DIR)/androswitch.nro
@@ -56,7 +56,7 @@ $(OUTPUT_DIR)/sqlite_memory.o: ../sqlite/memory_vfs.c $(SQLITE_SOURCE)/sqlite3.h
 	$(CC) $(CFLAGS) $(SQLITE_FLAGS) -I$(SQLITE_SOURCE) -c "$<" -o "$@"
 $(OUTPUT_DIR)/%.o: ../switch-smoke/%.c ../switch-smoke/native.h | $(OUTPUT_DIR)
 	$(CC) $(CFLAGS) -fno-strict-aliasing -c "$<" -o "$@"
-$(OUTPUT_DIR)/jni.o: ../switch-smoke/jni_arguments.h ../switch-smoke/jni_construct.inc ../switch-smoke/jni_traps.inc ../../third_party/android/jni.h
+$(OUTPUT_DIR)/jni.o: ../switch-smoke/jni_arguments.h ../switch-smoke/jni_construct.inc ../switch-smoke/jni_static_fields.inc ../switch-smoke/jni_traps.inc ../../third_party/android/jni.h
 $(OUTPUT_DIR)/resource_info.o: ../switch-smoke/resource_info.h
 $(addprefix $(OUTPUT_DIR)/,native.o bionic_io.o bionic_cxx.o bionic_keys.o bionic_libc.o bionic_log.o bionic_vfs.o bionic_sync.o): ../switch-smoke/bionic_cxx.h ../switch-smoke/bionic_errno.h ../switch-smoke/bionic_vfs.h
 $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/bionic_libc.o $(OUTPUT_DIR)/bionic_locale.o: ../switch-smoke/bionic_locale.h
@@ -79,3 +79,8 @@ $(OUTPUT_DIR)/androswitch.nro: $(OUTPUT_DIR)/androswitch.elf $(OUTPUT_DIR)/andro
 $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/worker_admission.o $(OUTPUT_DIR)/workers.o $(OUTPUT_DIR)/glsurface.o $(OUTPUT_DIR)/opensl.o: ../switch-smoke/worker_admission.h
 
 $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/bionic_dlfcn.o: ../switch-smoke/bionic_dlfcn.h
+
+$(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/bionic_memory.o: ../switch-smoke/bionic_memory.h
+$(OUTPUT_DIR)/bionic_memory.o: ../switch-smoke/bionic_cxx.h
+
+$(OUTPUT_DIR)/bionic_io.o: ../switch-smoke/bionic_descriptors.inc

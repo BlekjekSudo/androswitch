@@ -51,6 +51,7 @@ try{
     @{id='gc-owners-fixture';script='fixtures/m9/gc-owners/build.ps1'},
     @{id='jni-constructor-fixture';script='fixtures/m9/jni-construct/build.ps1'},
     @{id='jni-constructor-abi';script='scripts/test-jni-constructor-abi.ps1'},
+    @{id='jni-static-fields-abi';script='scripts/test-jni-static-fields-abi.ps1'},
     @{id='jni-objects-fixture';script='fixtures/m9/jni-objects/build.ps1'},
     @{id='jni-objects';args=@('test','-p','as-switch-smoke','--features','host-cli,portable-tests','--test','jni_objects','--locked','--','--test-threads=1')},
     @{id='jni-constructor';args=@('test','-p','as-switch-smoke','--features','portable-tests','--test','jni_constructor','--locked','--','--test-threads=1')},

@@ -35,7 +35,7 @@ $(OUTPUT_DIR)/worker_admission.o: worker_admission.c worker_admission.h | $(OUTP
 $(OUTPUT_DIR)/native_call.o: native_call.S | $(OUTPUT_DIR)
 	$(CC) $(ARCH) -c "$<" -o "$@"
 
-$(OUTPUT_DIR)/jni.o: jni.c jni_arguments.h jni_construct.inc jni_traps.inc native.h ../../third_party/android/jni.h | $(OUTPUT_DIR)
+$(OUTPUT_DIR)/jni.o: jni.c jni_arguments.h jni_construct.inc jni_static_fields.inc jni_traps.inc native.h ../../third_party/android/jni.h | $(OUTPUT_DIR)
 	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -fno-strict-aliasing -I$(LIBNX)/include -c "$<" -o "$@"
 
 $(OUTPUT_DIR)/bionic_io.o: bionic_io.c native.h | $(OUTPUT_DIR)
@@ -84,8 +84,8 @@ $(addprefix $(OUTPUT_DIR)/,native.o bionic_io.o bionic_cxx.o bionic_keys.o bioni
 $(OUTPUT_DIR)/missing_import.o: missing_import.c bionic_cxx.h native.h | $(OUTPUT_DIR)
 	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
 
-$(OUTPUT_DIR)/androswitch-smoke.elf: $(OUTPUT_DIR)/main.o $(OUTPUT_DIR)/fs.o $(OUTPUT_DIR)/resource_info.o $(OUTPUT_DIR)/resource_extra.o $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/worker_admission.o $(OUTPUT_DIR)/native_call.o $(OUTPUT_DIR)/jni.o $(OUTPUT_DIR)/bionic_io.o $(OUTPUT_DIR)/bionic_sync.o $(OUTPUT_DIR)/bionic_cxx.o $(OUTPUT_DIR)/bionic_finalize.o $(OUTPUT_DIR)/bionic_libc.o $(OUTPUT_DIR)/bionic_dlfcn.o $(OUTPUT_DIR)/bionic_locale.o $(OUTPUT_DIR)/bionic_multibyte.o $(OUTPUT_DIR)/bionic_random.o $(OUTPUT_DIR)/bionic_keys.o $(OUTPUT_DIR)/bionic_log.o $(OUTPUT_DIR)/bionic_vfs.o $(OUTPUT_DIR)/missing_import.o $(RUST_LIBRARY) Makefile
-	$(CC) $(ARCH) -specs=$(LIBNX)/switch.specs -L$(LIBNX)/lib $(OUTPUT_DIR)/main.o $(OUTPUT_DIR)/fs.o $(OUTPUT_DIR)/resource_info.o $(OUTPUT_DIR)/resource_extra.o $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/worker_admission.o $(OUTPUT_DIR)/native_call.o $(OUTPUT_DIR)/jni.o $(OUTPUT_DIR)/bionic_io.o $(OUTPUT_DIR)/bionic_sync.o $(OUTPUT_DIR)/bionic_cxx.o $(OUTPUT_DIR)/bionic_finalize.o $(OUTPUT_DIR)/bionic_libc.o $(OUTPUT_DIR)/bionic_dlfcn.o $(OUTPUT_DIR)/bionic_locale.o $(OUTPUT_DIR)/bionic_multibyte.o $(OUTPUT_DIR)/bionic_random.o $(OUTPUT_DIR)/bionic_keys.o $(OUTPUT_DIR)/bionic_log.o $(OUTPUT_DIR)/bionic_vfs.o $(OUTPUT_DIR)/missing_import.o -Wl,--start-group "$(RUST_LIBRARY)" -lnx -lm -Wl,--end-group -o "$@"
+$(OUTPUT_DIR)/androswitch-smoke.elf: $(OUTPUT_DIR)/main.o $(OUTPUT_DIR)/fs.o $(OUTPUT_DIR)/resource_info.o $(OUTPUT_DIR)/resource_extra.o $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/worker_admission.o $(OUTPUT_DIR)/native_call.o $(OUTPUT_DIR)/jni.o $(OUTPUT_DIR)/bionic_io.o $(OUTPUT_DIR)/bionic_sync.o $(OUTPUT_DIR)/bionic_cxx.o $(OUTPUT_DIR)/bionic_finalize.o $(OUTPUT_DIR)/bionic_libc.o $(OUTPUT_DIR)/bionic_memory.o $(OUTPUT_DIR)/bionic_dlfcn.o $(OUTPUT_DIR)/bionic_locale.o $(OUTPUT_DIR)/bionic_multibyte.o $(OUTPUT_DIR)/bionic_random.o $(OUTPUT_DIR)/bionic_keys.o $(OUTPUT_DIR)/bionic_log.o $(OUTPUT_DIR)/bionic_vfs.o $(OUTPUT_DIR)/missing_import.o $(RUST_LIBRARY) Makefile
+	$(CC) $(ARCH) -specs=$(LIBNX)/switch.specs -L$(LIBNX)/lib $(OUTPUT_DIR)/main.o $(OUTPUT_DIR)/fs.o $(OUTPUT_DIR)/resource_info.o $(OUTPUT_DIR)/resource_extra.o $(OUTPUT_DIR)/native.o $(OUTPUT_DIR)/worker_admission.o $(OUTPUT_DIR)/native_call.o $(OUTPUT_DIR)/jni.o $(OUTPUT_DIR)/bionic_io.o $(OUTPUT_DIR)/bionic_sync.o $(OUTPUT_DIR)/bionic_cxx.o $(OUTPUT_DIR)/bionic_finalize.o $(OUTPUT_DIR)/bionic_libc.o $(OUTPUT_DIR)/bionic_memory.o $(OUTPUT_DIR)/bionic_dlfcn.o $(OUTPUT_DIR)/bionic_locale.o $(OUTPUT_DIR)/bionic_multibyte.o $(OUTPUT_DIR)/bionic_random.o $(OUTPUT_DIR)/bionic_keys.o $(OUTPUT_DIR)/bionic_log.o $(OUTPUT_DIR)/bionic_vfs.o $(OUTPUT_DIR)/missing_import.o -Wl,--start-group "$(RUST_LIBRARY)" -lnx -lm -Wl,--end-group -o "$@"
 
 $(OUTPUT_DIR)/androswitch-smoke.nacp: Makefile | $(OUTPUT_DIR)
 	$(TOOLS)/nacptool --create "AndroSwitch Runtime Proof" "AndroSwitch" "0.1.0" "$@"
@@ -98,3 +98,9 @@ $(OUTPUT_DIR)/native.o: worker_admission.h
 $(OUTPUT_DIR)/native.o: bionic_dlfcn.h
 $(OUTPUT_DIR)/bionic_dlfcn.o: bionic_dlfcn.c bionic_dlfcn.h bionic_cxx.h native.h | $(OUTPUT_DIR)
 	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
+
+$(OUTPUT_DIR)/native.o: bionic_memory.h
+$(OUTPUT_DIR)/bionic_memory.o: bionic_memory.c bionic_memory.h bionic_cxx.h | $(OUTPUT_DIR)
+	$(CC) $(ARCH) -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -c "$<" -o "$@"
+
+$(OUTPUT_DIR)/bionic_io.o: bionic_descriptors.inc

@@ -36,6 +36,11 @@ pub trait FrameworkHost {
     ) -> Result<Option<Value>, VmExit> {
         Ok(None)
     }
+    /// Exact implemented static declarations, independent of their current
+    /// value. JNI lookup must not guess a field type from a nullable value.
+    fn static_field_metadata(&self, _class: &str, _name: &str, _descriptor: &str) -> bool {
+        false
+    }
     fn attach(&self, vm: &mut Engine, class: &str, object: ObjRef) -> Result<bool, VmExit>;
     fn call_static(
         &self,

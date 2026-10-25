@@ -16,6 +16,8 @@ $zip=[IO.Compression.ZipArchive]::new($oracleStream,[IO.Compression.ZipArchiveMo
 try{foreach($class in $classes){$entry=[IO.Path]::GetRelativePath("$output/classes",$class.FullName).Replace('\','/');[IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip,$class.FullName,$entry,[IO.Compression.CompressionLevel]::Optimal)|Out-Null}}finally{$zip.Dispose()}
 & java -cp "$output/oracle.jar" org.androswitch.contracts.ForNameOracle | Set-Content "$output/jvm-oracle.txt" -Encoding utf8NoBOM
 if($LASTEXITCODE){throw 'Class.forName JVM oracle failed'}
+& java -cp "$output/oracle.jar" org.androswitch.contracts.ReflectionNewCases | Set-Content "$output/new-instance-jvm-oracle.tsv" -Encoding utf8NoBOM
+if($LASTEXITCODE){throw 'Class.newInstance JVM oracle failed'}
 & java -cp "$output/oracle.jar" org.androswitch.contracts.ForNameOracle defaults | Set-Content "$output/default-interface-jvm-oracle.txt" -Encoding utf8NoBOM
 if($LASTEXITCODE){throw 'Default interface initialization JVM oracle failed'}
 & "$tools/d8.bat" --min-api 26 --lib $androidJar --output "$output/dex" @($classes | ForEach-Object FullName)

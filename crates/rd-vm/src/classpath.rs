@@ -1683,6 +1683,8 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/os/Debug;"
         | "Lorg/androswitch/runtime/CollectionIterator;" => Some(OBJECT),
         "Ljava/lang/ClassLoader;" => Some(OBJECT),
+        "Landroid/os/Binder;" => Some(OBJECT),
+        "Landroid/util/Pair;" => Some(OBJECT),
         "Ljava/lang/BootClassLoader;" => Some(&["Ljava/lang/ClassLoader;", "Ljava/lang/Object;"]),
         "Ldalvik/system/BaseDexClassLoader;" => {
             Some(&["Ljava/lang/ClassLoader;", "Ljava/lang/Object;"])
@@ -1729,6 +1731,9 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
 /// Interfaces de plataforma conhecidas sem DEX (issue #26: check-cast /
 /// instanceof para CharSequence/Comparable/… sobre String/StringBuilder).
 fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
+    if class == "Landroid/os/Binder;" {
+        return Some(&["Landroid/os/IBinder;"]);
+    }
     // Preserve the actual parent interfaces of the modeled text contracts
     // before the generic empty root-interface case below.
     match class {
@@ -2131,7 +2136,9 @@ pub fn host_interface_modifiers(desc: &str) -> Option<u32> {
         "Ljava/lang/reflect/Member;"
         | "Ljava/lang/Runnable;"
         | "Ljava/lang/reflect/AnnotatedElement;"
-        | "Landroid/view/inputmethod/InputConnection;" => Some(0x0601),
+        | "Landroid/view/inputmethod/InputConnection;"
+        | "Landroid/os/IInterface;"
+        | "Landroid/os/IBinder;" => Some(0x0601),
         "Landroid/text/Editable;"
         | "Landroid/text/Spannable;"
         | "Landroid/text/Spanned;"

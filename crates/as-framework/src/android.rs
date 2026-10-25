@@ -25,6 +25,10 @@ pub use services::glsurface::{
     EglConfigBackend, EglConfigs, GlEvent, GlSurfaceRequest, GraphicsCaps,
 };
 type Result<T> = core::result::Result<T, VmExit>;
+/// Shared class-initialization admission for native/reflection adapters.
+pub fn initialize_runtime_class(vm: &mut Engine, class: &str) -> Result<()> {
+    services::Services::initialize_runtime_class(vm, class)
+}
 fn error(code: &str, cause: impl Into<String>) -> VmExit {
     rd_vm::err::vm_error(code, cause).into()
 }
@@ -1504,6 +1508,9 @@ impl FrameworkHost for Android {
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
         services::Services::method_metadata(class, name, sig)
+    }
+    fn static_field_metadata(&self, class: &str, name: &str, descriptor: &str) -> bool {
+        services::Services::static_field_metadata(class, name, descriptor)
     }
     fn thread_attached(&self, owner: u64, name: Option<&str>) -> Result<()> {
         self.services.executors.attached(owner, name)

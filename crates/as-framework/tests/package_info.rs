@@ -23,6 +23,50 @@ use std::{
 const PROBE: &str = "Lorg/androswitch/contracts/PackageMetadataProbe;";
 const INFO_SIG: &str = "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;";
 const MISSING: &str = "Landroid/content/pm/PackageManager$NameNotFoundException;";
+#[test]
+fn locale_sdk_fields_and_default_identity_follow_jvm_base_cases_and_declared_guest_profile() {
+    const LOCALE: &str = "Lorg/androswitch/contracts/LocaleCases;";
+    let oracle = std::fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/package-info-fixture/locale-oracle.tsv"),
+    )
+    .unwrap();
+    for fixture in ["package-info", "renamed"] {
+        let mut h = Harness::new(fixture);
+        h.launch();
+        assert_eq!(
+            h.app.vm.invoke_static(LOCALE, "proof", "()I", &[]).unwrap(),
+            Value::Int(1)
+        );
+        for line in oracle.lines() {
+            let (index, expected) = line.split_once('\t').unwrap();
+            let value = h
+                .app
+                .vm
+                .invoke_static(
+                    LOCALE,
+                    "normalize",
+                    "(I)Ljava/lang/String;",
+                    &[Value::Int(index.parse().unwrap())],
+                )
+                .unwrap();
+            assert_eq!(h.text(value), expected);
+        }
+        let first = h
+            .app
+            .vm
+            .invoke_static(LOCALE, "current", "()Ljava/util/Locale;", &[])
+            .unwrap();
+        h.app.vm.gc();
+        assert_eq!(
+            first,
+            h.app
+                .vm
+                .invoke_static(LOCALE, "current", "()Ljava/util/Locale;", &[])
+                .unwrap()
+        );
+    }
+}
 struct Reader {
     inner: Arc<dyn ReadOnlyFile>,
     bytes: Arc<AtomicUsize>,

@@ -244,3 +244,62 @@ fn formatter_bounds_unsupported_contracts_and_dex_callback_gc() {
         );
     }
 }
+
+#[test]
+fn math_min_max_match_1024_jvm_observations_including_signed_zero_and_nan() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/portable-format-fixture");
+    let oracle = std::fs::read_to_string(root.join("math-oracle.tsv")).unwrap();
+    assert_eq!(oracle.lines().count(), 1024);
+    let mut vm = vm();
+    for _ in 0..2 {
+        for line in oracle.lines() {
+            let row: Vec<_> = line.split('\t').collect();
+            let number = |i: usize| row[i].parse::<i64>().unwrap();
+            let (sig, a, b) = match row[0] {
+                "ints" => (
+                    "(III)I",
+                    Value::Int(number(2) as i32),
+                    Value::Int(number(3) as i32),
+                ),
+                "longs" => ("(IJJ)J", Value::Long(number(2)), Value::Long(number(3))),
+                "floats" => (
+                    "(IFF)F",
+                    Value::Float(f32::from_bits(number(2) as u32)),
+                    Value::Float(f32::from_bits(number(3) as u32)),
+                ),
+                "doubles" => (
+                    "(IDD)D",
+                    Value::Double(f64::from_bits(number(2) as u64)),
+                    Value::Double(f64::from_bits(number(3) as u64)),
+                ),
+                _ => panic!("unknown JVM type"),
+            };
+            let result = vm
+                .invoke_static(
+                    "Lorg/androswitch/vm/MathFixture;",
+                    row[0],
+                    sig,
+                    &[Value::Int(number(1) as i32), a, b],
+                )
+                .unwrap();
+            let bits = match result {
+                Value::Int(x) => i64::from(x),
+                Value::Long(x) => x,
+                Value::Float(x) => i64::from(x.to_bits() as i32),
+                Value::Double(x) => x.to_bits() as i64,
+                _ => panic!("invalid numeric result"),
+            };
+            assert_eq!(bits, number(4), "{line}");
+        }
+        vm.gc();
+    }
+    assert!(vm
+        .invoke_static(
+            "Ljava/lang/Math;",
+            "max",
+            "(II)J",
+            &[Value::Int(1), Value::Int(2)]
+        )
+        .is_err());
+}

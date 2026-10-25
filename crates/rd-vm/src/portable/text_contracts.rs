@@ -63,6 +63,52 @@ pub(super) fn call_static(
             _ => return Ok(None),
         }));
     }
+    if matches!(class, "Ljava/lang/Math;" | "Ljava/lang/StrictMath;")
+        && matches!(name, "min" | "max")
+    {
+        // Rust's floating min/max suppress a single NaN; Java propagates it.
+        // Equal signed zero also has an ordering in Java (negative < positive).
+        let minimum = name == "min";
+        macro_rules! floating {
+            ($a:expr, $b:expr, $kind:ident) => {{
+                let (a, b) = ($a, $b);
+                Value::$kind(if a.is_nan() {
+                    a
+                } else if b.is_nan() {
+                    b
+                } else if a == 0.0 && b == 0.0 {
+                    if minimum {
+                        if a.is_sign_negative() || b.is_sign_negative() {
+                            -0.0
+                        } else {
+                            0.0
+                        }
+                    } else if a.is_sign_negative() && b.is_sign_negative() {
+                        a
+                    } else {
+                        0.0
+                    }
+                } else if (minimum && a < b) || (!minimum && a > b) {
+                    a
+                } else {
+                    b
+                })
+            }};
+        }
+        return Ok(Some(match sig {
+            "(II)I" => {
+                let (a, b) = (args[0].as_int()?, args[1].as_int()?);
+                Value::Int(if minimum { a.min(b) } else { a.max(b) })
+            }
+            "(JJ)J" => {
+                let (a, b) = (args[0].as_long()?, args[1].as_long()?);
+                Value::Long(if minimum { a.min(b) } else { a.max(b) })
+            }
+            "(FF)F" => floating!(args[0].as_float()?, args[1].as_float()?, Float),
+            "(DD)D" => floating!(args[0].as_double()?, args[1].as_double()?, Double),
+            _ => return Ok(None),
+        }));
+    }
     if (class, name, sig)
         == (
             "Ljava/lang/System;",

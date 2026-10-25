@@ -1,5 +1,6 @@
 use super::*;
 pub(super) mod application_lifecycle;
+mod binder;
 pub(super) mod bitmap;
 mod bundle;
 mod collections;
@@ -9,7 +10,9 @@ mod device_info;
 pub(super) mod executors;
 pub(super) mod glsurface;
 mod input_connection;
+mod locale;
 mod package;
+mod pair;
 mod permissions;
 mod preferences;
 mod reflection;
@@ -30,17 +33,86 @@ pub(super) struct Services {
     pub(super) runtime: runtime::Runtime,
     input_connections: input_connection::InputConnections,
     device_info: device_info::DeviceInfo,
+    locales: locale::Locales,
     package_metadata: package::PackageService,
     reflection_fields: reflection::Fields,
     package: String,
     fs: Rc<dyn as_platform::fs::FileSystem>,
 }
 impl Services {
+    pub(super) fn initialize_runtime_class(vm: &mut Engine, class: &str) -> Result<()> {
+        reflection::initialize_class(vm, class)
+    }
+    pub(super) fn static_field_metadata(class: &str, name: &str, descriptor: &str) -> bool {
+        matches!(
+            (class, name, descriptor),
+            (
+                "Landroid/os/Build;",
+                "MODEL"
+                    | "MANUFACTURER"
+                    | "BRAND"
+                    | "PRODUCT"
+                    | "DEVICE"
+                    | "BOARD"
+                    | "HARDWARE"
+                    | "ID"
+                    | "DISPLAY"
+                    | "FINGERPRINT"
+                    | "TYPE"
+                    | "TAGS"
+                    | "USER"
+                    | "HOST",
+                "Ljava/lang/String;"
+            ) | (
+                "Landroid/os/Build;",
+                "SUPPORTED_ABIS" | "SUPPORTED_64_BIT_ABIS" | "SUPPORTED_32_BIT_ABIS",
+                "[Ljava/lang/String;"
+            ) | ("Landroid/os/Build;", "TIME", "J")
+                | (
+                    "Landroid/os/Build$VERSION;",
+                    "RELEASE" | "INCREMENTAL" | "CODENAME" | "BASE_OS" | "SECURITY_PATCH" | "SDK",
+                    "Ljava/lang/String;"
+                )
+                | (
+                    "Landroid/os/Build$VERSION;",
+                    "SDK_INT" | "PREVIEW_SDK_INT",
+                    "I"
+                )
+                | ("Ljava/util/Locale;", "ROOT", "Ljava/util/Locale;")
+                | (
+                    "Ljava/lang/Boolean;",
+                    "TRUE" | "FALSE",
+                    "Ljava/lang/Boolean;"
+                )
+                | (
+                    "Ljava/util/concurrent/TimeUnit;",
+                    "NANOSECONDS"
+                        | "MICROSECONDS"
+                        | "MILLISECONDS"
+                        | "SECONDS"
+                        | "MINUTES"
+                        | "HOURS"
+                        | "DAYS",
+                    "Ljava/util/concurrent/TimeUnit;"
+                )
+        ) || (name == "TYPE"
+            && descriptor == "Ljava/lang/Class;"
+            && collections::primitive(class).is_some())
+    }
     pub(super) fn method_metadata(
         class: &str,
         name: &str,
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
+        if let Some(kind) = pair::metadata(class, name, sig) {
+            return Some(kind);
+        }
+        if let Some(kind) = locale::Locales::metadata(class, name, sig) {
+            return Some(kind);
+        }
+        if let Some(kind) = binder::metadata(class, name, sig) {
+            return Some(kind);
+        }
         if class == "Landroid/os/Debug;"
             && matches!(name, "isDebuggerConnected" | "waitingForDebugger")
             && sig == "()Z"
@@ -89,6 +161,7 @@ impl Services {
             runtime: Default::default(),
             input_connections: Default::default(),
             device_info: Default::default(),
+            locales: Default::default(),
             package_metadata: Default::default(),
             reflection_fields: Default::default(),
             package: apk.manifest.package.clone(),
@@ -119,6 +192,15 @@ impl Services {
             .bind_source(self.fs.clone(), apk, path, storage)
     }
     pub(super) fn attach(&self, vm: &mut Engine, class: &str, r: ObjRef) -> Result<bool> {
+        if pair::attach(vm, class, r)? {
+            return Ok(true);
+        }
+        if locale::Locales::attach(vm, class, r)? {
+            return Ok(true);
+        }
+        if binder::attach(vm, class, r)? {
+            return Ok(true);
+        }
         if self.input_connections.attach(vm, class, r)? {
             return Ok(true);
         }
@@ -155,6 +237,9 @@ impl Services {
         name: &str,
         _descriptor: &str,
     ) -> Result<Option<Value>> {
+        if let Some(value) = self.locales.static_field(vm, class, name, _descriptor)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = self
             .device_info
             .static_field(vm, class, name, _descriptor)?
@@ -196,7 +281,13 @@ impl Services {
         sig: &str,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if let Some(value) = pair::create(vm, class, name, sig, args)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = self.package_metadata.call_static(vm, class, name, sig)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = self.locales.call_static(vm, class, name, sig, args)? {
             return Ok(Some(value));
         }
         if class == "Landroid/os/Debug;"
@@ -318,7 +409,16 @@ impl Services {
         r: ObjRef,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if let Some(value) = pair::call(vm, class, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = self.runtime.call(vm, class, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = locale::Locales::call(vm, class, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
+        if let Some(value) = binder::call(vm, class, name, sig, r, args)? {
             return Ok(Some(value));
         }
         if let Some(value) = self
@@ -393,6 +493,7 @@ impl Services {
         roots.extend(self.runtime.roots());
         roots.extend(self.input_connections.roots());
         roots.extend(self.device_info.roots());
+        roots.extend(self.locales.roots());
         roots
     }
     pub(super) fn references(&self, r: ObjRef) -> Vec<ObjRef> {

@@ -277,6 +277,8 @@ static jboolean instance_of(JNIEnv *env, jobject object, jclass klass) {
                             NULL, 0);
 }
 
+#include "jni_static_fields.inc"
+
 static size_t argument_types(jmethodID method, char *types) {
   size_t length =
       (size_t)dispatch(METHOD_TYPES, (uint64_t)method, 0, 0, types, 128);
@@ -540,6 +542,20 @@ uint64_t as_jni_initialize(void) {
     BIND(NewObjectV, new_object_v);
     BIND(NewObjectA, new_object_a);
     BIND(IsInstanceOf, instance_of);
+    BIND(GetStaticFieldID, static_field_id);
+#define BIND_STATIC_FIELDS(Name)                                               \
+    BIND(GetStatic##Name##Field, get_static_##Name##_field);                     \
+    BIND(SetStatic##Name##Field, set_static_##Name##_field)
+    BIND_STATIC_FIELDS(Object);
+    BIND_STATIC_FIELDS(Boolean);
+    BIND_STATIC_FIELDS(Byte);
+    BIND_STATIC_FIELDS(Char);
+    BIND_STATIC_FIELDS(Short);
+    BIND_STATIC_FIELDS(Int);
+    BIND_STATIC_FIELDS(Long);
+    BIND_STATIC_FIELDS(Float);
+    BIND_STATIC_FIELDS(Double);
+#undef BIND_STATIC_FIELDS
     BIND(GetJavaVM, get_vm);
 #define BIND_METHODS(Name)                                                     \
   BIND(Call##Name##Method, call_##Name);                                       \

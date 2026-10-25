@@ -1727,6 +1727,7 @@ fn do_invoke(
                 | "Ljava/util/concurrent/atomic/AtomicBoolean;"
                 | "Ljava/util/concurrent/atomic/AtomicInteger;"
                 | "Ljava/util/concurrent/atomic/AtomicLong;"
+                | "Ljava/util/concurrent/atomic/AtomicReference;"
         )
     {
         mref.class.as_str()

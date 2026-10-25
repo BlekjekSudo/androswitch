@@ -8,6 +8,7 @@ use alloc::{
 };
 pub(crate) mod atomic;
 pub(crate) mod atomic_number;
+pub(crate) mod atomic_reference;
 mod charset_catalog;
 pub(crate) mod classes;
 pub(crate) mod enums;
@@ -136,6 +137,9 @@ impl Engine {
             }
             if current == atomic::CLASS {
                 return atomic::attach(self, _object);
+            }
+            if current == atomic_reference::CLASS {
+                return atomic_reference::attach(self, _object);
             }
             if matches!(
                 current.as_str(),

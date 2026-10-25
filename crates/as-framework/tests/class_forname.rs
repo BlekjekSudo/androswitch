@@ -6,6 +6,36 @@ use rd_vm::{Value, VmExit};
 use std::{path::PathBuf, rc::Rc};
 const ACTIVITY: &str = "Lorg/androswitch/contracts/ForNameActivity;";
 const PREFIX: &str = "org.androswitch.contracts.ForNameCases$";
+#[test]
+fn class_new_instance_uses_declared_constructors_access_gc_and_direct_exceptions_like_jvm() {
+    let oracle = std::fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/class-forname-fixture/new-instance-jvm-oracle.tsv"),
+    )
+    .unwrap();
+    for fixture in ["class-forname", "renamed"] {
+        let mut app = app(fixture);
+        for line in oracle.lines() {
+            let (index, expected) = line.split_once('\t').unwrap();
+            let value = app
+                .vm
+                .invoke_static(
+                    "Lorg/androswitch/contracts/ReflectionNewCases;",
+                    "run",
+                    "(I)Ljava/lang/String;",
+                    &[Value::Int(index.parse().unwrap())],
+                )
+                .unwrap();
+            let value = app
+                .vm
+                .heap
+                .as_str(value.as_ref().unwrap().unwrap())
+                .unwrap();
+            assert_eq!(value, expected, "case {index} in {fixture}");
+            app.vm.gc();
+        }
+    }
+}
 #[allow(clippy::assertions_on_constants)]
 fn app(fixture: &str) -> App {
     assert!(rd_vm::PORTABLE_CORE);
