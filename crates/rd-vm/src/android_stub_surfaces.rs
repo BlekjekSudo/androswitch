@@ -48633,8 +48633,15 @@ fn p36f_pdf_document_instance(
             Value::Null
         }
         ("getPages", "()Ljava/util/List;") => {
-            // Snapshot of AOSP's unmodifiable view over mPages.
-            p49_list_value(vm, p36f_pdf_finished_pages(vm, recv))?
+            // AOSP returns Collections.unmodifiableList(mPages); the host
+            // snapshot keeps the UOE-on-mutation contract.
+            let snapshot = p49_list_value(vm, p36f_pdf_finished_pages(vm, recv))?;
+            vm.invoke_static(
+                "Ljava/util/Collections;",
+                "unmodifiableList",
+                "(Ljava/util/List;)Ljava/util/List;",
+                &[snapshot],
+            )?
         }
         ("close", "()V") => {
             p36f_pdf_throw_if_current(vm, recv)?;

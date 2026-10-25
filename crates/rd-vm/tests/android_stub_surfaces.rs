@@ -20286,6 +20286,25 @@ fn pdf_document_lifecycle_and_page_info_are_guest_visible() {
         &[],
     ));
     assert_eq!(call(&mut engine, pages, "size", "()I", &[]), Value::Int(2));
+
+    // Deep audit: getPages exposes Collections.unmodifiableList(mPages),
+    // so mutating the returned list is rejected.
+    let first_page_info = object(call(
+        &mut engine,
+        pages,
+        "get",
+        "(I)Ljava/lang/Object;",
+        &[Value::Int(0)],
+    ));
+    assert_throws(
+        engine.invoke_instance(
+            pages,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(first_page_info)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
 }
 
 #[test]
