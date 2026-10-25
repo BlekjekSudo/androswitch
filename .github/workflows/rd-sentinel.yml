@@ -252,6 +252,7 @@ jobs:
               fh.write(f"needs_future={'true' if 'future' in components else 'false'}\n")
               fh.write(f"needs_golden={'true' if 'golden' in components else 'false'}\n")
               fh.write(f"needs_soak={'true' if 'soak' in components else 'false'}\n")
+              fh.write(f"needs_native={'true' if components & {'core', 'determinism'} else 'false'}\n")
           print("RD Sentinel components:", sorted(components))
           PY
 
@@ -281,8 +282,21 @@ jobs:
           rustup default stable
 
       - name: Install native real-APK worker dependency
-        if: steps.plan.outputs.needs_apk == 'true'
+        if: steps.plan.outputs.needs_apk == 'true' || steps.plan.outputs.needs_native == 'true'
         run: python -m pip install unicorn==2.1.4
+
+      # issue #193: core/determinism test commands can enable the rd-ndk
+      # native tests (--all-features / --features native), which read the
+      # golden/native three-ABI fixtures. Build them from source in the
+      # candidate tree (gitignored) so even the trusted-base bot sees
+      # them; campaigns.py also ensures this fail-closed at runtime.
+      - name: Build golden/native three-ABI fixtures for native tests
+        if: steps.plan.outputs.needs_native == 'true'
+        working-directory: candidate
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+          bash golden/native/build.sh
 
       - name: Set up Java for golden/soak harnesses
         if: steps.plan.outputs.needs_golden == 'true' || steps.plan.outputs.needs_soak == 'true'
