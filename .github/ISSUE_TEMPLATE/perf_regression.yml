@@ -1,0 +1,59 @@
+name: 📉 Performance regression (Moto E5 floor)
+description: Report a startup, CPU, RSS (VmHWM) or app-heap regression against the moto-e5 contract / Regressão de performance ou memória contra o piso Moto E5
+labels: ["perf-regression", "triage"]
+body:
+  - type: dropdown
+    id: metric
+    attributes:
+      label: Regressed metric / Métrica afetada
+      options:
+        - Cold startup (launch → first frame, budget < 1,500 ms emulated / 375 ms host)
+        - Warm / snapshot startup (budget ≤ 26 ms median — ADR 009)
+        - Peak process RSS / VmHWM (budget ≤ 512 MB)
+        - App heap watermark / GC pause (budget ≤ 256 MB / < 2 ms minor pause)
+        - Parser / DEX / ARSC / ZIP throughput
+        - JIT / bytecode execution throughput
+    validations:
+      required: true
+  - type: textarea
+    id: numbers
+    attributes:
+      label: Paired before / after measurements / Medições antes e depois (mesmo host)
+      placeholder: |
+        Before (<commit>): p50 = ... ms, max = ... ms, VmHWM = ... MB
+        After  (<commit>): p50 = ... ms, max = ... ms, VmHWM = ... MB
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Command & workload / Comando e APK usado
+      placeholder: |
+        cargo build --profile profiling -p rd-cli
+        ./target/profiling/rd perf path/to/app.apk --runs 5 --json
+    validations:
+      required: true
+  - type: input
+    id: commit-range
+    attributes:
+      label: Commit SHA or PR introducing the regression / Commit ou PR
+    validations:
+      required: true
+  - type: input
+    id: host-env
+    attributes:
+      label: Host CPU, RAM & OS / Hardware e SO do host
+      placeholder: "Linux x86_64, 2 vCPU, 4 GB RAM, rustc 1.99.1"
+  - type: textarea
+    id: json-output
+    attributes:
+      label: rd perf --json / benchmark output (optional)
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: Measurements were collected sequentially on the same machine / Medições feitas sequencialmente na mesma máquina
+          required: true
+        - label: I searched existing issues / Procurei em issues existentes
+          required: true
