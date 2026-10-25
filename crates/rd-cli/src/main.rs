@@ -9,6 +9,8 @@
 //! - `rd vm exec`            — interpretador Dalvik mínimo (DoD do M2: métodos puros)
 //! - `rd engine list|detect|check` — registro/detecção do Apêndice G (não execução)
 //! - `rd api-coverage list|show|check|report` — registro android.* do Apêndice C
+//! - `rd jetpack list|show|check|report` — registro AndroidX/Jetpack do Apêndice D
+//! - `rd gms list|show|check|report` — registro GMS/Firebase do Apêndice E (sem GMS honesto)
 //! - `rd perf <apk>`         — gate de performance (M7): startup cold/warm e RSS no piso moto-e5
 //!
 //! Códigos de saída (contrato API pública — issue #34):
@@ -24,6 +26,8 @@ use rd_framework::fd_permissions::{GrantState, PermissionEngine, PermissionTable
 use rd_framework::DeviceProfile;
 mod api_coverage;
 mod engines;
+mod gms_cli;
+mod jetpack;
 mod perf;
 
 use std::io::Write as _;
@@ -66,6 +70,16 @@ enum Cmd {
     ApiCoverage {
         #[command(subcommand)]
         sub: ApiCoverageSub,
+    },
+    /// AndroidX/Jetpack por módulo (Apêndice D — dado versionado)
+    Jetpack {
+        #[command(subcommand)]
+        sub: JetpackSub,
+    },
+    /// Google Play Services / Firebase (Apêndice E — modo sem GMS honesto)
+    Gms {
+        #[command(subcommand)]
+        sub: GmsSub,
     },
     /// Motor de permissões (Apêndice B — dado versionado)
     Perm {
@@ -200,6 +214,68 @@ enum ApiCoverageSub {
         json: bool,
     },
     /// Valida o registro inteiro contra o contrato dos 17 domínios do Apêndice C
+    Check {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Imprime (ou grava com --out) o relatório Markdown gerado do registro
+    Report {
+        #[arg(long, value_name = "FILE")]
+        out: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum JetpackSub {
+    /// Lista bibliotecas do registro (filtros opcionais por categoria/status)
+    List {
+        /// ID de categoria do Apêndice D (ex.: foundation, architecture, ui)
+        #[arg(long)]
+        category: Option<String>,
+        /// supported|partial|stub|not_implemented
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Mostra uma biblioteca por ID/prefixo exato ou classifica pacote.Classe[.método]/descritor
+    Show {
+        query: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Valida o registro inteiro contra o contrato das 6 categorias do Apêndice D
+    Check {
+        #[arg(long)]
+        json: bool,
+    },
+    /// Imprime (ou grava com --out) o relatório Markdown gerado do registro
+    Report {
+        #[arg(long, value_name = "FILE")]
+        out: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum GmsSub {
+    /// Lista serviços do registro (filtros opcionais por categoria/status)
+    List {
+        /// ID de categoria do Apêndice E (ex.: gms-core, gms-services, firebase)
+        #[arg(long)]
+        category: Option<String>,
+        /// supported|partial|stub|not_implemented
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Mostra um serviço por ID/prefixo exato ou classifica pacote.Classe[.método]/descritor
+    Show {
+        query: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Valida o registro inteiro contra o contrato honesto (sem GMS, network=none)
     Check {
         #[arg(long)]
         json: bool,
@@ -423,6 +499,8 @@ fn run(cli: Cli) -> i32 {
         Cmd::Inspect { path, json, device } => cmd_inspect(path, *json, device.as_deref(), &dd),
         Cmd::Engine { sub } => engines::run(sub, &dd),
         Cmd::ApiCoverage { sub } => api_coverage::run(sub, &dd),
+        Cmd::Jetpack { sub } => jetpack::run(sub, &dd),
+        Cmd::Gms { sub } => gms_cli::run(sub, &dd),
         Cmd::Perm { sub } => match sub {
             PermSub::List { path, json } => cmd_perm_list(path, *json, &dd),
             PermSub::Info { name, json } => cmd_perm_info(name, *json, &dd),

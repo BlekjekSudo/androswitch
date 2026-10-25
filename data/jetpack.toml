@@ -1,0 +1,793 @@
+# RustyDroid — data/jetpack.toml
+# Apêndice D da spec: AndroidX/Jetpack (shims por módulo).
+#
+# Fonte executável consumida por rd-framework::fd_jetpack, `rd jetpack`,
+# classificação MCP e `cargo xtask jetpack-report|jetpack-spec`.
+#
+# Semântica de status (conservadora, igual à do Apêndice C):
+# - supported: modelo host com estado para o subconjunto documentado; NUNCA
+#   a biblioteca inteira.
+# - partial: subconjunto real executa (DEX sobre a plataforma host e/ou
+#   shim host com estado); o resto é gap explícito.
+# - stub: reconhecimento apenas (hierarquia/constantes/inflate/alocação).
+# - not_implemented: nenhum modelo; falha tipada, nunca sucesso fingido.
+#
+# strategy: dex-passthrough (DEX da lib executa na VM) | host-shim (host
+# intercepta métodos listados; resto cai no DEX) | host-native (só host).
+# Presença de uma biblioteca no DEX de um APK NÃO é cobertura de execução.
+schema_version = 1
+source = "RustyDroid.md Appendix D"
+api_floor = 26
+api_ceiling = 36
+
+[[category]]
+id = "foundation"
+name = "Foundation"
+summary = "Base AndroidX: appcompat, core, activity, anotações, multidex e inicialização."
+
+[[category]]
+id = "architecture"
+name = "Architecture"
+summary = "Lifecycle, dados e navegação: room, paging, work, navigation, datastore, collection, palette."
+
+[[category]]
+id = "ui"
+name = "UI"
+summary = "Widgets e containers AndroidX/Material sobre o host de View, mais Compose (UI-05)."
+
+[[category]]
+id = "behavior"
+name = "Behavior"
+summary = "Mídia, câmera, biometria, cripto, credenciais e photo picker."
+
+[[category]]
+id = "di-async"
+name = "DI/async"
+summary = "Injeção de dependências e concorrência: hilt/dagger, coroutines/flow, RxJava."
+
+[[category]]
+id = "third-party"
+name = "3rd-party comuns"
+summary = "Bibliotecas comuns de terceiros (rede, JSON, imagens). Firebase vive no Apêndice E (data/gms.toml)."
+
+# ===================== Foundation =====================
+[[library]]
+id = "androidx-appcompat"
+name = "appcompat"
+category = "foundation"
+coordinates = "androidx.appcompat:appcompat"
+prefixes = ["androidx.appcompat"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "AppCompatActivity/delegate e views AppCompat não têm modelo host; o DEX da biblioteca depende de inflate/temas ainda não cobertos para este módulo."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-appcompat"
+key_apis = ["androidx.appcompat.app.AppCompatActivity", "androidx.appcompat.app.AppCompatDelegate"]
+
+[[library]]
+id = "androidx-core"
+name = "core-ktx"
+category = "foundation"
+coordinates = "androidx.core:core-ktx"
+prefixes = ["androidx.core"]
+strategy = "host-shim"
+status = "partial"
+module = "rd-vm/m9"
+code = ["crates/rd-vm/src/m9/notifications.rs"]
+milestone = "M9"
+notes = "NotificationCompat (Builder/styles/actions) e NotificationManagerCompat têm modelo host no M9. ContextCompat/ActivityCompat/FileProvider e o restante de androidx.core ainda não."
+evidence = ["docs/m9.md", "docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-core-partial"
+key_apis = ["androidx.core.app.NotificationCompat.Builder.build", "androidx.core.app.NotificationManagerCompat.notify"]
+
+[[library]]
+id = "androidx-activity"
+name = "activity"
+category = "foundation"
+coordinates = "androidx.activity:activity-ktx"
+prefixes = ["androidx.activity"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "ComponentActivity/activity-result rodam apenas como DEX do APK sobre o host android.app; não há shim host próprio nem registro de contratos de resultado."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-activity"
+key_apis = ["androidx.activity.ComponentActivity", "androidx.activity.result.ActivityResultRegistry"]
+
+[[library]]
+id = "androidx-annotation"
+name = "annotation"
+category = "foundation"
+coordinates = "androidx.annotation:annotation"
+prefixes = ["androidx.annotation"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Anotações são metadados de compilação; nenhum comportamento de runtime é modelado (CLASS retention não exige host). Nenhum shim é esperado."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-annotation"
+key_apis = ["androidx.annotation.NonNull", "androidx.annotation.Nullable"]
+
+[[library]]
+id = "androidx-multidex"
+name = "multidex"
+category = "foundation"
+coordinates = "androidx.multidex:multidex"
+prefixes = ["androidx.multidex"]
+strategy = "host-native"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "A VM já carrega classes*.dex múltiplos nativamente, mas MultiDex.install() chamado pelo app ainda não é interceptado como no-op seguro."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-multidex"
+key_apis = ["androidx.multidex.MultiDex.install"]
+
+[[library]]
+id = "androidx-startup"
+name = "startup"
+category = "foundation"
+coordinates = "androidx.startup:startup-runtime"
+prefixes = ["androidx.startup"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "AppInitializer/InitializationProvider não são executados no launch; inicializadores de bibliotecas não rodam automaticamente."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-startup"
+key_apis = ["androidx.startup.AppInitializer", "androidx.startup.Initializer"]
+
+# ===================== Architecture =====================
+[[library]]
+id = "androidx-lifecycle-runtime"
+name = "lifecycle-runtime"
+category = "architecture"
+coordinates = "androidx.lifecycle:lifecycle-runtime-ktx"
+prefixes = ["androidx.lifecycle"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "LifecycleRegistry/State/Event só existem como DEX do APK; não há máquina de estados host nem fallback para fixtures sem o corpo DEX."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-lifecycle-runtime"
+key_apis = ["androidx.lifecycle.LifecycleRegistry", "androidx.lifecycle.Lifecycle.State"]
+
+[[library]]
+id = "androidx-lifecycle-livedata"
+name = "lifecycle-livedata"
+category = "architecture"
+coordinates = "androidx.lifecycle:lifecycle-livedata-ktx"
+prefixes = ["androidx.lifecycle.LiveData", "androidx.lifecycle.MutableLiveData", "androidx.lifecycle.MediatorLiveData", "androidx.lifecycle.Observer", "androidx.lifecycle.Transformations"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "LiveData/MutableLiveData sem modelo host: observe/setValue/postValue só funcionam via DEX completo da biblioteca no APK."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-livedata"
+key_apis = ["androidx.lifecycle.MutableLiveData.setValue", "androidx.lifecycle.LiveData.observe"]
+
+[[library]]
+id = "androidx-lifecycle-viewmodel"
+name = "lifecycle-viewmodel"
+category = "architecture"
+coordinates = "androidx.lifecycle:lifecycle-viewmodel-ktx"
+prefixes = ["androidx.lifecycle.ViewModel", "androidx.lifecycle.ViewModelStore", "androidx.lifecycle.ViewModelProvider", "androidx.lifecycle.HasDefaultViewModelProviderFactory"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "ViewModelStore/Provider sem modelo host; retenção entre recriações de activity não é garantida pelo host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-viewmodel"
+key_apis = ["androidx.lifecycle.ViewModelProvider.get", "androidx.lifecycle.ViewModelStore.clear"]
+
+[[library]]
+id = "androidx-lifecycle-savedstate"
+name = "lifecycle-savedstate"
+category = "architecture"
+coordinates = "androidx.lifecycle:lifecycle-viewmodel-savedstate"
+prefixes = ["androidx.lifecycle.SavedStateHandle", "androidx.savedstate"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "SavedStateHandle/SavedStateRegistry sem modelo host; estado salvo não sobrevive via host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-savedstate"
+key_apis = ["androidx.lifecycle.SavedStateHandle.get", "androidx.savedstate.SavedStateRegistry"]
+
+[[library]]
+id = "androidx-room"
+name = "room"
+category = "architecture"
+coordinates = "androidx.room:room-runtime"
+prefixes = ["androidx.room"]
+strategy = "host-shim"
+status = "partial"
+module = "rd-vm/m8"
+code = ["crates/rd-vm/src/m8.rs", "crates/rd-vm/src/jsqlite.rs"]
+milestone = "M8"
+notes = "Room.databaseBuilder/inMemoryDatabaseBuilder + Builder.build geram um RoomDatabase host sobre o backend SQLite (ST-02). DAOs gerados por annotation processing, migrations e InvalidationTracker não são modelados."
+evidence = ["docs/compat-matrix.md", "docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-room-partial"
+key_apis = ["androidx.room.Room.databaseBuilder", "androidx.room.RoomDatabase.Builder.build"]
+
+[[library]]
+id = "androidx-paging"
+name = "paging 3"
+category = "architecture"
+coordinates = "androidx.paging:paging-runtime"
+prefixes = ["androidx.paging"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "PagingData/PagingSource/Pager (Flow) sem modelo host; listas paginadas dependem 100% do DEX + coroutines."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-paging"
+key_apis = ["androidx.paging.PagingSource", "androidx.paging.Pager"]
+
+[[library]]
+id = "androidx-work"
+name = "work"
+category = "architecture"
+coordinates = "androidx.work:work-runtime-ktx"
+prefixes = ["androidx.work"]
+strategy = "host-shim"
+status = "partial"
+module = "rd-vm/m8"
+code = ["crates/rd-vm/src/m8.rs"]
+milestone = "M8"
+notes = "WorkManager.getInstance/enqueue registram WorkRecords consultáveis (SYS-04, sessão); Worker.doWork() NÃO roda em background — estados avançam via harness (m8_complete_work). Data/Constraints/WorkInfo completos ainda não."
+evidence = ["docs/compat-matrix.md", "docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-work-partial"
+key_apis = ["androidx.work.WorkManager.getInstance", "androidx.work.WorkManager.enqueue"]
+
+[[library]]
+id = "androidx-navigation"
+name = "navigation"
+category = "architecture"
+coordinates = "androidx.navigation:navigation-runtime-ktx"
+prefixes = ["androidx.navigation"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "NavController/NavHost (UI-04) sem modelo host: grafo, destinos e back stack não são rastreados pelo host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-navigation"
+key_apis = ["androidx.navigation.NavController.navigate", "androidx.navigation.NavController.popBackStack"]
+
+[[library]]
+id = "androidx-datastore"
+name = "datastore"
+category = "architecture"
+coordinates = "androidx.datastore:datastore-preferences"
+prefixes = ["androidx.datastore"]
+strategy = "host-shim"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Preferences DataStore (ST-01) sem modelo host: Preferences/Key/edit e o Flow de dados não são interceptados."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-datastore"
+key_apis = ["androidx.datastore.preferences.core.Preferences", "androidx.datastore.core.DataStore"]
+
+[[library]]
+id = "androidx-collection"
+name = "collection"
+category = "architecture"
+coordinates = "androidx.collection:collection-ktx"
+prefixes = ["androidx.collection"]
+strategy = "host-native"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "ArrayMap/ArraySet/SparseArrayCompat/LruCache da androidx.collection sem modelo host (os equivalentes android.util são Apêndice C, outro registro)."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-collection"
+key_apis = ["androidx.collection.ArrayMap", "androidx.collection.LruCache"]
+
+[[library]]
+id = "androidx-palette"
+name = "palette"
+category = "architecture"
+coordinates = "androidx.palette:palette-ktx"
+prefixes = ["androidx.palette"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Palette.from(bitmap) é computação pura sobre pixels; sem bitmaps reais decodificados pelo host, não há modelo."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-palette"
+key_apis = ["androidx.palette.graphics.Palette.from"]
+
+# ===================== UI =====================
+[[library]]
+id = "androidx-compose"
+name = "compose"
+category = "ui"
+coordinates = "androidx.compose:compose-bom (UI-05)"
+prefixes = ["androidx.compose"]
+strategy = "host-native"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "UI-05 é experimental/longo prazo na spec: runtime Compose (recomposição/state/modifiers) e Material 3 não são implementados; registrado para classificação honesta, não como suporte."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-compose-ui05"
+key_apis = ["androidx.compose.runtime.Composer", "androidx.compose.ui.Modifier"]
+
+[[library]]
+id = "androidx-recyclerview"
+name = "recyclerview"
+category = "ui"
+coordinates = "androidx.recyclerview:recyclerview"
+prefixes = ["androidx.recyclerview"]
+strategy = "host-shim"
+status = "partial"
+module = "rd-vm/m8"
+code = ["crates/rd-vm/src/m8.rs"]
+milestone = "M8"
+notes = "RecyclerView host pergunta getItemCount ao adapter DEX e cria/vincula ViewHolders via DEX (Linear/GridLayoutManager). ItemDecoration, animações, DiffUtil completo e recycling real de pools não são modelados."
+evidence = ["docs/compat-matrix.md", "docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-recyclerview-partial"
+key_apis = ["androidx.recyclerview.widget.RecyclerView.setAdapter", "androidx.recyclerview.widget.LinearLayoutManager"]
+
+[[library]]
+id = "androidx-viewpager2"
+name = "viewpager2"
+category = "ui"
+coordinates = "androidx.viewpager2:viewpager2"
+prefixes = ["androidx.viewpager2", "androidx.viewpager"]
+strategy = "dex-passthrough"
+status = "stub"
+module = "rd-vm/inflate"
+code = ["crates/rd-vm/src/inflate.rs"]
+milestone = "M8"
+notes = "Só reconhecimento no inflate (LayoutParams do ViewPager legado); ViewPager2 (sobre RecyclerView) não tem modelo de páginas/fragmentos no host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-viewpager2"
+key_apis = ["androidx.viewpager2.widget.ViewPager2.setAdapter", "androidx.viewpager.widget.ViewPager.setAdapter"]
+
+[[library]]
+id = "androidx-constraintlayout"
+name = "constraintlayout"
+category = "ui"
+coordinates = "androidx.constraintlayout:constraintlayout"
+prefixes = ["androidx.constraintlayout"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Solver de constraints não é executado pelo motor de layout host; telas ConstraintLayout não têm geometria fiel."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-constraintlayout"
+key_apis = ["androidx.constraintlayout.widget.ConstraintLayout", "androidx.constraintlayout.widget.ConstraintSet"]
+
+[[library]]
+id = "androidx-coordinatorlayout"
+name = "coordinatorlayout"
+category = "ui"
+coordinates = "androidx.coordinatorlayout:coordinatorlayout"
+prefixes = ["androidx.coordinatorlayout"]
+strategy = "dex-passthrough"
+status = "stub"
+module = "rd-vm/inflate"
+code = ["crates/rd-vm/src/inflate.rs"]
+milestone = "M8"
+notes = "Inflate reconhece CoordinatorLayout/LayoutParams como ViewGroup genérico; Behaviors (AppBar/FAB/scroll) não são modelados."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-coordinatorlayout"
+key_apis = ["androidx.coordinatorlayout.widget.CoordinatorLayout"]
+
+[[library]]
+id = "androidx-drawerlayout"
+name = "drawerlayout"
+category = "ui"
+coordinates = "androidx.drawerlayout:drawerlayout"
+prefixes = ["androidx.drawerlayout"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "DrawerLayout sem modelo host de gaveta/gravidade; aberto/fechado não é rastreado."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-drawerlayout"
+key_apis = ["androidx.drawerlayout.widget.DrawerLayout.openDrawer"]
+
+[[library]]
+id = "androidx-swiperefreshlayout"
+name = "swiperefreshlayout"
+category = "ui"
+coordinates = "androidx.swiperefreshlayout:swiperefreshlayout"
+prefixes = ["androidx.swiperefreshlayout"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "SwipeRefreshLayout sem modelo host; gesto de refresh e listener não são acionados pelo host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-swiperefreshlayout"
+key_apis = ["androidx.swiperefreshlayout.widget.SwipeRefreshLayout.setRefreshing"]
+
+[[library]]
+id = "androidx-cardview"
+name = "cardview"
+category = "ui"
+coordinates = "androidx.cardview:cardview"
+prefixes = ["androidx.cardview"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "CardView sem reconhecimento dedicado no inflate/layout; raio/elevação não modelados."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-cardview"
+key_apis = ["androidx.cardview.widget.CardView.setRadius"]
+
+[[library]]
+id = "androidx-fragment"
+name = "fragment"
+category = "ui"
+coordinates = "androidx.fragment:fragment-ktx"
+prefixes = ["androidx.fragment"]
+strategy = "host-shim"
+status = "partial"
+module = "rd-vm/m8"
+code = ["crates/rd-vm/src/m8.rs", "crates/rd-vm/src/framework.rs"]
+milestone = "M8"
+notes = "FragmentManager/FragmentTransaction têm fallback host (add/replace/remove/commit registram fragments) SOMENTE quando o APK não fornece o corpo DEX; com DEX real, a biblioteca executa e o host cede. Back stack/animações/lifecycle completo são do DEX."
+evidence = ["docs/compat-matrix.md", "docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-fragment-partial"
+key_apis = ["androidx.fragment.app.FragmentManager.beginTransaction", "androidx.fragment.app.FragmentTransaction.commit"]
+
+[[library]]
+id = "androidx-browser"
+name = "browser (custom tabs)"
+category = "ui"
+coordinates = "androidx.browser:browser"
+prefixes = ["androidx.browser"]
+strategy = "host-shim"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Custom Tabs não têm shim: launchUrl não é registrado como deep link/web; não há navegador em sandbox."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-browser"
+key_apis = ["androidx.browser.customtabs.CustomTabsIntent.launchUrl"]
+
+[[library]]
+id = "androidx-emoji2"
+name = "emoji2"
+category = "ui"
+coordinates = "androidx.emoji2:emoji2"
+prefixes = ["androidx.emoji2"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "EmojiCompat/fontes de emoji não são modelados; glifos ausentes renderizam como substitutos no rasterizador host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-emoji2"
+key_apis = ["androidx.emoji2.text.EmojiCompat.get"]
+
+[[library]]
+id = "material-components"
+name = "material (extra além da tabela da spec)"
+category = "ui"
+coordinates = "com.google.android.material:material"
+prefixes = ["com.google.android.material"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Extra além da tabela D: apps reais referenciam Material (TabLayout, MaterialButton...) em todo launch; registrado para classificação — sem modelo host dedicado, só o host View genérico embaixo do DEX."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-material"
+key_apis = ["com.google.android.material.tabs.TabLayout", "com.google.android.material.button.MaterialButton"]
+
+# ===================== Behavior =====================
+[[library]]
+id = "androidx-media3"
+name = "media3/ExoPlayer"
+category = "behavior"
+coordinates = "androidx.media3:media3-exoplayer"
+prefixes = ["androidx.media3"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "MEDIA-01/02: ExoPlayer não tem pipeline host (sem decode/relogio de mídia); registrado como gap, não como player."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-media3"
+key_apis = ["androidx.media3.exoplayer.ExoPlayer.Builder.build"]
+
+[[library]]
+id = "androidx-camerax"
+name = "cameraX"
+category = "behavior"
+coordinates = "androidx.camera:camera-camera2"
+prefixes = ["androidx.camera"]
+strategy = "host-shim"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "MEDIA-03: ProcessCameraProvider/casos de uso não têm shim; não há câmera virtual ligada à CameraX."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-camerax"
+key_apis = ["androidx.camera.lifecycle.ProcessCameraProvider.getInstance"]
+
+[[library]]
+id = "androidx-biometric"
+name = "biometric"
+category = "behavior"
+coordinates = "androidx.biometric:biometric"
+prefixes = ["androidx.biometric"]
+strategy = "host-shim"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "MEDIA-05: BiometricPrompt/BiometricManager sem shim programável; autenticação não pode ser respondida pelo agente."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-biometric"
+key_apis = ["androidx.biometric.BiometricPrompt.authenticate", "androidx.biometric.BiometricManager.canAuthenticate"]
+
+[[library]]
+id = "androidx-security-crypto"
+name = "security-crypto"
+category = "behavior"
+coordinates = "androidx.security:security-crypto"
+prefixes = ["androidx.security"]
+strategy = "host-shim"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "ST-04: EncryptedSharedPreferences/MasterKey sem shim; depende de AndroidKeyStore (Apêndice C, gap próprio)."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-security-crypto"
+key_apis = ["androidx.security.crypto.EncryptedSharedPreferences.create", "androidx.security.crypto.MasterKeys.getOrCreate"]
+
+[[library]]
+id = "androidx-credentials"
+name = "credential-manager"
+category = "behavior"
+coordinates = "androidx.credentials:credentials"
+prefixes = ["androidx.credentials"]
+strategy = "host-shim"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "CredentialManager get/createCredential sem shim; nenhum provedor fake responde (passkeys/senhas)."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-credential-manager"
+key_apis = ["androidx.credentials.CredentialManager.create"]
+
+[[library]]
+id = "androidx-photopicker"
+name = "photo-picker (privacy)"
+category = "behavior"
+coordinates = "androidx.activity:activity (PickVisualMedia)"
+prefixes = ["androidx.activity.result.contracts.ActivityResultContracts$PickVisualMedia", "androidx.activity.result.contracts.ActivityResultContracts$PickMultipleVisualMedia"]
+strategy = "host-shim"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Contratos PickVisualMedia não devolvem URI programável pelo agente; o picker do sistema não existe em sandbox."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-photopicker"
+key_apis = ["androidx.activity.result.contracts.ActivityResultContracts$PickVisualMedia"]
+
+# ===================== DI/async =====================
+[[library]]
+id = "hilt-dagger"
+name = "hilt/dagger"
+category = "di-async"
+coordinates = "com.google.dagger:hilt-android"
+prefixes = ["dagger", "androidx.hilt"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Componentes Dagger/Hilt gerados são DEX do app e executam como código comum; 'reflection-free init' não tem suporte host dedicado nem validação própria."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-hilt-dagger"
+key_apis = ["dagger.hilt.android.HiltAndroidApp", "dagger.Component"]
+
+[[library]]
+id = "kotlinx-coroutines"
+name = "kotlinx-coroutines/flow"
+category = "di-async"
+coordinates = "org.jetbrains.kotlinx:kotlinx-coroutines-android"
+prefixes = ["kotlinx.coroutines"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Coroutines/Flow executam como DEX sobre o modelo de threads da VM; Dispatchers.Main/looper e scheduling determinístico não têm mapeamento host dedicado neste registro."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-coroutines"
+key_apis = ["kotlinx.coroutines.CoroutineScope", "kotlinx.coroutines.flow.Flow"]
+
+[[library]]
+id = "rxjava"
+name = "rxjava bridge"
+category = "di-async"
+coordinates = "io.reactivex.rxjava3:rxjava"
+prefixes = ["io.reactivex"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "RxJava é DEX puro; Schedulers (io/main) não têm bridge host — execução depende do modelo de threads genérico."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-rxjava"
+key_apis = ["io.reactivex.Observable", "io.reactivex.rxjava3.core.Observable"]
+
+# ===================== 3rd-party =====================
+[[library]]
+id = "okhttp"
+name = "okhttp"
+category = "third-party"
+coordinates = "com.squareup.okhttp3:okhttp"
+prefixes = ["okhttp3"]
+strategy = "host-shim"
+status = "partial"
+module = "rd-vm/m8"
+code = ["crates/rd-vm/src/m8.rs"]
+milestone = "M8"
+notes = "NET-01: OkHttpClient/Request/Call/Response têm shim offline determinístico — devolve a resposta programada (m8_set_http_response) e registra URLs; NÃO faz rede."
+evidence = ["docs/compat-matrix.md", "docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-okhttp-partial"
+key_apis = ["okhttp3.OkHttpClient.newCall", "okhttp3.Request.Builder.build"]
+
+[[library]]
+id = "retrofit"
+name = "retrofit"
+category = "third-party"
+coordinates = "com.squareup.retrofit2:retrofit"
+prefixes = ["retrofit2"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Retrofit.create() depende de java.lang.reflect.Proxy + conversores; sem bridge para o shim OkHttp registrado."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-retrofit"
+key_apis = ["retrofit2.Retrofit.create"]
+
+[[library]]
+id = "moshi"
+name = "moshi"
+category = "third-party"
+coordinates = "com.squareup.moshi:moshi"
+prefixes = ["com.squareup.moshi"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Moshi é DEX puro (codegen/reflect); nenhum suporte host é necessário nem registrado além da classificação."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-moshi"
+key_apis = ["com.squareup.moshi.Moshi.Builder.build"]
+
+[[library]]
+id = "gson"
+name = "gson"
+category = "third-party"
+coordinates = "com.google.code.gson:gson"
+prefixes = ["com.google.gson"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "Gson é DEX puro dependente de reflexão; classificado aqui (não é GMS). Sem modelo host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-gson"
+key_apis = ["com.google.gson.Gson.fromJson", "com.google.gson.Gson.toJson"]
+
+[[library]]
+id = "coil"
+name = "coil"
+category = "third-party"
+coordinates = "io.coil-kt:coil / io.coil-kt.coil3:coil"
+prefixes = ["coil", "coil3"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "UI-02: Coil depende de decode de imagens + rede/cache; sem pipeline de imagens host ligado."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-coil"
+key_apis = ["coil.ImageLoader", "coil3.ImageLoader"]
+
+[[library]]
+id = "glide"
+name = "glide"
+category = "third-party"
+coordinates = "com.github.bumptech.glide:glide"
+prefixes = ["com.bumptech.glide"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "UI-02: Glide.with(...).load(...) sem pipeline host; alvos ImageView não recebem bitmaps do host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-glide"
+key_apis = ["com.bumptech.glide.Glide.with"]
+
+[[library]]
+id = "picasso"
+name = "picasso"
+category = "third-party"
+coordinates = "com.squareup.picasso:picasso"
+prefixes = ["com.squareup.picasso"]
+strategy = "dex-passthrough"
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+notes = "UI-02: Picasso sem pipeline host de imagens."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-picasso"
+key_apis = ["com.squareup.picasso.Picasso.get"]
+
+[[library]]
+id = "guava-listenablefuture"
+name = "guava ListenableFuture (extra — base de work/camera)"
+category = "third-party"
+coordinates = "com.google.guava:listenablefuture"
+prefixes = ["com.google.common"]
+strategy = "host-shim"
+status = "stub"
+module = "rd-vm/m8"
+code = ["crates/rd-vm/src/m8.rs"]
+milestone = "M8"
+notes = "Operation.getResult() aloca um ListenableFuture host sem comportamento (get/addListener não modelados). Base necessária para WorkManager/CameraX."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-jetpack-listenablefuture"
+key_apis = ["com.google.common.util.concurrent.ListenableFuture"]

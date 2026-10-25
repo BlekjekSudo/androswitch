@@ -6,6 +6,8 @@
 
 use anyhow::{bail, Context, Result};
 use rd_framework::fd_api_coverage::ApiCoverageTable;
+use rd_framework::fd_gms::GmsTable;
+use rd_framework::fd_jetpack::JetpackTable;
 use std::path::{Path, PathBuf};
 
 fn main() {
@@ -67,6 +69,42 @@ fn run() -> Result<()> {
                 .unwrap_or_else(|| root.join("RustyDroid.md"));
             api_coverage_spec(&root, &out)
         }
+        Some("jetpack-report") => {
+            let out = args
+                .next()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.join("docs").join("jetpack.md"));
+            let table = jetpack_table(&root)?;
+            std::fs::write(&out, table.markdown_report())
+                .with_context(|| format!("writing {}", out.display()))?;
+            println!("jetpack report: {}", out.display());
+            Ok(())
+        }
+        Some("jetpack-spec") => {
+            let out = args
+                .next()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.join("RustyDroid.md"));
+            jetpack_spec(&root, &out)
+        }
+        Some("gms-report") => {
+            let out = args
+                .next()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.join("docs").join("gms.md"));
+            let table = gms_table(&root)?;
+            std::fs::write(&out, table.markdown_report())
+                .with_context(|| format!("writing {}", out.display()))?;
+            println!("gms report: {}", out.display());
+            Ok(())
+        }
+        Some("gms-spec") => {
+            let out = args
+                .next()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.join("RustyDroid.md"));
+            gms_spec(&root, &out)
+        }
         Some("--help") | Some("help") | None => {
             println!("xtask — RustyDroid build tasks");
             println!();
@@ -80,6 +118,10 @@ fn run() -> Result<()> {
             println!(
                 "  api-coverage-spec [out.md]   regenera a tabela Apêndice C em RustyDroid.md"
             );
+            println!("  jetpack-report [out.md] gera docs/jetpack.md (Apêndice D)");
+            println!("  jetpack-spec [out.md]   regenera a tabela Apêndice D em RustyDroid.md");
+            println!("  gms-report [out.md] gera docs/gms.md (Apêndice E)");
+            println!("  gms-spec [out.md]   regenera a tabela Apêndice E em RustyDroid.md");
             Ok(())
         }
         Some(other) => bail!("unknown task {other:?} — try `cargo xtask --help`"),
@@ -97,12 +139,12 @@ const CRATE_STATUS: &[(&str, &str, &str)] = &[
     (
         "rd-framework",
         "M0",
-        "fd-permissions (motor completo + gating maxSdk/since_api) · fd-devices · fd-behavior · fd-api-coverage (registro executável do Apêndice C)",
+        "fd-permissions (motor completo + gating maxSdk/since_api) · fd-devices · fd-behavior · fd-api-coverage (registro executável do Apêndice C) · fd-jetpack (Apêndice D) · fd-gms (Apêndice E, modo sem GMS honesto)",
     ),
     (
         "rd-cli",
         "M0–M6",
-        "inspect · perm · device · behavior · api-coverage · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6)",
+        "inspect · perm · device · behavior · api-coverage · jetpack · gms · dex disasm · vm exec · app run · mcp · test (suítes JUnit, M6)",
     ),
     (
         "rd-dex",
@@ -245,6 +287,37 @@ fn compat_report(root: &Path, out: &Path) -> Result<()> {
     ));
     md.push_str(&api_table.appendix_c_markdown_table());
 
+    let jetpack = jetpack_table(root)?;
+    let jp_counts = jetpack.status_counts();
+    let jp_count = |k: &str| jp_counts.get(k).copied().unwrap_or(0);
+    md.push_str("\n## AndroidX/Jetpack (Apêndice D — registro por módulo, não execução)\n\n");
+    md.push_str(&format!(
+        "**{} bibliotecas em {} categorias** (supported {}, partial {}, stub {}, not_implemented {}). Fonte executável: `data/jetpack.toml`; relatório completo em [jetpack.md](jetpack.md), ledger em [appendix-d-e.md](appendix-d-e.md), consulta via `rd jetpack`. Cada módulo declara estratégia (`dex-passthrough`/`host-shim`/`host-native`); `supported` é só o subconjunto documentado — nunca a biblioteca inteira.\n\n",
+        jetpack.library.len(),
+        jetpack.category.len(),
+        jp_count("supported"),
+        jp_count("partial"),
+        jp_count("stub"),
+        jp_count("not_implemented")
+    ));
+    md.push_str(&jetpack.appendix_d_markdown_table());
+
+    let gms = gms_table(root)?;
+    let gms_counts = gms.status_counts();
+    let gms_count = |k: &str| gms_counts.get(k).copied().unwrap_or(0);
+    md.push_str("\n## Play Services / Firebase (Apêndice E — registro sem GMS, não backend)\n\n");
+    md.push_str(&format!(
+        "**{} serviços em {} categorias** (supported {}, partial {}, stub {}, not_implemented {}), modo `{}` com `network = \"none\"` validado em todos. Fonte executável: `data/gms.toml`; relatório completo em [gms.md](gms.md), consulta via `rd gms`. Status mede o shim local programável — nunca paridade com os servidores do Google.\n\n",
+        gms.service.len(),
+        gms.category.len(),
+        gms_count("supported"),
+        gms_count("partial"),
+        gms_count("stub"),
+        gms_count("not_implemented"),
+        gms.mode
+    ));
+    md.push_str(&gms.appendix_e_markdown_table());
+
     md.push_str("\n## Dados versionados (M0)\n\n");
     md.push_str(&format!(
         "- permissions.toml: **{perm_count}** permissões + {role_count} roles (Apêndice B)\n"
@@ -259,6 +332,16 @@ fn compat_report(root: &Path, out: &Path) -> Result<()> {
         "- api-coverage.toml: **{}** superfícies android.* em {} domínios (Apêndice C)\n",
         api_table.surface.len(),
         api_table.domain.len()
+    ));
+    md.push_str(&format!(
+        "- jetpack.toml: **{}** bibliotecas AndroidX/3rd-party em {} categorias (Apêndice D)\n",
+        jetpack.library.len(),
+        jetpack.category.len()
+    ));
+    md.push_str(&format!(
+        "- gms.toml: **{}** serviços GMS/Firebase em {} categorias (Apêndice E, sem GMS honesto)\n",
+        gms.service.len(),
+        gms.category.len()
     ));
     md.push_str("\n## Compatibilidade por módulo (checklist PARTE 0)\n\n");
     md.push_str(
@@ -316,6 +399,67 @@ fn api_coverage_spec(root: &Path, out: &Path) -> Result<()> {
     );
     std::fs::write(out, generated).with_context(|| format!("writing {}", out.display()))?;
     println!("Appendix C table: {}", out.display());
+    Ok(())
+}
+
+fn jetpack_table(root: &Path) -> Result<JetpackTable> {
+    let text = std::fs::read_to_string(root.join("data/jetpack.toml"))
+        .context("data/jetpack.toml ausente")?;
+    JetpackTable::from_toml(&text).context("validating data/jetpack.toml")
+}
+
+fn gms_table(root: &Path) -> Result<GmsTable> {
+    let text =
+        std::fs::read_to_string(root.join("data/gms.toml")).context("data/gms.toml ausente")?;
+    GmsTable::from_toml(&text).context("validating data/gms.toml")
+}
+
+/// Replace only the marked region of the master spec; the rest of the
+/// file (including the other appendices' generated tables) is preserved
+/// byte-for-byte.
+fn replace_marked_table(
+    spec: &str,
+    start: &str,
+    end: &str,
+    table: &str,
+    what: &str,
+) -> Result<String> {
+    let (before, rest) = spec
+        .split_once(start)
+        .with_context(|| format!("{what} table start marker missing"))?;
+    let (_, after) = rest
+        .split_once(end)
+        .with_context(|| format!("{what} table end marker missing"))?;
+    Ok(format!("{before}{start}\n{table}{end}{after}"))
+}
+
+fn jetpack_spec(root: &Path, out: &Path) -> Result<()> {
+    let spec = std::fs::read_to_string(root.join("RustyDroid.md"))?;
+    let table = jetpack_table(root)?;
+    let generated = replace_marked_table(
+        &spec,
+        "<!-- BEGIN JETPACK -->",
+        "<!-- END JETPACK -->",
+        &table.appendix_d_markdown_table(),
+        "jetpack",
+    )?;
+    std::fs::write(out, generated).with_context(|| format!("writing {}", out.display()))?;
+    println!("Appendix D table: {}", out.display());
+    Ok(())
+}
+
+fn gms_spec(root: &Path, out: &Path) -> Result<()> {
+    let spec = std::fs::read_to_string(root.join("RustyDroid.md"))?;
+    let table = gms_table(root)?;
+    let generated = replace_marked_table(
+        &spec,
+        "<!-- BEGIN GMS -->",
+        "<!-- END GMS -->",
+        &table.appendix_e_markdown_table(),
+        "gms",
+    )?;
+    std::fs::write(out, generated).with_context(|| format!("writing {}", out.display()))?;
+    println!("Appendix E table: {}", out.display());
     Ok(())
 }
 
@@ -748,6 +892,50 @@ mod tests {
             table_md,
             table.appendix_c_markdown_table(),
             "run cargo xtask api-coverage-spec"
+        );
+    }
+
+    #[test]
+    fn jetpack_report_and_appendix_table_match_the_versioned_registry() {
+        let root = repo_root();
+        let table = jetpack_table(&root).unwrap();
+        assert_eq!(table.category.len(), 6);
+        assert!(table.library.len() >= 44);
+        assert_eq!(
+            std::fs::read_to_string(root.join("docs/jetpack.md")).unwrap(),
+            table.markdown_report(),
+            "run cargo xtask jetpack-report"
+        );
+        let spec = std::fs::read_to_string(root.join("RustyDroid.md")).unwrap();
+        let (_, table_md) = spec.split_once("<!-- BEGIN JETPACK -->\n").unwrap();
+        let (table_md, _) = table_md.split_once("<!-- END JETPACK -->").unwrap();
+        assert_eq!(
+            table_md,
+            table.appendix_d_markdown_table(),
+            "run cargo xtask jetpack-spec"
+        );
+    }
+
+    #[test]
+    fn gms_report_and_appendix_table_match_the_versioned_registry() {
+        let root = repo_root();
+        let table = gms_table(&root).unwrap();
+        assert_eq!(table.mode, "no-gms-honest");
+        assert_eq!(table.category.len(), 3);
+        assert!(table.service.len() >= 18);
+        assert!(table.service.iter().all(|s| s.network == "none"));
+        assert_eq!(
+            std::fs::read_to_string(root.join("docs/gms.md")).unwrap(),
+            table.markdown_report(),
+            "run cargo xtask gms-report"
+        );
+        let spec = std::fs::read_to_string(root.join("RustyDroid.md")).unwrap();
+        let (_, table_md) = spec.split_once("<!-- BEGIN GMS -->\n").unwrap();
+        let (table_md, _) = table_md.split_once("<!-- END GMS -->").unwrap();
+        assert_eq!(
+            table_md,
+            table.appendix_e_markdown_table(),
+            "run cargo xtask gms-spec"
         );
     }
 
