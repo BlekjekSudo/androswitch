@@ -440,14 +440,22 @@ pub(crate) fn static_intrinsic(
         ("Character", "isSpaceChar", _) => b(ch(0)
             .is_some_and(|c| c == ' ' || c == '\u{A0}' || (c.is_whitespace() && !c.is_control()))),
         ("Character", "isISOControl", _) => b(ch(0).is_some_and(char::is_control)),
-        ("Character", "isHighSurrogate", "(C)Z") => b((0xD800..=0xDBFF).contains(&i(0))),
-        ("Character", "isLowSurrogate", "(C)Z") => b((0xDC00..=0xDFFF).contains(&i(0))),
-        ("Character", "isSurrogate", "(C)Z") => b((0xD800..=0xDFFF).contains(&i(0))),
-        ("Character", "isSurrogatePair", "(CC)Z") => {
-            b((0xD800..=0xDBFF).contains(&i(0)) && (0xDC00..=0xDFFF).contains(&i(1)))
+        ("Character", "isHighSurrogate", "(C)Z") => {
+            b((0xD800..=0xDBFF).contains(&(i(0) as u16 as i32)))
         }
+        ("Character", "isLowSurrogate", "(C)Z") => {
+            b((0xDC00..=0xDFFF).contains(&(i(0) as u16 as i32)))
+        }
+        ("Character", "isSurrogate", "(C)Z") => {
+            b((0xD800..=0xDFFF).contains(&(i(0) as u16 as i32)))
+        }
+        ("Character", "isSurrogatePair", "(CC)Z") => b((0xD800..=0xDBFF)
+            .contains(&(i(0) as u16 as i32))
+            && (0xDC00..=0xDFFF).contains(&(i(1) as u16 as i32))),
         ("Character", "toCodePoint", "(CC)I") => {
-            Value::Int(((i(0) - 0xD800) << 10) + (i(1) - 0xDC00) + 0x10000)
+            let hi = i(0) as u16 as i32;
+            let lo = i(1) as u16 as i32;
+            Value::Int(((hi - 0xD800) << 10) + (lo - 0xDC00) + 0x10000)
         }
         ("Character", "toLowerCase", "(C)C") | ("Character", "toLowerCase", "(I)I") => {
             Value::Int(ch(0).map_or(i(0), |c| c.to_lowercase().next().map_or(i(0), |x| x as i32)))
@@ -461,11 +469,22 @@ pub(crate) fn static_intrinsic(
                 }
             }))
         }
-        ("Character", "digit", "(CI)I") | ("Character", "digit", "(II)I") => Value::Int(
-            ch(0)
-                .and_then(|c| c.to_digit(i(1).clamp(2, 36) as u32))
-                .map_or(-1, |x| x as i32),
-        ),
+        ("Character", "digit", "(CI)I") | ("Character", "digit", "(II)I") => {
+            let radix = i(1);
+            let cp = if sig == "(CI)I" {
+                i(0) as u16 as u32
+            } else {
+                i(0) as u32
+            };
+            let d_out = if (2..=36).contains(&radix) {
+                char::from_u32(cp)
+                    .and_then(|c| c.to_digit(radix as u32))
+                    .map_or(-1, |x| x as i32)
+            } else {
+                -1
+            };
+            Value::Int(d_out)
+        }
         ("Character", "getType", "(I)I") | ("Character", "getType", "(C)I") => {
             Value::Int(char_type(ch(0)))
         }
@@ -483,28 +502,40 @@ pub(crate) fn static_intrinsic(
         }
         ("Character", "codePointAt", "(Ljava/lang/CharSequence;I)I")
         | ("Character", "codePointBefore", "(Ljava/lang/CharSequence;I)I") => {
-            let Some(Value::Obj(r)) = args.first() else {
-                return Ok(None);
+            let r = match args.first() {
+                Some(Value::Obj(r)) => *r,
+                None | Some(Value::Null) | Some(Value::Int(0)) => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "seq == null",
+                    )));
+                }
+                _ => return Ok(None),
             };
-            let text: Vec<u16> = match vm.heap.as_str(*r) {
+            let text: Vec<u16> = match vm.heap.as_str(r) {
                 Ok(t) => t.encode_utf16().collect(),
-                Err(_) => crate::intrinsics::object_to_string(vm, *r)?
+                Err(_) => crate::intrinsics::object_to_string(vm, r)?
                     .encode_utf16()
                     .collect(),
             };
             let idx = i(1);
-            let (start, valid) = if name == "codePointAt" {
-                (idx, idx >= 0 && (idx as usize) < text.len())
+            let mut p = if name == "codePointAt" {
+                if idx < 0 || (idx as usize) >= text.len() {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/StringIndexOutOfBoundsException;",
+                        format!("index {idx}"),
+                    )));
+                }
+                idx as usize
             } else {
-                (idx - 1, idx >= 1 && (idx as usize) <= text.len())
+                if idx < 1 || (idx as usize) > text.len() {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/StringIndexOutOfBoundsException;",
+                        format!("index {idx}"),
+                    )));
+                }
+                (idx as usize) - 1
             };
-            if !valid {
-                return Err(VmExit::Exception(Throwable::new(
-                    "Ljava/lang/StringIndexOutOfBoundsException;",
-                    format!("index {idx}"),
-                )));
-            }
-            let mut p = start as usize;
             if name == "codePointBefore"
                 && p > 0
                 && (0xDC00..=0xDFFF).contains(&text[p])
@@ -519,30 +550,62 @@ pub(crate) fn static_intrinsic(
             Value::Int(cp)
         }
         ("Character", "toChars", "(I[CI)I") => {
-            let units: Vec<u16> = ch(0)
-                .map(|c| {
-                    let mut buf = [0u16; 2];
-                    c.encode_utf16(&mut buf).to_vec()
-                })
-                .unwrap_or_else(|| vec![i(0) as u16]);
-            let Some(Value::Obj(arr)) = args.get(1) else {
-                return Ok(None);
-            };
-            let at = i(2) as usize;
-            let elems = vm
-                .heap
-                .array_elems_mut(*arr)
-                .map_err(|e| VmExit::from(crate::err::vm_error("VM_TYPE_ERROR", e)))?;
-            if at + units.len() > elems.len() {
+            let cp = i(0);
+            if !(0..=0x10_FFFF).contains(&cp) {
                 return Err(VmExit::Exception(Throwable::new(
-                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
-                    format!("{at}"),
+                    "Ljava/lang/IllegalArgumentException;",
+                    format!("Not a valid Unicode code point: 0x{cp:X}"),
                 )));
             }
-            for (k, u) in units.iter().enumerate() {
+            let (units, unit_len): ([u16; 2], usize) = if cp < 0x10000 {
+                ([cp as u16, 0], 1)
+            } else {
+                let u = (cp - 0x10000) as u32;
+                (
+                    [0xD800 + ((u >> 10) as u16), 0xDC00 + ((u & 0x3FF) as u16)],
+                    2,
+                )
+            };
+            let arr = match args.get(1) {
+                Some(Value::Obj(arr)) => *arr,
+                None | Some(Value::Null) | Some(Value::Int(0)) => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "dst == null",
+                    )));
+                }
+                _ => return Ok(None),
+            };
+            let desc = vm
+                .heap
+                .class_of(arr)
+                .map_err(|e| VmExit::from(crate::err::vm_error("VM_TYPE_ERROR", e)))?;
+            if desc != "[C" {
+                return Err(crate::err::vm_error(
+                    "VM_TYPE_ERROR",
+                    format!("Character.toChars expected [C, got {desc}"),
+                )
+                .into());
+            }
+            let dst_idx = i(2);
+            let elems = vm
+                .heap
+                .array_elems_mut(arr)
+                .map_err(|e| VmExit::from(crate::err::vm_error("VM_TYPE_ERROR", e)))?;
+            if dst_idx < 0
+                || (dst_idx as usize) > elems.len()
+                || unit_len > elems.len() - (dst_idx as usize)
+            {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    format!("dstIndex={dst_idx} length={}", elems.len()),
+                )));
+            }
+            let at = dst_idx as usize;
+            for (k, u) in units[..unit_len].iter().enumerate() {
                 elems[at + k] = Value::Int(*u as i32);
             }
-            Value::Int(units.len() as i32)
+            Value::Int(unit_len as i32)
         }
         // ── Math / StrictMath ──
         ("Math" | "StrictMath", op, "(D)D") => {
@@ -583,8 +646,19 @@ pub(crate) fn static_intrinsic(
                     }
                 }
                 "ulp" => {
-                    let next = f64::from_bits(x.abs().to_bits() + 1);
-                    next - x.abs()
+                    if x.is_nan() {
+                        f64::NAN
+                    } else if x.is_infinite() {
+                        f64::INFINITY
+                    } else {
+                        let ax = x.abs();
+                        if ax == f64::MAX {
+                            f64::from_bits(0x7ca0_0000_0000_0000)
+                        } else {
+                            let next = f64::from_bits(ax.to_bits() + 1);
+                            next - ax
+                        }
+                    }
                 }
                 _ => return Ok(None),
             })
@@ -595,6 +669,22 @@ pub(crate) fn static_intrinsic(
                 x
             } else {
                 x.signum()
+            })
+        }
+        ("Math" | "StrictMath", "ulp", "(F)F") => {
+            let x = f(0);
+            Value::Float(if x.is_nan() {
+                f32::NAN
+            } else if x.is_infinite() {
+                f32::INFINITY
+            } else {
+                let ax = x.abs();
+                if ax == f32::MAX {
+                    f32::from_bits(0x7380_0000)
+                } else {
+                    let next = f32::from_bits(ax.to_bits() + 1);
+                    next - ax
+                }
             })
         }
         ("Math" | "StrictMath", "copySign", "(DD)D") => Value::Double(d(0).copysign(d(1))),
@@ -609,14 +699,20 @@ pub(crate) fn static_intrinsic(
 
 pub(crate) fn parse_float(t: &str) -> Result<f64, VmExit> {
     let s = t.trim_matches(|c: char| c <= ' ');
-    let core = s.trim_end_matches(['f', 'F', 'd', 'D']);
-    match core {
+    match s {
         "NaN" | "+NaN" | "-NaN" => return Ok(f64::NAN),
         "Infinity" | "+Infinity" => return Ok(f64::INFINITY),
         "-Infinity" => return Ok(f64::NEG_INFINITY),
         _ => {}
     }
-    if core.is_empty() || core.contains(|c: char| c.is_ascii_alphabetic() && c != 'e' && c != 'E') {
+    let core = s.strip_suffix(['f', 'F', 'd', 'D']).unwrap_or(s);
+    if core.is_empty()
+        || matches!(
+            core,
+            "NaN" | "+NaN" | "-NaN" | "Infinity" | "+Infinity" | "-Infinity"
+        )
+        || core.contains(|c: char| c.is_ascii_alphabetic() && c != 'e' && c != 'E')
+    {
         return Err(nfe(t));
     }
     core.parse::<f64>().map_err(|_| nfe(t))
