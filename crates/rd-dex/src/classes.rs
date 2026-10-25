@@ -3,7 +3,7 @@
 use crate::error::{RdError, RdResult};
 use crate::fields::{self, EncodedField};
 use crate::methods::EncodedMethod;
-use crate::read::{self, Reader};
+use crate::read::Reader;
 
 /// class_def_item (20 bytes fixos).
 #[derive(Debug, Clone, Copy)]
@@ -26,38 +26,46 @@ pub struct ClassDef {
     pub static_values_off: u32,
 }
 
-pub fn parse_class_defs(data: &[u8], count: u32, off: u32) -> RdResult<Vec<ClassDef>> {
+pub(crate) fn validate_class_defs_window(data: &[u8], count: u32, off: u32) -> RdResult<&[u8]> {
     let count = count as usize;
     let off = off as usize;
-    if count.checked_mul(32).is_none() {
-        return Err(RdError::parse("classes: class_defs_size overflow"));
-    }
+    let byte_len = count
+        .checked_mul(32)
+        .ok_or_else(|| RdError::parse("classes: class_defs_size overflow"))?;
     let window = data
         .get(off..)
         .ok_or_else(|| RdError::parse(format!("classes: table @ {off} além dos dados")))?;
-    if count > window.len() / 32 {
-        return Err(RdError::parse(format!(
+    window.get(..byte_len).ok_or_else(|| {
+        RdError::parse(format!(
             "classes: {} defs não cabem em {} bytes",
             count,
             window.len()
-        )));
+        ))
+    })
+}
+
+#[inline]
+pub(crate) fn decode_class_def(index: usize, b: &[u8]) -> ClassDef {
+    ClassDef {
+        index,
+        class_idx: u32::from_le_bytes([b[0], b[1], b[2], b[3]]),
+        access_flags: u32::from_le_bytes([b[4], b[5], b[6], b[7]]),
+        superclass_idx: u32::from_le_bytes([b[8], b[9], b[10], b[11]]),
+        interfaces_off: u32::from_le_bytes([b[12], b[13], b[14], b[15]]),
+        source_file_idx: u32::from_le_bytes([b[16], b[17], b[18], b[19]]),
+        annotations_off: u32::from_le_bytes([b[20], b[21], b[22], b[23]]),
+        class_data_off: u32::from_le_bytes([b[24], b[25], b[26], b[27]]),
+        static_values_off: u32::from_le_bytes([b[28], b[29], b[30], b[31]]),
     }
-    let mut out = Vec::with_capacity(count);
-    for i in 0..count {
-        let base = i * 32;
-        out.push(ClassDef {
-            index: i,
-            class_idx: read::u32_at(window, base)?,
-            access_flags: read::u32_at(window, base + 4)?,
-            superclass_idx: read::u32_at(window, base + 8)?,
-            interfaces_off: read::u32_at(window, base + 12)?,
-            source_file_idx: read::u32_at(window, base + 16)?,
-            annotations_off: read::u32_at(window, base + 20)?,
-            class_data_off: read::u32_at(window, base + 24)?,
-            static_values_off: read::u32_at(window, base + 28)?,
-        });
-    }
-    Ok(out)
+}
+
+pub fn parse_class_defs(data: &[u8], count: u32, off: u32) -> RdResult<Vec<ClassDef>> {
+    let window = validate_class_defs_window(data, count, off)?;
+    Ok(window
+        .chunks_exact(32)
+        .enumerate()
+        .map(|(i, b)| decode_class_def(i, b))
+        .collect())
 }
 
 /// class_data_item — membros da classe em uleb128 com diffs acumulados.

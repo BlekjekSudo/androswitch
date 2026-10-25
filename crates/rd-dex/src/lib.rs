@@ -18,6 +18,7 @@ pub mod dex;
 pub mod disasm;
 pub mod error;
 pub mod fields;
+pub mod lazy;
 pub mod methods;
 pub mod mutf8;
 pub mod opcode;
@@ -28,6 +29,7 @@ pub mod types;
 
 pub use dex::{Dex, Header, MapItem, MapType};
 pub use error::{RdError, RdResult};
+pub use lazy::{DexBacking, LazyDex, RawClassIndex};
 
 pub const MODULE_ID: &str = "rd-dex";
 /// Milestone em que este módulo entrou de verdade (spec PARTE 4).

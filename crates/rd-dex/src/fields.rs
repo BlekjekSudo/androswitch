@@ -1,7 +1,7 @@
 //! field_id_item + encoded_field — referências de campo e entradas de class_data.
 
 use crate::error::{RdError, RdResult};
-use crate::read::{self, Reader};
+use crate::read::Reader;
 
 #[derive(Debug, Clone, Copy)]
 pub struct FieldId {
@@ -13,32 +13,36 @@ pub struct FieldId {
     pub name_idx: u32,
 }
 
-pub fn parse_field_ids(data: &[u8], count: u32, off: u32) -> RdResult<Vec<FieldId>> {
+pub(crate) fn validate_field_window(data: &[u8], count: u32, off: u32) -> RdResult<&[u8]> {
     let count = count as usize;
     let off = off as usize;
-    if count.checked_mul(8).is_none() {
-        return Err(RdError::parse("fields: field_ids_size overflow"));
-    }
+    let byte_len = count
+        .checked_mul(8)
+        .ok_or_else(|| RdError::parse("fields: field_ids_size overflow"))?;
     let window = data
         .get(off..)
         .ok_or_else(|| RdError::parse(format!("fields: table @ {off} além dos dados")))?;
-    if count > window.len() / 8 {
-        return Err(RdError::parse(format!(
+    window.get(..byte_len).ok_or_else(|| {
+        RdError::parse(format!(
             "fields: {} ids não cabem em {} bytes",
             count,
             window.len()
-        )));
+        ))
+    })
+}
+
+#[inline]
+pub(crate) fn decode_field_id(b: &[u8]) -> FieldId {
+    FieldId {
+        class_idx: u16::from_le_bytes([b[0], b[1]]),
+        type_idx: u16::from_le_bytes([b[2], b[3]]),
+        name_idx: u32::from_le_bytes([b[4], b[5], b[6], b[7]]),
     }
-    let mut out = Vec::with_capacity(count);
-    for i in 0..count {
-        let base = i * 8;
-        out.push(FieldId {
-            class_idx: read::u16_at(window, base)?,
-            type_idx: read::u16_at(window, base + 2)?,
-            name_idx: read::u32_at(window, base + 4)?,
-        });
-    }
-    Ok(out)
+}
+
+pub fn parse_field_ids(data: &[u8], count: u32, off: u32) -> RdResult<Vec<FieldId>> {
+    let window = validate_field_window(data, count, off)?;
+    Ok(window.chunks_exact(8).map(decode_field_id).collect())
 }
 
 /// encoded_field (class_data): field_idx_diff uleb + access_flags uleb.

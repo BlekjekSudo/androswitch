@@ -2,7 +2,6 @@
 //! Cada entrada é um índice para a tabela de strings; validação básica de forma.
 
 use crate::error::{RdError, RdResult};
-use crate::read;
 
 /// Tabela de tipos: cada item é um string_idx.
 #[derive(Debug, Clone, Default)]
@@ -11,26 +10,30 @@ pub struct TypeIds {
 }
 
 impl TypeIds {
-    pub fn parse(data: &[u8], count: u32, off: u32) -> RdResult<TypeIds> {
+    pub(crate) fn validate_window(data: &[u8], count: u32, off: u32) -> RdResult<&[u8]> {
         let count = count as usize;
         let off = off as usize;
-        if count.checked_mul(4).is_none() {
-            return Err(RdError::parse("types: type_ids_size overflow"));
-        }
+        let byte_len = count
+            .checked_mul(4)
+            .ok_or_else(|| RdError::parse("types: type_ids_size overflow"))?;
         let window = data
             .get(off..)
             .ok_or_else(|| RdError::parse(format!("types: table @ {off} além dos dados")))?;
-        if count > window.len() / 4 {
-            return Err(RdError::parse(format!(
+        window.get(..byte_len).ok_or_else(|| {
+            RdError::parse(format!(
                 "types: {} ids não cabem em {} bytes",
                 count,
                 window.len()
-            )));
-        }
-        let mut string_idx = Vec::with_capacity(count);
-        for i in 0..count {
-            string_idx.push(read::u32_at(window, i * 4)?);
-        }
+            ))
+        })
+    }
+
+    pub fn parse(data: &[u8], count: u32, off: u32) -> RdResult<TypeIds> {
+        let window = Self::validate_window(data, count, off)?;
+        let string_idx = window
+            .chunks_exact(4)
+            .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+            .collect();
         Ok(TypeIds { string_idx })
     }
 
