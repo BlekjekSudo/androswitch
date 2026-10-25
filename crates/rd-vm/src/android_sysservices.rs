@@ -1216,7 +1216,8 @@ fn interpolator_instance(
             }
         }
         "Landroid/view/animation/AccelerateDecelerateInterpolator;" => {
-            (((input as f64 + 1.0) * std::f64::consts::PI).cos() / 2.0) as f32 + 0.5
+            // AOSP computes (input + 1) in float before widening.
+            (f64::from(input + 1.0) * std::f64::consts::PI).cos() as f32 / 2.0 + 0.5
         }
         "Landroid/view/animation/AnticipateInterpolator;" => {
             let tension = ffield(vm, recv, "mTension", 2.0);

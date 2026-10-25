@@ -494,6 +494,18 @@ fn view_animation_interpolators_match_aosp_formulas() {
         ),
         1.0,
     );
+
+    // Deep audit: AccelerateDecelerate computes (input + 1) in float
+    // before widening for cos; one ULP above 0.25 the float sum
+    // rounds to exactly 1.25, changing the last bits of the result.
+    let exact = interpolation(
+        &mut engine,
+        "Landroid/view/animation/AccelerateDecelerateInterpolator;",
+        "()V",
+        &[],
+        f32::from_bits(0x3e80_0001),
+    );
+    assert_eq!(exact.to_bits(), 0x3e15_f61a);
 }
 
 fn account(engine: &mut Engine, name: &str, ty: &str) -> ObjRef {
