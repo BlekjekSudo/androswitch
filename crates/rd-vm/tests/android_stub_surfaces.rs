@@ -16259,17 +16259,25 @@ fn identity_without_credstore_is_guest_visible() {
         );
     }
     // AOSP looks up the missing binder before it ever dereferences the
-    // Context, so even a null Context returns the documented null.
-    assert_eq!(
-        call_static(
-            &mut engine,
-            P36A_IDENTITY_STORE,
-            "getInstance",
-            "(Landroid/content/Context;)Landroid/security/identity/IdentityCredentialStore;",
-            &[Value::Null],
-        ),
-        Value::Null
-    );
+    // Context, so even a null Context returns the documented null. Both
+    // factories and the Credstore subclass entry points share that path.
+    for class in [
+        P36A_IDENTITY_STORE,
+        "Landroid/security/identity/CredstoreIdentityCredentialStore;",
+    ] {
+        for method in ["getInstance", "getDirectAccessInstance"] {
+            assert_eq!(
+                call_static(
+                    &mut engine,
+                    class,
+                    method,
+                    "(Landroid/content/Context;)Landroid/security/identity/IdentityCredentialStore;",
+                    &[Value::Null],
+                ),
+                Value::Null
+            );
+        }
+    }
 
     // The public base-class presentation-session implementation is the
     // documented UnsupportedOperationException.
