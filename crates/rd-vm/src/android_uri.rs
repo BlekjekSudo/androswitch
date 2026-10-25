@@ -121,10 +121,7 @@ const UNRESERVED: &str = "_-!.~'()*";
 pub(crate) fn encode(s: &str, allow: &str) -> String {
     let mut out = String::new();
     for ch in s.chars() {
-        if ch.is_ascii_alphanumeric()
-            || UNRESERVED.contains(ch)
-            || (ch.is_ascii() && allow.contains(ch))
-        {
+        if ch.is_ascii_alphanumeric() || UNRESERVED.contains(ch) || allow.contains(ch) {
             out.push(ch);
         } else {
             let mut b = [0u8; 4];
@@ -136,6 +133,15 @@ pub(crate) fn encode(s: &str, allow: &str) -> String {
     out
 }
 
+fn hex_nibble(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
+
 /// `Uri.decode` (`plus` → also turn `+` into space, as for query values).
 pub(crate) fn decode(s: &str, plus: bool) -> String {
     let b = s.as_bytes();
@@ -143,13 +149,13 @@ pub(crate) fn decode(s: &str, plus: bool) -> String {
     let mut i = 0;
     while i < b.len() {
         match b[i] {
-            b'%' if i + 2 < b.len() => match u8::from_str_radix(&s[i + 1..i + 3], 16) {
-                Ok(v) => {
-                    out.push(v);
+            b'%' if i + 2 < b.len() => match (hex_nibble(b[i + 1]), hex_nibble(b[i + 2])) {
+                (Some(hi), Some(lo)) => {
+                    out.push((hi << 4) | lo);
                     i += 3;
                     continue;
                 }
-                Err(_) => out.push(b'%'),
+                _ => out.push(b'%'),
             },
             b'+' if plus => out.push(b' '),
             c => out.push(c),
@@ -197,6 +203,25 @@ pub(crate) fn new_uri(vm: &mut Engine, s: String) -> Result<Value, VmExit> {
         .map_err(crate::err::oom_throwable)?;
     vm.fw.m8.uris.insert(r, s);
     Ok(Value::Obj(r))
+}
+
+fn builder_from_parts(p: Parts) -> B {
+    B {
+        scheme: p.scheme,
+        opaque: p.opaque.then(|| p.ssp.clone()),
+        authority: p.authority,
+        path: p.path,
+        query: p.query,
+        fragment: p.fragment,
+    }
+}
+
+fn append_encoded_segment(b: &mut B, seg: &str) {
+    if !b.path.ends_with('/') {
+        b.path.push('/');
+    }
+    b.path.push_str(seg.strip_prefix('/').unwrap_or(seg));
+    b.opaque = None;
 }
 
 fn build_string(b: &B) -> String {
@@ -263,8 +288,18 @@ pub fn static_intrinsic(
             new_uri(vm, format!("file://{}", encode(&path, "/")))?
         }
         "fromParts" => {
-            let scheme = sval(vm, args.first()).unwrap_or_default();
-            let ssp = sval(vm, args.get(1)).unwrap_or_default();
+            let Some(scheme) = sval(vm, args.first()) else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "scheme",
+                )));
+            };
+            let Some(ssp) = sval(vm, args.get(1)) else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "ssp",
+                )));
+            };
             let mut s = format!("{scheme}:{}", encode(&ssp, ""));
             if let Some(f) = sval(vm, args.get(2)) {
                 s.push('#');
@@ -284,13 +319,27 @@ pub fn static_intrinsic(
             None => Value::Null,
         },
         "withAppendedPath" => {
-            let base = match args.first() {
-                Some(Value::Obj(u)) => vm.fw.m8.uris.get(u).cloned().unwrap_or_default(),
-                _ => String::new(),
+            let Some(Value::Obj(u)) = args.first() else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "baseUri",
+                )));
             };
-            let seg = sval(vm, args.get(1)).unwrap_or_default();
-            let sep = if base.ends_with('/') { "" } else { "/" };
-            new_uri(vm, format!("{base}{sep}{seg}"))?
+            let Some(base) = vm.fw.m8.uris.get(u).cloned() else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "baseUri",
+                )));
+            };
+            let Some(seg) = sval(vm, args.get(1)) else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "pathSegment",
+                )));
+            };
+            let mut b = builder_from_parts(parse_parts(&base));
+            append_encoded_segment(&mut b, &seg);
+            new_uri(vm, build_string(&b))?
         }
         _ => return Ok(None),
     }))
@@ -456,14 +505,7 @@ pub fn instance_intrinsic(
             _ => Value::Obj(recv),
         },
         "buildUpon" => {
-            let b = B {
-                scheme: p.scheme,
-                opaque: p.opaque.then(|| p.ssp.clone()),
-                authority: p.authority,
-                path: p.path,
-                query: p.query,
-                fragment: p.fragment,
-            };
+            let b = builder_from_parts(p);
             let r = vm
                 .heap
                 .alloc_instance(BUILDER.to_string(), Vec::new())
@@ -540,17 +582,18 @@ fn builder(
             Value::Null
         }
         "appendPath" | "appendEncodedPath" => {
-            let seg = a0.unwrap_or_default();
+            let Some(seg) = a0 else {
+                return Err(VmExit::Exception(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "newSegment",
+                )));
+            };
             let seg = if name == "appendPath" {
                 encode(&seg, "")
             } else {
                 seg
             };
-            if !b.path.ends_with('/') {
-                b.path.push('/');
-            }
-            b.path.push_str(seg.trim_start_matches('/'));
-            b.opaque = None;
+            append_encoded_segment(&mut b, &seg);
             Value::Null
         }
         "query" => {

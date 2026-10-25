@@ -48,13 +48,15 @@ pub const BLOCK_ID_V3_1: u32 = 0x3ba0_6f8c;
 
 #[inline]
 fn u32_at(d: &[u8], off: usize) -> Option<u32> {
-    d.get(off..off + 4)
+    let end = off.checked_add(4)?;
+    d.get(off..end)
         .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
 }
 
 #[inline]
 fn u64_at(d: &[u8], off: usize) -> Option<u64> {
-    d.get(off..off + 8).map(|b| {
+    let end = off.checked_add(8)?;
+    d.get(off..end).map(|b| {
         let mut a = [0u8; 8];
         a.copy_from_slice(b);
         u64::from_le_bytes(a)
@@ -69,20 +71,26 @@ pub fn detect(data: &[u8], cd_offset: u64, zip: &Zip) -> SigningInfo {
     };
 
     // bloco de assinatura termina exatamente onde o CD começa.
-    // issue #18: `cd_offset` vem do EOCD (campo do atacante) — bound-check
-    // obrigatório antes de qualquer slice; o sentinela ZIP64 (0xFFFFFFFF)
-    // nunca aponta para um bloco real (o Zip::parse resolve ZIP64 e expõe o
-    // offset verdadeiro via `cd_offset()`)
-    if cd_offset >= 32 && cd_offset != 0xFFFF_FFFF && cd_offset <= data.len() as u64 {
-        let cd = cd_offset as usize;
-        if &data[cd - 16..cd] == APK_SIG_BLOCK_MAGIC {
-            // issue #18: block_size lido do arquivo — toda aritmética checked
-            // (a soma não-checada `block_size + 8` envolvia em release)
-            if let Some(block_size) = u64_at(data, cd - 24).map(|v| v as usize) {
-                if block_size.checked_add(8).is_some_and(|v| v <= cd) {
-                    let block_start = cd - block_size - 8;
-                    if block_start + 8 <= data.len() {
-                        walk_pairs(data, block_start + 8, cd - 24, &mut info);
+    // issue #18 / #264: `cd_offset` e `block_size` vêm do arquivo — usar
+    // `usize::try_from` (sem truncar `u64` em alvos 32-bit), exigir
+    // `block_size >= 24` e igualdade entre os campos `size_of_block` inicial
+    // e final conforme a especificação AOSP (`ApkSigningBlockUtils`).
+    if cd_offset >= 32 && cd_offset != 0xFFFF_FFFF {
+        if let Ok(cd) = usize::try_from(cd_offset) {
+            if cd <= data.len() && &data[cd - 16..cd] == APK_SIG_BLOCK_MAGIC {
+                if let Some(block_size_u64) = u64_at(data, cd - 24) {
+                    if block_size_u64 >= 24 {
+                        if let Some(total_size) = usize::try_from(block_size_u64)
+                            .ok()
+                            .and_then(|bs| bs.checked_add(8))
+                        {
+                            if total_size <= cd {
+                                let block_start = cd - total_size;
+                                if u64_at(data, block_start) == Some(block_size_u64) {
+                                    walk_pairs(data, block_start + 8, cd - 24, &mut info);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -92,9 +100,9 @@ pub fn detect(data: &[u8], cd_offset: u64, zip: &Zip) -> SigningInfo {
 }
 
 fn walk_pairs(data: &[u8], mut p: usize, end: usize, info: &mut SigningInfo) {
-    // issue #18: aritmética checked em toda etapa — pair_len do atacante
-    // (2^64-8) envolvia em release e pendurava o processo em loop infinito;
-    // em debug pânica. Par malformado apenas encerra a varredura.
+    // issue #18 / #264: aritmética checked em toda etapa; `end = cd - 24` é o
+    // fim exato da sequência de pares ID-valor (antes do `size_of_block` do
+    // rodapé), portanto `pair_end` não pode ultrapassar `end`.
     while let Some(q) = p.checked_add(12) {
         if q > end || q > data.len() {
             break;
@@ -103,16 +111,18 @@ fn walk_pairs(data: &[u8], mut p: usize, end: usize, info: &mut SigningInfo) {
             break;
         };
         // fim do par: p + 8 + pair_len (u64 para não truncar/envolver)
-        let Some(pair_end) = (p as u64)
+        let Some(pair_end_u64) = (p as u64)
             .checked_add(8)
             .and_then(|v| v.checked_add(pair_len))
         else {
             break;
         };
-        if pair_len < 4 || pair_end > (end as u64).saturating_add(8) || pair_end > data.len() as u64
-        {
+        if pair_len < 4 || pair_end_u64 > end as u64 || pair_end_u64 > data.len() as u64 {
             break; // par malformado: não travamos a detecção
         }
+        let Ok(pair_end) = usize::try_from(pair_end_u64) else {
+            break;
+        };
         let Some(id) = u32_at(data, p + 8) else { break };
         match id {
             BLOCK_ID_V2 => info.v2 = true,
@@ -120,7 +130,7 @@ fn walk_pairs(data: &[u8], mut p: usize, end: usize, info: &mut SigningInfo) {
             BLOCK_ID_V3_1 => info.v3_1 = true,
             _ => {}
         }
-        p = pair_end as usize;
+        p = pair_end;
     }
 }
 
