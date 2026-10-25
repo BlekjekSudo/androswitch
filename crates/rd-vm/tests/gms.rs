@@ -2198,3 +2198,63 @@ fn billing_product_details_modern_path() {
     assert_eq!(svm!(e, ci!(e, "Lcom/android/billingclient/api/ProductDetails$OneTimePurchaseOfferDetails;",
         "getFormattedPrice", "()Ljava/lang/String;", offer, []).unwrap()), "R$ 9,99");
 }
+
+// ── Ponta a ponta: bytecode DEX chama o shim pelo dispatch real ─────────
+#[test]
+fn dex_bytecode_calls_gms_through_full_dispatch() {
+    let mut b = DexBuilder::new();
+    let probe = b.class("LProbe;", "Ljava/lang/Object;");
+    b.static_field(probe, "result", "I", common::SVal::Int(-1));
+    b.static_field(probe, "code", "I", common::SVal::Int(-1));
+    let f_result = b.field_idx("LProbe;", "I", "result");
+    let f_code = b.field_idx("LProbe;", "I", "code");
+
+    let p_void = b.proto_idx("V", vec![]);
+    let p_messaging = b.proto_idx("Lcom/google/firebase/messaging/FirebaseMessaging;", vec![]);
+    let p_task = b.proto_idx("Lcom/google/android/gms/tasks/Task;", vec![]);
+    let p_bool = b.proto_idx("Z", vec![]);
+    let p_avail = b.proto_idx("Lcom/google/android/gms/common/GoogleApiAvailability;", vec![]);
+    let p_avail_check = b.proto_idx("I", vec!["Landroid/content/Context;".to_string()]);
+
+    let m_fm = b.method_idx("Lcom/google/firebase/messaging/FirebaseMessaging;", p_messaging, "getInstance");
+    let m_token = b.method_idx("Lcom/google/firebase/messaging/FirebaseMessaging;", p_task, "getToken");
+    let m_ok = b.method_idx("Lcom/google/android/gms/tasks/Task;", p_bool, "isSuccessful");
+    let m_ga = b.method_idx("Lcom/google/android/gms/common/GoogleApiAvailability;", p_avail, "getInstance");
+    let m_check = b.method_idx(
+        "Lcom/google/android/gms/common/GoogleApiAvailability;", p_avail_check,
+        "isGooglePlayServicesAvailable");
+
+    b.direct(probe, "run", "V", vec![], ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(4, 0, 2, {
+            let mut u = op35c(0x71, 0, m_fm, [0, 0, 0, 0, 0]); // invoke-static getInstance
+            u.extend(op11x(0x0C, 0)); // move-result-object v0
+            u.extend(op35c(0x6E, 1, m_token, [0, 0, 0, 0, 0])); // invoke-virtual getToken
+            u.extend(op11x(0x0C, 1)); // move-result-object v1
+            u.extend(op35c(0x6E, 1, m_ok, [1, 0, 0, 0, 0])); // invoke-virtual isSuccessful
+            u.extend(op11x(0x0A, 2)); // move-result v2
+            u.extend(op21c(0x67, 2, f_result)); // sput v2, result
+            u.extend(op35c(0x71, 0, m_ga, [0, 0, 0, 0, 0])); // invoke-static getInstance
+            u.extend(op11x(0x0C, 0)); // move-result-object v0
+            u.extend(op11n(0x12, 1, 0)); // const/4 v1, 0 (Context null)
+            u.extend(op35c(0x6E, 2, m_check, [0, 1, 0, 0, 0])); // invoke-virtual check
+            u.extend(op11x(0x0A, 2)); // move-result v2
+            u.extend(op21c(0x67, 2, f_code)); // sput v2, code
+            u.extend(op10x(0x0E)); // return-void
+            u
+        })));
+    let _ = p_void;
+
+    let mut e = engine_of(&b);
+    e.invoke_static("LProbe;", "run", "()V", &[]).expect("Probe.run executa");
+    let get = |e: &Engine, name: &str| match e.statics.get(&("LProbe;".into(), name.into())) {
+        Some(Value::Int(n)) => *n,
+        other => panic!("static {name}: {other:?}"),
+    };
+    assert_eq!(get(&e, "result"), 1, "Task do token concluiu com sucesso via DEX");
+    assert_eq!(get(&e, "code"), 0, "disponibilidade SUCCESS via DEX");
+
+    // Programado pelo hospedeiro, o mesmo bytecode vê SERVICE_MISSING.
+    e.gms_set_availability(1);
+    e.invoke_static("LProbe;", "run", "()V", &[]).expect("Probe.run outra vez");
+    assert_eq!(get(&e, "code"), 1);
+}
