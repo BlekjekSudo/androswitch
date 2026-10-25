@@ -41971,6 +41971,24 @@ fn p36b_nfc_adapter_static(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if (name, sig) == ("getDefaultAdapter", "()Landroid/nfc/NfcAdapter;") {
+        // The deprecated no-arg overload delegates to getNfcAdapter(null),
+        // whose very first branch returns a cached adapter constructed
+        // with a null Context -- on every device, before any NFC feature
+        // or service checks. It is therefore never null itself.
+        let key = (
+            P36B_NFC_ADAPTER.to_string(),
+            "sNullContextNfcAdapter".to_string(),
+        );
+        if let Some(v) = vm.statics.get(&key) {
+            return Ok(Some(v.clone()));
+        }
+        let adapter = alloc_obj(vm, P36B_NFC_ADAPTER, Vec::new())?;
+        put(vm, adapter, "mContext", Value::Null)?;
+        let v = Value::Obj(adapter);
+        vm.statics.insert(key, v.clone());
+        return Ok(Some(v));
+    }
     if (name, sig)
         != (
             "getDefaultAdapter",

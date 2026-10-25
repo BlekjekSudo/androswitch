@@ -16545,6 +16545,38 @@ fn nfc_without_nfc_feature_or_service_is_guest_visible() {
         ),
         "Ljava/lang/NullPointerException;",
     );
+
+    // The deprecated no-arg overload takes getNfcAdapter(null)'s first
+    // branch: a cached null-context adapter even with no NFC hardware.
+    let legacy = call_static(
+        &mut engine,
+        P36B_NFC_ADAPTER,
+        "getDefaultAdapter",
+        "()Landroid/nfc/NfcAdapter;",
+        &[],
+    );
+    let legacy_adapter = object(legacy.clone());
+    assert_eq!(
+        call(
+            &mut engine,
+            legacy_adapter,
+            "getContext",
+            "()Landroid/content/Context;",
+            &[],
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36B_NFC_ADAPTER,
+            "getDefaultAdapter",
+            "()Landroid/nfc/NfcAdapter;",
+            &[],
+        ),
+        legacy,
+        "the null-context adapter is a process singleton in AOSP"
+    );
 }
 
 // ---- Appendix C Batch 36-C: android.net.nsd + android.net.sip ----
