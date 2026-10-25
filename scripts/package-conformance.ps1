@@ -21,7 +21,7 @@ New-Item -ItemType Directory -Force "$folder/docs","$folder/evidence","$folder/l
 Copy-Item "$repo/docs/CONFORMANCE_SUITE.md" "$folder/docs/CONFORMANCE_SUITE.md"
 New-Item -ItemType Directory -Force "$folder/docs/images","$folder/reports"|Out-Null
 Copy-Item -LiteralPath "$repo/docs/images/conformance-sdk.png" -Destination "$folder/docs/images/conformance-sdk.png"
-foreach($name in @('conformance-mesa-20261025.json','m9-mesa-independent-apps-20261025.json')){
+foreach($name in @('conformance-mesa-20261025.json','conformance-hardware-20261025.json','m9-mesa-independent-apps-20261025.json')){
     $reportPath=Join-Path $repo "reports/$name"
     if(Test-Path -LiteralPath $reportPath){Copy-Item -LiteralPath $reportPath -Destination "$folder/reports/$name"}
 }
@@ -66,20 +66,26 @@ Build Android adalah identitas kompatibilitas virtual; clock/core Horizon dan
 identitas GPU dicatat lewat query terpisah. Dukungan yang belum tersedia tetap
 terlihat dalam JSON. Ini development test bundle, bukan kelulusan CTS, seluruh
 Android, game tertentu, atau rilis M9 selesai. Lihat evidence untuk hasil
-emulator; build ini belum diverifikasi pada Switch fisik atau Android referensi.
+emulator. __HARDWARE_STATUS__ Android referensi belum diuji.
 
 AndroSwitch dibangun di atas RustyDroid oleh nadabgfccvd dan kontributornya:
 https://github.com/nadabgfccvd/RustyDroid
 Riwayat, atribusi, dan lisensi dipertahankan. Lihat CREDITS.md dan NOTICE.md.
 Source runtime dan suite: https://github.com/BlekjekSudo/androswitch
 '@|Set-Content "$folder/MULAI-DI-SINI.md" -Encoding utf8NoBOM
+$hardwarePath=Join-Path $repo 'reports/conformance-hardware-20261025.json'
+$hardware=if(Test-Path $hardwarePath){Get-Content $hardwarePath -Raw|ConvertFrom-Json}else{$null}
+$hardwareMatches=$hardware -and $hardware.status -ceq 'passed_user_reported' -and $hardware.reported_counts.PASS -eq $summary.total -and $hardware.package_context.expected_nro_sha256 -ceq $summary.nro_sha256 -and $hardware.package_context.expected_apk_sha256 -ceq $summary.apk_sha256 -and $hardware.package_context.expected_catalog_sha256 -ceq $summary.catalog_sha256
+$hardwareText=if($hardwareMatches){'Pengguna mengonfirmasi suite ini 219/219 PASS pada Switch fisik; laporan agregat dan identitas paket ada di reports/conformance-hardware-20261025.json. Raw journal perangkat belum diarsipkan.'}else{'Build ini belum memiliki hasil pengujian Switch fisik dengan identitas paket yang cocok.'}
+$startPath=Join-Path $folder 'MULAI-DI-SINI.md'
+[IO.File]::WriteAllText($startPath,([IO.File]::ReadAllText($startPath)).Replace('__HARDWARE_STATUS__',$hardwareText),[Text.UTF8Encoding]::new($false))
 & python -X utf8 "$PSScriptRoot/prepare-package-docs.py" $folder $build.source_commit
 if($LASTEXITCODE){throw 'Packaged documentation link preparation failed'}
 $manifest=@{
     schema_version=1;kind='development_conformance_bundle';total_cases=$summary.total;acceptance_passed=[bool]$summary.acceptance_passed;diagnostic=[bool]$Diagnostic
     source_commit=$build.source_commit;apk_source_commit=$apkBuild.source_commit;runtime_source_manifest_sha256=$build.source_manifest_sha256;upstream=@{project='RustyDroid';authors='nadabgfccvd and contributors';revision='6388281f66d254c8e01a0fdc7a5a9a30239bc762'}
     apk_sha256=$summary.apk_sha256;nro_sha256=$summary.nro_sha256;catalog_sha256=$summary.catalog_sha256
-    emulator_counts=$summary.counts;hardware='not_run';android_reference='not_run';m9_independent_game_gate='open'
+    emulator_counts=$summary.counts;emulator_acceptance_passed=[bool]$summary.acceptance_passed;hardware=if($hardwareMatches){$hardware.status}else{'not_run'};hardware_reported_counts=if($hardwareMatches){$hardware.reported_counts}else{$null};hardware_raw_journal_received=if($hardwareMatches){$hardware.verification_limits.raw_device_journal_received}else{$false};android_reference='not_run';m9_independent_game_gate='open'
     files=@(Get-ChildItem $folder -Recurse -File|ForEach-Object {@{path=[IO.Path]::GetRelativePath($folder,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}})
 }
 $manifest|ConvertTo-Json -Depth 15|Set-Content "$folder/package.json" -Encoding utf8NoBOM

@@ -58,8 +58,9 @@
         "status": "NOT_RUN"
       }
     ],
-    "remaining_reason": "Ryujinx PCV service lacks the read-only clock-rate command. Runtime uses real clkrst/PCV; physical Switch execution still required.",
-    "vulkan_scope": "Six loader/instance/physical-device/queue/memory/logical-device cases; no Android WSI or rendered Vulkan frame."
+    "remaining_reason": "These three clock observations remain NOT_RUN in Ryujinx because its PCV command is absent. The subsequent physical Switch run is separately user-reported 219/219 PASS.",
+    "vulkan_scope": "Six loader/instance/physical-device/queue/memory/logical-device cases; no Android WSI or rendered Vulkan frame.",
+    "acceptance_passed": false
   },
   "host": {
     "counts": {
@@ -96,21 +97,13 @@
     "global_toolchains_modified": false
   },
   "physical_switch": {
-    "status": "pending",
-    "remaining_clock_queries": [
-      {
-        "id": "host.cpu.clock_hz",
-        "status": "NOT_RUN"
-      },
-      {
-        "id": "host.gpu.clock_hz",
-        "status": "NOT_RUN"
-      },
-      {
-        "id": "host.memory.clock_hz",
-        "status": "NOT_RUN"
-      }
-    ],
+    "status": "passed_user_reported",
+    "reported_counts": {
+      "PASS": 219
+    },
+    "evidence": "reports/conformance-hardware-20261025.json",
+    "raw_device_journal_received": false,
+    "binary_identity_independently_verified": false,
     "bundle_contains_exclusion_files": false
   },
   "android_reference": "not_run",
@@ -1573,6 +1566,14 @@
     {
       "path": "target/evidence/conformance-mesa-acceptance-negative.log",
       "sha256": "425902f0198d896431278a320d5625e76a5587099dce1a58f29bb84330197eed"
+    },
+    {
+      "path": "reports/conformance-hardware-20261025.json",
+      "sha256": "5a523f14c235c012b76aacd0cd92b2aba77694709849f3583381ea93d141f948"
     }
-  ]
+  ],
+  "acceptance_evidence_type": "frozen_automated_emulator_journal",
+  "automatically_verified_219_case_journal": false,
+  "hardware_reported_passed": true,
+  "suite_target_status": "passed_user_reported_physical_switch"
 }

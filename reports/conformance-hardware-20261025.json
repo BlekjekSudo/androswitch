@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-25",
+  "evidence_type": "direct_user_report_of_physical_switch_execution",
+  "user_message": "aku udah etts di hardware siwtch sih pass 219/219",
+  "suite": "AndroSwitch Conformance",
+  "reported_total": 219,
+  "reported_counts": {
+    "PASS": 219
+  },
+  "status": "passed_user_reported",
+  "sensor_tests": false,
+  "runtime_implementation_commit": "0289bf71425776dc85317f0f707526c40ae363a1",
+  "package_context": {
+    "description": "Bundle linked in this chat before the user confirmed the result; post-commit rebuild has the identical NRO hash",
+    "archive": "androswitch-conformance-20261025-125546-2b0e4836.zip",
+    "archive_sha256": "37c67d541f634bf60f8a38a6ef95ac14ca32125b7fd2d553b5aea7d3198251f3",
+    "expected_nro_sha256": "1eb775c0876ec44dcff1014776c7f13f01e9892c3d612835ec53f31a00718c53",
+    "expected_apk_sha256": "f77a08b2463d60fef05e2a2c0130d5126fab77eb10e4c24ff76ccdc42a279157",
+    "expected_catalog_sha256": "0778a8ded8917482b38aa7d9046e286f417c6e4ddc857be989718e65c3e69864"
+  },
+  "verification_limits": {
+    "device_binary_hash_independently_read": false,
+    "raw_device_journal_received": false,
+    "per_case_rows_received": false,
+    "clock_values_received": false
+  },
+  "scope": "User confirms the entire 219-case APK on a physical Switch, including the three clock observations excluded from Ryujinx. Counts are recorded as reported; emulator rows are not relabeled.",
+  "m9_independent_game_first_screen_gate": "open",
+  "android_reference": "not_run",
+  "upstream": {
+    "project": "RustyDroid",
+    "authors": "nadabgfccvd and contributors",
+    "revision": "6388281f66d254c8e01a0fdc7a5a9a30239bc762"
+  }
+}

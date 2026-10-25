@@ -14,7 +14,7 @@ Implementation and verification are independent. `pending` is not a pass.
 | M6 | NativeActivity/assets/window/input/threading/EGL/GLES2/PCM audio | supported proof subset implemented | passed shared contracts; Android reference pending | passed native/mixed media corpus | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
 | M7 | Console launcher/verified session teardown; scan/install/launch/return/update/uninstall; one copy-ready folder | implemented for the alpha corpus; failed-startup cleanup added | passed package workflow | console workflow / ten completed sessions; startup and boundary evidence in reports | tested on physical Switch — user confirmed 2026-10-24; detailed per-scenario/binary identity not recorded |
 | M8 | SharedPreferences/native SQLite/reflection/collections/permissions; independent APK integration | bounded shared contracts implemented; wider integration ongoing | contract/JVM/persistence/fault tests; see candidate report | pending for new build | SQLite readable / SharedPreferences working — user reported 2026-10-24; detailed scenario results not recorded |
-| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix; independent first-screen gate | general DEX/memory/native/GLSurfaceView startup improvements in progress; release gate incomplete | repeated candidate corpus plus scoped new API/ABI contracts | unified SDK suite: 216 PASS / 3 clock queries NOT_RUN; independent retest reaches ClassLoader.getSystemClassLoader (Mekorama) and AtomicInteger construction (Candy); both return safely, neither has a first-screen pass; see the separate 2026-10-25 evidence records | delivered candidate reaches Java/native startup but both games remain blocked; hardware binary hash unrecorded; full gate incomplete |
+| M9 | Offline v0.1 corpus/lifecycle stress/benchmarks/copy-ready package/evidence matrix; independent first-screen gate | general DEX/memory/native/GLSurfaceView startup improvements in progress; release gate incomplete | repeated candidate corpus plus scoped new API/ABI contracts | unified SDK suite: 216 PASS / 3 clock queries NOT_RUN; independent retest reaches ClassLoader.getSystemClassLoader (Mekorama) and AtomicInteger construction (Candy); both return safely, neither has a first-screen pass; see the separate 2026-10-25 evidence records | unified suite 219/219 PASS — user confirmed 2026-10-25; raw suite journal/device hash not archived; independent games remain blocked and the full M9 gate is incomplete |
 | M10 | DNS/socket/TLS/HTTP(S), Java/native networking and split APKs | planned | pending | pending | pending |
 | M11 | Higher API/GLES3/engine ecosystem; separate ARM32/x86 research | planned | pending | pending | pending |
 | M12 | Physical Switch stability, suspend/resume, handheld/docked, migrations, v1.0 | planned | pending | pending | pending |
@@ -154,8 +154,11 @@ is additional to the independent-app and physical-device gates above.
 
 The latest [unified-SDK baseline](../reports/conformance-mesa-20261025.json)
 records **216 PASS and 3 NOT_RUN** in 20 diagnostic Ryujinx sessions. No completed
-case is FAIL/ERROR/UNSUPPORTED/INTERRUPTED. The three remaining read-only
-CPU/GPU/memory clock queries are implemented against clkrst/PCV, but still need
-physical-device execution evidence: this emulator's PCV service is empty. They
-remain open, rather than receiving estimated clock rates. The hardware bundle
-contains all 219 cases and none of the emulator exclusion/control files.
+case is FAIL/ERROR/UNSUPPORTED/INTERRUPTED. The three read-only CPU/GPU/memory clock queries remain NOT_RUN on this
+emulator because its PCV service is empty. The user subsequently confirmed
+**219/219 PASS on a physical Switch**, including those observations. See the
+[hardware record](../reports/conformance-hardware-20261025.json): it preserves
+the direct aggregate report and the absence of an archived raw journal/device
+binary hash. The hardware bundle contains all 219 cases and no exclusion files.
+This closes the suite target at the user-reported hardware evidence level; the
+independent-game and Android-reference gates remain separate.

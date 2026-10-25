@@ -154,3 +154,11 @@ The separate touch-driven UI run verifies category navigation, the bottom
 result-navigation row, 219-row report export, reset history and Stop/save's
 persistent autorun control. Its empty journal is a UI test, not another
 compatibility pass. [Observed framebuffer](images/conformance-sdk.png).
+
+The user subsequently confirmed **219/219 PASS on a physical Switch**, including
+the three clock observations. [Hardware feedback](../reports/conformance-hardware-20261025.json)
+records this aggregate result, the linked bundle identities and the absence of
+an archived raw device journal. The emulator journal remains 216 PASS / 3
+NOT_RUN; its strict automated acceptance flag is not changed by a different
+backend's report. The suite target is satisfied at the user-reported hardware
+level. This does not establish whole-Android or independent-game compatibility.

@@ -20,10 +20,12 @@ platform observations](docs/CONFORMANCE_SUITE.md); this is not official CTS or
 complete Android coverage.
 
 Latest unified-SDK Ryujinx baseline: **216 PASS, 3 NOT_RUN** across 20 sessions.
-The remaining CPU/GPU/memory clock queries require physical Switch validation;
-the diagnostic emulator has no PCV implementation. All nine GLES and six Vulkan
+The user subsequently confirmed **219/219 PASS on a physical Switch**; see the
+[hardware feedback record](reports/conformance-hardware-20261025.json). The emulator
+keeps three clock queries NOT_RUN because its PCV command is absent. All nine GLES and six Vulkan
 discovery/device cases pass; Vulkan rendering/presentation is outside these six
-cases. The acceptance target remains **219 actual PASS**. See the
+cases. The 219-case hardware result is user-reported; its raw device journal has not
+yet been archived. See the
 [recorded results](reports/conformance-mesa-20261025.json) and
 [optional Mesa integration](docs/MESA_SWITCH_PORT.md).
 

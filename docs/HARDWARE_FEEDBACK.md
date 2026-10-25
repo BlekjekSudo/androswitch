@@ -194,3 +194,19 @@ uses the frozen APKs and exact delivered NRO hash, reproduces both errors, and
 confirms that both rejected startups return to the launcher. New Enum and
 `getauxval` implementations need their own execution evidence before a game
 first-screen or hardware compatibility claim.
+
+## Unified conformance suite: 219/219 (2026-10-25)
+
+After testing the linked Mesa SDK development bundle on a physical Switch, the
+user confirmed **219/219 PASS**. This is recorded as direct aggregate hardware
+feedback, separately from the 216 PASS / 3 NOT_RUN diagnostic Ryujinx baseline.
+The supplied bundle contains every case and no emulator exclusion files; the
+three CPU/GPU/memory clock observations are included in the reported hardware
+result. No estimated clock values were substituted into the runtime.
+
+The [hardware receipt](../reports/conformance-hardware-20261025.json) preserves
+the user message and expected package/NRO/APK/catalog identities. A raw device
+journal, individual measured clock values and an independently read device
+binary hash were not supplied with this confirmation. The result applies to
+the declared suite; independent Mekorama/Candy Crush first-screen compatibility
+and Android reference testing remain separate gates.

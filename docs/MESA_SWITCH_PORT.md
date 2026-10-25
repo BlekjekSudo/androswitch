@@ -72,4 +72,7 @@ six Vulkan discovery/device cases pass. The emulator's fixed-address GPU
 allocation bug and missing legacy thread-tick alias are documented with a
 [source patch and production allocator probe](../tools/ryujinx-cfg/README.md).
 Those emulator changes do not enter the Android runtime or SD package.
-Physical Switch and Android reference results for this SDK remain pending.
+The user subsequently confirmed 219/219 PASS on a physical Switch;
+[hardware feedback](../reports/conformance-hardware-20261025.json) is recorded
+separately as an aggregate report. The raw journal/device binary hash has not
+been archived. Android reference testing remains pending.
