@@ -18154,3 +18154,1099 @@ fn renderscript_disabled_context_and_element_state_are_guest_visible() {
         "Landroid/renderscript/RSIllegalArgumentException;",
     );
 }
+
+// ---- Appendix C Batch 36-G: service.credentials / app.admin ----
+
+const P36G_CALLING_APP_INFO: &str = "Landroid/service/credentials/CallingAppInfo;";
+const P36G_BEGIN_GET_OPTION: &str = "Landroid/service/credentials/BeginGetCredentialOption;";
+const P36G_BEGIN_GET_REQ_BUILDER: &str =
+    "Landroid/service/credentials/BeginGetCredentialRequest$Builder;";
+const P36G_GET_REQ: &str = "Landroid/service/credentials/GetCredentialRequest;";
+const P36G_CREATE_REQ: &str = "Landroid/service/credentials/CreateCredentialRequest;";
+const P36G_BEGIN_CREATE_REQ: &str = "Landroid/service/credentials/BeginCreateCredentialRequest;";
+const P36G_CLEAR_REQ: &str = "Landroid/service/credentials/ClearCredentialStateRequest;";
+const P36G_CREDENTIAL_OPTION_BUILDER: &str = "Landroid/credentials/CredentialOption$Builder;";
+const P36G_ACTION: &str = "Landroid/service/credentials/Action;";
+const P36G_CREATE_ENTRY: &str = "Landroid/service/credentials/CreateEntry;";
+const P36G_REMOTE_ENTRY: &str = "Landroid/service/credentials/RemoteEntry;";
+const P36G_CREDENTIAL_ENTRY: &str = "Landroid/service/credentials/CredentialEntry;";
+const P36G_BEGIN_GET_RESP: &str = "Landroid/service/credentials/BeginGetCredentialResponse;";
+const P36G_BEGIN_GET_RESP_BUILDER: &str =
+    "Landroid/service/credentials/BeginGetCredentialResponse$Builder;";
+const P36G_BEGIN_CREATE_RESP: &str = "Landroid/service/credentials/BeginCreateCredentialResponse;";
+const P36G_BEGIN_CREATE_RESP_BUILDER: &str =
+    "Landroid/service/credentials/BeginCreateCredentialResponse$Builder;";
+const P36G_PROVIDER_SERVICE: &str = "Landroid/service/credentials/CredentialProviderService;";
+const P36G_DPM: &str = "Landroid/app/admin/DevicePolicyManager;";
+const P36G_UPDATE_POLICY: &str = "Landroid/app/admin/SystemUpdatePolicy;";
+const P36G_IAE: &str = "Ljava/lang/IllegalArgumentException;";
+const P36G_NPE: &str = "Ljava/lang/NullPointerException;";
+
+fn p36g_calling_app_info(engine: &mut Engine) -> ObjRef {
+    let signing = instance(engine, "Landroid/content/pm/SigningInfo;");
+    let package = text(engine, "dev.RustyDroid.caller");
+    let origin = text(engine, "https://example.com");
+    p49_new(
+        engine,
+        P36G_CALLING_APP_INFO,
+        "(Ljava/lang/String;Landroid/content/pm/SigningInfo;Ljava/lang/String;)V",
+        &[package, Value::Obj(signing), origin],
+    )
+}
+
+fn p36g_bundle_with(engine: &mut Engine, key: &str, value: &str) -> ObjRef {
+    let bundle = p41_bundle(engine);
+    let key = text(engine, key);
+    let value = text(engine, value);
+    call(
+        engine,
+        bundle,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+        &[key, value],
+    );
+    bundle
+}
+
+fn p36g_bundle_string(engine: &mut Engine, bundle: ObjRef, key: &str) -> Value {
+    let key = text(engine, key);
+    call(
+        engine,
+        bundle,
+        "getString",
+        "(Ljava/lang/String;)Ljava/lang/String;",
+        &[key],
+    )
+}
+
+fn p36g_list_size(engine: &mut Engine, list: Value) -> Value {
+    call(engine, object(list), "size", "()I", &[])
+}
+
+fn p36g_list_size_of(engine: &mut Engine, recv: ObjRef, name: &str, sig: &str) -> Value {
+    let list = call(engine, recv, name, sig, &[]);
+    p36g_list_size(engine, list)
+}
+
+#[test]
+fn credentials_request_and_option_values_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    assert!(engine
+        .cp
+        .is_subtype(P36G_BEGIN_GET_OPTION, "Landroid/os/Parcelable;"));
+    assert!(engine
+        .cp
+        .is_subtype(P36G_PROVIDER_SERVICE, "Landroid/app/Service;"));
+
+    let signing = instance(&mut engine, "Landroid/content/pm/SigningInfo;");
+    let empty_package = text(&mut engine, "");
+    let bad_info = instance(&mut engine, P36G_CALLING_APP_INFO);
+    assert_throws(
+        engine.invoke_instance(
+            bad_info,
+            "<init>",
+            "(Ljava/lang/String;Landroid/content/pm/SigningInfo;)V",
+            &[empty_package, Value::Obj(signing)],
+        ),
+        P36G_IAE,
+    );
+    let package = text(&mut engine, "dev.RustyDroid.caller");
+    assert_throws(
+        engine.invoke_instance(
+            bad_info,
+            "<init>",
+            "(Ljava/lang/String;Landroid/content/pm/SigningInfo;)V",
+            &[package, Value::Null],
+        ),
+        P36G_NPE,
+    );
+    let info = p36g_calling_app_info(&mut engine);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            info,
+            "getPackageName",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "dev.RustyDroid.caller"
+    );
+    assert_eq!(
+        call_text(&mut engine, info, "getOrigin", "()Ljava/lang/String;", &[]),
+        "https://example.com"
+    );
+    assert!(!matches!(
+        call(
+            &mut engine,
+            info,
+            "getSigningInfo",
+            "()Landroid/content/pm/SigningInfo;",
+            &[]
+        ),
+        Value::Null
+    ));
+
+    let bundle = p36g_bundle_with(&mut engine, "k", "v");
+    let id = text(&mut engine, "id1");
+    let kind = text(&mut engine, "android.credentials.TYPE_PASSWORD_CREDENTIAL");
+    let option = p49_new(
+        &mut engine,
+        P36G_BEGIN_GET_OPTION,
+        "(Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V",
+        &[id, kind.clone(), Value::Obj(bundle)],
+    );
+    assert_eq!(
+        call_text(&mut engine, option, "getId", "()Ljava/lang/String;", &[]),
+        "id1"
+    );
+    assert_eq!(
+        call_text(&mut engine, option, "getType", "()Ljava/lang/String;", &[]),
+        "android.credentials.TYPE_PASSWORD_CREDENTIAL"
+    );
+    let candidate = object(call(
+        &mut engine,
+        option,
+        "getCandidateQueryData",
+        "()Landroid/os/Bundle;",
+        &[],
+    ));
+    assert_ne!(candidate, bundle);
+    let bundle_id = p36g_bundle_string(
+        &mut engine,
+        candidate,
+        "android.service.credentials.BeginGetCredentialOption.BUNDLE_ID_KEY",
+    );
+    assert_eq!(text_of(&engine, &bundle_id), "id1");
+    let bundle_value = p36g_bundle_string(&mut engine, candidate, "k");
+    assert_eq!(text_of(&engine, &bundle_value), "v");
+    let key2 = text(&mut engine, "k2");
+    let value2 = text(&mut engine, "later");
+    call(
+        &mut engine,
+        bundle,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)V",
+        &[key2, value2],
+    );
+    assert_eq!(
+        p36g_bundle_string(&mut engine, candidate, "k2"),
+        Value::Null
+    );
+    let bad_option = instance(&mut engine, P36G_BEGIN_GET_OPTION);
+    let empty_id = text(&mut engine, "");
+    assert_throws(
+        engine.invoke_instance(
+            bad_option,
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V",
+            &[empty_id, kind, Value::Obj(bundle)],
+        ),
+        P36G_IAE,
+    );
+    let good_id = text(&mut engine, "id2");
+    assert_throws(
+        engine.invoke_instance(
+            bad_option,
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V",
+            &[good_id, Value::Null, Value::Obj(bundle)],
+        ),
+        P36G_IAE,
+    );
+
+    let builder = p49_new(&mut engine, P36G_BEGIN_GET_REQ_BUILDER, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "build",
+            "()Landroid/service/credentials/BeginGetCredentialRequest;",
+            &[],
+        ),
+        P36G_IAE,
+    );
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "addBeginGetCredentialOption",
+            "(Landroid/service/credentials/BeginGetCredentialOption;)Landroid/service/credentials/BeginGetCredentialRequest$Builder;",
+            &[Value::Null],
+        ),
+        P36G_NPE,
+    );
+    let empty = list_of(&mut engine, &[]);
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "setBeginGetCredentialOptions",
+            "(Ljava/util/List;)Landroid/service/credentials/BeginGetCredentialRequest$Builder;",
+            &[Value::Obj(empty)],
+        ),
+        P36G_IAE,
+    );
+    let with_null = list_of(&mut engine, &[Value::Null]);
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "setBeginGetCredentialOptions",
+            "(Ljava/util/List;)Landroid/service/credentials/BeginGetCredentialRequest$Builder;",
+            &[Value::Obj(with_null)],
+        ),
+        P36G_NPE,
+    );
+    call(
+        &mut engine,
+        builder,
+        "setCallingAppInfo",
+        "(Landroid/service/credentials/CallingAppInfo;)Landroid/service/credentials/BeginGetCredentialRequest$Builder;",
+        &[Value::Obj(info)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "addBeginGetCredentialOption",
+        "(Landroid/service/credentials/BeginGetCredentialOption;)Landroid/service/credentials/BeginGetCredentialRequest$Builder;",
+        &[Value::Obj(option)],
+    );
+    let request = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/service/credentials/BeginGetCredentialRequest;",
+        &[],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            request,
+            "getCallingAppInfo",
+            "()Landroid/service/credentials/CallingAppInfo;",
+            &[]
+        ),
+        Value::Obj(info)
+    );
+    let options = call(
+        &mut engine,
+        request,
+        "getBeginGetCredentialOptions",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36g_list_size(&mut engine, options.clone()), Value::Int(1));
+    assert_eq!(p49_list_get(&mut engine, options, 0), Value::Obj(option));
+
+    let retrieval = p41_bundle(&mut engine);
+    let query = p41_bundle(&mut engine);
+    let option_builder = instance(&mut engine, P36G_CREDENTIAL_OPTION_BUILDER);
+    let kind2 = text(
+        &mut engine,
+        "android.credentials.TYPE_PUBLIC_KEY_CREDENTIAL",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            option_builder,
+            "<init>",
+            "(Ljava/lang/String;Landroid/os/Bundle;Landroid/os/Bundle;)V",
+            &[kind2.clone(), Value::Null, Value::Obj(query)],
+        ),
+        P36G_NPE,
+    );
+    call(
+        &mut engine,
+        option_builder,
+        "<init>",
+        "(Ljava/lang/String;Landroid/os/Bundle;Landroid/os/Bundle;)V",
+        &[kind2, Value::Obj(retrieval), Value::Obj(query)],
+    );
+    call(
+        &mut engine,
+        option_builder,
+        "setIsSystemProviderRequired",
+        "(Z)Landroid/credentials/CredentialOption$Builder;",
+        &[Value::Int(1)],
+    );
+    let provider = instance(&mut engine, "Landroid/content/ComponentName;");
+    call(
+        &mut engine,
+        option_builder,
+        "addAllowedProvider",
+        "(Landroid/content/ComponentName;)Landroid/credentials/CredentialOption$Builder;",
+        &[Value::Obj(provider)],
+    );
+    let credential_option = object(call(
+        &mut engine,
+        option_builder,
+        "build",
+        "()Landroid/credentials/CredentialOption;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            credential_option,
+            "getType",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "android.credentials.TYPE_PUBLIC_KEY_CREDENTIAL"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            credential_option,
+            "getCredentialRetrievalData",
+            "()Landroid/os/Bundle;",
+            &[]
+        ),
+        Value::Obj(retrieval)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            credential_option,
+            "isSystemProviderRequired",
+            "()Z",
+            &[]
+        ),
+        Value::Int(1)
+    );
+    let allowed = call(
+        &mut engine,
+        credential_option,
+        "getAllowedProviders",
+        "()Ljava/util/Set;",
+        &[],
+    );
+    assert_eq!(p36g_list_size(&mut engine, allowed), Value::Int(1));
+
+    let get_request = instance(&mut engine, P36G_GET_REQ);
+    assert_throws(
+        engine.invoke_instance(
+            get_request,
+            "<init>",
+            "(Landroid/service/credentials/CallingAppInfo;Ljava/util/List;)V",
+            &[Value::Null, Value::Obj(empty)],
+        ),
+        P36G_NPE,
+    );
+    let option_list = list_of(&mut engine, &[Value::Obj(credential_option)]);
+    call(
+        &mut engine,
+        get_request,
+        "<init>",
+        "(Landroid/service/credentials/CallingAppInfo;Ljava/util/List;)V",
+        &[Value::Obj(info), Value::Obj(option_list)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            get_request,
+            "getCredentialOptions",
+            "()Ljava/util/List;",
+            &[]
+        ),
+        Value::Obj(option_list)
+    );
+
+    let create_kind = text(&mut engine, "android.credentials.TYPE_PASSWORD_CREDENTIAL");
+    let create_request = p49_new(
+        &mut engine,
+        P36G_CREATE_REQ,
+        "(Landroid/service/credentials/CallingAppInfo;Ljava/lang/String;Landroid/os/Bundle;)V",
+        &[Value::Obj(info), create_kind, Value::Obj(bundle)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            create_request,
+            "getData",
+            "()Landroid/os/Bundle;",
+            &[]
+        ),
+        Value::Obj(bundle)
+    );
+    let begin_create_kind = text(&mut engine, "android.credentials.TYPE_PASSWORD_CREDENTIAL");
+    let begin_create = p49_new(
+        &mut engine,
+        P36G_BEGIN_CREATE_REQ,
+        "(Ljava/lang/String;Landroid/os/Bundle;)V",
+        &[begin_create_kind, Value::Obj(bundle)],
+    );
+    let copied = object(call(
+        &mut engine,
+        begin_create,
+        "getData",
+        "()Landroid/os/Bundle;",
+        &[],
+    ));
+    assert_ne!(copied, bundle);
+    assert_eq!(
+        call(
+            &mut engine,
+            begin_create,
+            "getCallingAppInfo",
+            "()Landroid/service/credentials/CallingAppInfo;",
+            &[]
+        ),
+        Value::Null
+    );
+    let clear = instance(&mut engine, P36G_CLEAR_REQ);
+    assert_throws(
+        engine.invoke_instance(
+            clear,
+            "<init>",
+            "(Landroid/service/credentials/CallingAppInfo;Landroid/os/Bundle;)V",
+            &[Value::Obj(info), Value::Null],
+        ),
+        P36G_NPE,
+    );
+    call(
+        &mut engine,
+        clear,
+        "<init>",
+        "(Landroid/service/credentials/CallingAppInfo;Landroid/os/Bundle;)V",
+        &[Value::Obj(info), Value::Obj(bundle)],
+    );
+    assert_eq!(
+        call(&mut engine, clear, "getData", "()Landroid/os/Bundle;", &[]),
+        Value::Obj(bundle)
+    );
+}
+
+#[test]
+fn credentials_entries_responses_and_service_binding_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let slice = instance(&mut engine, "Landroid/app/slice/Slice;");
+    let action = instance(&mut engine, P36G_ACTION);
+    assert_throws(
+        engine.invoke_instance(
+            action,
+            "<init>",
+            "(Landroid/app/slice/Slice;)V",
+            &[Value::Null],
+        ),
+        P36G_NPE,
+    );
+    call(
+        &mut engine,
+        action,
+        "<init>",
+        "(Landroid/app/slice/Slice;)V",
+        &[Value::Obj(slice)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            action,
+            "getSlice",
+            "()Landroid/app/slice/Slice;",
+            &[]
+        ),
+        Value::Obj(slice)
+    );
+    let create_entry = p49_new(
+        &mut engine,
+        P36G_CREATE_ENTRY,
+        "(Landroid/app/slice/Slice;)V",
+        &[Value::Obj(slice)],
+    );
+    let remote_entry = p49_new(
+        &mut engine,
+        P36G_REMOTE_ENTRY,
+        "(Landroid/app/slice/Slice;)V",
+        &[Value::Obj(slice)],
+    );
+
+    let bundle = p41_bundle(&mut engine);
+    let id = text(&mut engine, "opt-1");
+    let kind = text(&mut engine, "android.credentials.TYPE_PASSWORD_CREDENTIAL");
+    let option = p49_new(
+        &mut engine,
+        P36G_BEGIN_GET_OPTION,
+        "(Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V",
+        &[id, kind, Value::Obj(bundle)],
+    );
+    let entry = p49_new(
+        &mut engine,
+        P36G_CREDENTIAL_ENTRY,
+        "(Landroid/service/credentials/BeginGetCredentialOption;Landroid/app/slice/Slice;)V",
+        &[Value::Obj(option), Value::Obj(slice)],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            entry,
+            "getBeginGetCredentialOptionId",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "opt-1"
+    );
+    assert_eq!(
+        call_text(&mut engine, entry, "getType", "()Ljava/lang/String;", &[]),
+        "android.credentials.TYPE_PASSWORD_CREDENTIAL"
+    );
+    let empty_kind = text(&mut engine, "");
+    let unbound_entry = p49_new(
+        &mut engine,
+        P36G_CREDENTIAL_ENTRY,
+        "(Ljava/lang/String;Landroid/app/slice/Slice;)V",
+        &[empty_kind, Value::Obj(slice)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            unbound_entry,
+            "getBeginGetCredentialOptionId",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            unbound_entry,
+            "getType",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        ""
+    );
+    let bad_entry = instance(&mut engine, P36G_CREDENTIAL_ENTRY);
+    let entry_id = text(&mut engine, "");
+    let entry_kind = text(&mut engine, "t");
+    assert_throws(
+        engine.invoke_instance(
+            bad_entry,
+            "<init>",
+            "(Ljava/lang/String;Ljava/lang/String;Landroid/app/slice/Slice;)V",
+            &[entry_id, entry_kind, Value::Obj(slice)],
+        ),
+        P36G_IAE,
+    );
+
+    let empty_response = p49_new(&mut engine, P36G_BEGIN_GET_RESP, "()V", &[]);
+    assert_eq!(
+        p36g_list_size_of(
+            &mut engine,
+            empty_response,
+            "getCredentialEntries",
+            "()Ljava/util/List;"
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            empty_response,
+            "getRemoteCredentialEntry",
+            "()Landroid/service/credentials/RemoteEntry;",
+            &[]
+        ),
+        Value::Null
+    );
+    let builder = p49_new(&mut engine, P36G_BEGIN_GET_RESP_BUILDER, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "addCredentialEntry",
+            "(Landroid/service/credentials/CredentialEntry;)Landroid/service/credentials/BeginGetCredentialResponse$Builder;",
+            &[Value::Null],
+        ),
+        P36G_NPE,
+    );
+    call(
+        &mut engine,
+        builder,
+        "addCredentialEntry",
+        "(Landroid/service/credentials/CredentialEntry;)Landroid/service/credentials/BeginGetCredentialResponse$Builder;",
+        &[Value::Obj(entry)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "addAction",
+        "(Landroid/service/credentials/Action;)Landroid/service/credentials/BeginGetCredentialResponse$Builder;",
+        &[Value::Obj(action)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "addAuthenticationAction",
+        "(Landroid/service/credentials/Action;)Landroid/service/credentials/BeginGetCredentialResponse$Builder;",
+        &[Value::Obj(action)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setRemoteCredentialEntry",
+        "(Landroid/service/credentials/RemoteEntry;)Landroid/service/credentials/BeginGetCredentialResponse$Builder;",
+        &[Value::Obj(remote_entry)],
+    );
+    let response = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/service/credentials/BeginGetCredentialResponse;",
+        &[],
+    ));
+    let entries = call(
+        &mut engine,
+        response,
+        "getCredentialEntries",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36g_list_size(&mut engine, entries.clone()), Value::Int(1));
+    assert_eq!(p49_list_get(&mut engine, entries, 0), Value::Obj(entry));
+    assert_eq!(
+        p36g_list_size_of(&mut engine, response, "getActions", "()Ljava/util/List;"),
+        Value::Int(1)
+    );
+    assert_eq!(
+        p36g_list_size_of(
+            &mut engine,
+            response,
+            "getAuthenticationActions",
+            "()Ljava/util/List;"
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            response,
+            "getRemoteCredentialEntry",
+            "()Landroid/service/credentials/RemoteEntry;",
+            &[]
+        ),
+        Value::Obj(remote_entry)
+    );
+
+    let create_builder = p49_new(&mut engine, P36G_BEGIN_CREATE_RESP_BUILDER, "()V", &[]);
+    let empty = list_of(&mut engine, &[]);
+    assert_throws(
+        engine.invoke_instance(
+            create_builder,
+            "setCreateEntries",
+            "(Ljava/util/List;)Landroid/service/credentials/BeginCreateCredentialResponse$Builder;",
+            &[Value::Obj(empty)],
+        ),
+        P36G_IAE,
+    );
+    call(
+        &mut engine,
+        create_builder,
+        "addCreateEntry",
+        "(Landroid/service/credentials/CreateEntry;)Landroid/service/credentials/BeginCreateCredentialResponse$Builder;",
+        &[Value::Obj(create_entry)],
+    );
+    let create_response = object(call(
+        &mut engine,
+        create_builder,
+        "build",
+        "()Landroid/service/credentials/BeginCreateCredentialResponse;",
+        &[],
+    ));
+    assert_eq!(
+        p36g_list_size_of(
+            &mut engine,
+            create_response,
+            "getCreateEntries",
+            "()Ljava/util/List;"
+        ),
+        Value::Int(1)
+    );
+    let empty_create = p49_new(&mut engine, P36G_BEGIN_CREATE_RESP, "()V", &[]);
+    assert_eq!(
+        p36g_list_size_of(
+            &mut engine,
+            empty_create,
+            "getCreateEntries",
+            "()Ljava/util/List;"
+        ),
+        Value::Int(0)
+    );
+
+    let service = instance(&mut engine, P36G_PROVIDER_SERVICE);
+    let wrong_action = text(&mut engine, "example.WRONG");
+    let wrong_intent = instance(&mut engine, "Landroid/content/Intent;");
+    call(
+        &mut engine,
+        wrong_intent,
+        "<init>",
+        "(Ljava/lang/String;)V",
+        &[wrong_action],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(wrong_intent)]
+        ),
+        Value::Null
+    );
+    let action_text = text(
+        &mut engine,
+        "android.service.credentials.CredentialProviderService",
+    );
+    let intent = instance(&mut engine, "Landroid/content/Intent;");
+    call(
+        &mut engine,
+        intent,
+        "<init>",
+        "(Ljava/lang/String;)V",
+        &[action_text],
+    );
+    let binder = call(
+        &mut engine,
+        service,
+        "onBind",
+        "(Landroid/content/Intent;)Landroid/os/IBinder;",
+        &[Value::Obj(intent)],
+    );
+    assert!(!matches!(binder, Value::Null));
+    assert_eq!(
+        call(
+            &mut engine,
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(intent)]
+        ),
+        binder
+    );
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Null],
+        ),
+        P36G_NPE,
+    );
+}
+
+#[test]
+fn device_policy_no_service_and_system_update_policy_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    assert!(engine.cp.is_subtype(
+        "Landroid/app/admin/SystemUpdatePolicy$ValidationFailedException;",
+        "Ljava/lang/IllegalArgumentException;"
+    ));
+    let context = instance(&mut engine, CONTEXT);
+    let admin = instance(&mut engine, "Landroid/content/ComponentName;");
+    let service_name = text(&mut engine, "device_policy");
+    let from_context = object(call(
+        &mut engine,
+        context,
+        "getSystemService",
+        "(Ljava/lang/String;)Ljava/lang/Object;",
+        &[service_name],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            from_context,
+            "isAdminActive",
+            "(Landroid/content/ComponentName;)Z",
+            &[Value::Obj(admin)]
+        ),
+        Value::Int(0)
+    );
+
+    let manager = p49_new(
+        &mut engine,
+        P36G_DPM,
+        "(Landroid/content/Context;Landroid/app/admin/IDevicePolicyManager;)V",
+        &[Value::Obj(context), Value::Null],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isAdminActive",
+            "(Landroid/content/ComponentName;)Z",
+            &[Value::Obj(admin)]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getActiveAdmins",
+            "()Ljava/util/List;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "hasGrantedPolicy",
+            "(Landroid/content/ComponentName;I)Z",
+            &[Value::Obj(admin), Value::Int(1)]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getPasswordQuality",
+            "(Landroid/content/ComponentName;)I",
+            &[Value::Null]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getPasswordMinimumLength",
+            "(Landroid/content/ComponentName;)I",
+            &[Value::Obj(admin)]
+        ),
+        Value::Int(0)
+    );
+    call(
+        &mut engine,
+        manager,
+        "setPasswordQuality",
+        "(Landroid/content/ComponentName;I)V",
+        &[Value::Obj(admin), Value::Int(0x60000)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getPasswordQuality",
+            "(Landroid/content/ComponentName;)I",
+            &[Value::Obj(admin)]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getStorageEncryptionStatus",
+            "()I",
+            &[]
+        ),
+        Value::Int(0)
+    );
+    let package = text(&mut engine, "dev.RustyDroid.owner");
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isDeviceOwnerApp",
+            "(Ljava/lang/String;)Z",
+            &[package]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isDeviceOwnerApp",
+            "(Ljava/lang/String;)Z",
+            &[Value::Null]
+        ),
+        Value::Int(0)
+    );
+    let profile_package = text(&mut engine, "dev.RustyDroid.owner");
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "isProfileOwnerApp",
+            "(Ljava/lang/String;)Z",
+            &[profile_package]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getDeviceOwnerComponentOnCallingUser",
+            "()Landroid/content/ComponentName;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(&mut engine, manager, "getDeviceOwnerUserId", "()I", &[]),
+        Value::Int(-10000)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getRequiredStrongAuthTimeout",
+            "(Landroid/content/ComponentName;)J",
+            &[Value::Null]
+        ),
+        Value::Long(259_200_000)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getSystemUpdatePolicy",
+            "()Landroid/app/admin/SystemUpdatePolicy;",
+            &[]
+        ),
+        Value::Null
+    );
+    call(
+        &mut engine,
+        manager,
+        "removeActiveAdmin",
+        "(Landroid/content/ComponentName;)V",
+        &[Value::Obj(admin)],
+    );
+    let provision_action = text(&mut engine, "android.app.action.PROVISION_MANAGED_PROFILE");
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "isProvisioningAllowed",
+            "(Ljava/lang/String;)Z",
+            &[provision_action],
+        ),
+        P36G_NPE,
+    );
+
+    let parent = p49_new(
+        &mut engine,
+        P36G_DPM,
+        "(Landroid/content/Context;Landroid/app/admin/IDevicePolicyManager;Z)V",
+        &[Value::Obj(context), Value::Null, Value::Int(1)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            parent,
+            "isAdminActive",
+            "(Landroid/content/ComponentName;)Z",
+            &[Value::Obj(admin)],
+        ),
+        "Ljava/lang/SecurityException;",
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            parent,
+            "getPasswordQuality",
+            "(Landroid/content/ComponentName;)I",
+            &[Value::Null]
+        ),
+        Value::Int(0)
+    );
+
+    let windowed = object(call_static(
+        &mut engine,
+        P36G_UPDATE_POLICY,
+        "createWindowedInstallPolicy",
+        "(II)Landroid/app/admin/SystemUpdatePolicy;",
+        &[Value::Int(1380), Value::Int(120)],
+    ));
+    assert_eq!(
+        call(&mut engine, windowed, "getPolicyType", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call(&mut engine, windowed, "getInstallWindowStart", "()I", &[]),
+        Value::Int(1380)
+    );
+    assert_eq!(
+        call(&mut engine, windowed, "getInstallWindowEnd", "()I", &[]),
+        Value::Int(120)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            windowed,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "SystemUpdatePolicy (type: 2, windowStart: 1380, windowEnd: 120, freezes: [])"
+    );
+    assert_eq!(
+        p36g_list_size_of(
+            &mut engine,
+            windowed,
+            "getFreezePeriods",
+            "()Ljava/util/List;"
+        ),
+        Value::Int(0)
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36G_UPDATE_POLICY,
+            "createWindowedInstallPolicy",
+            "(II)Landroid/app/admin/SystemUpdatePolicy;",
+            &[Value::Int(-1), Value::Int(0)],
+        ),
+        P36G_IAE,
+    );
+    assert_throws(
+        engine.invoke_static(
+            P36G_UPDATE_POLICY,
+            "createWindowedInstallPolicy",
+            "(II)Landroid/app/admin/SystemUpdatePolicy;",
+            &[Value::Int(0), Value::Int(1440)],
+        ),
+        P36G_IAE,
+    );
+    let automatic = object(call_static(
+        &mut engine,
+        P36G_UPDATE_POLICY,
+        "createAutomaticInstallPolicy",
+        "()Landroid/app/admin/SystemUpdatePolicy;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, automatic, "getPolicyType", "()I", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, automatic, "getInstallWindowStart", "()I", &[]),
+        Value::Int(-1)
+    );
+    let postponed = object(call_static(
+        &mut engine,
+        P36G_UPDATE_POLICY,
+        "createPostponeInstallPolicy",
+        "()Landroid/app/admin/SystemUpdatePolicy;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, postponed, "getPolicyType", "()I", &[]),
+        Value::Int(3)
+    );
+    call(
+        &mut engine,
+        manager,
+        "setSystemUpdatePolicy",
+        "(Landroid/content/ComponentName;Landroid/app/admin/SystemUpdatePolicy;)V",
+        &[Value::Obj(admin), Value::Obj(windowed)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            manager,
+            "getSystemUpdatePolicy",
+            "()Landroid/app/admin/SystemUpdatePolicy;",
+            &[]
+        ),
+        Value::Null
+    );
+}

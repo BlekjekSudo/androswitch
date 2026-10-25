@@ -455,6 +455,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial36f_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36g_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -629,6 +632,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial36f_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36g_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -734,6 +740,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial36f_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial36g_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -48854,6 +48863,1144 @@ fn p36f_matrix_instance(
             }
             store(vm, &out)?;
             Value::Null
+        }
+        _ => return Ok(None),
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Appendix C Batch 36-G: android.service.credentials + android.app.admin.
+//
+// Credentials: the provider-side request/response/entry value classes
+// (including the android.credentials.CredentialOption collaborator) are
+// modelled with AOSP null/empty validation, Bundle-copy semantics and
+// builder list state.  CredentialProviderService contributes only its
+// final onBind action check and intent-extra constants; no credential
+// manager service, provider discovery, UI selector, passkey/WebAuthn or
+// binder callback flow exists.
+//
+// Admin: SystemUpdatePolicy factories/values are modelled, and
+// DevicePolicyManager is modelled with a null IDevicePolicyManager
+// service exactly as AOSP's `if (mService != null)` branches behave
+// (including parent-instance SecurityExceptions and the unchecked
+// isProvisioningAllowed dereference).  No device/profile owner, active
+// admin, password policy enforcement or provisioning exists.
+// ---------------------------------------------------------------------------
+
+const P36G_ACTION: &str = "Landroid/service/credentials/Action;";
+const P36G_BEGIN_CREATE_REQ: &str = "Landroid/service/credentials/BeginCreateCredentialRequest;";
+const P36G_BEGIN_CREATE_RESP: &str = "Landroid/service/credentials/BeginCreateCredentialResponse;";
+const P36G_BEGIN_CREATE_RESP_BUILDER: &str =
+    "Landroid/service/credentials/BeginCreateCredentialResponse$Builder;";
+const P36G_BEGIN_GET_OPTION: &str = "Landroid/service/credentials/BeginGetCredentialOption;";
+const P36G_BEGIN_GET_REQ: &str = "Landroid/service/credentials/BeginGetCredentialRequest;";
+const P36G_BEGIN_GET_REQ_BUILDER: &str =
+    "Landroid/service/credentials/BeginGetCredentialRequest$Builder;";
+const P36G_BEGIN_GET_RESP: &str = "Landroid/service/credentials/BeginGetCredentialResponse;";
+const P36G_BEGIN_GET_RESP_BUILDER: &str =
+    "Landroid/service/credentials/BeginGetCredentialResponse$Builder;";
+const P36G_CALLING_APP_INFO: &str = "Landroid/service/credentials/CallingAppInfo;";
+const P36G_CLEAR_REQ: &str = "Landroid/service/credentials/ClearCredentialStateRequest;";
+const P36G_CREATE_REQ: &str = "Landroid/service/credentials/CreateCredentialRequest;";
+const P36G_CREATE_ENTRY: &str = "Landroid/service/credentials/CreateEntry;";
+const P36G_CREDENTIAL_ENTRY: &str = "Landroid/service/credentials/CredentialEntry;";
+const P36G_PROVIDER_SERVICE: &str = "Landroid/service/credentials/CredentialProviderService;";
+const P36G_GET_REQ: &str = "Landroid/service/credentials/GetCredentialRequest;";
+const P36G_REMOTE_ENTRY: &str = "Landroid/service/credentials/RemoteEntry;";
+const P36G_CREDENTIAL_OPTION: &str = "Landroid/credentials/CredentialOption;";
+const P36G_CREDENTIAL_OPTION_BUILDER: &str = "Landroid/credentials/CredentialOption$Builder;";
+const P36G_DPM: &str = "Landroid/app/admin/DevicePolicyManager;";
+const P36G_UPDATE_POLICY: &str = "Landroid/app/admin/SystemUpdatePolicy;";
+const P36G_VALIDATION_FAILED: &str =
+    "Landroid/app/admin/SystemUpdatePolicy$ValidationFailedException;";
+
+fn partial36g_host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    let text = match (owner, field) {
+        (P36G_PROVIDER_SERVICE, "SERVICE_INTERFACE") => {
+            Some("android.service.credentials.CredentialProviderService")
+        }
+        (P36G_PROVIDER_SERVICE, "SYSTEM_SERVICE_INTERFACE") => {
+            Some("android.service.credentials.system.CredentialProviderService")
+        }
+        (P36G_PROVIDER_SERVICE, "SERVICE_META_DATA") => Some("android.credentials.provider"),
+        (P36G_PROVIDER_SERVICE, "EXTRA_CREATE_CREDENTIAL_REQUEST") => {
+            Some("android.service.credentials.extra.CREATE_CREDENTIAL_REQUEST")
+        }
+        (P36G_PROVIDER_SERVICE, "EXTRA_GET_CREDENTIAL_REQUEST") => {
+            Some("android.service.credentials.extra.GET_CREDENTIAL_REQUEST")
+        }
+        (P36G_PROVIDER_SERVICE, "EXTRA_CREATE_CREDENTIAL_RESPONSE") => {
+            Some("android.service.credentials.extra.CREATE_CREDENTIAL_RESPONSE")
+        }
+        (P36G_PROVIDER_SERVICE, "EXTRA_GET_CREDENTIAL_RESPONSE") => {
+            Some("android.service.credentials.extra.GET_CREDENTIAL_RESPONSE")
+        }
+        (P36G_PROVIDER_SERVICE, "EXTRA_BEGIN_GET_CREDENTIAL_RESPONSE") => {
+            Some("android.service.credentials.extra.BEGIN_GET_CREDENTIAL_RESPONSE")
+        }
+        (P36G_PROVIDER_SERVICE, "EXTRA_GET_CREDENTIAL_EXCEPTION") => {
+            Some("android.service.credentials.extra.GET_CREDENTIAL_EXCEPTION")
+        }
+        (P36G_PROVIDER_SERVICE, "EXTRA_CREATE_CREDENTIAL_EXCEPTION") => {
+            Some("android.service.credentials.extra.CREATE_CREDENTIAL_EXCEPTION")
+        }
+        (P36G_PROVIDER_SERVICE, "EXTRA_BEGIN_GET_CREDENTIAL_REQUEST") => {
+            Some("android.service.credentials.extra.BEGIN_GET_CREDENTIAL_REQUEST")
+        }
+        (P36G_CREDENTIAL_OPTION, "SUPPORTED_ELEMENT_KEYS") => {
+            Some("android.credentials.GetCredentialOption.SUPPORTED_ELEMENT_KEYS")
+        }
+        (P36G_DPM, "EXTRA_DEVICE_ADMIN") => Some("android.app.extra.DEVICE_ADMIN"),
+        _ => None,
+    };
+    if let Some(text) = text {
+        return jstr(vm, text).map(Some);
+    }
+    let int = match (owner, field) {
+        (P36G_UPDATE_POLICY, "TYPE_INSTALL_AUTOMATIC") => Some(1),
+        (P36G_UPDATE_POLICY, "TYPE_INSTALL_WINDOWED") => Some(2),
+        (P36G_UPDATE_POLICY, "TYPE_POSTPONE") => Some(3),
+        (P36G_UPDATE_POLICY, "TYPE_PAUSE") => Some(4),
+        (P36G_DPM, "PASSWORD_QUALITY_UNSPECIFIED") => Some(0),
+        (P36G_DPM, "PASSWORD_QUALITY_BIOMETRIC_WEAK") => Some(0x8000),
+        (P36G_DPM, "PASSWORD_QUALITY_SOMETHING") => Some(0x10000),
+        (P36G_DPM, "PASSWORD_QUALITY_NUMERIC") => Some(0x20000),
+        (P36G_DPM, "PASSWORD_QUALITY_NUMERIC_COMPLEX") => Some(0x30000),
+        (P36G_DPM, "PASSWORD_QUALITY_ALPHABETIC") => Some(0x40000),
+        (P36G_DPM, "PASSWORD_QUALITY_ALPHANUMERIC") => Some(0x50000),
+        (P36G_DPM, "PASSWORD_QUALITY_COMPLEX") => Some(0x60000),
+        (P36G_DPM, "PASSWORD_QUALITY_MANAGED") => Some(0x80000),
+        (P36G_DPM, "PASSWORD_COMPLEXITY_NONE") => Some(0),
+        (P36G_DPM, "PASSWORD_COMPLEXITY_LOW") => Some(0x10000),
+        (P36G_DPM, "PASSWORD_COMPLEXITY_MEDIUM") => Some(0x30000),
+        (P36G_DPM, "PASSWORD_COMPLEXITY_HIGH") => Some(0x50000),
+        (P36G_DPM, "ENCRYPTION_STATUS_UNSUPPORTED") => Some(0),
+        (P36G_DPM, "ENCRYPTION_STATUS_INACTIVE") => Some(1),
+        (P36G_DPM, "ENCRYPTION_STATUS_ACTIVATING") => Some(2),
+        (P36G_DPM, "ENCRYPTION_STATUS_ACTIVE") => Some(3),
+        (P36G_DPM, "ENCRYPTION_STATUS_ACTIVE_DEFAULT_KEY") => Some(4),
+        (P36G_DPM, "ENCRYPTION_STATUS_ACTIVE_PER_USER") => Some(5),
+        _ => None,
+    };
+    if let Some(value) = int {
+        return Ok(Some(Value::Int(value)));
+    }
+    if (owner, field) == (P36G_DPM, "DEFAULT_STRONG_AUTH_TIMEOUT_MS") {
+        return Ok(Some(Value::Long(72 * 60 * 60 * 1000)));
+    }
+    Ok(None)
+}
+
+fn p36g_is_class(class: &str) -> bool {
+    matches!(
+        class,
+        P36G_ACTION
+            | P36G_BEGIN_CREATE_REQ
+            | P36G_BEGIN_CREATE_RESP
+            | P36G_BEGIN_CREATE_RESP_BUILDER
+            | P36G_BEGIN_GET_OPTION
+            | P36G_BEGIN_GET_REQ
+            | P36G_BEGIN_GET_REQ_BUILDER
+            | P36G_BEGIN_GET_RESP
+            | P36G_BEGIN_GET_RESP_BUILDER
+            | P36G_CALLING_APP_INFO
+            | P36G_CLEAR_REQ
+            | P36G_CREATE_REQ
+            | P36G_CREATE_ENTRY
+            | P36G_CREDENTIAL_ENTRY
+            | P36G_PROVIDER_SERVICE
+            | P36G_GET_REQ
+            | P36G_REMOTE_ENTRY
+            | P36G_CREDENTIAL_OPTION
+            | P36G_CREDENTIAL_OPTION_BUILDER
+            | P36G_DPM
+            | P36G_UPDATE_POLICY
+            | P36G_VALIDATION_FAILED
+    )
+}
+
+fn partial36g_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class != P36G_UPDATE_POLICY {
+        return Ok(None);
+    }
+    let make = |vm: &mut Engine, kind: i32, start: i32, end: i32| -> Result<Value, VmExit> {
+        let policy = alloc_obj(vm, P36G_UPDATE_POLICY, Vec::new())?;
+        let freezes = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+        put(vm, policy, "mPolicyType", Value::Int(kind))?;
+        put(vm, policy, "mMaintenanceWindowStart", Value::Int(start))?;
+        put(vm, policy, "mMaintenanceWindowEnd", Value::Int(end))?;
+        put(vm, policy, "mFreezePeriods", Value::Obj(freezes))?;
+        Ok(Value::Obj(policy))
+    };
+    Ok(Some(match (name, sig) {
+        ("createAutomaticInstallPolicy", "()Landroid/app/admin/SystemUpdatePolicy;") => {
+            make(vm, 1, 0, 0)?
+        }
+        ("createPostponeInstallPolicy", "()Landroid/app/admin/SystemUpdatePolicy;") => {
+            make(vm, 3, 0, 0)?
+        }
+        ("createWindowedInstallPolicy", "(II)Landroid/app/admin/SystemUpdatePolicy;") => {
+            let (start, end) = (iarg(args, 0), iarg(args, 1));
+            if !(0..1440).contains(&start) || !(0..1440).contains(&end) {
+                return Err(iae("startTime and endTime must be inside [0, 1440)"));
+            }
+            make(vm, 2, start, end)?
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn partial36g_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let class = if p36g_is_class(recv_class) {
+        recv_class
+    } else if p36g_is_class(mref_class) {
+        mref_class
+    } else {
+        return Ok(None);
+    };
+    // CredentialProviderService is abstract: only its final onBind and
+    // onCreate super-call are modelled, never the abstract callbacks a
+    // guest subclass implements.
+    if class == P36G_PROVIDER_SERVICE && !matches!(name, "onBind" | "onCreate" | "<init>") {
+        return Ok(None);
+    }
+    match class {
+        P36G_ACTION | P36G_CREATE_ENTRY | P36G_REMOTE_ENTRY => {
+            p36g_slice_entry_instance(vm, name, sig, recv, args)
+        }
+        P36G_BEGIN_GET_OPTION => p36g_begin_get_option_instance(vm, name, sig, recv, args),
+        P36G_CALLING_APP_INFO => p36g_calling_app_info_instance(vm, name, sig, recv, args),
+        P36G_BEGIN_GET_REQ => Ok(Some(match (name, sig) {
+            ("getCallingAppInfo", "()Landroid/service/credentials/CallingAppInfo;") => {
+                get(vm, recv, "mCallingAppInfo")
+            }
+            ("getBeginGetCredentialOptions", "()Ljava/util/List;") => {
+                get(vm, recv, "mBeginGetCredentialOptions")
+            }
+            _ => return Ok(None),
+        })),
+        P36G_BEGIN_GET_REQ_BUILDER => p36g_begin_get_req_builder_instance(vm, name, sig, recv, args),
+        P36G_GET_REQ => Ok(Some(match (name, sig) {
+            (
+                "<init>",
+                "(Landroid/service/credentials/CallingAppInfo;Ljava/util/List;)V",
+            ) => {
+                req_obj(args, 0, "callingAppInfo must not be null")?;
+                req_obj(args, 1, "credentialOptions must not be null")?;
+                put(vm, recv, "mCallingAppInfo", p36a_value(args, 0))?;
+                put(vm, recv, "mCredentialOptions", p36a_value(args, 1))?;
+                Value::Null
+            }
+            ("getCallingAppInfo", "()Landroid/service/credentials/CallingAppInfo;") => {
+                get(vm, recv, "mCallingAppInfo")
+            }
+            ("getCredentialOptions", "()Ljava/util/List;") => get(vm, recv, "mCredentialOptions"),
+            _ => return Ok(None),
+        })),
+        P36G_BEGIN_CREATE_REQ => p36g_begin_create_req_instance(vm, name, sig, recv, args),
+        P36G_CREATE_REQ => Ok(Some(match (name, sig) {
+            (
+                "<init>",
+                "(Landroid/service/credentials/CallingAppInfo;Ljava/lang/String;Landroid/os/Bundle;)V",
+            ) => {
+                req_obj(args, 0, "callingAppInfo must not be null")?;
+                let kind = p36g_check_string_not_empty(
+                    vm,
+                    &p36a_value(args, 1),
+                    "type must not be null or empty",
+                )?;
+                req_obj(args, 2, "data must not be null")?;
+                put(vm, recv, "mCallingAppInfo", p36a_value(args, 0))?;
+                put(vm, recv, "mType", kind)?;
+                put(vm, recv, "mData", p36a_value(args, 2))?;
+                Value::Null
+            }
+            ("getCallingAppInfo", "()Landroid/service/credentials/CallingAppInfo;") => {
+                get(vm, recv, "mCallingAppInfo")
+            }
+            ("getType", "()Ljava/lang/String;") => get(vm, recv, "mType"),
+            ("getData", "()Landroid/os/Bundle;") => get(vm, recv, "mData"),
+            _ => return Ok(None),
+        })),
+        P36G_CLEAR_REQ => Ok(Some(match (name, sig) {
+            (
+                "<init>",
+                "(Landroid/service/credentials/CallingAppInfo;Landroid/os/Bundle;)V",
+            ) => {
+                req_obj(args, 0, "callingAppInfo must not be null")?;
+                req_obj(args, 1, "data must not be null")?;
+                put(vm, recv, "mCallingAppInfo", p36a_value(args, 0))?;
+                put(vm, recv, "mData", p36a_value(args, 1))?;
+                Value::Null
+            }
+            ("getCallingAppInfo", "()Landroid/service/credentials/CallingAppInfo;") => {
+                get(vm, recv, "mCallingAppInfo")
+            }
+            ("getData", "()Landroid/os/Bundle;") => get(vm, recv, "mData"),
+            _ => return Ok(None),
+        })),
+        P36G_CREDENTIAL_ENTRY => p36g_credential_entry_instance(vm, name, sig, recv, args),
+        P36G_BEGIN_GET_RESP => p36g_begin_get_resp_instance(vm, name, sig, recv, args),
+        P36G_BEGIN_GET_RESP_BUILDER => {
+            p36g_begin_get_resp_builder_instance(vm, name, sig, recv, args)
+        }
+        P36G_BEGIN_CREATE_RESP => Ok(Some(match (name, sig) {
+            ("<init>", "()V") => {
+                let entries = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+                put(vm, recv, "mCreateEntries", Value::Obj(entries))?;
+                put(vm, recv, "mRemoteCreateEntry", Value::Null)?;
+                Value::Null
+            }
+            ("getCreateEntries", "()Ljava/util/List;") => get(vm, recv, "mCreateEntries"),
+            ("getRemoteCreateEntry", "()Landroid/service/credentials/RemoteEntry;") => {
+                get(vm, recv, "mRemoteCreateEntry")
+            }
+            _ => return Ok(None),
+        })),
+        P36G_BEGIN_CREATE_RESP_BUILDER => {
+            p36g_begin_create_resp_builder_instance(vm, name, sig, recv, args)
+        }
+        P36G_CREDENTIAL_OPTION => Ok(Some(match (name, sig) {
+            ("getType", "()Ljava/lang/String;") => get(vm, recv, "mType"),
+            ("getCredentialRetrievalData", "()Landroid/os/Bundle;") => {
+                get(vm, recv, "mCredentialRetrievalData")
+            }
+            ("getCandidateQueryData", "()Landroid/os/Bundle;") => {
+                get(vm, recv, "mCandidateQueryData")
+            }
+            ("isSystemProviderRequired", "()Z") => {
+                Value::Int(i32::from(field_bool(vm, recv, "mIsSystemProviderRequired")))
+            }
+            ("getAllowedProviders", "()Ljava/util/Set;") => get(vm, recv, "mAllowedProviders"),
+            _ => return Ok(None),
+        })),
+        P36G_CREDENTIAL_OPTION_BUILDER => {
+            p36g_credential_option_builder_instance(vm, name, sig, recv, args)
+        }
+        P36G_PROVIDER_SERVICE => p36g_provider_service_instance(vm, name, sig, recv, args),
+        P36G_DPM => p36g_dpm_instance(vm, name, sig, recv, args),
+        P36G_UPDATE_POLICY => Ok(Some(match (name, sig) {
+            ("<init>", "()V") => {
+                let freezes = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+                put(vm, recv, "mPolicyType", Value::Int(-1))?;
+                put(vm, recv, "mFreezePeriods", Value::Obj(freezes))?;
+                Value::Null
+            }
+            ("getPolicyType", "()I") => Value::Int(field_int(vm, recv, "mPolicyType")),
+            ("getInstallWindowStart", "()I") => {
+                if field_int(vm, recv, "mPolicyType") == 2 {
+                    Value::Int(field_int(vm, recv, "mMaintenanceWindowStart"))
+                } else {
+                    Value::Int(-1)
+                }
+            }
+            ("getInstallWindowEnd", "()I") => {
+                if field_int(vm, recv, "mPolicyType") == 2 {
+                    Value::Int(field_int(vm, recv, "mMaintenanceWindowEnd"))
+                } else {
+                    Value::Int(-1)
+                }
+            }
+            ("getFreezePeriods", "()Ljava/util/List;") => get(vm, recv, "mFreezePeriods"),
+            ("toString", "()Ljava/lang/String;") => {
+                let mut freezes = Vec::new();
+                for item in collection_items(vm, Some(&get(vm, recv, "mFreezePeriods"))) {
+                    freezes.push(value_string(vm, &item)?);
+                }
+                jstr(
+                    vm,
+                    format!(
+                        "SystemUpdatePolicy (type: {}, windowStart: {}, windowEnd: {}, freezes: [{}])",
+                        field_int(vm, recv, "mPolicyType"),
+                        field_int(vm, recv, "mMaintenanceWindowStart"),
+                        field_int(vm, recv, "mMaintenanceWindowEnd"),
+                        freezes.join(",")
+                    ),
+                )?
+            }
+            _ => return Ok(None),
+        })),
+        P36G_VALIDATION_FAILED => Ok(Some(match (name, sig) {
+            ("getErrorCode", "()I") => Value::Int(field_int(vm, recv, "mErrorCode")),
+            _ => return Ok(None),
+        })),
+        _ => Ok(None),
+    }
+}
+
+// --- credentials helpers -----------------------------------------------------
+
+fn p36g_check_string_not_empty(vm: &Engine, value: &Value, message: &str) -> Result<Value, VmExit> {
+    match opt_str(vm, Some(value)) {
+        Some(text) if !text.is_empty() => Ok(value.clone()),
+        _ => Err(iae(message)),
+    }
+}
+
+fn p36g_collection_not_empty(vm: &Engine, value: &Value, name: &str) -> Result<Vec<Value>, VmExit> {
+    if !matches!(value, Value::Obj(_)) {
+        return Err(npe(&format!("{name} must not be null")));
+    }
+    let items = collection_items(vm, Some(value));
+    if items.is_empty() {
+        return Err(iae(format!("{name} is empty")));
+    }
+    Ok(items)
+}
+
+fn p36g_elements_not_null(items: &[Value], name: &str) -> Result<(), VmExit> {
+    if items.iter().any(|item| matches!(item, Value::Null)) {
+        return Err(npe(&format!("{name} element must not be null")));
+    }
+    Ok(())
+}
+
+fn p36g_list_push(vm: &mut Engine, list: ObjRef, value: Value) -> Result<(), VmExit> {
+    if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&list) {
+        elems.push(value);
+        return Ok(());
+    }
+    vm.invoke_instance(list, "add", "(Ljava/lang/Object;)Z", &[value])?;
+    Ok(())
+}
+
+fn p36g_builder_list(vm: &mut Engine, recv: ObjRef, field: &str) -> Result<ObjRef, VmExit> {
+    if let Some(list) = field_obj(vm, recv, field) {
+        return Ok(list);
+    }
+    let list = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+    put(vm, recv, field, Value::Obj(list))?;
+    Ok(list)
+}
+
+fn p36g_slice_entry_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/app/slice/Slice;)V") => {
+            req_obj(args, 0, "slice must not be null")?;
+            put(vm, recv, "mSlice", p36a_value(args, 0))?;
+            Value::Null
+        }
+        ("getSlice", "()Landroid/app/slice/Slice;") => get(vm, recv, "mSlice"),
+        _ => return Ok(None),
+    }))
+}
+
+fn p36g_begin_get_option_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V") => {
+            let id = p36g_check_string_not_empty(vm, &p36a_value(args, 0), "id must not be empty")?;
+            let kind =
+                p36g_check_string_not_empty(vm, &p36a_value(args, 1), "type must not be empty")?;
+            let copy = p36e_clone_bundle(vm, &p36a_value(args, 2))?;
+            let Value::Obj(copy_ref) = copy else {
+                return Err(npe("candidateQueryData"));
+            };
+            let key = jstr(
+                vm,
+                "android.service.credentials.BeginGetCredentialOption.BUNDLE_ID_KEY",
+            )?;
+            vm.invoke_instance(
+                copy_ref,
+                "putString",
+                "(Ljava/lang/String;Ljava/lang/String;)V",
+                &[key, id.clone()],
+            )?;
+            put(vm, recv, "mId", id)?;
+            put(vm, recv, "mType", kind)?;
+            put(vm, recv, "mCandidateQueryData", copy)?;
+            Value::Null
+        }
+        ("getId", "()Ljava/lang/String;") => get(vm, recv, "mId"),
+        ("getType", "()Ljava/lang/String;") => get(vm, recv, "mType"),
+        ("getCandidateQueryData", "()Landroid/os/Bundle;") => get(vm, recv, "mCandidateQueryData"),
+        ("toString", "()Ljava/lang/String;") => {
+            let kind = value_string(vm, &get(vm, recv, "mType"))?;
+            let data = value_string(vm, &get(vm, recv, "mCandidateQueryData"))?;
+            let id = value_string(vm, &get(vm, recv, "mId"))?;
+            jstr(
+                vm,
+                format!("GetCredentialOption {{type={kind}, candidateQueryData={data}, id={id}}}"),
+            )?
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p36g_calling_app_info_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;Landroid/content/pm/SigningInfo;)V")
+        | ("<init>", "(Ljava/lang/String;Landroid/content/pm/SigningInfo;Ljava/lang/String;)V") => {
+            let package = p36g_check_string_not_empty(
+                vm,
+                &p36a_value(args, 0),
+                "package namemust not be null or empty",
+            )?;
+            req_obj(args, 1, "signingInfo")?;
+            put(vm, recv, "mPackageName", package)?;
+            put(vm, recv, "mSigningInfo", p36a_value(args, 1))?;
+            put(
+                vm,
+                recv,
+                "mOrigin",
+                if args.len() > 2 {
+                    p36a_value(args, 2)
+                } else {
+                    Value::Null
+                },
+            )?;
+            Value::Null
+        }
+        ("getPackageName", "()Ljava/lang/String;") => get(vm, recv, "mPackageName"),
+        ("getSigningInfo", "()Landroid/content/pm/SigningInfo;") => get(vm, recv, "mSigningInfo"),
+        ("getOrigin", "()Ljava/lang/String;") => get(vm, recv, "mOrigin"),
+        _ => return Ok(None),
+    }))
+}
+
+fn p36g_begin_get_req_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            let options = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+            put(vm, recv, "mCallingAppInfo", Value::Null)?;
+            put(vm, recv, "mBeginGetCredentialOptions", Value::Obj(options))?;
+            Value::Null
+        }
+        (
+            "setCallingAppInfo",
+            "(Landroid/service/credentials/CallingAppInfo;)Landroid/service/credentials/BeginGetCredentialRequest$Builder;",
+        ) => {
+            put(vm, recv, "mCallingAppInfo", p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        (
+            "setBeginGetCredentialOptions",
+            "(Ljava/util/List;)Landroid/service/credentials/BeginGetCredentialRequest$Builder;",
+        ) => {
+            let value = p36a_value(args, 0);
+            let items = p36g_collection_not_empty(vm, &value, "getBeginCredentialOptions")?;
+            p36g_elements_not_null(&items, "getBeginCredentialOptions")?;
+            put(vm, recv, "mBeginGetCredentialOptions", value)?;
+            Value::Obj(recv)
+        }
+        (
+            "addBeginGetCredentialOption",
+            "(Landroid/service/credentials/BeginGetCredentialOption;)Landroid/service/credentials/BeginGetCredentialRequest$Builder;",
+        ) => {
+            req_obj(args, 0, "beginGetCredentialOption must not be null")?;
+            let list = p36g_builder_list(vm, recv, "mBeginGetCredentialOptions")?;
+            p36g_list_push(vm, list, p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/service/credentials/BeginGetCredentialRequest;") => {
+            let options = get(vm, recv, "mBeginGetCredentialOptions");
+            p36g_collection_not_empty(vm, &options, "beginGetCredentialOptions")?;
+            let request = alloc_obj(vm, P36G_BEGIN_GET_REQ, Vec::new())?;
+            put(vm, request, "mCallingAppInfo", get(vm, recv, "mCallingAppInfo"))?;
+            put(vm, request, "mBeginGetCredentialOptions", options)?;
+            Value::Obj(request)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p36g_begin_create_req_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;Landroid/os/Bundle;)V")
+        | (
+            "<init>",
+            "(Ljava/lang/String;Landroid/os/Bundle;Landroid/service/credentials/CallingAppInfo;)V",
+        ) => {
+            let kind = p36g_check_string_not_empty(
+                vm,
+                &p36a_value(args, 0),
+                "type must not be null or empty",
+            )?;
+            let copy = p36e_clone_bundle(vm, &p36a_value(args, 1))?;
+            put(vm, recv, "mType", kind)?;
+            put(vm, recv, "mData", copy)?;
+            put(
+                vm,
+                recv,
+                "mCallingAppInfo",
+                if args.len() > 2 {
+                    p36a_value(args, 2)
+                } else {
+                    Value::Null
+                },
+            )?;
+            Value::Null
+        }
+        ("getCallingAppInfo", "()Landroid/service/credentials/CallingAppInfo;") => {
+            get(vm, recv, "mCallingAppInfo")
+        }
+        ("getType", "()Ljava/lang/String;") => get(vm, recv, "mType"),
+        ("getData", "()Landroid/os/Bundle;") => get(vm, recv, "mData"),
+        _ => return Ok(None),
+    }))
+}
+
+fn p36g_credential_entry_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;Landroid/app/slice/Slice;)V") => {
+            let id = p36g_check_string_not_empty(
+                vm,
+                &p36a_value(args, 0),
+                "beginGetCredentialOptionId must not be null, or empty",
+            )?;
+            let kind = p36g_check_string_not_empty(
+                vm,
+                &p36a_value(args, 1),
+                "type must not be null, or empty",
+            )?;
+            req_obj(args, 2, "slice must not be null")?;
+            put(vm, recv, "mBeginGetCredentialOptionId", id)?;
+            put(vm, recv, "mType", kind)?;
+            put(vm, recv, "mSlice", p36a_value(args, 2))?;
+            Value::Null
+        }
+        (
+            "<init>",
+            "(Landroid/service/credentials/BeginGetCredentialOption;Landroid/app/slice/Slice;)V",
+        ) => {
+            let option = req_obj(args, 0, "beginGetCredentialOption must not be null")?;
+            let id = p36g_check_string_not_empty(
+                vm,
+                &get(vm, option, "mId"),
+                "Id in beginGetCredentialOption must not be null",
+            )?;
+            let kind = p36g_check_string_not_empty(
+                vm,
+                &get(vm, option, "mType"),
+                "type in beginGetCredentialOption must not be null",
+            )?;
+            req_obj(args, 1, "slice must not be null")?;
+            put(vm, recv, "mBeginGetCredentialOptionId", id)?;
+            put(vm, recv, "mType", kind)?;
+            put(vm, recv, "mSlice", p36a_value(args, 1))?;
+            Value::Null
+        }
+        ("<init>", "(Ljava/lang/String;Landroid/app/slice/Slice;)V") => {
+            // This overload uses requireNonNull(type): empty is allowed.
+            req_obj(args, 0, "type must not be null")?;
+            req_obj(args, 1, "slice must not be null")?;
+            put(vm, recv, "mBeginGetCredentialOptionId", Value::Null)?;
+            put(vm, recv, "mType", p36a_value(args, 0))?;
+            put(vm, recv, "mSlice", p36a_value(args, 1))?;
+            Value::Null
+        }
+        ("getBeginGetCredentialOptionId", "()Ljava/lang/String;") => {
+            get(vm, recv, "mBeginGetCredentialOptionId")
+        }
+        ("getType", "()Ljava/lang/String;") => get(vm, recv, "mType"),
+        ("getSlice", "()Landroid/app/slice/Slice;") => get(vm, recv, "mSlice"),
+        _ => return Ok(None),
+    }))
+}
+
+fn p36g_begin_get_resp_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    _args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            for field in ["mCredentialEntries", "mAuthenticationEntries", "mActions"] {
+                let list = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+                put(vm, recv, field, Value::Obj(list))?;
+            }
+            put(vm, recv, "mRemoteCredentialEntry", Value::Null)?;
+            Value::Null
+        }
+        ("getCredentialEntries", "()Ljava/util/List;") => get(vm, recv, "mCredentialEntries"),
+        ("getAuthenticationActions", "()Ljava/util/List;") => {
+            get(vm, recv, "mAuthenticationEntries")
+        }
+        ("getActions", "()Ljava/util/List;") => get(vm, recv, "mActions"),
+        ("getRemoteCredentialEntry", "()Landroid/service/credentials/RemoteEntry;") => {
+            get(vm, recv, "mRemoteCredentialEntry")
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p36g_begin_get_resp_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    const RETURN: &str = "Landroid/service/credentials/BeginGetCredentialResponse$Builder;";
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            for field in ["mCredentialEntries", "mAuthenticationEntries", "mActions"] {
+                let list = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+                put(vm, recv, field, Value::Obj(list))?;
+            }
+            put(vm, recv, "mRemoteCredentialEntry", Value::Null)?;
+            Value::Null
+        }
+        ("setRemoteCredentialEntry", s)
+            if s == format!("(Landroid/service/credentials/RemoteEntry;){RETURN}") =>
+        {
+            put(vm, recv, "mRemoteCredentialEntry", p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("addCredentialEntry", s)
+            if s == format!("(Landroid/service/credentials/CredentialEntry;){RETURN}") =>
+        {
+            req_obj(args, 0, "credentialEntry")?;
+            let list = p36g_builder_list(vm, recv, "mCredentialEntries")?;
+            p36g_list_push(vm, list, p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("addAuthenticationAction", s)
+            if s == format!("(Landroid/service/credentials/Action;){RETURN}") =>
+        {
+            req_obj(args, 0, "authenticationAction")?;
+            let list = p36g_builder_list(vm, recv, "mAuthenticationEntries")?;
+            p36g_list_push(vm, list, p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("addAction", s) if s == format!("(Landroid/service/credentials/Action;){RETURN}") => {
+            req_obj(args, 0, "action must not be null")?;
+            let list = p36g_builder_list(vm, recv, "mActions")?;
+            p36g_list_push(vm, list, p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("setActions", s) if s == format!("(Ljava/util/List;){RETURN}") => {
+            let value = p36a_value(args, 0);
+            if !matches!(value, Value::Obj(_)) {
+                return Err(npe("actions must not be null"));
+            }
+            p36g_elements_not_null(&collection_items(vm, Some(&value)), "actions")?;
+            put(vm, recv, "mActions", value)?;
+            Value::Obj(recv)
+        }
+        ("setCredentialEntries", s) if s == format!("(Ljava/util/List;){RETURN}") => {
+            let value = p36a_value(args, 0);
+            if !matches!(value, Value::Obj(_)) {
+                return Err(npe("credentialEntries must not be null"));
+            }
+            p36g_elements_not_null(&collection_items(vm, Some(&value)), "credentialEntries")?;
+            put(vm, recv, "mCredentialEntries", value)?;
+            Value::Obj(recv)
+        }
+        ("setAuthenticationActions", s) if s == format!("(Ljava/util/List;){RETURN}") => {
+            let value = p36a_value(args, 0);
+            if !matches!(value, Value::Obj(_)) {
+                return Err(npe("authenticationActions must not be null"));
+            }
+            p36g_elements_not_null(&collection_items(vm, Some(&value)), "authenticationActions")?;
+            put(vm, recv, "mAuthenticationEntries", value)?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/service/credentials/BeginGetCredentialResponse;") => {
+            let response = alloc_obj(vm, P36G_BEGIN_GET_RESP, Vec::new())?;
+            for field in [
+                "mCredentialEntries",
+                "mAuthenticationEntries",
+                "mActions",
+                "mRemoteCredentialEntry",
+            ] {
+                let value = get(vm, recv, field);
+                put(vm, response, field, value)?;
+            }
+            Value::Obj(response)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p36g_begin_create_resp_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    const RETURN: &str = "Landroid/service/credentials/BeginCreateCredentialResponse$Builder;";
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") => {
+            let entries = new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?;
+            put(vm, recv, "mCreateEntries", Value::Obj(entries))?;
+            put(vm, recv, "mRemoteCreateEntry", Value::Null)?;
+            Value::Null
+        }
+        ("setCreateEntries", s) if s == format!("(Ljava/util/List;){RETURN}") => {
+            let value = p36a_value(args, 0);
+            let items = p36g_collection_not_empty(vm, &value, "createEntries")?;
+            p36g_elements_not_null(&items, "createEntries")?;
+            put(vm, recv, "mCreateEntries", value)?;
+            Value::Obj(recv)
+        }
+        ("addCreateEntry", s)
+            if s == format!("(Landroid/service/credentials/CreateEntry;){RETURN}") =>
+        {
+            req_obj(args, 0, "createEntry")?;
+            let list = p36g_builder_list(vm, recv, "mCreateEntries")?;
+            p36g_list_push(vm, list, p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("setRemoteCreateEntry", s)
+            if s == format!("(Landroid/service/credentials/RemoteEntry;){RETURN}") =>
+        {
+            put(vm, recv, "mRemoteCreateEntry", p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/service/credentials/BeginCreateCredentialResponse;") => {
+            let response = alloc_obj(vm, P36G_BEGIN_CREATE_RESP, Vec::new())?;
+            put(
+                vm,
+                response,
+                "mCreateEntries",
+                get(vm, recv, "mCreateEntries"),
+            )?;
+            put(
+                vm,
+                response,
+                "mRemoteCreateEntry",
+                get(vm, recv, "mRemoteCreateEntry"),
+            )?;
+            Value::Obj(response)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p36g_credential_option_builder_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    const RETURN: &str = "Landroid/credentials/CredentialOption$Builder;";
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Ljava/lang/String;Landroid/os/Bundle;Landroid/os/Bundle;)V") => {
+            let kind = p36g_check_string_not_empty(
+                vm,
+                &p36a_value(args, 0),
+                "type must not be null, or empty",
+            )?;
+            req_obj(args, 1, "credentialRetrievalData must not be null")?;
+            req_obj(args, 2, "candidateQueryData must not be null")?;
+            let allowed = new_collection(vm, "Landroid/util/ArraySet;", Vec::new())?;
+            put(vm, recv, "mType", kind)?;
+            put(vm, recv, "mCredentialRetrievalData", p36a_value(args, 1))?;
+            put(vm, recv, "mCandidateQueryData", p36a_value(args, 2))?;
+            put(vm, recv, "mIsSystemProviderRequired", Value::Int(0))?;
+            put(vm, recv, "mAllowedProviders", Value::Obj(allowed))?;
+            Value::Null
+        }
+        ("setIsSystemProviderRequired", s) if s == format!("(Z){RETURN}") => {
+            put(
+                vm,
+                recv,
+                "mIsSystemProviderRequired",
+                Value::Int(iarg(args, 0)),
+            )?;
+            Value::Obj(recv)
+        }
+        ("addAllowedProvider", s) if s == format!("(Landroid/content/ComponentName;){RETURN}") => {
+            req_obj(args, 0, "allowedProvider must not be null")?;
+            let list = p36g_builder_list(vm, recv, "mAllowedProviders")?;
+            p36g_list_push(vm, list, p36a_value(args, 0))?;
+            Value::Obj(recv)
+        }
+        ("setAllowedProviders", s) if s == format!("(Ljava/util/Set;){RETURN}") => {
+            let value = p36a_value(args, 0);
+            if !matches!(value, Value::Obj(_)) {
+                return Err(npe("allowedProviders must not be null"));
+            }
+            let items = collection_items(vm, Some(&value));
+            p36g_elements_not_null(&items, "allowedProviders")?;
+            let copy = new_collection(vm, "Landroid/util/ArraySet;", items)?;
+            put(vm, recv, "mAllowedProviders", Value::Obj(copy))?;
+            Value::Obj(recv)
+        }
+        ("build", "()Landroid/credentials/CredentialOption;") => {
+            let option = alloc_obj(vm, P36G_CREDENTIAL_OPTION, Vec::new())?;
+            for field in [
+                "mType",
+                "mCredentialRetrievalData",
+                "mCandidateQueryData",
+                "mIsSystemProviderRequired",
+                "mAllowedProviders",
+            ] {
+                let value = get(vm, recv, field);
+                put(vm, option, field, value)?;
+            }
+            Value::Obj(option)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+fn p36g_provider_service_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    Ok(Some(match (name, sig) {
+        ("<init>", "()V") | ("onCreate", "()V") => Value::Null,
+        ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
+            let Some(intent) = oarg(args, 0) else {
+                return Err(npe("intent"));
+            };
+            let action_value =
+                vm.invoke_instance(intent, "getAction", "()Ljava/lang/String;", &[])?;
+            let action = opt_str(vm, Some(&action_value));
+            if action.as_deref() == Some("android.service.credentials.CredentialProviderService") {
+                if let Some(binder) = field_obj(vm, recv, "rd_interface_binder") {
+                    Value::Obj(binder)
+                } else {
+                    let binder = alloc_obj(vm, "Landroid/os/Binder;", Vec::new())?;
+                    put(vm, recv, "rd_interface_binder", Value::Obj(binder))?;
+                    Value::Obj(binder)
+                }
+            } else {
+                Value::Null
+            }
+        }
+        _ => return Ok(None),
+    }))
+}
+
+// --- android.app.admin ---------------------------------------------------------
+
+fn p36g_dpm_parent(vm: &Engine, recv: ObjRef, function: &str) -> Result<(), VmExit> {
+    if field_bool(vm, recv, "mParentInstance") {
+        return Err(throw(
+            "Ljava/lang/SecurityException;",
+            format!("{function} cannot be called on the parent instance"),
+        ));
+    }
+    Ok(())
+}
+
+fn p36g_dpm_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // With a real IDevicePolicyManager bound there is nothing honest to
+    // return from the host; only the null-service branches are modelled.
+    let has_service = field_obj(vm, recv, "mService").is_some();
+    Ok(Some(match (name, sig) {
+        ("<init>", "(Landroid/content/Context;Landroid/app/admin/IDevicePolicyManager;)V")
+        | ("<init>", "(Landroid/content/Context;Landroid/app/admin/IDevicePolicyManager;Z)V") => {
+            put(vm, recv, "mContext", p36a_value(args, 0))?;
+            put(vm, recv, "mService", p36a_value(args, 1))?;
+            put(
+                vm,
+                recv,
+                "mParentInstance",
+                Value::Int(if args.len() > 2 { iarg(args, 2) } else { 0 }),
+            )?;
+            Value::Null
+        }
+        ("isAdminActive", "(Landroid/content/ComponentName;)Z") => {
+            p36g_dpm_parent(vm, recv, "isAdminActive")?;
+            if has_service {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        ("isAdminActiveAsUser", "(Landroid/content/ComponentName;I)Z") => {
+            if has_service {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        ("getActiveAdmins", "()Ljava/util/List;") => {
+            p36g_dpm_parent(vm, recv, "getActiveAdmins")?;
+            if has_service {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("getActiveAdminsAsUser", "(I)Ljava/util/List;") => {
+            if has_service {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("removeActiveAdmin", "(Landroid/content/ComponentName;)V") => {
+            p36g_dpm_parent(vm, recv, "removeActiveAdmin")?;
+            if has_service {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("hasGrantedPolicy", "(Landroid/content/ComponentName;I)Z") => {
+            p36g_dpm_parent(vm, recv, "hasGrantedPolicy")?;
+            if has_service {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        (
+            "getPasswordQuality"
+            | "getPasswordMinimumLength"
+            | "getPasswordMinimumLetters"
+            | "getPasswordMinimumUpperCase"
+            | "getPasswordMinimumLowerCase"
+            | "getPasswordMinimumNumeric"
+            | "getPasswordMinimumSymbols"
+            | "getPasswordMinimumNonLetter",
+            "(Landroid/content/ComponentName;)I" | "(Landroid/content/ComponentName;I)I",
+        ) => {
+            if has_service {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        ("setPasswordQuality", "(Landroid/content/ComponentName;I)V") => {
+            if has_service {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("getRequiredStrongAuthTimeout", "(Landroid/content/ComponentName;)J")
+        | ("getRequiredStrongAuthTimeout", "(Landroid/content/ComponentName;I)J") => {
+            if has_service {
+                return Ok(None);
+            }
+            Value::Long(72 * 60 * 60 * 1000)
+        }
+        ("getStorageEncryptionStatus", "()I") => {
+            p36g_dpm_parent(vm, recv, "getStorageEncryptionStatus")?;
+            if has_service {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        ("getStorageEncryptionStatus", "(I)I") => {
+            if has_service {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        ("isDeviceOwnerApp", "(Ljava/lang/String;)Z") => {
+            p36g_dpm_parent(vm, recv, "isDeviceOwnerApp")?;
+            if has_service {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        ("isDeviceOwnerAppOnCallingUser", "(Ljava/lang/String;)Z")
+        | ("isDeviceOwnerAppOnAnyUser", "(Ljava/lang/String;)Z") => {
+            if has_service {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        ("isProfileOwnerApp", "(Ljava/lang/String;)Z") => {
+            p36g_dpm_parent(vm, recv, "isProfileOwnerApp")?;
+            if has_service {
+                return Ok(None);
+            }
+            Value::Int(0)
+        }
+        ("getDeviceOwnerComponentOnCallingUser", "()Landroid/content/ComponentName;")
+        | ("getDeviceOwnerComponentOnAnyUser", "()Landroid/content/ComponentName;") => {
+            if has_service {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("getDeviceOwnerUserId", "()I") => {
+            if has_service {
+                return Ok(None);
+            }
+            // UserHandle.USER_NULL
+            Value::Int(-10000)
+        }
+        ("getSystemUpdatePolicy", "()Landroid/app/admin/SystemUpdatePolicy;") => {
+            p36g_dpm_parent(vm, recv, "getSystemUpdatePolicy")?;
+            if has_service {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        (
+            "setSystemUpdatePolicy",
+            "(Landroid/content/ComponentName;Landroid/app/admin/SystemUpdatePolicy;)V",
+        ) => {
+            p36g_dpm_parent(vm, recv, "setSystemUpdatePolicy")?;
+            if has_service {
+                return Ok(None);
+            }
+            Value::Null
+        }
+        ("isProvisioningAllowed", "(Ljava/lang/String;)Z") => {
+            p36g_dpm_parent(vm, recv, "isProvisioningAllowed")?;
+            if has_service {
+                return Ok(None);
+            }
+            // AOSP dereferences mService without a null check here.
+            return Err(npe("mService"));
         }
         _ => return Ok(None),
     }))

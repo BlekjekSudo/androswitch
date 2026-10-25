@@ -2261,6 +2261,7 @@ const SERVICES: &[(&str, &str)] = &[
     ("account", "Landroid/accounts/AccountManager;"),
     ("batterymanager", "Landroid/os/BatteryManager;"),
     ("wifi", "Landroid/net/wifi/WifiManager;"),
+    ("device_policy", "Landroid/app/admin/DevicePolicyManager;"),
     ("telephony", "Landroid/telephony/TelephonyManager;"),
     ("shortcut", "Landroid/content/pm/ShortcutManager;"),
     ("appwidget", "Landroid/appwidget/AppWidgetManager;"),

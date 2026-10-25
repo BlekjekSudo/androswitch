@@ -2080,6 +2080,39 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             "Ljava/lang/Throwable;",
             "Ljava/lang/Object;",
         ]),
+        // Appendix C Batch 36-G bounded credentials / device-admin slices.
+        "Landroid/service/credentials/Action;"
+        | "Landroid/service/credentials/BeginCreateCredentialRequest;"
+        | "Landroid/service/credentials/BeginCreateCredentialResponse;"
+        | "Landroid/service/credentials/BeginCreateCredentialResponse$Builder;"
+        | "Landroid/service/credentials/BeginGetCredentialOption;"
+        | "Landroid/service/credentials/BeginGetCredentialRequest;"
+        | "Landroid/service/credentials/BeginGetCredentialRequest$Builder;"
+        | "Landroid/service/credentials/BeginGetCredentialResponse;"
+        | "Landroid/service/credentials/BeginGetCredentialResponse$Builder;"
+        | "Landroid/service/credentials/CallingAppInfo;"
+        | "Landroid/service/credentials/ClearCredentialStateRequest;"
+        | "Landroid/service/credentials/CreateCredentialRequest;"
+        | "Landroid/service/credentials/CreateEntry;"
+        | "Landroid/service/credentials/CredentialEntry;"
+        | "Landroid/service/credentials/GetCredentialRequest;"
+        | "Landroid/service/credentials/RemoteEntry;"
+        | "Landroid/credentials/CredentialOption;"
+        | "Landroid/credentials/CredentialOption$Builder;"
+        | "Landroid/app/admin/DevicePolicyManager;"
+        | "Landroid/app/admin/SystemUpdatePolicy;" => Some(OBJECT),
+        "Landroid/service/credentials/CredentialProviderService;" => Some(&[
+            "Landroid/app/Service;",
+            "Landroid/content/Context;",
+            "Ljava/lang/Object;",
+        ]),
+        "Landroid/app/admin/SystemUpdatePolicy$ValidationFailedException;" => Some(&[
+            "Ljava/lang/IllegalArgumentException;",
+            "Ljava/lang/RuntimeException;",
+            "Ljava/lang/Exception;",
+            "Ljava/lang/Throwable;",
+            "Ljava/lang/Object;",
+        ]),
         _ => None,
     }
 }
@@ -2715,6 +2748,25 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         // Interfaces in the Batch 36-F bounded slices.
         "Landroid/graphics/pdf/PdfRenderer;" | "Landroid/graphics/pdf/PdfRenderer$Page;" => {
             Some(&["Ljava/lang/AutoCloseable;"])
+        }
+        // Interfaces in the Batch 36-G bounded slices.
+        "Landroid/service/credentials/Action;"
+        | "Landroid/service/credentials/BeginCreateCredentialRequest;"
+        | "Landroid/service/credentials/BeginCreateCredentialResponse;"
+        | "Landroid/service/credentials/BeginGetCredentialOption;"
+        | "Landroid/service/credentials/BeginGetCredentialRequest;"
+        | "Landroid/service/credentials/BeginGetCredentialResponse;"
+        | "Landroid/service/credentials/CallingAppInfo;"
+        | "Landroid/service/credentials/ClearCredentialStateRequest;"
+        | "Landroid/service/credentials/CreateCredentialRequest;"
+        | "Landroid/service/credentials/CreateEntry;"
+        | "Landroid/service/credentials/CredentialEntry;"
+        | "Landroid/service/credentials/GetCredentialRequest;"
+        | "Landroid/service/credentials/RemoteEntry;"
+        | "Landroid/credentials/CredentialOption;"
+        | "Landroid/app/admin/SystemUpdatePolicy;"
+        | "Landroid/app/admin/SystemUpdatePolicy$ValidationFailedException;" => {
+            Some(&["Landroid/os/Parcelable;"])
         }
         _ => None,
     }

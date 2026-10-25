@@ -455,7 +455,7 @@ A fonte executável deste apêndice é [`data/api-coverage.toml`](data/api-cover
 <!-- BEGIN API COVERAGE -->
 | Domínio | Superfícies/pacotes principais | Status das superfícies | Módulos |
 |---|---|---|---|
-| App/lifecycle | `android.app`, `android.app.admin`, `android.app.backup`, `android.app.job`, `android.app.slice`, `android.content`, `android.content.pm`, `android.content.res` | partial 7 · not_implemented 1 | `none`, `rd-vm/android-pm`, `rd-vm/android-res`, `rd-vm/android-stub-surfaces`, `rd-vm/framework`, `rd-vm/m8` |
+| App/lifecycle | `android.app`, `android.app.admin`, `android.app.backup`, `android.app.job`, `android.app.slice`, `android.content`, `android.content.pm`, `android.content.res` | partial 8 | `rd-vm/android-pm`, `rd-vm/android-res`, `rd-vm/android-stub-surfaces`, `rd-vm/framework`, `rd-vm/m8` |
 | View/UI | `android.view`, `android.view.accessibility`, `android.view.animation`, `android.view.inputmethod`, `android.view.textservice`, `android.view.translation`, `android.webkit`, `android.widget` | partial 8 | `rd-vm/android-stub-surfaces`, `rd-vm/android-sysservices`, `rd-vm/m9`, `rd-vm/view-layout` |
 | Graphics | `android.graphics`, `android.graphics.drawable`, `android.graphics.pdf`, `android.opengl`, `android.renderscript` | partial 5 | `rd-vm/android-stub-surfaces`, `rd-vm/graphics` |
 | Text | `android.text`, `android.text.format`, `android.text.method`, `android.text.style`, `android.text.util` | partial 5 | `rd-vm/android-sysservices`, `rd-vm/android-text`, `rd-vm/graphics` |
@@ -467,7 +467,7 @@ A fonte executável deste apêndice é [`data/api-coverage.toml`](data/api-cover
 | Hardware | `android.hardware`, `android.hardware.biometrics`, `android.hardware.display`, `android.hardware.fingerprint`, `android.hardware.hdmi`, `android.hardware.input`, `android.hardware.soundtrigger`, `android.hardware.usb`, `android.location` | partial 9 | `rd-vm/android-display`, `rd-vm/android-stub-surfaces`, `rd-vm/android-sysservices` |
 | Telephony | `android.telecom`, `android.telephony`, `android.telephony.cellbroadcast`, `android.telephony.euicc`, `android.telephony.gsm`, `android.telephony.mbms` | partial 2 · not_implemented 4 | `none`, `rd-vm/android-stub-surfaces` |
 | Connectivity | `android.bluetooth`, `android.bluetooth.le`, `android.companion`, `android.nfc`, `android.nfc.cardemulation`, `android.nfc.tech` | partial 6 | `rd-vm/android-stub-surfaces` |
-| Security | `android.se.omapi`, `android.security`, `android.security.identity`, `android.security.keystore`, `android.service.credentials` | partial 4 · not_implemented 1 | `none`, `rd-vm/android-stub-surfaces` |
+| Security | `android.se.omapi`, `android.security`, `android.security.identity`, `android.security.keystore`, `android.service.credentials` | partial 5 | `rd-vm/android-stub-surfaces` |
 | Speech/ML | `android.service.voice`, `android.speech`, `android.speech.tts`, `android.view.textclassifier` | partial 4 | `rd-vm/android-stub-surfaces` |
 | Services ext | `android.service.autofill`, `android.service.carrier`, `android.service.chooser`, `android.service.dreams`, `android.service.media`, `android.service.notification`, `android.service.quicksettings`, `android.service.textservice`, `android.service.wallpaper` | partial 9 | `rd-vm/android-stub-surfaces`, `rd-vm/m9` |
 | System UI | `android.accessibilityservice`, `android.app.usage`, `android.appwidget`, `android.inputmethodservice`, `android.print` | partial 5 | `rd-vm/android-stub-surfaces`, `rd-vm/m9` |

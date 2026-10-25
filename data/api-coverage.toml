@@ -140,15 +140,15 @@ key_apis = ["android.app.job.JobScheduler.schedule", "android.app.job.JobInfo.Bu
 id = "android-app-admin"
 prefix = "android.app.admin"
 domain = "app-lifecycle"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "future"
-notes = "DevicePolicyManager and device/profile-owner administration have no host model."
-evidence = ["docs/compat-matrix.md"]
+notes = "Partial: SystemUpdatePolicy automatic/windowed/postpone factories (with [0,1440) window validation), getters and toString are guest-visible, and DevicePolicyManager obtained via Context.DEVICE_POLICY_SERVICE models AOSP's null-IDevicePolicyManager branches: isAdminActive/getActiveAdmins/hasGrantedPolicy, password-quality/minimum getters returning unspecified/0, storage-encryption unsupported, no device/profile owner, USER_NULL device-owner id, default strong-auth timeout, silent no-op setters, parent-instance SecurityExceptions, and the unchecked isProvisioningAllowed NullPointerException. No active-admin enrollment, device/profile-owner provisioning, policy enforcement, password validation, freeze-period validation, DeviceAdminReceiver dispatch or DeviceAdminInfo XML parsing exists."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/api-coverage.md"]
 gap_id = "gap-android-app-admin"
-key_apis = ["android.app.admin.DevicePolicyManager.isAdminActive"]
+key_apis = ["android.app.admin.DevicePolicyManager.isAdminActive", "android.app.admin.DevicePolicyManager.getPasswordQuality", "android.app.admin.SystemUpdatePolicy.createWindowedInstallPolicy", "android.app.admin.DevicePolicyManager.getSystemUpdatePolicy"]
 
 [[surface]]
 id = "android-app-backup"
@@ -1273,15 +1273,15 @@ key_apis = ["android.se.omapi.SEService.isConnected", "android.se.omapi.SEServic
 id = "android-service-credentials"
 prefix = "android.service.credentials"
 domain = "security"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "CredentialProviderService/passkey credential manager service integration is not modelled. Appendix C also lists credentials under service extensions; the security domain owns the package here."
-evidence = ["docs/compat-matrix.md"]
+notes = "Partial: provider-side credential value classes are guest-visible with AOSP validation: CallingAppInfo, BeginGetCredentialOption (Bundle copy plus injected BUNDLE_ID_KEY), BeginGetCredentialRequest/Builder, GetCredentialRequest, BeginCreateCredentialRequest (Bundle copy), CreateCredentialRequest, ClearCredentialStateRequest, CredentialEntry/Action/CreateEntry/RemoteEntry Slice holders, BeginGet/BeginCreate credential response builders, the android.credentials.CredentialOption collaborator builder, and CredentialProviderService's final onBind action check plus EXTRA/SERVICE_INTERFACE constants. No CredentialManager system service, provider discovery/enablement, account-selector UI, PendingIntent flows, binder callbacks, passkey/WebAuthn cryptography or credential storage exists. Appendix C also lists credentials under service extensions; the security domain owns the package here."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/api-coverage.md"]
 gap_id = "gap-android-service-credentials"
-key_apis = ["android.service.credentials.CredentialProviderService.onBeginGetCredential"]
+key_apis = ["android.service.credentials.CredentialProviderService.onBind", "android.service.credentials.BeginGetCredentialRequest.Builder.build", "android.service.credentials.BeginGetCredentialOption.getCandidateQueryData", "android.service.credentials.BeginGetCredentialResponse.Builder.build"]
 
 # ===================== Speech/ML =====================
 [[surface]]
