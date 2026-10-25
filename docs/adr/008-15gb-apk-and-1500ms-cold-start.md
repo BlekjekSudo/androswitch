@@ -230,3 +230,39 @@ Stage 4 VM internals, and the 15 GB sparse *launch* fixture — the
 - **On-disk `.rdcache`:** deferred — cache integrity/versioning is its own trust problem; session-scoped index captures the perf win first.
 - **Raising `MAX_INPUT_BYTES` only:** rejected — removes the error, not the O(n) RSS/time blow-up.
 - **Forking DEX parsing to threads:** rejected for now — determinism (Law 4) and the 1-core quota make lazy mounting strictly better than parallel eager mounting.
+
+## 11. Addendum (2026-10-25): Stage 2 integration and the `Zip::raw_bytes` contract change
+
+**Context.** Stage 2 moved from a prototype to integration (PR #216). `Zip` now holds a private `ZipSource` with two variants:
+- `Whole(Vec<u8>)`: the legacy in-memory container;
+- `Paged(Arc<PagedZip>)`: payloads stay on disk behind the 16 MiB LRU page cache.
+
+`Apk::open` routes any file above `Apk::MAX_INPUT_BYTES` to `Zip::open_paged` instead of rejecting it, so the issue #38 `INVALID_FORMAT` path is gone.
+
+**Contract change.** `Zip::raw_bytes` changes from `pub fn raw_bytes(&self) -> &[u8]` to `pub fn raw_bytes(&self) -> Option<&[u8]>`. A paged container has no contiguous in-memory image to borrow. The alternatives were:
+- materialize the file, which defeats Stage 2 and breaks the RSS cap;
+- panic in paged mode, which is banned on production paths;
+- return an empty slice, which silently lies to callers.
+
+`None` makes paged mode explicit at the type level.
+
+New public surface, all mode-agnostic:
+- `Zip::is_paged()`;
+- `Zip::file_len()`;
+- `Zip::read_range(off, len)`, which copies from memory in whole mode and reads through the page cache in paged mode;
+- `PagedZip::read_range`.
+
+**Callers.** The only in-tree caller of `raw_bytes` is `rd_apk::detect_signing`:
+- whole mode keeps the original full-buffer `signing::detect`;
+- paged mode reads only the 24-byte APK Signing Block trailer and then the block window before `cd_offset`.
+
+The paged window is capped at 64 MiB. A malformed trailer or an adversarial `block_size` degrades to *v1-only* and never allocates or panics.
+
+**Concurrency.** `PagedZip`'s cache moved from `RefCell` to `Mutex`, so paged `Zip`/`Apk` stay `Send + Sync` like the whole-file path. `Arc<Apk>` crosses the agent's threads. Lock poisoning is not a panic path: the cache only memoizes immutable file pages, and payloads are CRC-checked again on extraction. On poison, the pages are dropped and refilled from disk.
+
+**Evidence.** The `rd-apk` tests cover:
+- whole × paged parity on the same container: entries, duplicates (#84), STORED and DEFLATE reads, raw windows, `is_paged`/`raw_bytes` mode signals;
+- a sparse container above 512 MiB that opens paged without being materialized;
+- `Apk::open` routing above the whole-file cap.
+
+**Out of scope.** `CompactCdIndex` (Stage 2b) and the 15 GiB end-to-end launch remain follow-ups.
