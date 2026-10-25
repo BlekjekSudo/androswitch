@@ -20672,16 +20672,40 @@ fn p57_spell_subtype_hash(locale: &str, extra: &str) -> i32 {
     result
 }
 
+fn p57_java_split(s: &str, separator: char) -> Vec<String> {
+    // java.lang.String.split with limit 0: trailing empty strings are
+    // discarded, an all-empty result becomes an empty array, and splitting
+    // the empty string yields a single empty string.
+    if s.is_empty() {
+        return vec![String::new()];
+    }
+    let mut parts: Vec<String> = s.split(separator).map(str::to_string).collect();
+    while parts.len() > 1 && parts.last().is_some_and(|part| part.is_empty()) {
+        parts.pop();
+    }
+    if parts.iter().all(|part| part.is_empty()) {
+        return Vec::new();
+    }
+    parts
+}
+
 fn p57_spell_subtype_extra_map(extra: &str) -> Vec<(String, Option<String>)> {
     let mut out: Vec<(String, Option<String>)> = Vec::new();
-    for pair in extra.split(',') {
-        let mut parts = pair.split('=');
-        let Some(key) = parts.next() else { continue };
-        let value = parts.next().map(str::to_string);
+    for pair in p57_java_split(extra, ',') {
+        let parts = p57_java_split(&pair, '=');
+        // A pair that splits to zero parts (e.g. "=") stores nothing; a
+        // single part stores a null value; extra '=' parts are ignored
+        // beyond the first value, matching getExtraValueHashMap.
+        let Some(key) = parts.first() else { continue };
+        let value = if parts.len() == 1 {
+            None
+        } else {
+            Some(parts[1].clone())
+        };
         if let Some(existing) = out.iter_mut().find(|(k, _)| k == key) {
             existing.1 = value;
         } else {
-            out.push((key.to_string(), value));
+            out.push((key.clone(), value));
         }
     }
     out
@@ -20772,20 +20796,41 @@ fn p57_spell_subtype_instance(
         }
         ("getLocaleObject", "()Ljava/util/Locale;") => {
             let tag = field_str(vm, recv, "mSubtypeLanguageTag").unwrap_or_default();
-            let locale = if !tag.is_empty() {
-                tag
+            if !tag.is_empty() {
+                // Locale.forLanguageTag(tag)
+                let tag_value = jstr(vm, tag)?;
+                vm.invoke_static(
+                    "Ljava/util/Locale;",
+                    "forLanguageTag",
+                    "(Ljava/lang/String;)Ljava/util/Locale;",
+                    &[tag_value],
+                )?
             } else {
-                field_str(vm, recv, "mSubtypeLocale").unwrap_or_default()
-            };
-            if locale.is_empty() {
-                Value::Null
-            } else {
-                // java.util.Locale is already hosted; construct through its
-                // one-argument constructor with an AOSP locale string form.
-                let r = alloc_obj(vm, "Ljava/util/Locale;", Vec::new())?;
-                let s = jstr(vm, locale)?;
-                vm.invoke_instance(r, "<init>", "(Ljava/lang/String;)V", &[s])?;
-                Value::Obj(r)
+                // SubtypeLocaleUtils.constructLocaleFromString: split on '_'
+                // (at most 3 parts), map the legacy "tl" language to "fil",
+                // then use the matching Locale constructor.
+                let locale = field_str(vm, recv, "mSubtypeLocale").unwrap_or_default();
+                if locale.is_empty() {
+                    Value::Null
+                } else {
+                    let mut parts: Vec<String> =
+                        locale.splitn(3, '_').map(str::to_string).collect();
+                    if parts.first().is_some_and(|language| language == "tl") {
+                        parts[0] = "fil".to_string();
+                    }
+                    let r = alloc_obj(vm, "Ljava/util/Locale;", Vec::new())?;
+                    let mut ctor_args: Vec<Value> = Vec::new();
+                    for part in &parts {
+                        ctor_args.push(jstr(vm, part)?);
+                    }
+                    let sig = match parts.len() {
+                        1 => "(Ljava/lang/String;)V",
+                        2 => "(Ljava/lang/String;Ljava/lang/String;)V",
+                        _ => "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+                    };
+                    vm.invoke_instance(r, "<init>", sig, &ctor_args)?;
+                    Value::Obj(r)
+                }
             }
         }
         ("hashCode", "()I") => Value::Int(field_int(vm, recv, "mSubtypeHashCode")),
@@ -20861,10 +20906,9 @@ fn p57_spell_params_instance(
                 Value::Obj(recv)
             }
             ("setExtras", "(Landroid/os/Bundle;)Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;") => {
-                let v = match args.first() {
-                    Some(Value::Obj(_)) => args.first().cloned().unwrap(),
-                    _ => return Err(npe("extras")),
-                };
+                // AOSP's setter stores the argument without a null check,
+                // despite the @NonNull annotation.
+                let v = args.first().cloned().unwrap_or(Value::Null);
                 put(vm, recv, "mExtras", v)?;
                 Value::Obj(recv)
             }
@@ -20902,12 +20946,9 @@ fn p57_spell_params_instance(
             Value::Int(field_int(vm, recv, "mSupportedAttributes"))
         }
         ("getExtras", "()Landroid/os/Bundle;") => {
-            let v = get(vm, recv, "mExtras");
-            if matches!(v, Value::Obj(_)) {
-                v
-            } else {
-                empty_bundle(vm)?
-            }
+            // The builder defaults the field to Bundle.EMPTY; a null stored
+            // through setExtras comes back as null, as in AOSP.
+            get(vm, recv, "mExtras")
         }
         _ => return Ok(None),
     }))
@@ -20957,7 +20998,13 @@ fn p57_text_services_manager_instance(
             )?
         }
         ("getEnabledSpellCheckerInfos", "()Ljava/util/List;") => {
-            Value::Obj(new_collection(vm, "Ljava/util/ArrayList;", Vec::new())?)
+            // With no enabled checkers AOSP returns Collections.emptyList().
+            vm.invoke_static(
+                "Ljava/util/Collections;",
+                "emptyList",
+                "()Ljava/util/List;",
+                &[],
+            )?
         }
         ("getCurrentSpellCheckerInfo", "()Landroid/view/textservice/SpellCheckerInfo;")
         | ("getCurrentSpellChecker", "()Landroid/view/textservice/SpellCheckerInfo;")

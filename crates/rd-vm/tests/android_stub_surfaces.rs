@@ -5001,6 +5001,200 @@ fn textservice_values_params_and_no_checker_manager_are_guest_visible() {
         call(&mut engine, session, "isSessionDisconnected", "()Z", &[]),
         Value::Int(1)
     );
+
+    // Deep audit: subtype extra-value parsing follows String.split
+    // semantics, so "a=" stores a null value, "b==x" stores "", a bare
+    // "=" pair stores nothing, and an empty extra value still maps the
+    // empty key to null.
+    let split_locale = text(&mut engine, "en");
+    let split_extra = text(&mut engine, "a=,b==x,=,c");
+    let split_subtype = instance(
+        &mut engine,
+        "Landroid/view/textservice/SpellCheckerSubtype;",
+    );
+    call(
+        &mut engine,
+        split_subtype,
+        "<init>",
+        "(ILjava/lang/String;Ljava/lang/String;)V",
+        &[Value::Int(0), split_locale, split_extra],
+    );
+    let a_key = text(&mut engine, "a");
+    assert_eq!(
+        call(
+            &mut engine,
+            split_subtype,
+            "getExtraValueOf",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[a_key],
+        ),
+        Value::Null
+    );
+    let b_key = text(&mut engine, "b");
+    assert_eq!(
+        call_text(
+            &mut engine,
+            split_subtype,
+            "getExtraValueOf",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[b_key],
+        ),
+        ""
+    );
+    let empty_key = text(&mut engine, "");
+    assert_eq!(
+        call(
+            &mut engine,
+            split_subtype,
+            "containsExtraValueKey",
+            "(Ljava/lang/String;)Z",
+            &[empty_key],
+        ),
+        Value::Int(0)
+    );
+    let empty_locale = text(&mut engine, "en");
+    let empty_extra = text(&mut engine, "");
+    let empty_subtype = instance(
+        &mut engine,
+        "Landroid/view/textservice/SpellCheckerSubtype;",
+    );
+    call(
+        &mut engine,
+        empty_subtype,
+        "<init>",
+        "(ILjava/lang/String;Ljava/lang/String;)V",
+        &[Value::Int(0), empty_locale, empty_extra],
+    );
+    let empty_key = text(&mut engine, "");
+    assert_eq!(
+        call(
+            &mut engine,
+            empty_subtype,
+            "containsExtraValueKey",
+            "(Ljava/lang/String;)Z",
+            &[empty_key],
+        ),
+        Value::Int(1)
+    );
+
+    // Deep audit: getLocaleObject parses the legacy underscore locale
+    // string (en_US) into language/country instead of treating it as a
+    // single language, and maps the legacy "tl" language to "fil".
+    let subtype_locale = object(call(
+        &mut engine,
+        subtype,
+        "getLocaleObject",
+        "()Ljava/util/Locale;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            subtype_locale,
+            "getLanguage",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "en"
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            subtype_locale,
+            "getCountry",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "US"
+    );
+    let tl_locale = text(&mut engine, "tl_PH");
+    let tl_extra = text(&mut engine, "");
+    let tl_subtype = instance(
+        &mut engine,
+        "Landroid/view/textservice/SpellCheckerSubtype;",
+    );
+    call(
+        &mut engine,
+        tl_subtype,
+        "<init>",
+        "(ILjava/lang/String;Ljava/lang/String;)V",
+        &[Value::Int(0), tl_locale, tl_extra],
+    );
+    let fil_locale = object(call(
+        &mut engine,
+        tl_subtype,
+        "getLocaleObject",
+        "()Ljava/util/Locale;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            fil_locale,
+            "getLanguage",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "fil"
+    );
+
+    // Deep audit: SpellCheckerSessionParams.Builder.setExtras performs no
+    // null check, and the null comes back from getExtras.
+    let null_extras_builder = instance(
+        &mut engine,
+        "Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;",
+    );
+    call(&mut engine, null_extras_builder, "<init>", "()V", &[]);
+    call(
+        &mut engine,
+        null_extras_builder,
+        "setShouldReferToSpellCheckerLanguageSettings",
+        "(Z)Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;",
+        &[Value::Int(1)],
+    );
+    call(
+        &mut engine,
+        null_extras_builder,
+        "setExtras",
+        "(Landroid/os/Bundle;)Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams$Builder;",
+        &[Value::Null],
+    );
+    let null_extras_params = object(call(
+        &mut engine,
+        null_extras_builder,
+        "build",
+        "()Landroid/view/textservice/SpellCheckerSession$SpellCheckerSessionParams;",
+        &[],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            null_extras_params,
+            "getExtras",
+            "()Landroid/os/Bundle;",
+            &[]
+        ),
+        Value::Null
+    );
+
+    // Deep audit: with no enabled checkers the manager returns
+    // Collections.emptyList(), whose mutation throws.
+    let enabled_list = object(call(
+        &mut engine,
+        manager,
+        "getEnabledSpellCheckerInfos",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    assert_throws(
+        engine.invoke_instance(
+            enabled_list,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(checker_info)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
 }
 
 #[test]
