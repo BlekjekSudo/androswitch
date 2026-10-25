@@ -51913,6 +51913,9 @@ fn partial36i_telephony_static(
     if class == P36I_SUBSCRIPTION_MANAGER {
         let v = match (name, sig) {
             ("isValidSubscriptionId", "(I)Z") => bool_value(iarg(args, 0) > -1),
+            // PropertyInvalidatedCache defaults when ISub is absent:
+            // INVALID_PHONE_INDEX / INVALID_SIM_SLOT_INDEX.
+            ("getPhoneId", "(I)I") | ("getSlotIndex", "(I)I") => Value::Int(-1),
             ("isUsableSubscriptionId", "(I)Z") | ("isUsableSubIdValue", "(I)Z") => {
                 let id = iarg(args, 0);
                 bool_value((0..i32::MAX).contains(&id))
@@ -51981,6 +51984,8 @@ fn p36i_telephony_manager(
         | ("getNetworkOperatorName", "()Ljava/lang/String;")
         | ("getNetworkOperatorName", "(I)Ljava/lang/String;") => empty(vm)?,
         ("isNetworkRoaming", "()Z") | ("isNetworkRoaming", "(I)Z") => bool_value(false),
+        ("getCellLocation", "()Landroid/telephony/CellLocation;")
+        | ("getAllCellInfo", "()Ljava/util/List;") => Value::Null,
         // No ITelephony binder: getServiceStateForSubscriber returns null.
         ("getServiceState", "()Landroid/telephony/ServiceState;")
         | ("getServiceState", "(I)Landroid/telephony/ServiceState;")
@@ -53558,6 +53563,27 @@ fn p36i_telecom_manager(
                 "Ljava/lang/IllegalStateException;",
                 "Telecom is not available".to_string(),
             ));
+        }
+        ("endCall", "()Z")
+        | ("isInEmergencyCall", "()Z")
+        | ("handlePinMmi", "(Ljava/lang/String;)Z")
+        | ("handlePinMmi", "(Landroid/telecom/PhoneAccountHandle;Ljava/lang/String;)Z") => {
+            bool_value(false)
+        }
+        // Without ITelecomService these AOSP methods simply do nothing.
+        ("acceptRingingCall", "()V")
+        | ("acceptRingingCall", "(I)V")
+        | ("silenceRinger", "()V")
+        | ("cancelMissedCallsNotification", "()V") => Value::Null,
+        ("getAdnUriForPhoneAccount", "(Landroid/telecom/PhoneAccountHandle;)Landroid/net/Uri;") => {
+            // AOSP falls back to the generic ADN content URI.
+            let text = jstr(vm, "content://icc/adn")?;
+            vm.invoke_static(
+                "Landroid/net/Uri;",
+                "parse",
+                "(Ljava/lang/String;)Landroid/net/Uri;",
+                &[text],
+            )?
         }
         _ => return Ok(None),
     };

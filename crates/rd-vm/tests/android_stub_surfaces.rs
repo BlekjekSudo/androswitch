@@ -22394,7 +22394,13 @@ fn intent_parse_uri_selector_and_android_app_are_guest_visible() {
         &[sel_uri, Value::Int(0)],
     ));
     assert_eq!(
-        call_text(&mut engine, parsed, "getAction", "()Ljava/lang/String;", &[]),
+        call_text(
+            &mut engine,
+            parsed,
+            "getAction",
+            "()Ljava/lang/String;",
+            &[]
+        ),
         "com.example.BASE"
     );
     let selector = object(call(
@@ -22405,10 +22411,22 @@ fn intent_parse_uri_selector_and_android_app_are_guest_visible() {
         &[],
     ));
     assert_eq!(
-        call_text(&mut engine, selector, "getAction", "()Ljava/lang/String;", &[]),
+        call_text(
+            &mut engine,
+            selector,
+            "getAction",
+            "()Ljava/lang/String;",
+            &[]
+        ),
         "com.example.SEL"
     );
-    let back = call_text(&mut engine, parsed, "toUri", "(I)Ljava/lang/String;", &[Value::Int(0)]);
+    let back = call_text(
+        &mut engine,
+        parsed,
+        "toUri",
+        "(I)Ljava/lang/String;",
+        &[Value::Int(0)],
+    );
     assert!(back.contains("SEL;action=com.example.SEL"), "toUri: {back}");
 
     // android-app: package + scheme + authority + path decomposition.
@@ -22431,7 +22449,13 @@ fn intent_parse_uri_selector_and_android_app_are_guest_visible() {
         call_text(&mut engine, app, "getAction", "()Ljava/lang/String;", &[]),
         "android.intent.action.VIEW"
     );
-    let data = object(call(&mut engine, app, "getData", "()Landroid/net/Uri;", &[]));
+    let data = object(call(
+        &mut engine,
+        app,
+        "getData",
+        "()Landroid/net/Uri;",
+        &[],
+    ));
     assert_eq!(
         call_text(&mut engine, data, "toString", "()Ljava/lang/String;", &[]),
         "https://example.com/watch"
@@ -22447,11 +22471,23 @@ fn intent_parse_uri_selector_and_android_app_are_guest_visible() {
         &[pkg_uri, Value::Int(0)],
     ));
     assert_eq!(
-        call_text(&mut engine, pkg_intent, "getAction", "()Ljava/lang/String;", &[]),
+        call_text(
+            &mut engine,
+            pkg_intent,
+            "getAction",
+            "()Ljava/lang/String;",
+            &[]
+        ),
         "android.intent.action.MAIN"
     );
     assert_eq!(
-        call(&mut engine, pkg_intent, "getData", "()Landroid/net/Uri;", &[]),
+        call(
+            &mut engine,
+            pkg_intent,
+            "getData",
+            "()Landroid/net/Uri;",
+            &[]
+        ),
         Value::Null
     );
 
@@ -22471,9 +22507,215 @@ fn intent_parse_uri_selector_and_android_app_are_guest_visible() {
         call_text(&mut engine, old, "getAction", "()Ljava/lang/String;", &[]),
         "com.example.OLD"
     );
-    let old_data = object(call(&mut engine, old, "getData", "()Landroid/net/Uri;", &[]));
+    let old_data = object(call(
+        &mut engine,
+        old,
+        "getData",
+        "()Landroid/net/Uri;",
+        &[],
+    ));
     assert_eq!(
-        call_text(&mut engine, old_data, "toString", "()Ljava/lang/String;", &[]),
+        call_text(
+            &mut engine,
+            old_data,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
         "https://example.com/x"
+    );
+}
+
+#[test]
+fn telecom_call_control_no_service_behaviour_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let telecom = p36i_system_service(&mut engine, "telecom");
+    assert_eq!(
+        call(&mut engine, telecom, "endCall", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, telecom, "isInEmergencyCall", "()Z", &[]),
+        Value::Int(0)
+    );
+    call(&mut engine, telecom, "acceptRingingCall", "()V", &[]);
+    call(&mut engine, telecom, "silenceRinger", "()V", &[]);
+    call(
+        &mut engine,
+        telecom,
+        "cancelMissedCallsNotification",
+        "()V",
+        &[],
+    );
+    let dial = text(&mut engine, "*#06#");
+    assert_eq!(
+        call(
+            &mut engine,
+            telecom,
+            "handlePinMmi",
+            "(Ljava/lang/String;)Z",
+            &[dial]
+        ),
+        Value::Int(0)
+    );
+    let adn = call(
+        &mut engine,
+        telecom,
+        "getAdnUriForPhoneAccount",
+        "(Landroid/telecom/PhoneAccountHandle;)Landroid/net/Uri;",
+        &[Value::Null],
+    );
+    let adn_uri = object(adn);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            adn_uri,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "content://icc/adn"
+    );
+}
+
+#[test]
+fn telephony_cell_defaults_and_subscription_id_caches_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let tm = p36i_system_service(&mut engine, "telephony");
+    assert_eq!(
+        call(
+            &mut engine,
+            tm,
+            "getCellLocation",
+            "()Landroid/telephony/CellLocation;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(&mut engine, tm, "getAllCellInfo", "()Ljava/util/List;", &[]),
+        Value::Null
+    );
+    assert_eq!(
+        call_static(&mut engine, P36I_SM, "getPhoneId", "(I)I", &[Value::Int(3)]),
+        Value::Int(-1)
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36I_SM,
+            "getSlotIndex",
+            "(I)I",
+            &[Value::Int(3)]
+        ),
+        Value::Int(-1)
+    );
+}
+
+#[test]
+fn intent_to_uri_with_data_and_intent_scheme_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let intent = p49_new(&mut engine, "Landroid/content/Intent;", "()V", &[]);
+    let data = p36i_uri(&mut engine, "https://example.com/play?id=7");
+    call(
+        &mut engine,
+        intent,
+        "setData",
+        "(Landroid/net/Uri;)Landroid/content/Intent;",
+        &[data],
+    );
+    // flags=0: raw data string, no fragment (nothing else is set).
+    assert_eq!(
+        call_text(
+            &mut engine,
+            intent,
+            "toUri",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(0)]
+        ),
+        "https://example.com/play?id=7"
+    );
+    // URI_INTENT_SCHEME: scheme moves into the fragment.
+    let with_scheme = call_text(
+        &mut engine,
+        intent,
+        "toUri",
+        "(I)Ljava/lang/String;",
+        &[Value::Int(1)],
+    );
+    assert_eq!(
+        with_scheme,
+        "intent://example.com/play?id=7#Intent;scheme=https;end"
+    );
+    let value = text(&mut engine, &with_scheme);
+    let parsed = object(call_static(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "parseUri",
+        "(Ljava/lang/String;I)Landroid/content/Intent;",
+        &[value, Value::Int(1)],
+    ));
+    let parsed_data = object(call(
+        &mut engine,
+        parsed,
+        "getData",
+        "()Landroid/net/Uri;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            parsed_data,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "https://example.com/play?id=7"
+    );
+
+    // Component survives the round trip via flattenToShortString.
+    let component = p36i_component(&mut engine, "com.example.app", "com.example.app.Player");
+    call(
+        &mut engine,
+        intent,
+        "setComponent",
+        "(Landroid/content/ComponentName;)Landroid/content/Intent;",
+        &[Value::Obj(component)],
+    );
+    let uri_text = call_text(
+        &mut engine,
+        intent,
+        "toUri",
+        "(I)Ljava/lang/String;",
+        &[Value::Int(0)],
+    );
+    assert!(
+        uri_text.contains("component=com.example.app/.Player"),
+        "{uri_text}"
+    );
+    let value = text(&mut engine, &uri_text);
+    let parsed = object(call_static(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "parseUri",
+        "(Ljava/lang/String;I)Landroid/content/Intent;",
+        &[value, Value::Int(0)],
+    ));
+    let back = object(call(
+        &mut engine,
+        parsed,
+        "getComponent",
+        "()Landroid/content/ComponentName;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            back,
+            "getClassName",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "com.example.app.Player"
     );
 }
