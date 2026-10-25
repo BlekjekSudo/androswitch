@@ -66,10 +66,12 @@ export PATH="$HOME/.cargo/bin:$PATH"   # rustc 1.99.1 em 2026-10-25
 - [x] S4 xtask + docs gerados + spec D/E + ADR 012 + ledger D/E (xtask 14 testes ✅, geradores idempotentes)
 - [x] S5 Runtime AndroidX (`androidx.rs`) + estado/GC/dispatch + testes
 - [ ] S6 Runtime GMS/Firebase (`gms.rs`) + estado/GC/dispatch + testes
-- [ ] S7 Hierarquias classpath (hook mínimo) + inflate AndroidX
+- [x] S7 Hierarquias classpath (hook mínimo) + inflate AndroidX — **FECHADO 2026-10-25** (branch `appendix-de-s7-classpath-inflate-20261025` de `main@3e6fa29`; sessao tempchat 8873)
 - [ ] S8 MCP (se limpo) + compat-matrix + verificação completa + push/PR
 
 ## Log
+
+- 2026-10-25 S7 FECHADO (branch sobre main@3e6fa29, pos-merge do PR #205): hook minimo = extensao das tabelas existentes `builtin_hierarchy`/`builtin_interfaces` em classpath.rs com as cadeias fixas AndroidX/Material (AppCompatActivity→FragmentActivity→ComponentActivity→Activity, widgets AppCompat*, containers Constraint/Coordinator/Drawer/Card/SwipeRefresh/ViewPager(2)/NestedScrollView/FragmentContainerView + LayoutParams, Material* principais; interfaces LifecycleOwner/ViewModelStoreOwner/SavedStateRegistryOwner). Como attach_host_state e o LayoutInflater ja sao subtype-driven, isto destrava inflate de tags AndroidX FQCN sem o DEX das libs. inflate.rs: layout_params_class ganha Constraint/Drawer/ViewPager/RecyclerView e assign_layout_params semeia width/height quando a classe de LP nao tem corpo DEX (bug apanhado pelo teste novo). tests/androidx_hierarchy.rs 5/5 (subtipagem +/-, attach, inflate AXML com AppCompatTextView+MaterialButton+onClick, LP do ConstraintLayout). jetpack.toml: appcompat not_implemented→partial; constraint/drawer/card/swipe/material →stub; coordinator/viewpager2 stub com notes/code actualizados. Docs/spec D/compat regenerados; rd-vm inteiro + rd-framework 34/34 + xtask 14/14 verdes; clippy -D warnings limpo.
 
 - 2026-10-25 S0: clone, branch criada de `main@89bbe8f`, rustup stable
   1.99.1, `cargo test -p rd-framework --lib` = 24 passed. PRs 191/192

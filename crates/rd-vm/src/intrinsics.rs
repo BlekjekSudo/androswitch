@@ -8,6 +8,11 @@ use crate::heap::HeapObj;
 use crate::repr;
 use crate::value::Value;
 
+pub use crate::android_display::{
+    dispatch_display_event, EVENT_FLAG_DISPLAY_ADDED, EVENT_FLAG_DISPLAY_CHANGED,
+    EVENT_FLAG_DISPLAY_REMOVED,
+};
+
 const STRING: &str = "Ljava/lang/String;";
 const SB: &str = "Ljava/lang/StringBuilder;";
 const OBJECT: &str = "Ljava/lang/Object;";
@@ -4035,13 +4040,18 @@ fn instance_intrinsic_dispatch(
             return Ok(Some(v));
         }
     }
-    // the default Display (android_display.rs)
+    // the default Display, Display.Mode, and DisplayManager (android_display.rs)
     if matches!(name, "getDisplay" | "getDefaultDisplay")
-        || recv_class == crate::android_display::DISPLAY
+        || matches!(
+            recv_class,
+            crate::android_display::DISPLAY
+                | crate::android_display::DISPLAY_MODE
+                | crate::android_display::DISPLAY_MANAGER
+        )
     {
-        if let Some(v) =
-            crate::android_display::instance_intrinsic(vm, recv_class, mref_class, name, sig, args)?
-        {
+        if let Some(v) = crate::android_display::instance_intrinsic(
+            vm, recv_class, mref_class, name, sig, recv, args,
+        )? {
             return Ok(Some(v));
         }
     }
