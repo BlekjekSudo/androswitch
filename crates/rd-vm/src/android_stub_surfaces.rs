@@ -50126,12 +50126,47 @@ fn p36h_bytes(vm: &Engine, value: Option<&Value>) -> Vec<u8> {
     }
 }
 
-// WifiSsid.decodeSsid: strict UTF-8 with a 32-char output buffer; malformed
-// input yields null, overflow yields the first 32 decoded chars.
+// WifiSsid.decodeSsid: strict UTF-8 into a 32-UTF-16-unit CharBuffer. A
+// malformed sequence before the buffer fills yields null; overflow yields
+// the buffered prefix without examining the remaining bytes.
 fn p36h_ssid_utf8_text(bytes: &[u8]) -> Option<String> {
-    std::str::from_utf8(bytes)
-        .ok()
-        .map(|s| s.chars().take(32).collect::<String>())
+    let mut out = String::new();
+    let mut units = 0usize;
+    let mut rest = bytes;
+    while !rest.is_empty() && units < 32 {
+        match std::str::from_utf8(rest) {
+            Ok(s) => {
+                for c in s.chars() {
+                    if units + c.len_utf16() > 32 {
+                        break;
+                    }
+                    units += c.len_utf16();
+                    out.push(c);
+                }
+                rest = &[];
+            }
+            Err(e) => {
+                let valid_up_to = e.valid_up_to();
+                if valid_up_to == 0 {
+                    return None;
+                }
+                let prefix = std::str::from_utf8(&rest[..valid_up_to]).ok()?;
+                for c in prefix.chars() {
+                    if units + c.len_utf16() > 32 {
+                        return Some(out);
+                    }
+                    units += c.len_utf16();
+                    out.push(c);
+                }
+                if units >= 32 {
+                    return Some(out);
+                }
+                rest = &rest[valid_up_to..];
+                // Next iteration starts at the malformed byte and fails.
+            }
+        }
+    }
+    Some(out)
 }
 
 fn p36h_new_wifi_ssid(vm: &mut Engine, bytes: Vec<u8>) -> Result<Value, VmExit> {
@@ -50396,9 +50431,25 @@ fn partial36h_wifi_static(
         }
         // WifiSsid factories.
         (P36H_WIFI_SSID, "fromBytes", "([B)Landroid/net/wifi/WifiSsid;") => {
-            let bytes = match args.first() {
-                Some(v) if !matches!(v, Value::Null) => p36h_bytes(vm, Some(v)),
-                _ => Vec::new(),
+            // AOSP WifiSsid keeps the caller's byte[] reference (no copy);
+            // null becomes an empty array.
+            match args.first() {
+                Some(v) if !matches!(v, Value::Null) => {
+                    let r = alloc_obj(vm, P36H_WIFI_SSID, Vec::new())?;
+                    put(vm, r, "mBytes", v.clone())?;
+                    Value::Obj(r)
+                }
+                _ => p36h_new_wifi_ssid(vm, Vec::new())?,
+            }
+        }
+        (
+            P36H_WIFI_SSID,
+            "createFromAsciiEncoded",
+            "(Ljava/lang/String;)Landroid/net/wifi/WifiSsid;",
+        ) => {
+            let bytes = match opt_str(vm, args.first()) {
+                Some(t) => t.into_bytes(),
+                None => Vec::new(),
             };
             p36h_new_wifi_ssid(vm, bytes)?
         }
@@ -50627,7 +50678,7 @@ fn partial36h_wifi_instance(
         ),
         (P36H_WIFI_INFO, "describeContents", "()I") => Value::Int(0),
         // WifiSsid instance surface.
-        (P36H_WIFI_SSID, "getBytes", "()[B") => {
+        (P36H_WIFI_SSID, "getBytes", "()[B") | (P36H_WIFI_SSID, "getOctets", "()[B") => {
             let bytes = p36h_bytes(vm, Some(&get(vm, recv, "mBytes")));
             p49_new_byte_array(vm, &bytes)?
         }
@@ -51069,9 +51120,81 @@ fn p36h_proposal_builder(
 
 fn p36h_proposal_getters(
     vm: &mut Engine,
+    recv_class: &str,
     name: &str,
+    sig: &str,
     recv: ObjRef,
+    args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    // SaProposal/IkeSaProposal/ChildSaProposal value identity (AOSP):
+    // Objects.hash over (protocol, Arrays.hashCode(transforms)...) with
+    // per-transform Objects.hash(type, id[, keyLength]); transform types
+    // ENCR=1 PRF=2 INTEG=3 DH=4 ESN=5; protocol IKE=1 ESP=3.
+    if (name, sig) == ("equals", "(Ljava/lang/Object;)Z") {
+        let eq = match oarg(args, 0) {
+            Some(other) if class_of(vm, other) == recv_class => {
+                p36h_read_pairs(vm, &get(vm, recv, "rd_enc"))
+                    == p36h_read_pairs(vm, &get(vm, other, "rd_enc"))
+                    && p36h_read_ints(vm, &get(vm, recv, "rd_integ"))
+                        == p36h_read_ints(vm, &get(vm, other, "rd_integ"))
+                    && p36h_read_ints(vm, &get(vm, recv, "rd_dh"))
+                        == p36h_read_ints(vm, &get(vm, other, "rd_dh"))
+                    && (recv_class != P36H_IKE_PROPOSAL
+                        || p36h_read_ints(vm, &get(vm, recv, "rd_prf"))
+                            == p36h_read_ints(vm, &get(vm, other, "rd_prf")))
+            }
+            _ => false,
+        };
+        return Ok(Some(bool_value(eq)));
+    }
+    if (name, sig) == ("hashCode", "()I") {
+        fn chain(values: &[i32]) -> i32 {
+            let mut h: i32 = 1;
+            for v in values {
+                h = h.wrapping_mul(31).wrapping_add(*v);
+            }
+            h
+        }
+        let enc_hash = chain(
+            &p36h_read_pairs(vm, &get(vm, recv, "rd_enc"))
+                .iter()
+                .map(|(id, key_len)| chain(&[1, *id, *key_len]))
+                .collect::<Vec<_>>(),
+        );
+        let integ_hash = chain(
+            &p36h_read_ints(vm, &get(vm, recv, "rd_integ"))
+                .iter()
+                .map(|id| chain(&[3, *id]))
+                .collect::<Vec<_>>(),
+        );
+        let dh_hash = chain(
+            &p36h_read_ints(vm, &get(vm, recv, "rd_dh"))
+                .iter()
+                .map(|id| chain(&[4, *id]))
+                .collect::<Vec<_>>(),
+        );
+        let protocol = if recv_class == P36H_CHILD_PROPOSAL {
+            3
+        } else {
+            1
+        };
+        let super_hash = chain(&[protocol, enc_hash, integ_hash, dh_hash]);
+        let h = match recv_class {
+            P36H_IKE_PROPOSAL => {
+                let prf_hash = chain(
+                    &p36h_read_ints(vm, &get(vm, recv, "rd_prf"))
+                        .iter()
+                        .map(|id| chain(&[2, *id]))
+                        .collect::<Vec<_>>(),
+                );
+                chain(&[super_hash, prf_hash])
+            }
+            // Child builds carry a single default EsnTransform (type 5, id 0).
+            P36H_CHILD_PROPOSAL => chain(&[super_hash, chain(&[chain(&[5, 0])])]),
+            _ => super_hash,
+        };
+        return Ok(Some(Value::Int(h)));
+    }
     let field = match name {
         "getEncryptionAlgorithms" => "rd_enc",
         "getIntegrityAlgorithms" => "rd_integ",
@@ -51098,7 +51221,8 @@ fn p36h_ts_init(
         7 => {
             if !p36h_is_inet4(vm, Some(&starting)) || !p36h_is_inet4(vm, Some(&ending)) {
                 return Err(iae(
-                    "Invalid IPv4 address range for IPv4 Traffic Selector.".to_string()
+                    "Invalid address range: TS_IPV4_ADDR_RANGE requires IPv4 addresses."
+                        .to_string(),
                 ));
             }
             16
@@ -51106,7 +51230,8 @@ fn p36h_ts_init(
         8 => {
             if !p36h_is_inet6(vm, Some(&starting)) || !p36h_is_inet6(vm, Some(&ending)) {
                 return Err(iae(
-                    "Invalid IPv6 address range for IPv6 Traffic Selector.".to_string()
+                    "Invalid address range: TS_IPV6_ADDR_RANGE requires IPv6 addresses."
+                        .to_string(),
                 ));
             }
             40
@@ -51192,6 +51317,25 @@ fn p36h_traffic_selector(
                 _ => false,
             };
             bool_value(eq)
+        }
+        ("hashCode", "()I") => {
+            // Objects.hash(tsType, ipProtocolId, selectorLength, startPort,
+            // endPort, startingAddress, endingAddress)
+            let mut h: i32 = 1;
+            for f in [
+                "tsType",
+                "ipProtocolId",
+                "selectorLength",
+                "startPort",
+                "endPort",
+            ] {
+                h = h.wrapping_mul(31).wrapping_add(field_int(vm, recv, f));
+            }
+            for f in ["startingAddress", "endingAddress"] {
+                let addr = get(vm, recv, f);
+                h = h.wrapping_mul(31).wrapping_add(af_objects_hash(vm, &addr)?);
+            }
+            Value::Int(h)
         }
         _ => return Ok(None),
     };
@@ -51493,7 +51637,7 @@ fn partial36h_instance(
         recv_class,
         P36H_IKE_PROPOSAL | P36H_CHILD_PROPOSAL | P36H_SA_PROPOSAL
     ) {
-        return p36h_proposal_getters(vm, name, recv);
+        return p36h_proposal_getters(vm, recv_class, name, sig, recv, args);
     }
     if recv_class == P36H_TS {
         return p36h_traffic_selector(vm, name, sig, recv, args);

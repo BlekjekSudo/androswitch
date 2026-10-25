@@ -22719,3 +22719,180 @@ fn intent_to_uri_with_data_and_intent_scheme_is_guest_visible() {
         "com.example.app.Player"
     );
 }
+
+#[test]
+fn wifi_ipsec_value_identity_audit_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+
+    // WifiSsid.fromBytes keeps the caller's array reference (AOSP does not
+    // copy); getBytes still clones.
+    let raw = byte_array(&mut engine, b"AliasNet");
+    let ssid = object(call_static(
+        &mut engine,
+        P36H_WIFI_SSID,
+        "fromBytes",
+        "([B)Landroid/net/wifi/WifiSsid;",
+        std::slice::from_ref(&raw),
+    ));
+    assert_eq!(field(&engine, ssid, "mBytes"), raw);
+    let cloned = call(&mut engine, ssid, "getBytes", "()[B", &[]);
+    assert_ne!(cloned, raw);
+
+    // decodeSsid overflow: >32 UTF-16 units truncate instead of failing,
+    // and a malformed byte past the buffer is never examined.
+    let mut long = Vec::new();
+    long.extend_from_slice(&[b'a'; 40]);
+    long.push(0xff);
+    let long_array = byte_array(&mut engine, &long);
+    let long_ssid = object(call_static(
+        &mut engine,
+        P36H_WIFI_SSID,
+        "fromBytes",
+        "([B)Landroid/net/wifi/WifiSsid;",
+        &[long_array],
+    ));
+    let decoded = call(
+        &mut engine,
+        long_ssid,
+        "getUtf8Text",
+        "()Ljava/lang/CharSequence;",
+        &[],
+    );
+    assert_eq!(text_of(&engine, &decoded), "a".repeat(32));
+
+    // IkeTrafficSelector equals/hashCode contract.
+    let v4a = instance(&mut engine, "Ljava/net/Inet4Address;");
+    let v4b = instance(&mut engine, "Ljava/net/Inet4Address;");
+    let make_ts = |engine: &mut Engine| {
+        p49_new(
+            engine,
+            P36H_TS,
+            "(IILjava/net/InetAddress;Ljava/net/InetAddress;)V",
+            &[
+                Value::Int(0),
+                Value::Int(65535),
+                Value::Obj(v4a),
+                Value::Obj(v4b),
+            ],
+        )
+    };
+    let ts1 = make_ts(&mut engine);
+    let ts2 = make_ts(&mut engine);
+    assert_eq!(
+        call(
+            &mut engine,
+            ts1,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(ts2)]
+        ),
+        Value::Int(1)
+    );
+    let h1 = call(&mut engine, ts1, "hashCode", "()I", &[]);
+    let h2 = call(&mut engine, ts2, "hashCode", "()I", &[]);
+    assert_eq!(h1, h2);
+    assert_ne!(h1, Value::Int(ts1 as i32));
+
+    // SaProposal equals/hashCode contract (IKE + PRFs, Child + default ESN).
+    let build_ike = |engine: &mut Engine| {
+        let builder = p36h_ike_builder(engine);
+        call(
+            engine,
+            builder,
+            "addEncryptionAlgorithm",
+            "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+            &[Value::Int(12), Value::Int(256)],
+        );
+        call(
+            engine,
+            builder,
+            "addIntegrityAlgorithm",
+            "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+            &[Value::Int(12)],
+        );
+        call(
+            engine,
+            builder,
+            "addPseudorandomFunction",
+            "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+            &[Value::Int(5)],
+        );
+        call(
+            engine,
+            builder,
+            "addDhGroup",
+            "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+            &[Value::Int(14)],
+        );
+        object(call(
+            engine,
+            builder,
+            "build",
+            "()Landroid/net/ipsec/ike/IkeSaProposal;",
+            &[],
+        ))
+    };
+    let p1 = build_ike(&mut engine);
+    let p2 = build_ike(&mut engine);
+    assert_eq!(
+        call(
+            &mut engine,
+            p1,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(p2)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, p1, "hashCode", "()I", &[]),
+        call(&mut engine, p2, "hashCode", "()I", &[])
+    );
+    // Different key length -> not equal.
+    let builder = p36h_ike_builder(&mut engine);
+    call(
+        &mut engine,
+        builder,
+        "addEncryptionAlgorithm",
+        "(II)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(12), Value::Int(128)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "addIntegrityAlgorithm",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(12)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "addPseudorandomFunction",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(5)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "addDhGroup",
+        "(I)Landroid/net/ipsec/ike/IkeSaProposal$Builder;",
+        &[Value::Int(14)],
+    );
+    let p3 = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/net/ipsec/ike/IkeSaProposal;",
+        &[],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            p1,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(p3)]
+        ),
+        Value::Int(0)
+    );
+}
