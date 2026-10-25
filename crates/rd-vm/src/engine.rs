@@ -68,6 +68,9 @@ pub struct Engine {
     pub config: VmConfig,
     /// (classe, campo) → valor
     pub statics: HashMap<(String, String), Value>,
+    /// Bounded Java valueOf identities, shared by desktop and device dispatch.
+    /// The collectors retain these VM-owned constants until Engine teardown.
+    pub(crate) boxed_cache: HashMap<(String, i64), ObjRef>,
     clinit_done: HashSet<String>,
     #[cfg(feature = "std")]
     clinit_running: HashSet<String>,
@@ -206,6 +209,7 @@ impl Engine {
             heap: Heap::new(budget),
             config,
             statics: HashMap::new(),
+            boxed_cache: HashMap::new(),
             clinit_done: HashSet::new(),
             clinit_running: Default::default(),
             clinit_failed: HashSet::new(),

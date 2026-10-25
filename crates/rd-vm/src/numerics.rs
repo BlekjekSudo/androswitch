@@ -12,14 +12,8 @@
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
+use crate::primitive_parse::{parse_float, parse_float32, parse_radix};
 use crate::value::Value;
-
-fn nfe(s: &str) -> VmExit {
-    VmExit::Exception(Throwable::new(
-        "Ljava/lang/NumberFormatException;",
-        format!("For input string: \"{s}\""),
-    ))
-}
 
 fn str_arg(vm: &Engine, v: Option<&Value>) -> Result<String, VmExit> {
     match v {
@@ -29,33 +23,6 @@ fn str_arg(vm: &Engine, v: Option<&Value>) -> Result<String, VmExit> {
             "Cannot parse null string: null",
         ))),
     }
-}
-
-fn parse_radix(s: &str, radix: i32, min: i128, max: i128) -> Result<i128, VmExit> {
-    if !(2..=36).contains(&radix) || s.is_empty() {
-        return Err(nfe(s));
-    }
-    let (neg, digits) = match s.as_bytes()[0] {
-        b'-' => (true, &s[1..]),
-        b'+' => (false, &s[1..]),
-        _ => (false, s),
-    };
-    if digits.is_empty() {
-        return Err(nfe(s));
-    }
-    let mut acc: i128 = 0;
-    for c in digits.chars() {
-        let d = c.to_digit(radix as u32).ok_or_else(|| nfe(s))? as i128;
-        acc = acc * radix as i128 + d;
-        if acc > max + 1 {
-            return Err(nfe(s));
-        }
-    }
-    let v = if neg { -acc } else { acc };
-    if v < min || v > max {
-        return Err(nfe(s));
-    }
-    Ok(v)
 }
 
 fn to_radix(mut v: i128, radix: u32) -> String {
@@ -371,11 +338,11 @@ pub(crate) fn static_intrinsic(
         }
         ("Float", "parseFloat", "(Ljava/lang/String;)F") => {
             let t = str_arg(vm, args.first())?;
-            Value::Float(parse_float(&t)? as f32)
+            Value::Float(parse_float32(&t)?)
         }
         ("Float", "valueOf", "(Ljava/lang/String;)Ljava/lang/Float;") => {
             let t = str_arg(vm, args.first())?;
-            let x = parse_float(&t)? as f32;
+            let x = parse_float32(&t)?;
             Value::Obj(crate::boxes::box_value(
                 vm,
                 "Ljava/lang/Float;",
@@ -605,21 +572,6 @@ pub(crate) fn static_intrinsic(
         _ => return Ok(None),
     };
     Ok(Some(v))
-}
-
-fn parse_float(t: &str) -> Result<f64, VmExit> {
-    let s = t.trim_matches(|c: char| c <= ' ');
-    let core = s.trim_end_matches(['f', 'F', 'd', 'D']);
-    match core {
-        "NaN" | "+NaN" | "-NaN" => return Ok(f64::NAN),
-        "Infinity" | "+Infinity" => return Ok(f64::INFINITY),
-        "-Infinity" => return Ok(f64::NEG_INFINITY),
-        _ => {}
-    }
-    if core.is_empty() || core.contains(|c: char| c.is_ascii_alphabetic() && c != 'e' && c != 'E') {
-        return Err(nfe(t));
-    }
-    core.parse::<f64>().map_err(|_| nfe(t))
 }
 
 fn char_type(c: Option<char>) -> i32 {

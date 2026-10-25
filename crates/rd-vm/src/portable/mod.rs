@@ -114,6 +114,9 @@ impl Engine {
     /// Plain DEX objects need no host-side state. Platform-backed objects must
     /// fail before they can be mistaken for functioning framework objects.
     pub fn attach_host_state(&mut self, class: &str, _object: ObjRef) -> Result<(), VmExit> {
+        if crate::boxes::kind(class).is_some() {
+            return Ok(());
+        }
         if let Some(host) = self.framework_host() {
             if host.attach(self, class, _object)? {
                 return Ok(());

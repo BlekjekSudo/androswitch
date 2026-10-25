@@ -1,0 +1,511 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-25",
+  "implementation_commit": "62d23239323daa9855f2a184cdc2cda4b8032484",
+  "status": "in_progress",
+  "first_screen_pass": false,
+  "physical_hardware_new_changes": "not_run",
+  "no_package_specific_runtime_fixes": true,
+  "source_provenance": "Each NRO has an immutable local startup-iterations/<nro>/build.json and source.json. Earlier builds record the parent commit plus the exact source-file hashes; compilation does not imply hardware execution.",
+  "runs": [
+    {
+      "label": "nro28",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/4706f39e32ba427ca7417177aca7688b/verification.json",
+        "sha256": "9543c0af233b2fdc384d171a97089acf75e272a429b2e92437ed939614b97436"
+      },
+      "nro_sha256": "14f2a6cb0e7439dd8dc3e4de2b4a567081b52c76ee4c8e5da9ef175fbdfff819",
+      "status": "blocked_runtime",
+      "sd_original_restore": "restored",
+      "emulator_exit_code_before_cleanup": null,
+      "cases": [
+        {
+          "apk_sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+          "status": "failed",
+          "error": "exception java.lang.NoSuchMethodError: Ldalvik/system/PathClassLoader;->loadClass(Ljava/lang/String;)Ljava/lang/Class;\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V",
+          "returned_to_launcher": true,
+          "first_screen_pass": false
+        },
+        {
+          "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "status": "failed",
+          "error": "NOT_FOUND [rd-vm]: método Landroid/content/pm/PackageManager;->resolveContentProvider(Ljava/lang/String;I)Landroid/content/pm/ProviderInfo; não resolvido [pc 0x23: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 3, idx: 1035, regs: [0, 4, 3, 0, 0] } }]\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->zzf(Landroid/content/Context;)Z\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->zza(Landroid/content/Context;Ljava/lang/String;Z)I\n  at Lcom/google/android/gms/dynamite/zze;->zzb(Landroid/content/Context;Ljava/lang/String;Z)I\n  at Lcom/google/android/gms/dynamite/zzi;->selectModule(Landroid/content/Context;Ljava/lang/String;Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy$IVersions;)Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy$SelectionResult;\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->load(Landroid/content/Context;Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy;Ljava/lang/String;)Lcom/google/android/gms/dynamite/DynamiteModule;\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzf(Landroid/content/Context;Z)Lcom/google/android/gms/internal/measurement/zzcc;\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "returned_to_launcher": true,
+          "first_screen_pass": false
+        }
+      ]
+    },
+    {
+      "label": "nro29",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/c9b1ef18af9f44a8ad9e516dd40ef472/verification.json",
+        "sha256": "d8f25870d76e63203a0dad9cbd4c3cf6956bd9848e4075f0942d725b7248da2c"
+      },
+      "nro_sha256": "4def6ecbaf187c7f4f83f1cd6b293ae8d9c9bceca0f116bbcee35ae33375d99b",
+      "status": "blocked_runtime",
+      "sd_original_restore": "restored",
+      "emulator_exit_code_before_cleanup": null,
+      "cases": [
+        {
+          "apk_sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+          "status": "failed",
+          "error": "NOT_FOUND [rd-vm]: método Lcom/king/core/GameView;->setDefaultFocusHighlightEnabled(Z)V não resolvido [pc 0x0: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 483, regs: [0, 1, 0, 0, 0] } }]\n  at Lcom/king/core/GameView$$ExternalSyntheticApiModelOutline0;->m(Lcom/king/core/GameView;Z)V\n  at Lcom/king/core/GameView;-><init>(Landroid/app/Activity;Lcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V — a classe pode depender de plataforma fora do escopo M2",
+          "returned_to_launcher": true,
+          "first_screen_pass": false
+        },
+        {
+          "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "status": "failed",
+          "error": "HORIZON_WORKER_ERROR [rd-vm]: HORIZON_WORKER_ERROR [start]: worker 4611686018427387905: platform result -140 [pc 0x2: Insn { opcode: 114, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 27514, regs: [0, 2, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V",
+          "returned_to_launcher": true,
+          "first_screen_pass": false
+        }
+      ]
+    },
+    {
+      "label": "nro29-long",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/6ad022192bf54265b37e9c1a6184ca06/verification.json",
+        "sha256": "913d8f163be2dfec1845c880c366e489e730dabb2dd0c786dba38d30ac88995d"
+      },
+      "nro_sha256": "4def6ecbaf187c7f4f83f1cd6b293ae8d9c9bceca0f116bbcee35ae33375d99b",
+      "status": "blocked_runtime",
+      "sd_original_restore": "restored",
+      "emulator_exit_code_before_cleanup": null,
+      "cases": [
+        {
+          "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "status": "failed",
+          "error": "NOT_FOUND [rd-vm]: método Landroid/content/pm/PackageManager;->getApplicationInfo(Ljava/lang/String;I)Landroid/content/pm/ApplicationInfo; não resolvido [pc 0x6: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 3, idx: 1010, regs: [0, 2, 3, 0, 0] } }]\n  at Lcom/google/android/gms/common/wrappers/PackageManagerWrapper;->getApplicationInfo(Ljava/lang/String;I)Landroid/content/pm/ApplicationInfo;\n  at Lcom/google/android/gms/common/internal/zzah;->zzc(Landroid/content/Context;)V\n  at Lcom/google/android/gms/common/internal/zzah;->zza(Landroid/content/Context;)I\n  at Lcom/google/android/gms/common/GooglePlayServicesUtilLight;->isGooglePlayServicesAvailable(Landroid/content/Context;I)I\n  at Lcom/google/android/gms/common/GoogleApiAvailabilityLight;->isGooglePlayServicesAvailable(Landroid/content/Context;I)I\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->zzf(Landroid/content/Context;)Z\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->zza(Landroid/content/Context;Ljava/lang/String;Z)I\n  at Lcom/google/android/gms/dynamite/zze;->zzb(Landroid/content/Context;Ljava/lang/String;Z)I\n  at Lcom/google/android/gms/dynamite/zzi;->selectModule(Landroid/content/Context;Ljava/lang/String;Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy$IVersions;)Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy$SelectionResult;\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->load(Landroid/content/Context;Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy;Ljava/lang/String;)Lcom/google/android/gms/dynamite/DynamiteModule;\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzf(Landroid/content/Context;Z)Lcom/google/android/gms/internal/measurement/zzcc;\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "returned_to_launcher": true,
+          "first_screen_pass": false
+        }
+      ]
+    },
+    {
+      "label": "nro30",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/9d0560935493434aaee7634a2212bbe0/verification.json",
+        "sha256": "fb570121d3366b8db57a7e6f9db19b1eae67230279a9d4499c461ad3979ab248"
+      },
+      "nro_sha256": "98e326f32383e19cdba3184374afa2f94d17e1c3166d54d37ea383699b3e5692",
+      "status": "attempted_failed",
+      "sd_original_restore": "restored",
+      "emulator_exit_code_before_cleanup": -532462766,
+      "cases": [
+        {
+          "package": "com.king.candycrushsaga",
+          "status": "failed",
+          "error": "JNI_API_UNAVAILABLE [rd-vm]: JNI slot 16: ExceptionDescribe [pc 0x45: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 5, idx: 4256, regs: [3, 4, 5, 6, 0] } }]\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V",
+          "returned_to_launcher": false,
+          "first_screen_pass": false,
+          "scope": "Diagnostic session only; final launcher workflow did not complete."
+        }
+      ]
+    },
+    {
+      "label": "nro31-mek",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/d7610c16939d46c98ac490793aba0123/verification.json",
+        "sha256": "2c685741da9890566640245bcee6522585957c9871d43d7ef3b621d285d7b685"
+      },
+      "nro_sha256": "7219675308eea7a81ba39aa0387288aa023303010b62735bc2ae1f702563cb3a",
+      "status": "blocked_runtime",
+      "sd_original_restore": "restored",
+      "emulator_exit_code_before_cleanup": null,
+      "cases": [
+        {
+          "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "status": "failed",
+          "error": "NOT_FOUND [rd-vm]: método Landroid/content/pm/PackageManager;->hasSystemFeature(Ljava/lang/String;)Z não resolvido [pc 0xd: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 1025, regs: [2, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/common/util/DeviceProperties;->zzd(Landroid/content/pm/PackageManager;)Z\n  at Lcom/google/android/gms/common/util/DeviceProperties;->isWearable(Landroid/content/Context;)Z\n  at Lcom/google/android/gms/common/util/DeviceProperties;->isWearableWithoutPlayStore(Landroid/content/Context;)Z\n  at Lcom/google/android/gms/common/GooglePlayServicesUtilLight;->isGooglePlayServicesAvailable(Landroid/content/Context;I)I\n  at Lcom/google/android/gms/common/GoogleApiAvailabilityLight;->isGooglePlayServicesAvailable(Landroid/content/Context;I)I\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->zzf(Landroid/content/Context;)Z\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->zza(Landroid/content/Context;Ljava/lang/String;Z)I\n  at Lcom/google/android/gms/dynamite/zze;->zzb(Landroid/content/Context;Ljava/lang/String;Z)I\n  at Lcom/google/android/gms/dynamite/zzi;->selectModule(Landroid/content/Context;Ljava/lang/String;Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy$IVersions;)Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy$SelectionResult;\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->load(Landroid/content/Context;Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy;Ljava/lang/String;)Lcom/google/android/gms/dynamite/DynamiteModule;\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzf(Landroid/content/Context;Z)Lcom/google/android/gms/internal/measurement/zzcc;\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "returned_to_launcher": true,
+          "first_screen_pass": false
+        }
+      ]
+    },
+    {
+      "label": "nro31-candy",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/9711c576023749748d9106c66f81eb74/verification.json",
+        "sha256": "eca3742eddaee9644c6d5b7b16f4c96af1720089c861d852970ba854843a9abd"
+      },
+      "nro_sha256": "7219675308eea7a81ba39aa0387288aa023303010b62735bc2ae1f702563cb3a",
+      "status": "attempted_failed",
+      "sd_original_restore": "restored",
+      "emulator_exit_code_before_cleanup": -532462766,
+      "cases": [
+        {
+          "package": "com.king.candycrushsaga",
+          "status": "failed",
+          "error": "NOT_FOUND [rd-vm]: método Landroid/content/Intent;->getStringArrayExtra(Ljava/lang/String;)[Ljava/lang/String; não resolvido [pc 0x4: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 194, regs: [0, 2, 0, 0, 0] } }]\n  at Lcom/king/main/EngineActivity;->getIntentStringArrayExtra(Ljava/lang/String;)[Ljava/lang/String;\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V — a classe pode depender de plataforma fora do escopo M2",
+          "returned_to_launcher": false,
+          "first_screen_pass": false,
+          "scope": "Diagnostic session only; final launcher workflow did not complete."
+        }
+      ]
+    },
+    {
+      "label": "nro32-mek",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/245380432c2c4be5b1bc8f7610b55021/verification.json",
+        "sha256": "b22ecd56d53078c0ccf724cae05a24a638513939705e070d4ab7e82f4f349915"
+      },
+      "nro_sha256": "4b2603b96a521c7864480b00088f2c1b4ef37cb9287445bc2d0bf629cc6adbf2",
+      "status": "blocked_runtime",
+      "sd_original_restore": "restored",
+      "emulator_exit_code_before_cleanup": null,
+      "cases": [
+        {
+          "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "status": "failed",
+          "error": "exception java.lang.NoClassDefFoundError: Landroid/os/Binder;\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->instantiate(Ljava/lang/String;)Landroid/os/IBinder;\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzf(Landroid/content/Context;Z)Lcom/google/android/gms/internal/measurement/zzcc;\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "returned_to_launcher": true,
+          "first_screen_pass": false
+        }
+      ]
+    },
+    {
+      "label": "nro32-candy",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/3155f465241843b18df0fb7173af8f09/verification.json",
+        "sha256": "1bd9c2118bdc96e1e7c2875a8a6561781d915bf665aa3b2cf151edfe15cd6e9b"
+      },
+      "nro_sha256": "4b2603b96a521c7864480b00088f2c1b4ef37cb9287445bc2d0bf629cc6adbf2",
+      "status": "attempted_failed",
+      "sd_original_restore": "restored",
+      "emulator_exit_code_before_cleanup": -532462766,
+      "cases": [
+        {
+          "package": "com.king.candycrushsaga",
+          "status": "failed",
+          "error": "NOT_FOUND [rd-vm]: método Ljava/util/Locale;->getDefault()Ljava/util/Locale; não resolvido [pc 0x0: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 0, idx: 52615, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/king/core/DeviceLocale;->getCountryCode()Ljava/lang/String;\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V — a classe pode depender de plataforma fora do escopo M2",
+          "returned_to_launcher": false,
+          "first_screen_pass": false,
+          "scope": "Diagnostic session only; final launcher workflow did not complete."
+        }
+      ]
+    },
+    {
+      "nro_sha256": "38c30c75173739a36e1146a61091c2f194753c11c95a5afb6666a6834970c26e",
+      "status": "blocked_runtime",
+      "emulator_exit_code_before_cleanup": null,
+      "label": "nro33-mek",
+      "cases": [
+        {
+          "first_screen_pass": false,
+          "status": "failed",
+          "error": "NOT_FOUND [rd-vm]: método Ljava/lang/Class;->newInstance()Ljava/lang/Object; não resolvido [pc 0xa: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 62893, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->instantiate(Ljava/lang/String;)Landroid/os/IBinder;\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzf(Landroid/content/Context;Z)Lcom/google/android/gms/internal/measurement/zzcc;\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "returned_to_launcher": true
+        }
+      ],
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/009057a76c9842b4b93aae389ae9e3cf/verification.json",
+        "sha256": "43c8e4450e4484874e889342b6ce59147cd66e66ccae082a624c31289090925b"
+      },
+      "sd_original_restore": "restored"
+    },
+    {
+      "nro_sha256": "38c30c75173739a36e1146a61091c2f194753c11c95a5afb6666a6834970c26e",
+      "status": "attempted_failed",
+      "emulator_exit_code_before_cleanup": null,
+      "label": "nro33-candy",
+      "cases": [
+        {
+          "returned_to_launcher": false,
+          "status": "failed",
+          "scope": "Diagnostic session only; final launcher workflow did not complete.",
+          "first_screen_pass": false,
+          "package": "com.king.candycrushsaga",
+          "error": "JNI_API_UNAVAILABLE [rd-vm]: JNI slot 144: GetStaticFieldID [pc 0x45: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 5, idx: 4256, regs: [3, 4, 5, 6, 0] } }]\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V"
+        }
+      ],
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/b1a4c6fa2a704e148f56c06efb030f04/verification.json",
+        "sha256": "cf9d4c4e72439c059f7aa6f7ecdad9edcb8c44ec90c8b5a990eb50fa9a883f88"
+      },
+      "sd_original_restore": "restored"
+    },
+    {
+      "nro_sha256": "c085042ee2413741a646735e78ce1fee9a37bc420cea20ab720c706302ced4a9",
+      "status": "blocked_runtime",
+      "emulator_exit_code_before_cleanup": null,
+      "label": "nro34-mek",
+      "cases": [
+        {
+          "first_screen_pass": false,
+          "status": "failed",
+          "error": "NOT_FOUND [rd-vm]: método Ljava/lang/Math;->max(II)I não resolvido [pc 0x52: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 26235, regs: [3, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "returned_to_launcher": true
+        }
+      ],
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/c792fe13122d4731b02471805ee134ab/verification.json",
+        "sha256": "5baf9c4e17047a20eaa53946fd23a1b8e9bf9c5812a42574f0bf4b8398b99d35"
+      },
+      "sd_original_restore": "restored"
+    },
+    {
+      "nro_sha256": "c085042ee2413741a646735e78ce1fee9a37bc420cea20ab720c706302ced4a9",
+      "status": "attempted_failed",
+      "emulator_exit_code_before_cleanup": null,
+      "label": "nro34-candy",
+      "cases": [
+        {
+          "returned_to_launcher": false,
+          "status": "failed",
+          "scope": "Diagnostic session only; final launcher workflow did not complete.",
+          "first_screen_pass": false,
+          "package": "com.king.candycrushsaga",
+          "error": "NATIVE_API_UNAVAILABLE [rd-vm]: call: libcandycrushsaga.so: call requires mmap [pc 0x45: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 5, idx: 4256, regs: [3, 4, 5, 6, 0] } }]\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V"
+        }
+      ],
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/a3ee0c7a697147dda86b00877d6c667d/verification.json",
+        "sha256": "94b58a3a7399081bc5868f206e50bdbe9d5cb7d7b481a95e657aa6bcc077a8d0"
+      },
+      "sd_original_restore": "restored"
+    },
+    {
+      "nro_sha256": "7f22c7995d21c6f37de13ff841d48bc31d1db739c82e49090f7a346f49b166d6",
+      "status": "blocked_runtime",
+      "emulator_exit_code_before_cleanup": null,
+      "label": "nro35-mek",
+      "cases": [
+        {
+          "first_screen_pass": false,
+          "status": "failed",
+          "error": "API_UNAVAILABLE [rd-vm]: new-instance Ljava/util/concurrent/atomic/AtomicReference;: platform state for Ljava/util/concurrent/atomic/AtomicReference; is unavailable [pc 0x7: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 4326) }]\n  at Lcom/google/android/gms/internal/measurement/zzib;-><clinit>()V\n  at Lcom/google/android/gms/measurement/internal/zzfr;-><init>(Lcom/google/android/gms/measurement/internal/zzgu;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;->zzp(Landroid/content/Context;Lcom/google/android/gms/internal/measurement/zzcl;Ljava/lang/Long;)Lcom/google/android/gms/measurement/internal/zzfr;\n  at Lcom/google/android/gms/measurement/internal/AppMeasurementDynamiteService;->initialize(Lcom/google/android/gms/dynamic/IObjectWrapper;Lcom/google/android/gms/internal/measurement/zzcl;J)V\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "returned_to_launcher": true
+        }
+      ],
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/31cf3c594bca4c0d93a1c528216fa249/verification.json",
+        "sha256": "c0ccd43ff0dad778487e55736e3b01eb4b14a41684cc4ecab748ab40914981fe"
+      },
+      "sd_original_restore": "restored"
+    },
+    {
+      "nro_sha256": "7f22c7995d21c6f37de13ff841d48bc31d1db739c82e49090f7a346f49b166d6",
+      "status": "attempted_failed",
+      "emulator_exit_code_before_cleanup": null,
+      "label": "nro35-candy",
+      "cases": [
+        {
+          "returned_to_launcher": false,
+          "status": "failed",
+          "scope": "Diagnostic session only; final launcher workflow did not complete.",
+          "first_screen_pass": false,
+          "package": "com.king.candycrushsaga",
+          "error": "NATIVE_API_UNAVAILABLE [rd-vm]: call: libcandycrushsaga.so: call requires fileno [pc 0x45: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 5, idx: 4256, regs: [3, 4, 5, 6, 0] } }]\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V"
+        }
+      ],
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/aeb8655aa1704896bfe22fa6c0b08b54/verification.json",
+        "sha256": "396a3d578d951ed2909d6991f4ba16d8cf36967db80e1a637eab338aa3ba3224"
+      },
+      "sd_original_restore": "restored"
+    },
+    {
+      "label": "nro36-mek",
+      "sd_original_restore": "restored",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/2cea55d7a5fa426cbe63eb30d8d98bb4/verification.json",
+        "sha256": "0cf06660c547f14e1aed3c14288b64b940214a8082d9162efd77f07fda152195"
+      },
+      "cases": [
+        {
+          "status": "failed",
+          "error": "API_UNAVAILABLE [rd-vm]: new-instance Landroid/util/Pair;: platform state for Landroid/util/Pair; is unavailable [pc 0x0: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 133) }]\n  at Lcom/google/android/gms/measurement/internal/zzew;-><clinit>()V\n  at Lcom/google/android/gms/measurement/internal/zzfr;-><init>(Lcom/google/android/gms/measurement/internal/zzgu;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;->zzp(Landroid/content/Context;Lcom/google/android/gms/internal/measurement/zzcl;Ljava/lang/Long;)Lcom/google/android/gms/measurement/internal/zzfr;\n  at Lcom/google/android/gms/measurement/internal/AppMeasurementDynamiteService;->initialize(Lcom/google/android/gms/dynamic/IObjectWrapper;Lcom/google/android/gms/internal/measurement/zzcl;J)V\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "first_screen_pass": false,
+          "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+          "returned_to_launcher": true
+        }
+      ],
+      "application_session_observed": true,
+      "error": null,
+      "nro_sha256": "0c6bd5c707fea7fefc0f58124bdbbacaab8cc74fa467da5c0e994a3ec2d86b07",
+      "status": "blocked_runtime"
+    },
+    {
+      "label": "nro36-candy",
+      "sd_original_restore": "restored",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/43cb0ec918784257be756e308d9f38e3/verification.json",
+        "sha256": "11b9bda947e02142d841e267b37ef3b68490098d9aa473c9bfd4a820e8cf2976"
+      },
+      "cases": [],
+      "application_session_observed": false,
+      "error": "No fresh completed launcher report before the timeout.",
+      "nro_sha256": "0c6bd5c707fea7fefc0f58124bdbbacaab8cc74fa467da5c0e994a3ec2d86b07",
+      "status": "attempted_failed"
+    },
+    {
+      "cases": [
+        {
+          "returned_to_launcher": true,
+          "captures": [],
+          "first_screen": "not_visually_verified",
+          "teardown_phases": [
+            "stop_requested",
+            "native_activity_stop",
+            "java_activity_stop",
+            "worker_admission_closed",
+            "background_worker_quiesce",
+            "media_thread_quiesce",
+            "glsurface_join",
+            "egl_wait_gpu",
+            "egl_unbind",
+            "egl_destroy_context",
+            "egl_destroy_surface",
+            "egl_terminate",
+            "egl_terminated",
+            "guest_thread_quiesce",
+            "native_destructors",
+            "media_reset",
+            "media_released",
+            "activity_dispose",
+            "runtime_drop",
+            "native_mapping_release",
+            "native_resource_reset",
+            "native_reset_guest_threads",
+            "native_reset_cxx",
+            "native_reset_keys",
+            "native_reset_sync",
+            "native_reset_locale",
+            "native_reset_admitted",
+            "native_mapping_release",
+            "native_reset_anonymous_memory",
+            "native_tls_reset",
+            "native_resources_released",
+            "display_geometry_reset",
+            "runtime_closed",
+            "launcher_refresh"
+          ],
+          "runtime_status": "failed",
+          "status": "blocked_or_unreported",
+          "input": {
+            "attempt": 0,
+            "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+            "install_snapshot_step": 3,
+            "bytes": 13099584,
+            "expected_session_id": "0f672ae3e91a400880161e7a3307c0fe-1",
+            "source": "D:\\Download\\mekorama-1-7-2.apk",
+            "staged_name": "0000-external.apk",
+            "index": 0
+          },
+          "presented_frames": null,
+          "installed_identity_matches": true,
+          "error": "API_UNAVAILABLE [rd-vm]: new-instance Ljava/util/concurrent/ConcurrentHashMap;: platform state for Ljava/util/concurrent/ConcurrentHashMap; is unavailable [pc 0xa: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(1, 4288) }]\n  at Lcom/google/android/gms/measurement/internal/zzim;-><init>(Lcom/google/android/gms/measurement/internal/zzfr;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;-><init>(Lcom/google/android/gms/measurement/internal/zzgu;)V\n  at Lcom/google/android/gms/measurement/internal/zzfr;->zzp(Landroid/content/Context;Lcom/google/android/gms/internal/measurement/zzcl;Ljava/lang/Long;)Lcom/google/android/gms/measurement/internal/zzfr;\n  at Lcom/google/android/gms/measurement/internal/AppMeasurementDynamiteService;->initialize(Lcom/google/android/gms/dynamic/IObjectWrapper;Lcom/google/android/gms/internal/measurement/zzcl;J)V\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+          "snapshots": []
+        }
+      ],
+      "error": null,
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/0f672ae3e91a400880161e7a3307c0fe/verification.json",
+        "sha256": "32f28ea83345646cad0213933e8ff51d66a675e75ce2f635af1500c74d08d19a"
+      },
+      "sd_original_restore": "restored",
+      "label": "nro37-mek",
+      "nro_sha256": "2afc2fbc3de242e18119434ddd1a55333aaed918615140347d2019a16392c2b1",
+      "status": "blocked_runtime"
+    },
+    {
+      "cases": [],
+      "error": "No fresh completed launcher report before the timeout.",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/9b296e2a93ba43519ee3603086f27c5d/verification.json",
+        "sha256": "d346d3a40e6dddeb0a0a23266c71c57367c347ba34a606db243227ca48c48d6d"
+      },
+      "sd_original_restore": "restored",
+      "label": "nro37-candy-hdd-timeout",
+      "nro_sha256": "2afc2fbc3de242e18119434ddd1a55333aaed918615140347d2019a16392c2b1",
+      "status": "attempted_failed"
+    },
+    {
+      "cases": [],
+      "error": "No fresh completed launcher report before the timeout.",
+      "evidence": {
+        "path": "local-artifacts/m9/external-runs/bbdd9f3be54d458d82d88d2be192ab74/verification.json",
+        "sha256": "ed55054691e701a6ea292d54f3c355b32b2426e93d5ea640413d21e6fcdb0a42"
+      },
+      "sd_original_restore": "restored",
+      "label": "nro37-candy-host-disk",
+      "nro_sha256": "2afc2fbc3de242e18119434ddd1a55333aaed918615140347d2019a16392c2b1",
+      "status": "attempted_failed"
+    }
+  ],
+  "pending_device_scope": [
+    "NRO37 Mekorama advances past Pair and stops at ConcurrentHashMap. NRO38 with the portable map is built but has not been run. The later shared-upstream wrapper port has scoped host/JVM proof; its NRO retest and hardware verification are separate pending gates.",
+    "NRO37 Candy SSD attempt fails during host APK staging with explicit disk exhaustion; the dedicated HDD retry times out before DEX admission. These are not new Android API blockers or post-fileno execution proof."
+  ],
+  "host_checks": {
+    "receipt": {
+      "path": "target/evidence/m9-checks.json",
+      "sha256": "3551af20e98fefda05632ccb5569187c7216761693a43dd7ac977909cb4a6491"
+    },
+    "last_full_gate_count": 67,
+    "scope": "Historical 67-gate receipt plus later scoped startup follow-ups. This is not the new 70-check catalog or a complete shared-wrapper regression run. The pre-wrapper full framework retry was interrupted after refactoring superseded its binary; partial logs are retained.",
+    "focused": [
+      {
+        "path": "target/evidence/m9-atomic-reference-test-final.log",
+        "sha256": "e1912c4a20bc0583b3f3f555314f540f3452d750d6702b5fe09b60069f919828"
+      },
+      {
+        "path": "target/evidence/m9-pair-test-3.log",
+        "sha256": "9fd5763e9cbab6a96b8e2a1826a1492c09dd73580bdf8ba478b0834d9b7a3ffa"
+      },
+      {
+        "path": "target/evidence/m9-final-native-abi.log",
+        "sha256": "9e31869bad241840114b12b9897fc78c246b549861e3aed7267c58e4c9a818af"
+      },
+      {
+        "path": "target/evidence/m9-math-test.log",
+        "sha256": "42d26b3dcbac865a0854471fd21a577a3f2c083008b3280b793aab637ad550ff"
+      },
+      {
+        "path": "target/evidence/m9-static-fields-test-2.log",
+        "sha256": "765afdc4b6f6ae78a5ab17b25af8f7db4472ad4cf1dd895c468edc8e0fc062ec"
+      },
+      {
+        "path": "target/evidence/m9-static-fields-abi.log",
+        "sha256": "3671a340ac5bc7bf689155743176d3c430dd018eac89ad92c31d24dd9b02ea2f"
+      }
+    ],
+    "last_full_gate_status": "passed_after_Pair_clippy_repair"
+  },
+  "hardware_219_scope": "The earlier direct user report remains bound to NRO 1eb775c0876ec44dcff1014776c7f13f01e9892c3d612835ec53f31a00718c53. It does not verify these new builds.",
+  "last_updated": "2026-10-26",
+  "sd_archive_relocations": [
+    {
+      "manifest": "local-artifacts/m9/sd-archive-20261026/3155f465241843b18df0fb7173af8f09.json",
+      "sha256": "6c56144fde2b700fae614e73f379fece5f4e12c92819d5e5260576d8160c60fa"
+    },
+    {
+      "manifest": "local-artifacts/m9/sd-archive-20261026/43cb0ec918784257be756e308d9f38e3.json",
+      "sha256": "61ad89230d37ee0c28be1c34947114c3df7a97f41e664fef4ff60d955256a2d0"
+    },
+    {
+      "manifest": "local-artifacts/m9/sd-archive-20261026/9711c576023749748d9106c66f81eb74.json",
+      "sha256": "753753f39b663de5d3fb40dbbea50f57b1396ad691088dd88a1a8adb3b8c2632"
+    },
+    {
+      "manifest": "local-artifacts/m9/sd-archive-20261026/9d0560935493434aaee7634a2212bbe0.json",
+      "sha256": "8c689027481074eaf3a3df9e50f2c65ae4dfb0415e4e4c049a1542963af30d2f"
+    },
+    {
+      "manifest": "local-artifacts/m9/sd-archive-20261026/a3ee0c7a697147dda86b00877d6c667d.json",
+      "sha256": "0bb1445120a7c36ea703e37c5f47d90893f5e2acab78886e34f84f39982b8bd1"
+    },
+    {
+      "manifest": "local-artifacts/m9/sd-archive-20261026/aeb8655aa1704896bfe22fa6c0b08b54.json",
+      "sha256": "790f23abe4b36ab78210ed5040764015fcadcb5692e3076c27ef3c7bc953356d"
+    },
+    {
+      "manifest": "local-artifacts/m9/sd-archive-20261026/b1a4c6fa2a704e148f56c06efb030f04.json",
+      "sha256": "a35412087a32759938973f177a29ad7c816a9bf4b5686869d9d43b064e47995e"
+    }
+  ]
+}

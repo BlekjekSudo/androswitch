@@ -21,8 +21,14 @@
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
+use crate::framework_host::HostMethodKind;
 use crate::heap::ObjRef;
 use crate::value::Value;
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec,
+};
 
 pub(crate) const BOOLEAN: &str = "Ljava/lang/Boolean;";
 const BYTE: &str = "Ljava/lang/Byte;";
@@ -48,6 +54,102 @@ pub(crate) fn kind(class: &str) -> Option<char> {
     })
 }
 
+/// Primitive class descriptor used by TYPE metadata and shared adapters.
+pub fn primitive_descriptor(class: &str) -> Option<&'static str> {
+    Some(match class {
+        BOOLEAN => "Z",
+        BYTE => "B",
+        SHORT => "S",
+        CHARACTER => "C",
+        INTEGER => "I",
+        LONG => "J",
+        FLOAT => "F",
+        DOUBLE => "D",
+        "Ljava/lang/Void;" => "V",
+        _ => return None,
+    })
+}
+
+/// Descriptor of a supported platform static field; lookup does not allocate.
+pub fn static_field_descriptor(class: &str, field: &str) -> Option<&'static str> {
+    Some(match (class, field) {
+        (BOOLEAN, "TRUE" | "FALSE") => BOOLEAN,
+        (INTEGER, "MIN_VALUE" | "MAX_VALUE") => "I",
+        (LONG, "MIN_VALUE" | "MAX_VALUE") => "J",
+        (FLOAT, "NaN" | "POSITIVE_INFINITY" | "NEGATIVE_INFINITY" | "MIN_VALUE" | "MAX_VALUE") => {
+            "F"
+        }
+        (DOUBLE, "NaN" | "POSITIVE_INFINITY" | "NEGATIVE_INFINITY" | "MIN_VALUE" | "MAX_VALUE") => {
+            "D"
+        }
+        (class, "TYPE") if primitive_descriptor(class).is_some() => "Ljava/lang/Class;",
+        _ => return None,
+    })
+}
+
+/// Exact declarations implemented by this module, shared with JNI lookup.
+pub fn method_metadata(class: &str, name: &str, sig: &str) -> Option<HostMethodKind> {
+    use HostMethodKind::{Constructor, Instance, Static};
+    let k = kind(class)?;
+    if name == "<init>" {
+        return ((sig == format!("({k})V"))
+            || (k != 'C' && sig == "(Ljava/lang/String;)V")
+            || (k == 'F' && sig == "(D)V"))
+            .then_some(Constructor);
+    }
+    if matches!(
+        (name, sig),
+        ("toString", "()Ljava/lang/String;")
+            | ("hashCode", "()I")
+            | ("equals", "(Ljava/lang/Object;)Z")
+    ) || (name == "compareTo"
+        && (sig == "(Ljava/lang/Object;)I" || sig == format!("({class})I")))
+        || (!matches!(k, 'Z' | 'C')
+            && matches!(
+                (name, sig),
+                ("byteValue", "()B")
+                    | ("shortValue", "()S")
+                    | ("intValue", "()I")
+                    | ("longValue", "()J")
+                    | ("floatValue", "()F")
+                    | ("doubleValue", "()D")
+            ))
+        || (k == 'Z' && (name, sig) == ("booleanValue", "()Z"))
+        || (k == 'C' && (name, sig) == ("charValue", "()C"))
+    {
+        return Some(Instance);
+    }
+    if (name == "valueOf" && sig == format!("({k}){class}"))
+        || (name == "hashCode" && sig == format!("({k})I"))
+        || (name == "compare" && sig == format!("({k}{k})I"))
+        || (name == "toString" && sig == format!("({k})Ljava/lang/String;"))
+        || (k == 'Z'
+            && matches!(
+                (name, sig),
+                ("parseBoolean", "(Ljava/lang/String;)Z")
+                    | ("valueOf", "(Ljava/lang/String;)Ljava/lang/Boolean;")
+                    | ("logicalAnd" | "logicalOr" | "logicalXor", "(ZZ)Z")
+            ))
+        || (k == 'F'
+            && matches!(
+                (name, sig),
+                ("floatToIntBits" | "floatToRawIntBits", "(F)I")
+                    | ("intBitsToFloat", "(I)F")
+                    | ("isNaN" | "isInfinite" | "isFinite", "(F)Z")
+            ))
+        || (k == 'D'
+            && matches!(
+                (name, sig),
+                ("doubleToLongBits" | "doubleToRawLongBits", "(D)J")
+                    | ("longBitsToDouble", "(J)D")
+                    | ("isNaN" | "isInfinite" | "isFinite", "(D)Z")
+            ))
+    {
+        return Some(Static);
+    }
+    None
+}
+
 fn npe(msg: &str) -> VmExit {
     VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", msg))
 }
@@ -64,7 +166,7 @@ fn narrow(k: char, v: i32) -> i32 {
 }
 
 /// Box `v` (already of the right primitive kind) into `class`.
-pub(crate) fn box_value(vm: &mut Engine, class: &str, v: Value) -> Result<ObjRef, VmExit> {
+pub fn box_value(vm: &mut Engine, class: &str, v: Value) -> Result<ObjRef, VmExit> {
     let k = kind(class).ok_or_else(|| npe("not a wrapper class"))?;
     if k == 'Z' {
         return boolean_obj(vm, v.as_int()? != 0);
@@ -75,9 +177,29 @@ pub(crate) fn box_value(vm: &mut Engine, class: &str, v: Value) -> Result<ObjRef
         'D' => Value::Double(v.as_double()?),
         _ => Value::Int(narrow(k, v.as_int()?)),
     };
-    vm.heap
+    let cache = match v {
+        Value::Int(n)
+            if k == 'B'
+                || (k == 'C' && (0..128).contains(&n))
+                || (matches!(k, 'S' | 'I') && (-128..128).contains(&n)) =>
+        {
+            Some(n as i64)
+        }
+        Value::Long(n) if (-128..128).contains(&n) => Some(n),
+        _ => None,
+    }
+    .map(|n| (class.to_string(), n));
+    if let Some(r) = cache.as_ref().and_then(|key| vm.boxed_cache.get(key)) {
+        return Ok(*r);
+    }
+    let object = vm
+        .heap
         .alloc_instance(class.to_string(), vec![("value".to_string(), v)])
-        .map_err(crate::err::oom_throwable)
+        .map_err(crate::err::oom_throwable)?;
+    if let Some(key) = cache {
+        vm.boxed_cache.insert(key, object);
+    }
+    Ok(object)
 }
 
 /// Canonical `Boolean.TRUE` / `Boolean.FALSE`. They are stored in the static
@@ -104,11 +226,7 @@ pub(crate) fn boolean_obj(vm: &mut Engine, b: bool) -> Result<ObjRef, VmExit> {
 
 /// Host static constants of JDK classes that are not in any DEX. Called by
 /// `sget` before falling back to the type default.
-pub(crate) fn host_static(
-    vm: &mut Engine,
-    owner: &str,
-    field: &str,
-) -> Result<Option<Value>, VmExit> {
+pub fn host_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<Value>, VmExit> {
     Ok(Some(match (owner, field) {
         (BOOLEAN, "TRUE") => Value::Obj(boolean_obj(vm, true)?),
         (BOOLEAN, "FALSE") => Value::Obj(boolean_obj(vm, false)?),
@@ -199,6 +317,7 @@ fn prim_compare(k: char, a: &Value, b: &Value) -> Result<i32, VmExit> {
         'J' => a.as_long()?.cmp(&b.as_long()?) as i32,
         'F' => float_compare(a.as_float()?, b.as_float()?),
         'D' => double_compare(a.as_double()?, b.as_double()?),
+        'B' | 'S' | 'C' => a.as_int()?.wrapping_sub(b.as_int()?),
         _ => a.as_int()?.cmp(&b.as_int()?) as i32,
     })
 }
@@ -243,15 +362,26 @@ fn java_d2l(x: f64) -> i64 {
     x as i64
 }
 
+fn int_value(k: char, v: &Value) -> Result<i32, VmExit> {
+    Ok(match k {
+        'F' => v.as_float()? as i32,
+        'D' => v.as_double()? as i32,
+        _ => numeric(k, v)?.0 as i32,
+    })
+}
+
 /// Static methods of the wrappers. Returns `Ok(None)` when the call is not a
 /// wrapper static this module models.
-pub(crate) fn static_intrinsic(
+pub fn static_intrinsic(
     vm: &mut Engine,
     class: &str,
     name: &str,
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if method_metadata(class, name, sig) != Some(HostMethodKind::Static) {
+        return Ok(None);
+    }
     let Some(k) = kind(class) else {
         return Ok(None);
     };
@@ -309,7 +439,7 @@ pub(crate) fn static_intrinsic(
 }
 
 /// Instance methods on a wrapper receiver. Returns `Ok(None)` when not modelled.
-pub(crate) fn instance_intrinsic(
+pub fn instance_intrinsic(
     vm: &mut Engine,
     recv_class: &str,
     name: &str,
@@ -317,6 +447,12 @@ pub(crate) fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if !matches!(
+        method_metadata(recv_class, name, sig),
+        Some(HostMethodKind::Instance | HostMethodKind::Constructor)
+    ) {
+        return Ok(None);
+    }
     let Some(k) = kind(recv_class) else {
         return Ok(None);
     };
@@ -325,21 +461,38 @@ pub(crate) fn instance_intrinsic(
     if name == "<init>" {
         let v = match args.first() {
             Some(Value::Obj(sr)) if sig == "(Ljava/lang/String;)V" => {
-                let s = vm.heap.as_str(*sr)?.trim().to_string();
-                let bad = || {
-                    VmExit::Exception(Throwable::new(
-                        "Ljava/lang/NumberFormatException;",
-                        format!("For input string: \"{s}\""),
-                    ))
-                };
+                let s = vm.heap.as_str(*sr)?.to_string();
                 match k {
                     'Z' => Value::Int(s.eq_ignore_ascii_case("true") as i32),
-                    'J' => Value::Long(s.parse().map_err(|_| bad())?),
-                    'F' => Value::Float(s.parse().map_err(|_| bad())?),
-                    'D' => Value::Double(s.parse().map_err(|_| bad())?),
-                    _ => Value::Int(narrow(k, s.parse().map_err(|_| bad())?)),
+                    'J' => Value::Long(crate::primitive_parse::parse_radix(
+                        &s,
+                        10,
+                        i64::MIN as i128,
+                        i64::MAX as i128,
+                    )? as i64),
+                    'F' => Value::Float(crate::primitive_parse::parse_float32(&s)?),
+                    'D' => Value::Double(crate::primitive_parse::parse_float(&s)?),
+                    _ => {
+                        let (min, max) = match k {
+                            'B' => (i8::MIN as i128, i8::MAX as i128),
+                            'S' => (i16::MIN as i128, i16::MAX as i128),
+                            _ => (i32::MIN as i128, i32::MAX as i128),
+                        };
+                        Value::Int(crate::primitive_parse::parse_radix(&s, 10, min, max)? as i32)
+                    }
                 }
             }
+            Some(Value::Null | Value::Int(0)) if sig == "(Ljava/lang/String;)V" && k == 'Z' => {
+                Value::Int(0)
+            }
+            Some(value) if sig == "(Ljava/lang/String;)V" => {
+                if matches!(k, 'F' | 'D') {
+                    return Err(npe("wrapper constructor string == null"));
+                }
+                let _ = crate::primitive_parse::string_argument(vm, value)?;
+                return Ok(None);
+            }
+            Some(a) if k == 'F' && sig == "(D)V" => Value::Float(a.as_double()? as f32),
             Some(a) => match k {
                 'J' => Value::Long(a.as_long()?),
                 'F' => Value::Float(a.as_float()?),
@@ -356,10 +509,10 @@ pub(crate) fn instance_intrinsic(
     let v = match (name, sig) {
         ("booleanValue", "()Z") if k == 'Z' => Value::Int((mine.as_int()? != 0) as i32),
         ("charValue", "()C") if k == 'C' => Value::Int(mine.as_int()?),
-        ("intValue", "()I") if numeric_kind => Value::Int(numeric(k, &mine)?.0 as i32),
+        ("intValue", "()I") if numeric_kind => Value::Int(int_value(k, &mine)?),
         ("longValue", "()J") if numeric_kind => Value::Long(numeric(k, &mine)?.0),
-        ("shortValue", "()S") if numeric_kind => Value::Int(numeric(k, &mine)?.0 as i16 as i32),
-        ("byteValue", "()B") if numeric_kind => Value::Int(numeric(k, &mine)?.0 as i8 as i32),
+        ("shortValue", "()S") if numeric_kind => Value::Int(int_value(k, &mine)? as i16 as i32),
+        ("byteValue", "()B") if numeric_kind => Value::Int(int_value(k, &mine)? as i8 as i32),
         ("floatValue", "()F") if numeric_kind => Value::Float(match k {
             'F' => mine.as_float()?,
             'J' => mine.as_long()? as f32,

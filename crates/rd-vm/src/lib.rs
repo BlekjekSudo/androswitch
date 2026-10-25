@@ -72,8 +72,7 @@ pub(crate) mod android_util;
 pub(crate) mod arrays;
 #[cfg(feature = "std")]
 pub(crate) mod atomics;
-#[cfg(feature = "std")]
-pub(crate) mod boxes;
+pub mod boxes;
 #[cfg(feature = "std")]
 pub(crate) mod bundle;
 #[cfg(feature = "std")]
@@ -172,6 +171,7 @@ pub(crate) mod numerics;
 pub mod perms;
 #[cfg(feature = "std")]
 pub(crate) mod platform_base;
+mod primitive_parse;
 #[cfg(feature = "std")]
 pub(crate) mod reflect;
 pub mod repr;

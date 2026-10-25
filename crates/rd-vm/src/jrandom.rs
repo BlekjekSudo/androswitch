@@ -6,6 +6,11 @@
 //! deterministic per-process seed sequence (`RD_RANDOM_SEED` overrides the
 //! base) so agent runs are reproducible.
 
+// Pinned clippy suggests const for SEEDS, but rustc rejects HashMap::new with
+// RandomState in a const initializer (E0015). The lint is emitted on the macro;
+// item-level allows do not cover it. Keep the inherited runtime initializer.
+#![allow(clippy::missing_const_for_thread_local)]
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 

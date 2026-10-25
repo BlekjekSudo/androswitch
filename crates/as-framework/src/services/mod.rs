@@ -5,6 +5,7 @@ pub(super) mod bitmap;
 mod bundle;
 mod collections;
 mod communication;
+mod concurrent_map;
 mod database;
 mod device_info;
 pub(super) mod executors;
@@ -80,11 +81,6 @@ impl Services {
                 )
                 | ("Ljava/util/Locale;", "ROOT", "Ljava/util/Locale;")
                 | (
-                    "Ljava/lang/Boolean;",
-                    "TRUE" | "FALSE",
-                    "Ljava/lang/Boolean;"
-                )
-                | (
                     "Ljava/util/concurrent/TimeUnit;",
                     "NANOSECONDS"
                         | "MICROSECONDS"
@@ -95,15 +91,16 @@ impl Services {
                         | "DAYS",
                     "Ljava/util/concurrent/TimeUnit;"
                 )
-        ) || (name == "TYPE"
-            && descriptor == "Ljava/lang/Class;"
-            && collections::primitive(class).is_some())
+        )
     }
     pub(super) fn method_metadata(
         class: &str,
         name: &str,
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
+        if let Some(kind) = concurrent_map::metadata(class, name, sig) {
+            return Some(kind);
+        }
         if let Some(kind) = pair::metadata(class, name, sig) {
             return Some(kind);
         }
@@ -192,6 +189,9 @@ impl Services {
             .bind_source(self.fs.clone(), apk, path, storage)
     }
     pub(super) fn attach(&self, vm: &mut Engine, class: &str, r: ObjRef) -> Result<bool> {
+        if concurrent_map::attach(vm, class, r)? {
+            return Ok(true);
+        }
         if pair::attach(vm, class, r)? {
             return Ok(true);
         }
@@ -237,6 +237,9 @@ impl Services {
         name: &str,
         _descriptor: &str,
     ) -> Result<Option<Value>> {
+        if rd_vm::boxes::static_field_descriptor(class, name) == Some(_descriptor) {
+            return rd_vm::boxes::host_static(vm, class, name);
+        }
         if let Some(value) = self.locales.static_field(vm, class, name, _descriptor)? {
             return Ok(Some(value));
         }
@@ -249,11 +252,6 @@ impl Services {
         if let Some(value) = self.executors.static_field(vm, class, name, _descriptor)? {
             return Ok(Some(value));
         }
-        if name == "TYPE" {
-            if let Some(descriptor) = collections::primitive(class) {
-                return Ok(Some(Value::Obj(vm.device_class_object(descriptor)?)));
-            }
-        }
         if class == "Landroid/os/Build$VERSION;" && name == "SDK_INT" && _descriptor == "I" {
             return Ok(Some(Value::Int(crate::properties::sdk_int().ok_or_else(
                 || {
@@ -263,12 +261,6 @@ impl Services {
                     )
                 },
             )?)));
-        }
-        if class == "Ljava/lang/Boolean;" && matches!(name, "TRUE" | "FALSE") {
-            return self
-                .collections
-                .boxed(vm, class, Value::Int(i32::from(name == "TRUE")))
-                .map(Some);
         }
         Ok(None)
     }
@@ -409,6 +401,9 @@ impl Services {
         r: ObjRef,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if let Some(value) = concurrent_map::call(vm, class, name, sig, r, args)? {
+            return Ok(Some(value));
+        }
         if let Some(value) = pair::call(vm, class, name, sig, r, args)? {
             return Ok(Some(value));
         }

@@ -473,7 +473,7 @@ There is still no verified game screen. Both sessions return and SD restoration
 completes. Candy Crush was not rerun on NRO20; its latest observed input-connection
 failure remains the separate NRO19 result.
 
-## Unified-SDK retest (2026-10-25)
+## Earlier unified-SDK retest (2026-10-25)
 
 After the shared conformance repairs, a separate two-APK run with the Mesa
 NVC0/NVK build still has no first-screen pass. Candy Crush now reaches
@@ -484,3 +484,216 @@ contract will not itself supply Google Play Services. Both failures release the
 session and return to the console; the original test SD directory is restored.
 See [exact APK/NRO identities and errors](../reports/m9-mesa-independent-apps-20261025.json).
 The independent-game gate remains open alongside the separate 219-case target.
+
+## Shared atomic, loader and provider contracts (2026-10-25)
+
+The next startup work implements API 26 scalar `AtomicInteger` and `AtomicLong`
+operations in the portable VM. Private GC-owned value slots preserve identity;
+CAS, wrapping arithmetic, pre/post update results and Number conversions share
+the Engine/JNI serialization gate. Functional updater callbacks and Java 9
+access modes remain unavailable. The JVM differential fixture now has 62 rows
+(including the existing AtomicBoolean cases), repeated before and after GC.
+
+The application and system loaders are distinct, rooted PathClassLoader
+identities with a bootstrap parent. The system loader cannot see APK DEX;
+the application loader can. JNI method-ID lookup follows modeled platform
+superclasses as well as DEX metadata, without inheriting constructors or accepting
+an incorrect static kind or descriptor.
+
+`PackageManager.resolveContentProvider(String,int)` supports flags zero over
+the committed installation registry. It reads ZIP directories/manifests instead
+of materializing APK bodies. An exact authority or semicolon-separated alias
+returns a fresh, GC-owned ProviderInfo snapshot; updates, uninstall and disabled
+applications/components affect subsequent queries. A missing authority returns
+null only after this lookup. Resource-valued unresolved declarations, unsupported
+flags and path-permission objects produce explicit errors. Provider activation,
+ContentResolver transport and Google Play Services are not supplied by this
+metadata query. API 26 exported defaults, empty permissions, single-user and
+instant-visibility flags follow the Android PackageParser reference.
+
+`getApplicationInfo(String,int)` shares the same installed identity and
+NameNotFoundException rules. Flags zero and GET_META_DATA are supported; literal
+String/boolean/int/float values retain their Bundle types, `android:resource`
+retains its resource ID, and `android:value` resolves references against the
+currently mounted installation's resource table. Resource resolution for another
+installation and other flags remain explicitly unavailable. This does not claim
+support for every ApplicationInfo field or the full application flag bitset.
+
+The API 26 View default-focus-highlight getter/setter retain per-view state.
+On the software UI renderer the setting enables/disables a visible fallback
+outline on the current keyboard-selected clickable view. Touch removes that
+keyboard indication. The focused tests toggle it through normal SDK DEX calls
+and verify actual changed pixels in both fixture identities. Android theme
+drawables, general focusable-view policy and GL/CPU overlay composition remain
+outside this bounded fallback.
+
+Bundle/Intent scalar storage now also retains primitive and String arrays by
+reference, including shallow snapshot aliases, exact array type checks, null
+defaults and GC edges. The SDK fixture covers all nine array kinds; Parcel,
+Parcelable arrays and transport remain unavailable. PackageManager's feature
+queries expose the implemented offline guest profile (single-pointer touch,
+fake touch and both screen orientations), with API26 version comparisons. They
+do not advertise unavailable sensors, radios, multitouch or broader gamepad APIs
+based on the physical console alone. Never-installed package queries produce
+NameNotFoundException before unsupported field flags; retained/uninstalled
+records still require implemented visibility flags and cannot use this shortcut.
+
+The VM has no Java debugger attachment/wait backend; the two supported
+`android.os.Debug` status queries report that state. Native call tracing is not
+a Java debugger. JNI ExceptionDescribe clears the thread's pending exception
+before callbacks, prints its actual object detail and captured DEX frames to the
+shared System.err log sink, and has an explicit no-pending no-op. This does not
+implement Java StackTraceElement, cause or suppressed-exception APIs. An earlier
+Candy run faulted in a native destructor after an unsupported startup call;
+that failed attempt is retained separately and is not a safe-return pass.
+
+Subsequent shared contracts add process-local Binder ownership (`attachInterface`,
+descriptor lookup and actual owner identity) and canonical base Locale objects.
+Binder owners/descriptors are ordinary GC-scanned heap references; this creates
+no external service or Binder/Parcel transport. The default Locale is the
+declared `persist.sys.locale=en-US` guest profile, with per-VM `setDefault`, base
+constructors/getters and ROOT. Horizon system-language discovery, script/Unicode
+extensions and ICU display names remain unavailable. Five ordinary JVM Locale
+cases and both renamed SDK fixture identities cover the supported base subset.
+
+`Class.newInstance()` invokes a real, declared no-argument DEX constructor,
+checks class/member access and shared initialization admission, and propagates
+constructor exceptions directly. It rejects abstract/interface/primitive/array
+types and does not inherit a parent's constructor. The JVM corpus covers 16
+observations, including a constructor GC, private/same-package access, failed
+initialization and repeat failure. Platform constructor reflection is not
+advertised by this DEX-only implementation.
+
+The product JNI table now connects GetStaticFieldID and all nine typed static
+getters/setters to descriptor-checked declarations, real DEX static storage and
+the explicit platform-field catalog. It supports inherited DEX fields, actual
+class initialization, private JNI access, narrow/wide/FP values and reference
+GC roots. Same-name static fields that the VM cannot store separately are
+rejected. Platform writes and product instance-field entry points remain
+unavailable. An additional NDK-to-Horizon-GCC oracle executes the production C
+entry points for 19 cases, including signed narrow results and exact NaN bits;
+this CPU oracle is separate from VM semantics and Horizon execution. The required
+host regression list now includes this oracle (67 gates instead of the earlier 66).
+
+The NRO34 retest advances Mekorama through Binder and Class.newInstance to a
+missing Math.max(int,int) call; it returns to the launcher with its worker and
+cleanup errors preserved. Candy Crush passes Locale and JNI static fields, then
+requests mmap. Its abort-time native finalization faults, so that run has no
+safe-return pass. The isolated harness stops only its owned emulator process
+and records restoration of the original SD tree. Neither game has a first-screen
+pass. NRO34 SHA256: `c085042ee2413741a646735e78ce1fee9a37bc420cea20ab720c706302ced4a9`.
+
+Shared Math/StrictMath min/max now implement integer bounds, NaN propagation
+and signed-zero ordering for all four scalar overloads. An ordinary JVM corpus
+provides 1,024 observations, replayed through unchanged DEX before and after GC.
+
+The guest native adapter now implements owned, page-aligned private anonymous
+mmap/mmap64, mprotect, partial munmap and bounded madvise contracts. Backing is
+zeroed and Horizon permissions are applied with svcSetMemoryPermission; NONE,
+READ and READ|WRITE are supported. Partial unmaps revoke access immediately but
+retain the backing allocation until its last page is unmapped. Reset restores
+RW before releasing retained backing, after guest threads/finalizers quiesce.
+This is eager physical allocation, not demand paging or an overcommit promise.
+File/shared/fixed/executable mappings, mremap and DONTNEED on non-RW pages return
+explicit unsupported errors. The Mesa SDK's separate mmap wrapper is unchanged.
+The host memory test uses actual Win32 page permissions on MSYS (whose POSIX
+mprotect rejects a 4 KiB middle-page range), or POSIX mmap/mprotect on Linux;
+permission-failure injection checks that ownership is retained. Host results
+alone do not prove Horizon mapping behavior.
+
+NRO35 executes five successful anonymous mappings in Candy Crush (four 4 KiB
+and one 270,336-byte RW allocation), then stops at fileno. Mekorama passes the
+Math blocker and next requires AtomicReference. Both are still blocked; Candy's
+abort finalization again faults. The new shared AtomicReference subset provides
+get/set/lazySet/getAndSet and identity-based CAS/weakCAS, including null,
+GC-scanned values and actual object toString callbacks. Fourteen JVM observations
+cover identity versus equals, subclass dispatch, callback GC and replacement;
+host tests additionally prove that replaced/unrooted values are collected.
+
+Native FILE objects now have session-owned descriptors for fileno, fstat/fstat64,
+read/write, pread/pwrite, lseek and close. They use the same unbuffered VFS position;
+positioned I/O preserves it, closed descriptors are not reused within the session,
+and stale IDs return EBADF. A recursive VM lease serializes descriptor lookup,
+stdio position updates and close without holding the native metadata lock while
+entering the VFS. Transfers return bounded short counts. Standard console streams
+retain IDs 0/1/2; terminal reads and their synthetic stat records are unavailable.
+This remains a path-backed VFS: open-file behavior across rename/unlink, dup,
+open/fdopen and general POSIX file-descriptor APIs are not advertised by these
+entry points. No host/newlib descriptor escapes into an APK. Contract tests cover
+FILE/FD interleaving, positioned access, metadata layout, closure and stale IDs.
+
+NRO36 passes AtomicReference and next finds android.util.Pair in Mekorama.
+Candy's separate attempt times out before an application-session report or DEX
+memory-admission record, so it provides no new API diagnosis; the original SD
+tree is restored. Pair now has ordinary GC-scanned first/second fields,
+constructor/create, null-safe component equality, XOR component hashes and
+toString callbacks. Tests use two package identities, callback GC, lifetime
+release, Unicode String hashing and asymmetric equals to preserve API26's exact
+argument-component-first delegation. Component behavior delegates to the VM;
+an unavailable component method still fails explicitly. See
+[AOSP API26 Pair](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-8.0.0_r4/core/java/android/util/Pair.java).
+
+These are shared framework contracts, exercised through ordinary SDK DEX calls
+and renamed package fixtures. They do not add package-specific startup branches.
+Original-game execution and the remaining first-screen gate are recorded in the
+[startup retest](../reports/m9-atomic-loader-provider-20261025.json), separately
+from the user's 219/219 physical-Switch result for the earlier binary.
+
+## Upstream reuse correction (2026-10-26)
+
+The [source-routing audit](UPSTREAM_REUSE_AUDIT.md) identifies existing upstream
+implementations excluded from the device feature graph. Work now starts with
+those implementations and their tests, porting coherent API families before
+adding independent replacements. Existing single-threaded/snapshot assumptions
+are not automatically valid for native callbacks or Android contracts.
+
+The inherited `rd-vm::boxes` source file now compiles for both feature paths,
+with `alloc` imports and shared device/JNI dispatch metadata. It provides the
+implemented subsets of all eight primitive wrappers. Framework boxing calls
+from reflection and SharedPreferences delegate to it. The duplicate device
+wrapper allocation/cache, conversion and equality implementation was removed;
+the bounded valueOf cache is now Engine-owned and traced by both collectors.
+Boolean constants retain their actual static identity; constructors allocate
+separate objects. Static-field lookup uses exact descriptors, including TYPE.
+
+The numeric parsers were extracted from inherited `numerics.rs` into shared
+`primitive_parse.rs`. Differential checks correct byte/short/char comparison
+differences, floating-to-int saturation before byte/short narrowing, constructor
+range/whitespace/null errors, invalid repeated/special-value float suffixes, and
+direct f32 decimal rounding. Unported Unicode-digit and hexadecimal-floating
+input domains return named capability errors. Broader numeric utilities,
+Character Unicode APIs, wrapper parsing overloads and full Java float-format
+compatibility are not implied by this extraction.
+
+One ordinary JVM/DEX fixture supplies 86 observations, replayed before and after
+GC on both the inherited desktop VM and the actual portable VM. Both pass. Ten
+portable JNI metadata/constructor contracts pass, including use of this shared
+module. The fixture reads Boolean constants before calling valueOf: this exposed
+an additional portable sget binding gap, reproduced in a retained failing run.
+The device interpreter now uses the shared descriptor-checked constant resolver
+even without a FrameworkHost; the same ordered corpus then passes. Three new
+required checks build this fixture and test both paths; the
+registered regression catalog grows from 67 to 70. This does not retroactively
+turn an earlier 67-check receipt into a complete 70-check run. The larger
+framework regression, NRO execution and physical-device evidence retain their
+own statuses.
+
+The preceding NRO37 Mekorama attempt passed Pair and stopped at the missing
+ConcurrentHashMap family. The already-developed portable map adapter has seven
+communication tests including callback GC and reentrant mutation, with a
+24-observation JVM oracle. It remains a bounded serialized map, not a claim of
+the entire concurrent collections API or a completed unification of upstream
+collection state. Its required differences are recorded by the reuse audit.
+
+Two NRO37 Candy retries provided no new Android API evidence: one explicitly
+ran out of host disk during APK staging; the other timed out on a dedicated
+HDD profile before DEX admission. The host harness now checks staging space
+before moving the SD tree. Seven completed, owned SD result directories were
+moved to `local-artifacts/m9/sd-archive-20261026` with verified per-file SHA256
+manifests. Their immutable original receipts retain the former C: paths; the
+archive manifests provide the relocation mapping. Neither game has a verified
+first screen from these attempts.
+
+Reference behavior: [API26 ClassLoader](https://android.googlesource.com/platform/libcore/+/android-8.0.0_r4/ojluni/src/main/java/java/lang/ClassLoader.java),
+[JNI method IDs](https://docs.oracle.com/en/java/javase/21/docs/specs/jni/functions.html#getmethodid),
+[API26 provider parsing](https://github.com/aosp-mirror/platform_frameworks_base/blob/android-8.0.0_r4/core/java/android/content/pm/PackageParser.java).

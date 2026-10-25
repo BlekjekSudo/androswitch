@@ -17,6 +17,7 @@ impl Engine {
         let n = self.heap.len();
         let mut marked = vec![false; n + 1];
         let mut roots: Vec<ObjRef> = self.statics.values().filter_map(reference).collect();
+        roots.extend(self.boxed_cache.values().copied());
         roots.extend(self.execution_frames.roots());
         roots.extend(self.heap.gc_pinned_roots());
         roots.extend(self.portable.strings.values().copied());

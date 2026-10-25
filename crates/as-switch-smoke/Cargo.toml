@@ -70,6 +70,11 @@ path = "tests/portable_atomic.rs"
 required-features = ["portable-tests"]
 
 [[test]]
+name = "shared_boxes"
+path = "tests/shared_boxes.rs"
+required-features = ["portable-tests"]
+
+[[test]]
 name = "portable_monitor"
 path = "tests/portable_monitor.rs"
 required-features = ["portable-tests"]

@@ -10,6 +10,7 @@
 | DEX interpreter | Core opcodes, calls, heap, exceptions | Shared no_std Engine/dispatcher; 12 JVM results and six negative cases verified in Ryujinx |
 | Android framework/lifecycle | Host subsets implemented | Supported Application/Activity/Intent/resource/View/Canvas/Looper subset; real Java/Kotlin DEX callbacks |
 | DEX parser (not execution) | `rd-dex` implementation/tests | `no_std + alloc` build; real DEX smoke matched host in Ryujinx |
+| Primitive wrapper families | `rd-vm::boxes` implements a bounded eight-class subset | Same source now used by desktop and portable dispatch; 86 JVM observations pass on both, before/after GC. Exact method/static-field metadata and VM-owned valueOf identities are shared. This is not full java.lang coverage; see the upstream reuse audit. |
 | JNI/native | Bounded Unicorn/Python worker | Real Horizon ARM64 execution and VM JNI callbacks; supported subset below |
 | Filesystem | Java in-memory VFS | Persistent shared Java/native VFS, private package mounts and opaque OBB reads |
 | SQLite | Python subprocess/subset | Actual native SQLite C engine, durable 8 MiB snapshots and bounded Android SQLiteDatabase/helper/cursor contracts; no subprocess |
@@ -34,7 +35,9 @@ that other apps, APIs or full Activities work. The current native subset has
 explicit errors for missing imports, unsupported relocations/dependency cycles,
 arbitrary `System.load` paths and direct Linux SVC instructions. JNI monitors,
 weak references and unpaired UTF-16 strings remain unsupported. The tested
-JNI instance/static field subset is implemented; this is not full reflection.
+JNI instance/static field subset is implemented in the original M4 proof backend;
+the product NRO binds descriptor-checked static fields, while its instance-field
+table entries remain unavailable. These are distinct execution paths, not full reflection.
 JNI `FindClass` still searches the session DEX/builtin registry. Native-caller
 defining-loader selection, `JNI_OnLoad` loader association and bootstrap-only
 lookup on a newly attached native thread are not implemented. Java
@@ -85,8 +88,8 @@ M8/M9 results are scoped by scenario, not an APK-wide compatibility badge:
 | Native SQLite notes / renamed notes, transaction/cursor/reflection | Contract tests passed | not run in emulator | SQLite readable (user report); individual transaction/renamed/reflection results not recorded |
 | AOSP HelloActivity original source/layout | Recorded in candidate corpus; static rendering only | not run | individual result not recorded |
 | Vector Pinball 1.16.0, unmodified F-Droid APK | Shared metadata, source and monitors advance startup; now blocked at RandomAccessFile in MultiDex ZipUtil.getZipCrc; no gameplay | not run | individual result not recorded |
-| Mekorama 1.7.2, hash frozen in startup lock | DEX admitted; blocked at System.loadLibrary without host native backend | reflection and actual Runtime CPU query succeed; surface-created callback reaches billing purchases callback and next rejects AbstractCollection state in a DEX subclass; native reset and launcher return complete, original/cleanup errors retained; no first screen | latest user screenshot shows the earlier Enum initializer blocker; binary hash unrecorded |
-| Candy Crush Saga 1.332.1.1, hash frozen in startup lock | 34,874,388 raw DEX bytes admitted; blocked at System.loadLibrary without host native backend | isolated diagnostic emulator passes native initialization and COW/TimeUnit startup; GameView next rejects BaseInputConnection platform state; C++ finalization and launcher return complete; no first screen | latest logs confirm DEX admitted, then getauxval unavailable; teardown reaches launcher_ready; binary hash unrecorded |
+| Mekorama 1.7.2, hash frozen in startup lock | DEX admitted; generic framework contracts have SDK/JVM tests | NRO37 passes Math, AtomicReference and Pair; next stops at ConcurrentHashMap on a worker; returns to launcher with original/cleanup errors retained; no first screen | latest user screenshot shows the earlier Enum initializer blocker; binary hash unrecorded |
+| Candy Crush Saga 1.332.1.1, hash frozen in startup lock | 34,874,388 raw DEX bytes admitted; generic JNI static fields have VM and ARM64 C ABI tests | NRO35 executes five owned anonymous mappings then requires fileno; abort finalization faults. Later NRO37 attempts hit host disk exhaustion or time out before DEX admission, giving no new API blocker. No first-screen pass | latest logs confirm DEX admitted, then getauxval unavailable; teardown reaches launcher_ready; binary hash unrecorded |
 | External NDK hello-jni/native-activity | Build/integration pending | pending | pending |
 
 The [candidate report](../reports/m8-m9-candidate.json) records exact fixture

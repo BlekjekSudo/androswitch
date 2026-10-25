@@ -317,6 +317,13 @@ function Capture-Session([object]$Session){
     return @($images.ToArray())
 }
 try{
+    # Staged source, import cache and committed APK coexist during installation.
+    # Reject insufficient host disk before moving the user's original SD tree;
+    # a desktop ENOSPC exception supplies no Android compatibility evidence.
+    $volume=[IO.DriveInfo]::new([IO.Path]::GetPathRoot($switchRoot))
+    $requiredBytes=4L*[long](($inputs|Measure-Object bytes -Sum).Sum)+(Get-Item -LiteralPath $artifact).Length+512MB
+    $receipt.host_storage_preflight=@{volume=$volume.Name;available_bytes=$volume.AvailableFreeSpace;required_bytes=$requiredBytes;scope='Host staging estimate, separate from guest/Horizon memory admission'}
+    if($volume.AvailableFreeSpace -lt $requiredBytes){throw "Insufficient host test disk space on $($volume.Name): need at least $requiredBytes bytes before staging; available $($volume.AvailableFreeSpace). Use a test profile on a volume with enough space."}
     if(@(Get-EmulatorProcesses).Count){throw 'Close the existing Ryujinx session before executing this isolated test.'}
     New-Item -ItemType Directory -Path $switchRoot -Force | Out-Null
     if((Get-Item -LiteralPath $switchRoot -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Refusing an SD switch directory that is a link.'}

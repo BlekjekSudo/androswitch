@@ -95,6 +95,86 @@ fn app() -> (App, Rc<Identity>) {
     app.android.bind_main_thread(&app.vm).unwrap();
     (app, native)
 }
+#[test]
+fn upstream_wrappers_share_real_jni_constructor_method_and_static_field_metadata() {
+    let (mut app, native) = app();
+    let class = "Ljava/lang/Integer;";
+    let object = construct(&mut app.vm, class, "(I)V", &[Value::Int(42)], |r| {
+        native.roots.borrow_mut().push(r);
+        Ok(r)
+    })
+    .unwrap();
+    assert_eq!(
+        app.vm
+            .invoke_instance(object, "intValue", "()I", &[])
+            .unwrap(),
+        Value::Int(42)
+    );
+    assert_eq!(
+        method_owner(&mut app.vm, class, "intValue", "()I", false).unwrap(),
+        class
+    );
+    assert_eq!(
+        method_owner(
+            &mut app.vm,
+            class,
+            "valueOf",
+            "(I)Ljava/lang/Integer;",
+            true
+        )
+        .unwrap(),
+        class
+    );
+    assert!(method_owner(
+        &mut app.vm,
+        class,
+        "valueOf",
+        "(I)Ljava/lang/Integer;",
+        false
+    )
+    .is_err());
+    assert!(method_owner(&mut app.vm, class, "intValue", "()J", false).is_err());
+    let shared = app
+        .vm
+        .invoke_static(
+            class,
+            "valueOf",
+            "(I)Ljava/lang/Integer;",
+            &[Value::Int(42)],
+        )
+        .unwrap();
+    assert_ne!(
+        shared,
+        Value::Obj(object),
+        "constructors do not use valueOf caches"
+    );
+    app.vm.gc();
+    assert_eq!(
+        app.vm
+            .invoke_static(
+                class,
+                "valueOf",
+                "(I)Ljava/lang/Integer;",
+                &[Value::Int(42)]
+            )
+            .unwrap(),
+        shared
+    );
+    let host = app.vm.framework_host().unwrap();
+    assert!(host.static_field_metadata(class, "MAX_VALUE", "I"));
+    assert!(!host.static_field_metadata(class, "MAX_VALUE", "J"));
+    assert_eq!(
+        host.static_field(&mut app.vm, class, "MAX_VALUE", "I")
+            .unwrap(),
+        Some(Value::Int(i32::MAX))
+    );
+    assert_eq!(
+        host.static_field(&mut app.vm, class, "MAX_VALUE", "J")
+            .unwrap(),
+        None
+    );
+}
+
 fn current(app: &mut App) -> ObjRef {
     app.vm
         .invoke_static(THREAD, "currentThread", CURRENT, &[])

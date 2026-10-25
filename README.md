@@ -46,8 +46,17 @@ native property and display improvements advance startup further. An original
 portrait fixture renders real 720x1280 EGL buffers and returns cleanly to the
 launcher. Mekorama and Candy Crush still have **no first-screen compatibility
 pass**. See [M9 independent-app work](docs/M9_EXTERNAL_APPS.md) and the separate
-[display evidence](docs/HORIZON_DISPLAY.md). The 66 required regression checks pass; independent-game compatibility gates
-remain open.
+[display evidence](docs/HORIZON_DISPLAY.md). The earlier 67-check baseline and
+subsequent scoped checks are recorded separately from new changes; independent-game
+compatibility gates remain open.
+The current [upstream reuse work](docs/UPSTREAM_REUSE_AUDIT.md) shares RustyDroid's
+primitive wrapper module between desktop and device, with 86 JVM observations
+passing on both paths. Existing upstream code is audited before new API work.
+Shared startup work now includes numeric/reference atomics, class loaders,
+package/provider metadata, local Binder, Locale, constructor reflection, JNI static
+fields and owned native anonymous memory/FILE descriptors. See the
+[exact retest record](reports/m9-atomic-loader-provider-20261025.json). The earlier
+219-case hardware result does not verify these new binaries.
 M8 adds persistent XML SharedPreferences, native SQLite, boxed collections and
 DEX method reflection. M9 adds a repeated host corpus, external APK evaluation
 and startup/frame/heap measurements. See [exact evidence and limitations](docs/M8_M9_E2E.md).

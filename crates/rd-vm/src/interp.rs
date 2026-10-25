@@ -904,6 +904,15 @@ pub(crate) fn exec_frame(
                 #[cfg(not(feature = "std"))]
                 if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
                     && vm.cp.find_class(&owner).is_none()
+                    && crate::boxes::static_field_descriptor(&owner, &fname) == Some(ftype.as_str())
+                {
+                    if let Some(value) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
+                        vm.statics.insert((owner.clone(), fname.clone()), value);
+                    }
+                }
+                #[cfg(not(feature = "std"))]
+                if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
+                    && vm.cp.find_class(&owner).is_none()
                 {
                     if let Some(framework) = vm.framework_host() {
                         if let Some(value) =

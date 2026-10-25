@@ -176,6 +176,9 @@ impl Engine {
     /// except the weak host-object table (traced per reachable key). A generic
     /// sink lets collection scan the identical Debug text without allocating it.
     fn write_gc_roots(&mut self, s: &mut impl std::fmt::Write) {
+        for object in self.boxed_cache.values() {
+            let _ = write!(s, "|{object}");
+        }
         // the parsed APK (zip, arsc, layouts) holds no heap refs: skip it
         let objects = std::mem::take(&mut self.fw.objects);
         let resources = self.fw.resources.take();

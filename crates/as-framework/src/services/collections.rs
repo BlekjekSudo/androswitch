@@ -17,21 +17,9 @@ pub(super) struct Collections {
     cow: RefCell<copy_on_write::Copies>,
     objects: RefCell<BTreeMap<ObjRef, Container>>,
     changes: RefCell<BTreeMap<ObjRef, u64>>,
-    boxes: RefCell<BTreeMap<(String, i64), ObjRef>>,
 }
 pub(super) fn primitive(class: &str) -> Option<&'static str> {
-    Some(match class {
-        "Ljava/lang/Integer;" => "I",
-        "Ljava/lang/Long;" => "J",
-        "Ljava/lang/Float;" => "F",
-        "Ljava/lang/Double;" => "D",
-        "Ljava/lang/Boolean;" => "Z",
-        "Ljava/lang/Byte;" => "B",
-        "Ljava/lang/Short;" => "S",
-        "Ljava/lang/Character;" => "C",
-        "Ljava/lang/Void;" => "V",
-        _ => return None,
-    })
+    rd_vm::boxes::primitive_descriptor(class)
 }
 fn kind(vm: &Engine, class: &str) -> Option<&'static str> {
     let mut class = class.to_string();
@@ -57,22 +45,6 @@ pub(super) fn equals(vm: &mut Engine, left: &Value, right: &Value) -> Result<boo
     };
     if let (Ok(a), Ok(b)) = (vm.heap.as_str(*a), vm.heap.as_str(*b)) {
         return Ok(a == b);
-    }
-    if primitive(vm.heap.class_of(*a)?).is_some() {
-        if vm.heap.class_of(*a)? != vm.heap.class_of(*b)? {
-            return Ok(false);
-        }
-        let a = vm.heap.get_field(*a, "value")?;
-        let b = vm.heap.get_field(*b, "value")?;
-        return Ok(match (&a, &b) {
-            (Value::Float(a), Value::Float(b)) => {
-                a.to_bits() == b.to_bits() || a.is_nan() && b.is_nan()
-            }
-            (Value::Double(a), Value::Double(b)) => {
-                a.to_bits() == b.to_bits() || a.is_nan() && b.is_nan()
-            }
-            _ => a == b,
-        });
     }
     Ok(vm
         .invoke_instance(
@@ -167,35 +139,10 @@ impl Collections {
         self.objects.borrow_mut().insert(r, container);
         Ok(true)
     }
+    /// Framework boxing entry point; identity, narrowing and allocation are
+    /// owned by the same upstream module used by both VM feature paths.
     pub(super) fn boxed(&self, vm: &mut Engine, class: &str, value: Value) -> Result<Value> {
-        let integer = match value {
-            Value::Int(v) => Some(v as i64),
-            Value::Long(v) => Some(v),
-            _ => None,
-        };
-        let cache = integer
-            .filter(|n| match class {
-                "Ljava/lang/Boolean;" => matches!(*n, 0 | 1),
-                "Ljava/lang/Byte;" => true,
-                "Ljava/lang/Character;" => (0..128).contains(n),
-                "Ljava/lang/Integer;" | "Ljava/lang/Long;" | "Ljava/lang/Short;" => {
-                    (-128..128).contains(n)
-                }
-                _ => false,
-            })
-            .map(|n| (class.to_string(), n));
-        if let Some(key) = &cache {
-            if let Some(r) = self.boxes.borrow().get(key) {
-                return Ok(Value::Obj(*r));
-            }
-        }
-        let object = vm
-            .heap
-            .alloc_instance(class.into(), vec![("value".into(), value)])?;
-        if let Some(key) = cache {
-            self.boxes.borrow_mut().insert(key, object);
-        }
-        Ok(Value::Obj(object))
+        rd_vm::boxes::box_value(vm, class, value).map(Value::Obj)
     }
     pub(super) fn new_list(&self, vm: &mut Engine, values: Vec<Value>, set: bool) -> Result<Value> {
         self.budget(values.len())?;
@@ -246,14 +193,7 @@ impl Collections {
         sig: &str,
         args: &[Value],
     ) -> Result<Option<Value>> {
-        if name == "valueOf"
-            && args.len() == 1
-            && primitive(class).is_some_and(|p| sig == format!("({p}){class}"))
-            && !matches!(args[0], Value::Obj(_) | Value::Null)
-        {
-            return self.boxed(vm, class, args[0].clone()).map(Some);
-        }
-        Ok(None)
+        rd_vm::boxes::static_intrinsic(vm, class, name, sig, args)
     }
     #[allow(clippy::too_many_arguments)]
     pub(super) fn call(
@@ -390,70 +330,7 @@ impl Collections {
             }
         }
         if primitive(&actual).is_some() {
-            if name == "<init>" && primitive(&actual).is_some_and(|p| sig == format!("({p})V")) {
-                write(vm, r, "value", args[0].clone())?;
-                return Ok(Some(Value::Null));
-            }
-            let value = vm.heap.get_field(r, "value")?;
-            let out = match name {
-                "intValue" => Value::Int(match value {
-                    Value::Int(n) => n,
-                    Value::Long(n) => n as i32,
-                    Value::Float(n) => n as i32,
-                    Value::Double(n) => n as i32,
-                    _ => return Ok(None),
-                }),
-                "longValue" => Value::Long(match value {
-                    Value::Int(n) => n as i64,
-                    Value::Long(n) => n,
-                    Value::Float(n) => n as i64,
-                    Value::Double(n) => n as i64,
-                    _ => return Ok(None),
-                }),
-                "floatValue" => Value::Float(match value {
-                    Value::Int(n) => n as f32,
-                    Value::Long(n) => n as f32,
-                    Value::Float(n) => n,
-                    Value::Double(n) => n as f32,
-                    _ => return Ok(None),
-                }),
-                "doubleValue" => Value::Double(match value {
-                    Value::Int(n) => n as f64,
-                    Value::Long(n) => n as f64,
-                    Value::Float(n) => n as f64,
-                    Value::Double(n) => n,
-                    _ => return Ok(None),
-                }),
-                "booleanValue" if actual == "Ljava/lang/Boolean;" && sig == "()Z" => value,
-                "charValue" if actual == "Ljava/lang/Character;" && sig == "()C" => {
-                    Value::Int(value.as_int()? as u16 as i32)
-                }
-                "byteValue" if sig == "()B" => Value::Int(match value {
-                    Value::Int(n) => n as i8 as i32,
-                    Value::Long(n) => n as i8 as i32,
-                    Value::Float(n) => n as i32 as i8 as i32,
-                    Value::Double(n) => n as i32 as i8 as i32,
-                    _ => return Ok(None),
-                }),
-                "shortValue" if sig == "()S" => Value::Int(match value {
-                    Value::Int(n) => n as i16 as i32,
-                    Value::Long(n) => n as i16 as i32,
-                    Value::Float(n) => n as i32 as i16 as i32,
-                    Value::Double(n) => n as i32 as i16 as i32,
-                    _ => return Ok(None),
-                }),
-                "toString" => {
-                    let value = if actual == "Ljava/lang/Boolean;" {
-                        (value.as_int()? != 0).to_string()
-                    } else {
-                        display(vm, &value)?
-                    };
-                    string(vm, value)?
-                }
-                "equals" => Value::Int(equals(vm, &Value::Obj(r), &args[0])? as i32),
-                _ => return Ok(None),
-            };
-            return Ok(Some(out));
+            return rd_vm::boxes::instance_intrinsic(vm, &actual, name, sig, r, args);
         }
         self.budget(2)?;
         let container = self.objects.borrow().get(&r).cloned();
@@ -733,9 +610,7 @@ impl Collections {
             .collect()
     }
     pub(super) fn roots(&self) -> Vec<ObjRef> {
-        let mut roots: Vec<_> = self.boxes.borrow().values().copied().collect();
-        roots.extend(self.cow.borrow().roots());
-        roots
+        self.cow.borrow().roots()
     }
     pub(super) fn collect(&self, marked: &[bool]) {
         self.cow.borrow_mut().collect(marked);

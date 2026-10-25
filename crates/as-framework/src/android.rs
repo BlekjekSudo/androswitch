@@ -1507,10 +1507,12 @@ impl FrameworkHost for Android {
         name: &str,
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
-        services::Services::method_metadata(class, name, sig)
+        rd_vm::boxes::method_metadata(class, name, sig)
+            .or_else(|| services::Services::method_metadata(class, name, sig))
     }
     fn static_field_metadata(&self, class: &str, name: &str, descriptor: &str) -> bool {
-        services::Services::static_field_metadata(class, name, descriptor)
+        rd_vm::boxes::static_field_descriptor(class, name) == Some(descriptor)
+            || services::Services::static_field_metadata(class, name, descriptor)
     }
     fn thread_attached(&self, owner: u64, name: Option<&str>) -> Result<()> {
         self.services.executors.attached(owner, name)

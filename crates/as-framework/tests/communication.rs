@@ -484,3 +484,74 @@ fn pair_components_use_real_identity_value_callbacks_and_gc_in_two_packages() {
         assert_eq!(app.vm.heap.class_of(first).unwrap(), rd_vm::gc::FREED_CLASS);
     }
 }
+
+#[test]
+fn concurrent_map_atomic_contracts_callback_reentry_and_gc_match_jvm() {
+    const MAP: &str = "Lorg/androswitch/contracts/ConcurrentMapCases;";
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../local-artifacts/m9/communication-fixture");
+    let oracle = std::fs::read_to_string(base.join("concurrent-map-oracle.tsv")).unwrap();
+    assert_eq!(oracle.lines().count(), 24);
+    for package in [
+        "org.fixture.communication",
+        "net.example.renamedcommunication",
+    ] {
+        let (mut app, _) = app_package(package);
+        for line in oracle.lines() {
+            let row: Vec<_> = line.split('\t').collect();
+            assert_eq!(
+                app.vm
+                    .invoke_static(MAP, "probe", "(I)I", &[Value::Int(row[0].parse().unwrap())])
+                    .unwrap(),
+                Value::Int(row[1].parse().unwrap()),
+                "{line}"
+            );
+        }
+        let map = app
+            .vm
+            .invoke_static(
+                MAP,
+                "make",
+                "()Ljava/util/concurrent/ConcurrentHashMap;",
+                &[],
+            )
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        app.vm.gc();
+        assert_eq!(
+            app.vm.invoke_instance(map, "size", "()I", &[]).unwrap(),
+            Value::Int(1)
+        );
+        let entries = app
+            .vm
+            .heap
+            .get_field(map, "java.util.concurrent.ConcurrentHashMap#entries")
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        let children: Vec<_> = app
+            .vm
+            .heap
+            .as_array_elems(entries)
+            .unwrap()
+            .0
+            .iter()
+            .map(|v| v.as_ref().unwrap().unwrap())
+            .collect();
+        assert!(app
+            .vm
+            .invoke_instance(map, "mappingCount", "()J", &[])
+            .is_err());
+        app.vm.invoke_instance(map, "clear", "()V", &[]).unwrap();
+        app.vm.gc();
+        for child in children {
+            assert_eq!(app.vm.heap.class_of(child).unwrap(), rd_vm::gc::FREED_CLASS);
+        }
+        app.vm.invoke_static(MAP, "release", "()V", &[]).unwrap();
+        app.vm.gc();
+        assert_eq!(app.vm.heap.class_of(map).unwrap(), rd_vm::gc::FREED_CLASS);
+    }
+}
