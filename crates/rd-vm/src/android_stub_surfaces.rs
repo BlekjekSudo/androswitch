@@ -23610,6 +23610,9 @@ fn p57_print_builder_instance(
                 return Err(npe("mediaSize"));
             };
             put(vm, recv, "mMediaSize", args[0].clone())?;
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                put(vm, existing, "mMediaSize", args[0].clone())?;
+            }
             Value::Obj(recv)
         }
         (
@@ -23620,6 +23623,9 @@ fn p57_print_builder_instance(
                 return Err(npe("resolution"));
             };
             put(vm, recv, "mResolution", args[0].clone())?;
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                put(vm, existing, "mResolution", args[0].clone())?;
+            }
             Value::Obj(recv)
         }
         (
@@ -23630,6 +23636,9 @@ fn p57_print_builder_instance(
                 return Err(npe("margins"));
             };
             put(vm, recv, "mMinMargins", args[0].clone())?;
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                put(vm, existing, "mMinMargins", args[0].clone())?;
+            }
             Value::Obj(recv)
         }
         ("setColorMode", "(I)Landroid/print/PrintAttributes$Builder;") => {
@@ -23638,6 +23647,9 @@ fn p57_print_builder_instance(
                 return Err(iae(format!("invalid color mode: {mode}")));
             }
             put(vm, recv, "mColorMode", Value::Int(mode))?;
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                put(vm, existing, "mColorMode", Value::Int(mode))?;
+            }
             Value::Obj(recv)
         }
         ("setDuplexMode", "(I)Landroid/print/PrintAttributes$Builder;") => {
@@ -23646,6 +23658,9 @@ fn p57_print_builder_instance(
                 return Err(iae(format!("invalid duplex mode: {mode}")));
             }
             put(vm, recv, "mDuplexMode", Value::Int(mode))?;
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                put(vm, existing, "mDuplexMode", Value::Int(mode))?;
+            }
             Value::Obj(recv)
         }
         ("build", "()Landroid/print/PrintAttributes;") => {

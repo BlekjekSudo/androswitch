@@ -6451,6 +6451,36 @@ fn print_values_rotation_and_no_service_manager_are_guest_visible() {
         ),
         "Ljava/lang/IllegalArgumentException;",
     );
+
+    // Deep audit: the Builder' mAttributes is the object build() returns,
+    // so setter calls after build() mutate the already-returned instance,
+    // and repeated build() calls return the same instance.
+    let built = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/print/PrintAttributes;",
+        &[],
+    ));
+    let built_again = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/print/PrintAttributes;",
+        &[],
+    ));
+    assert_eq!(built, built_again);
+    call(
+        &mut engine,
+        builder,
+        "setColorMode",
+        "(I)Landroid/print/PrintAttributes$Builder;",
+        &[Value::Int(1)],
+    );
+    assert_eq!(
+        call(&mut engine, built, "getColorMode", "()I", &[]),
+        Value::Int(1)
+    );
 }
 
 #[test]
