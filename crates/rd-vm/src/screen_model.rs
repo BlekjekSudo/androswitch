@@ -186,10 +186,13 @@ impl Engine {
         in_image: bool,
         depth: usize,
     ) {
-        if depth > 64 {
+        if depth > 64 || sw.ops >= MAX_RASTER_OPS_VISITED {
             return;
         }
         for op in ops {
+            if sw.ops >= MAX_RASTER_OPS_VISITED {
+                return;
+            }
             sw.ops += 1;
             let m = mul(parent, &op.m);
             let cc = [
@@ -211,7 +214,7 @@ impl Engine {
                     r[2].min(sw.w).ceil() as i32,
                     r[3].min(sw.h).ceil() as i32,
                 ];
-                if b[2] - b[0] >= 2 && b[3] - b[1] >= 2 {
+                if b[2] - b[0] >= 2 && b[3] - b[1] >= 2 && sw.items.len() < 2_048 {
                     sw.items.push(ScreenItem {
                         kind,
                         text,
@@ -280,11 +283,16 @@ impl Engine {
                             ns.outline.or(Some([
                                 0.0,
                                 0.0,
-                                (ns.r - ns.l) as f32,
-                                (ns.b - ns.t) as f32,
+                                ns.r.saturating_sub(ns.l) as f32,
+                                ns.b.saturating_sub(ns.t) as f32,
                             ]))
                         } else if ns.clip_bounds {
-                            Some([0.0, 0.0, (ns.r - ns.l) as f32, (ns.b - ns.t) as f32])
+                            Some([
+                                0.0,
+                                0.0,
+                                ns.r.saturating_sub(ns.l) as f32,
+                                ns.b.saturating_sub(ns.t) as f32,
+                            ])
                         } else {
                             None
                         };
