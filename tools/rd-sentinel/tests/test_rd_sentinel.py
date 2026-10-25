@@ -18,6 +18,9 @@ sys.path.insert(0, str(ROOT))
 from sentinel import campaigns as campaigns_module  # noqa: E402
 from sentinel.audit import (  # noqa: E402
     _action_ref_kind,
+    _diff_rule_findings,
+    _rust_test_lines,
+    DiffLine,
     _check_inventory_regression,
     _fuzz_target_names,
     _named_test_findings,
@@ -1614,6 +1617,118 @@ class TinyRepoTests(unittest.TestCase):
             context=AuditContext(profile="auto", labels=["sentinel:policy-approved"]),
         )
         self.assertNotIn("protected-sentinel-path-changed", {f["id"] for f in approved["findings"]})
+
+
+class RustScopeRuleTests(unittest.TestCase):
+    """Inline `mod tests` scoping and global-vs-instance collection cells."""
+
+    SRC = """pub fn prod() -> u32 {
+    1
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first() {
+        assert_eq!(prod(), 1);
+    }
+
+    fn helper() -> std::path::PathBuf {
+        std::fs::create_dir_all("x").unwrap();
+        std::path::PathBuf::from("x")
+    }
+
+    #[test]
+    fn second() {
+        let _ = helper();
+    }
+}
+
+pub fn after() -> Option<u32> {
+    Some(2).map(|v| v + 1)
+}
+"""
+
+    def _repo(self, tmp: str, rel: str, src: str) -> Path:
+        repo = Path(tmp)
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(src, encoding="utf-8")
+        return repo
+
+    def test_helper_between_nested_tests_is_test_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp, "crates/rd-apk/src/zip.rs", self.SRC)
+            lines = _rust_test_lines(repo, "crates/rd-apk/src/zip.rs")
+        src_lines = self.SRC.splitlines()
+        helper_unwrap = next(i for i, l in enumerate(src_lines, 1) if "create_dir_all" in l)
+        blank_between = helper_unwrap - 2
+        self.assertIn(helper_unwrap, lines)
+        self.assertIn(blank_between, lines)
+        # production code before and after the test module stays production
+        self.assertNotIn(1, lines)
+        after = next(i for i, l in enumerate(src_lines, 1) if "pub fn after" in l)
+        self.assertNotIn(after, lines)
+        self.assertNotIn(after + 1, lines)
+
+    def test_unwrap_in_inline_test_helper_is_not_production_finding(self) -> None:
+        rel = "crates/rd-apk/src/zip.rs"
+        src_lines = self.SRC.splitlines()
+        n = next(i for i, l in enumerate(src_lines, 1) if "create_dir_all" in l)
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp, rel, self.SRC)
+            findings, _ = _diff_rule_findings(
+                repo,
+                [ChangedFile("M", rel)],
+                [DiffLine(rel, n, src_lines[n - 1], "added")],
+                {},
+            )
+        self.assertNotIn("new-unwrap-expect", {f.id for f in findings})
+
+    def test_unwrap_after_test_module_is_still_flagged(self) -> None:
+        rel = "crates/rd-apk/src/zip.rs"
+        src = self.SRC + "pub fn late(v: Option<u8>) -> u8 {\n    v.unwrap()\n}\n"
+        src_lines = src.splitlines()
+        n = len(src_lines) - 1
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp, rel, src)
+            findings, _ = _diff_rule_findings(
+                repo,
+                [ChangedFile("M", rel)],
+                [DiffLine(rel, n, src_lines[n - 1], "added")],
+                {},
+            )
+        self.assertIn("new-unwrap-expect", {f.id for f in findings})
+
+    def _rule_ids(self, text: str) -> dict[str, str]:
+        rel = "crates/rd-vm/src/x.rs"
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = self._repo(tmp, rel, text + "\n")
+            findings, _ = _diff_rule_findings(
+                repo, [ChangedFile("M", rel)], [DiffLine(rel, 1, text, "added")], {}
+            )
+        return {f.id: f.severity for f in findings}
+
+    def test_static_collection_globals_block(self) -> None:
+        for text in (
+            "static CACHE: OnceLock<Mutex<HashMap<u32, String>>> = OnceLock::new();",
+            "pub(crate) static TABLE: OnceLock<Vec<u8>> = OnceLock::new();",
+            "static REG: Mutex<BTreeMap<u32, u32>> = Mutex::new(BTreeMap::new());",
+            "static SEEN: LazyLock<RwLock<HashSet<u64>>> = LazyLock::new(Default::default);",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(self._rule_ids(text).get("new-global-collection"), "P1")
+
+    def test_instance_field_collection_cell_is_reported_non_blocking(self) -> None:
+        for text in (
+            "    cache: OnceLock<Mutex<BTreeMap<u32, Arc<Vec<u8>>>>>,",
+            "    slots: OnceLock<Vec<OnceLock<Option<String>>>>,",
+        ):
+            with self.subTest(text=text):
+                ids = self._rule_ids(text)
+                self.assertNotIn("new-global-collection", ids)
+                self.assertEqual(ids.get("new-instance-collection-cell"), "P2")
 
 
 if __name__ == "__main__":
