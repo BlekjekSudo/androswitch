@@ -9829,6 +9829,27 @@ fn dream_service_unattached_state_and_finish_are_guest_visible() {
     call(&mut engine, dream, "finish", "()V", &[]);
     call(&mut engine, dream, "onDreamingStopped", "()V", &[]);
 
+    let doze_dream = p41_new(&mut engine, P41_DREAM_SERVICE, "()V", &[]);
+    engine
+        .heap
+        .put_field(doze_dream, "mCanDoze", Value::Int(1))
+        .unwrap();
+    call(&mut engine, doze_dream, "startDozing", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, doze_dream, "isDozing", "()Z", &[]),
+        Value::Int(1),
+        "updateDoze returns early without a dream token"
+    );
+    assert_throws(
+        engine.invoke_instance(doze_dream, "stopDozing", "()V", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_eq!(
+        call(&mut engine, doze_dream, "isDozing", "()Z", &[]),
+        Value::Int(0),
+        "AOSP clears mDozing before dereferencing the absent IDreamManager"
+    );
+
     assert_eq!(
         call_static(
             &mut engine,
