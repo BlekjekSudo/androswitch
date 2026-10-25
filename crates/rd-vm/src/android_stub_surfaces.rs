@@ -24978,41 +24978,39 @@ fn p57_mtp_object_info_instance(
         ("getStorageId", "()I") => Value::Int(field_int(vm, recv, "mStorageId")),
         ("getFormat", "()I") => Value::Int(field_int(vm, recv, "mFormat")),
         ("getProtectionStatus", "()I") => Value::Int(field_int(vm, recv, "mProtectionStatus")),
-        ("getCompressedSize", "()I") => Value::Int(field_int(vm, recv, "mCompressedSize")),
+        ("getCompressedSize", "()I") => p57_mtp_checked_int(vm, recv, "mCompressedSize")?,
         ("getCompressedSizeLong", "()J") => {
             Value::Long(p57_mtp_uint32(field_int(vm, recv, "mCompressedSize")))
         }
         ("getThumbFormat", "()I") => Value::Int(field_int(vm, recv, "mThumbFormat")),
-        ("getThumbCompressedSize", "()I") => {
-            Value::Int(field_int(vm, recv, "mThumbCompressedSize"))
-        }
+        ("getThumbCompressedSize", "()I") => p57_mtp_checked_int(vm, recv, "mThumbCompressedSize")?,
         ("getThumbCompressedSizeLong", "()J") => {
             Value::Long(p57_mtp_uint32(field_int(vm, recv, "mThumbCompressedSize")))
         }
-        ("getThumbPixWidth", "()I") => Value::Int(field_int(vm, recv, "mThumbPixWidth")),
+        ("getThumbPixWidth", "()I") => p57_mtp_checked_int(vm, recv, "mThumbPixWidth")?,
         ("getThumbPixWidthLong", "()J") => {
             Value::Long(p57_mtp_uint32(field_int(vm, recv, "mThumbPixWidth")))
         }
-        ("getThumbPixHeight", "()I") => Value::Int(field_int(vm, recv, "mThumbPixHeight")),
+        ("getThumbPixHeight", "()I") => p57_mtp_checked_int(vm, recv, "mThumbPixHeight")?,
         ("getThumbPixHeightLong", "()J") => {
             Value::Long(p57_mtp_uint32(field_int(vm, recv, "mThumbPixHeight")))
         }
-        ("getImagePixWidth", "()I") => Value::Int(field_int(vm, recv, "mImagePixWidth")),
+        ("getImagePixWidth", "()I") => p57_mtp_checked_int(vm, recv, "mImagePixWidth")?,
         ("getImagePixWidthLong", "()J") => {
             Value::Long(p57_mtp_uint32(field_int(vm, recv, "mImagePixWidth")))
         }
-        ("getImagePixHeight", "()I") => Value::Int(field_int(vm, recv, "mImagePixHeight")),
+        ("getImagePixHeight", "()I") => p57_mtp_checked_int(vm, recv, "mImagePixHeight")?,
         ("getImagePixHeightLong", "()J") => {
             Value::Long(p57_mtp_uint32(field_int(vm, recv, "mImagePixHeight")))
         }
-        ("getImagePixDepth", "()I") => Value::Int(field_int(vm, recv, "mImagePixDepth")),
+        ("getImagePixDepth", "()I") => p57_mtp_checked_int(vm, recv, "mImagePixDepth")?,
         ("getImagePixDepthLong", "()J") => {
             Value::Long(p57_mtp_uint32(field_int(vm, recv, "mImagePixDepth")))
         }
         ("getParent", "()I") => Value::Int(field_int(vm, recv, "mParent")),
         ("getAssociationType", "()I") => Value::Int(field_int(vm, recv, "mAssociationType")),
         ("getAssociationDesc", "()I") => Value::Int(field_int(vm, recv, "mAssociationDesc")),
-        ("getSequenceNumber", "()I") => Value::Int(field_int(vm, recv, "mSequenceNumber")),
+        ("getSequenceNumber", "()I") => p57_mtp_checked_int(vm, recv, "mSequenceNumber")?,
         ("getSequenceNumberLong", "()J") => {
             Value::Long(p57_mtp_uint32(field_int(vm, recv, "mSequenceNumber")))
         }
@@ -25043,12 +25041,27 @@ fn p57_mtp_builder_info(vm: &Engine, recv: ObjRef) -> Result<ObjRef, VmExit> {
 }
 
 fn p57_mtp_long_to_uint32(value: i64) -> Result<i64, VmExit> {
-    if !(0..=0xffff_ffff).contains(&value) {
-        return Err(iae(format!(
-            "value should be in range [0, 4294967295], but is {value}"
-        )));
+    // AOSP MtpObjectInfo.longToUint32 delegates to
+    // Preconditions.checkArgumentInRange(value, 0, 0xffffffffL, "value").
+    if value < 0 {
+        return Err(iae("value is out of range of [0, 4294967295] (too low)"));
+    }
+    if value > 0xffff_ffff {
+        return Err(iae("value is out of range of [0, 4294967295] (too high)"));
     }
     Ok(value)
+}
+
+/// AOSP's 32-bit MtpObjectInfo getters call
+/// `Preconditions.checkState(field >= 0)` (IllegalStateException, null
+/// message) before returning the raw int; only the `*Long` variants expose
+/// the full unsigned-32 range.
+fn p57_mtp_checked_int(vm: &Engine, recv: ObjRef, field: &str) -> Result<Value, VmExit> {
+    let value = field_int(vm, recv, field);
+    if value < 0 {
+        return Err(ise(""));
+    }
+    Ok(Value::Int(value))
 }
 
 fn p57_mtp_object_builder_instance(

@@ -6361,6 +6361,25 @@ fn mtp_object_info_and_unopened_device_are_guest_visible() {
         call(&mut engine, info, "getCompressedSizeLong", "()J", &[]),
         Value::Long(0xffff_ffff)
     );
+    // AOSP's 32-bit getter runs Preconditions.checkState(size >= 0): the
+    // unsigned value above Integer.MAX_VALUE is only visible via the Long
+    // variant, and the int getter must fail instead of returning -1.
+    assert_throws(
+        engine.invoke_instance(info, "getCompressedSize", "()I", &[]),
+        "Ljava/lang/IllegalStateException;",
+    );
+    // longToUint32 validates on the RHS before the (already-consumed)
+    // builder's null mObjectInfo is stored through, so a negative value is
+    // an IllegalArgumentException even after build().
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "setCompressedSize",
+            "(J)Landroid/mtp/MtpObjectInfo$Builder;",
+            &[Value::Long(-1)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
     assert_eq!(
         call(
             &mut engine,
