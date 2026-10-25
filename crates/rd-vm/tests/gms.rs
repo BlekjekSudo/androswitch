@@ -1996,6 +1996,22 @@ fn tasks_when_all_success_failure_and_complete() {
     )
     .unwrap());
     assert_eq!(task_flag(&mut e, wcomplete, "isSuccessful"), 1);
+
+    // Coleção vazia: whenAllSuccess vende a lista vazia (upstream).
+    let empty = host_list(&mut e, Vec::new());
+    let wall0 = ov(cs!(
+        e,
+        TASKS,
+        "whenAllSuccess",
+        "(Ljava/util/Collection;)Lcom/google/android/gms/tasks/Task;",
+        [empty]
+    )
+    .unwrap());
+    let r0 = ov(task_result(&mut e, wall0));
+    match e.fw.objects.get(&r0) {
+        Some(HostObj::List { elems }) => assert!(elems.is_empty()),
+        other => panic!("whenAllSuccess vazio: {other:?}"),
+    }
 }
 
 #[test]
