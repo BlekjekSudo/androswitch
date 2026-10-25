@@ -26367,7 +26367,12 @@ fn p49_prompt_info_instance(
             Value::Null
         }
         ("setAllowedSensorIds", "(Ljava/util/List;)V") => {
+            // AOSP clears the current ids before addAll dereferences the
+            // argument, so a null argument still empties the list on its
+            // way to the NullPointerException.
             if oarg(args, 0).is_none() {
+                let empty = p49_empty_list(vm)?;
+                put(vm, recv, "mAllowedSensorIds", empty)?;
                 return Err(npe("sensorIds"));
             }
             let ids = p49_list_value(vm, collection_items(vm, args.first()))?;
@@ -26780,14 +26785,22 @@ fn p49_biometric_instance(
                 let crypto = args.first().cloned().unwrap_or(Value::Null);
                 put(vm, recv, "mCryptoObject", crypto)?;
                 put(vm, recv, "mAuthenticationType", Value::Int(iarg(args, 1)))?;
+                // The BiometricPrompt result passes a null identifier and
+                // userId 0 to the BiometricAuthenticator base class.
+                put(vm, recv, "mIdentifier", Value::Null)?;
+                put(vm, recv, "mUserId", Value::Int(0))?;
                 Value::Null
             }
             ("getCryptoObject", "()Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;") => {
                 get(vm, recv, "mCryptoObject")
             }
-            ("getAuthenticationResultType", "()I") => {
+            ("getAuthenticationType", "()I") => {
                 Value::Int(field_int(vm, recv, "mAuthenticationType"))
             }
+            ("getId", "()Landroid/hardware/biometrics/BiometricAuthenticator$Identifier;") => {
+                get(vm, recv, "mIdentifier")
+            }
+            ("getUserId", "()I") => Value::Int(field_int(vm, recv, "mUserId")),
             _ => return Ok(None),
         })),
         P49_BIOMETRIC_CALLBACK => {

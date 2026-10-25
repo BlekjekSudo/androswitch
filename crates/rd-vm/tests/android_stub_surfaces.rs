@@ -7362,6 +7362,27 @@ fn biometrics_absent_service_prompt_and_crypto_are_guest_visible() {
         "(I)Landroid/hardware/biometrics/BiometricPrompt$Builder;",
         &[Value::Int(0x000f)],
     );
+    // Deep audit: PromptInfo.setAllowedSensorIds clears the current ids
+    // before addAll dereferences the argument, so the null call throws
+    // after emptying the list.
+    let sensor_id = instance(&mut engine, "Ljava/lang/Integer;");
+    let sensor_ids = list_of(&mut engine, &[Value::Obj(sensor_id)]);
+    call(
+        &mut engine,
+        builder,
+        "setAllowedSensorIds",
+        "(Ljava/util/List;)Landroid/hardware/biometrics/BiometricPrompt$Builder;",
+        &[Value::Obj(sensor_ids)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            builder,
+            "setAllowedSensorIds",
+            "(Ljava/util/List;)Landroid/hardware/biometrics/BiometricPrompt$Builder;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
     call(
         &mut engine,
         builder,
@@ -7404,6 +7425,14 @@ fn biometrics_absent_service_prompt_and_crypto_are_guest_visible() {
         call(&mut engine, prompt, "isConfirmationRequired", "()Z", &[]),
         Value::Int(0)
     );
+    let cleared_ids = call(
+        &mut engine,
+        prompt,
+        "getAllowedSensorIds",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, cleared_ids), 0);
 
     let callback = p49_new(
         &mut engine,
@@ -7473,15 +7502,26 @@ fn biometrics_absent_service_prompt_and_crypto_are_guest_visible() {
         "(Landroid/hardware/biometrics/BiometricPrompt$CryptoObject;I)V",
         &[Value::Obj(crypto), Value::Int(2)],
     );
+    // Deep audit: the AOSP getter is getAuthenticationType (the
+    // @AuthenticationResultType annotation is not a method), and the
+    // BiometricPrompt result carries a null identifier and userId 0.
+    assert_eq!(
+        call(&mut engine, result, "getAuthenticationType", "()I", &[]),
+        Value::Int(2)
+    );
     assert_eq!(
         call(
             &mut engine,
             result,
-            "getAuthenticationResultType",
-            "()I",
+            "getId",
+            "()Landroid/hardware/biometrics/BiometricAuthenticator$Identifier;",
             &[]
         ),
-        Value::Int(2)
+        Value::Null
+    );
+    assert_eq!(
+        call(&mut engine, result, "getUserId", "()I", &[]),
+        Value::Int(0)
     );
 }
 
