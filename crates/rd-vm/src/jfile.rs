@@ -1023,14 +1023,25 @@ pub(crate) fn delete_file(p: &str) -> bool {
 }
 
 /// Issue #230: Android "clear data" / uninstall — apaga todo o
-/// armazenamento privado do pacote (`/data/user/0/<pkg>/`: files,
-/// databases SQLite, shared_prefs) e fecha os descritores abertos
-/// nesses caminhos. Sem isto, `package_clear`/`package_remove` no MCP
-/// só resetavam permissões e os dados "apagados" continuavam legíveis.
+/// armazenamento do pacote e fecha os descritores abertos nesses
+/// caminhos. Raízes (como no AOSP): o diretório privado
+/// (`/data/user/0/<pkg>/`: files, databases SQLite, shared_prefs), o
+/// alias legado dele (`/data/data/<pkg>/`) e os arquivos externos
+/// específicos do app (`/storage/emulated/0/Android/data/<pkg>/`,
+/// getExternalFilesDir/getExternalCacheDir). Sem isto,
+/// `package_clear`/`package_remove` no MCP só resetavam permissões e
+/// os dados "apagados" continuavam legíveis.
 pub fn clear_package_data(package: &str) {
-    let root = format!("/data/user/0/{package}");
-    let prefix = format!("{root}/");
-    let in_pkg = |p: &str| p == root || p.starts_with(&prefix);
+    let roots = [
+        format!("/data/user/0/{package}"),
+        format!("/data/data/{package}"),
+        format!("/storage/emulated/0/Android/data/{package}"),
+    ];
+    let in_pkg = |p: &str| {
+        roots
+            .iter()
+            .any(|root| p == root || p.strip_prefix(root).is_some_and(|s| s.starts_with('/')))
+    };
     VFS.with(|cell| {
         let mut v = cell.borrow_mut();
         let dead_descs: Vec<i64> = v
@@ -1072,12 +1083,27 @@ mod tests {
     fn clear_package_data_isolates_packages_and_reset_all_clears() {
         reset_all();
         write_bytes("/data/user/0/com.example.a/files/x.txt", b"a".to_vec());
+        write_bytes(
+            "/storage/emulated/0/Android/data/com.example.a/files/ext.txt",
+            b"e".to_vec(),
+        );
         write_bytes("/data/user/0/com.example.b/files/y.txt", b"b".to_vec());
+        write_bytes("/data/user/0/com.example.ab/files/z.txt", b"z".to_vec());
         clear_package_data("com.example.a");
         assert_eq!(
             read_bytes("/data/user/0/com.example.a/files/x.txt"),
             None,
             "#230: clear data apaga os arquivos do pacote"
+        );
+        assert_eq!(
+            read_bytes("/storage/emulated/0/Android/data/com.example.a/files/ext.txt"),
+            None,
+            "#230: clear data apaga também os externos específicos do app"
+        );
+        assert_eq!(
+            read_bytes("/data/user/0/com.example.ab/files/z.txt"),
+            Some(b"z".to_vec()),
+            "pacote com prefixo textual comum (com.example.ab) não é tocado"
         );
         assert_eq!(
             read_bytes("/data/user/0/com.example.b/files/y.txt"),
