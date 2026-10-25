@@ -2587,3 +2587,202 @@ fn rtdb_listener_writing_in_callback_is_bounded_not_recursive() {
     );
     assert!(e.gms_rtdb_value("loop").is_some());
 }
+
+// ── Regressões (auditoria de estabilização, Tasks):
+// (a) um OnCompleteListener que se re-adiciona à mesma Task abortava o
+//     processo (entrega síncrona recursiva sem guarda);
+// (b) de bytecode real, o arm GMS_TASK do M10 sequestrava TODAS as
+//     Tasks do shim com defaults rd_complete/rd_success=1 — Tasks
+//     pendentes/falhadas liam-se como sucesso com getResult() null.
+//     Os testes via call_instance directo não viam (b); estes passam
+//     pelo interpretador (vm.call).
+#[test]
+fn task_listener_readding_itself_is_bounded_not_recursive() {
+    let mut b = DexBuilder::new();
+    let cls = b.class("LTLoop;", "Ljava/lang/Object;");
+    b.static_field(cls, "calls", "I", common::SVal::Int(0));
+    let f_calls = b.field_idx("LTLoop;", "I", "calls");
+    let p_add = b.proto_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        vec!["Lcom/google/android/gms/tasks/OnCompleteListener;".into()],
+    );
+    let m_add = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_add,
+        "addOnCompleteListener",
+    );
+    b.r#virtual(
+        cls,
+        "onComplete",
+        "V",
+        vec!["Lcom/google/android/gms/tasks/Task;"],
+        ACC_PUBLIC,
+        Some(b.code(5, 2, 2, {
+            let mut u = op21c(0x60, 0, f_calls);
+            u.extend(op11n(0x12, 1, 1));
+            u.extend(op23x(0x90, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_calls));
+            u.extend(op35c(0x6E, 2, m_add, [4, 3, 0, 0, 0])); // task.add(this)
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    let t = ov(cs!(
+        e,
+        TASKS,
+        "forResult",
+        "(Ljava/lang/Object;)Lcom/google/android/gms/tasks/Task;",
+        [Value::Int(7)]
+    )
+    .unwrap());
+    let lis = obj(&mut e, "LTLoop;");
+    let r = ci!(
+        e,
+        TASK,
+        "addOnCompleteListener",
+        "(Lcom/google/android/gms/tasks/OnCompleteListener;)Lcom/google/android/gms/tasks/Task;",
+        t,
+        [Value::Obj(lis)]
+    );
+    assert!(r.is_ok(), "o registo conclui sem crash: {r:?}");
+    let calls = match e.statics.get(&("LTLoop;".to_string(), "calls".to_string())) {
+        Some(Value::Int(n)) => *n,
+        _ => 0,
+    };
+    assert!(calls > 1, "entregas iterativas aconteceram (calls={calls})");
+    assert!(calls <= 4096, "limitadas pelo teto (calls={calls})");
+}
+
+#[test]
+fn gms_tasks_are_observed_correctly_from_bytecode() {
+    // Classe-sonda DEX: lê isComplete/isSuccessful e regista um
+    // OnSuccessListener — tudo via invoke-virtual do interpretador.
+    let mut b = DexBuilder::new();
+    let probe = b.class("LTaskProbe;", "Ljava/lang/Object;");
+    b.static_field(probe, "complete", "I", common::SVal::Int(-1));
+    b.static_field(probe, "successful", "I", common::SVal::Int(-1));
+    let f_complete = b.field_idx("LTaskProbe;", "I", "complete");
+    let f_successful = b.field_idx("LTaskProbe;", "I", "successful");
+    let lis = b.class("LProbeLis;", "Ljava/lang/Object;");
+    b.static_field(lis, "calls", "I", common::SVal::Int(0));
+    b.static_field(lis, "last", "Ljava/lang/Object;", common::SVal::Int(0));
+    let f_calls = b.field_idx("LProbeLis;", "I", "calls");
+    let f_last = b.field_idx("LProbeLis;", "Ljava/lang/Object;", "last");
+    let p_task = b.proto_idx("Lcom/google/android/gms/tasks/Task;", vec![]);
+    let p_bool = b.proto_idx("Z", vec![]);
+    let p_add = b.proto_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        vec!["Lcom/google/android/gms/tasks/OnSuccessListener;".into()],
+    );
+    let m_complete = b.method_idx("Lcom/google/android/gms/tasks/Task;", p_bool, "isComplete");
+    let m_successful = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_bool,
+        "isSuccessful",
+    );
+    let m_add = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_add,
+        "addOnSuccessListener",
+    );
+    let _ = p_task;
+    // static observe(Task, Object listener)
+    b.direct(
+        probe,
+        "observe",
+        "V",
+        vec!["Lcom/google/android/gms/tasks/Task;", "Ljava/lang/Object;"],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(4, 2, 2, {
+            // ins=2: v2=task, v3=listener
+            let mut u = op35c(0x6E, 1, m_complete, [2, 0, 0, 0, 0]);
+            u.extend(op11x(0x0A, 0)); // move-result v0
+            u.extend(op21c(0x67, 0, f_complete));
+            u.extend(op35c(0x6E, 1, m_successful, [2, 0, 0, 0, 0]));
+            u.extend(op11x(0x0A, 0));
+            u.extend(op21c(0x67, 0, f_successful));
+            u.extend(op35c(0x6E, 2, m_add, [2, 3, 0, 0, 0]));
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    b.r#virtual(
+        lis,
+        "onSuccess",
+        "V",
+        vec!["Ljava/lang/Object;"],
+        ACC_PUBLIC,
+        Some(b.code(5, 2, 2, {
+            let mut u = op21c(0x60, 0, f_calls);
+            u.extend(op11n(0x12, 1, 1));
+            u.extend(op23x(0x90, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_calls));
+            u.extend(op21c(0x69, 4, f_last)); // sput-object v4(arg), last
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+
+    let mut e = engine_of(&b);
+    // Task pendente via TaskCompletionSource (host).
+    let tcs = obj(&mut e, TASK_SOURCE);
+    ci!(e, TASK_SOURCE, "<init>", "()V", tcs, []).unwrap();
+    let task = ov(ci!(
+        e,
+        TASK_SOURCE,
+        "getTask",
+        "()Lcom/google/android/gms/tasks/Task;",
+        tcs,
+        []
+    )
+    .unwrap());
+    let listener = obj(&mut e, "LProbeLis;");
+    let sget = |e: &Engine, cls: &str, f: &str| -> Value {
+        e.statics
+            .get(&(cls.to_string(), f.to_string()))
+            .cloned()
+            .unwrap_or(Value::Null)
+    };
+    e.invoke_static(
+        "LTaskProbe;",
+        "observe",
+        "(Lcom/google/android/gms/tasks/Task;Ljava/lang/Object;)V",
+        &[Value::Obj(task), Value::Obj(listener)],
+    )
+    .unwrap();
+    // Pendente: NEM completa NEM com sucesso, listener por disparar.
+    assert_eq!(sget(&e, "LTaskProbe;", "complete"), Value::Int(0));
+    assert_eq!(sget(&e, "LTaskProbe;", "successful"), Value::Int(0));
+    // (estáticos de classes ainda intocadas podem não estar
+    // materializados no mapa — ausência lê-se como 0.)
+    assert!(
+        matches!(sget(&e, "LProbeLis;", "calls"), Value::Int(0) | Value::Null),
+        "listener ainda não disparou"
+    );
+
+    let v = s(&mut e, "quarenta");
+    ci!(
+        e,
+        TASK_SOURCE,
+        "setResult",
+        "(Ljava/lang/Object;)V",
+        tcs,
+        [v]
+    )
+    .unwrap();
+    assert_eq!(sget(&e, "LProbeLis;", "calls"), Value::Int(1));
+    match sget(&e, "LProbeLis;", "last") {
+        Value::Obj(r) => assert_eq!(e.heap.as_str(r).unwrap(), "quarenta"),
+        other => panic!("resultado entregue: {other:?}"),
+    }
+    e.invoke_static(
+        "LTaskProbe;",
+        "observe",
+        "(Lcom/google/android/gms/tasks/Task;Ljava/lang/Object;)V",
+        &[Value::Obj(task), Value::Obj(listener)],
+    )
+    .unwrap();
+    assert_eq!(sget(&e, "LTaskProbe;", "complete"), Value::Int(1));
+    assert_eq!(sget(&e, "LTaskProbe;", "successful"), Value::Int(1));
+}

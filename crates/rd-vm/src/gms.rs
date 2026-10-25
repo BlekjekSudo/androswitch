@@ -486,6 +486,30 @@ pub enum PendingFire {
     Auth,
 }
 
+/// Entrega de Task adiada pela guarda de reentrância (ver
+/// `queue_task_delivery`): ou o disparo pós-settle (listeners +
+/// pendings, com as listas capturadas no settle), ou o disparo
+/// imediato de um listener registado numa Task já completa.
+#[derive(Debug)]
+pub enum TaskDelivery {
+    Settled {
+        task: ObjRef,
+        success: Vec<ObjRef>,
+        failure: Vec<ObjRef>,
+        complete: Vec<ObjRef>,
+        canceled_ls: Vec<ObjRef>,
+        result: Value,
+        exception: Option<Value>,
+        successful: bool,
+        canceled: bool,
+    },
+    Listener {
+        task: ObjRef,
+        kind: u8,
+        listener: ObjRef,
+    },
+}
+
 #[derive(Debug, Default)]
 pub struct GmsState {
     /// Entrega de listeners em curso: escritas feitas DENTRO de um
@@ -494,6 +518,11 @@ pub struct GmsState {
     /// pilha do hospedeiro transbordar — SIGABRT).
     pub firing_listeners: bool,
     pub pending_fires: Vec<PendingFire>,
+    /// Entrega de listeners de Tasks em curso: settles/listener-adds
+    /// aninhados enfileiram em `task_queue` em vez de recursar (um
+    /// OnCompleteListener que se re-adiciona abortava o processo).
+    pub task_delivering: bool,
+    pub task_queue: std::collections::VecDeque<TaskDelivery>,
     pub availability_code: i32,
     pub availability_obj: Option<ObjRef>,
     pub error_notifications: i32,
@@ -957,48 +986,170 @@ fn try_settle_task(
             t.successful,
         )
     };
-    if canceled {
-        for l in canceled_ls {
-            let _ = call_dex_any(vm, l, "onCanceled", &["()V"], Vec::new())?;
+    queue_task_delivery(
+        vm,
+        TaskDelivery::Settled {
+            task: r,
+            success: success_ls,
+            failure: failure_ls,
+            complete: complete_ls,
+            canceled_ls,
+            result: res,
+            exception: exc,
+            successful: ok,
+            canceled,
+        },
+    )?;
+    Ok(true)
+}
+
+/// Teto de entregas de Tasks por disparo exterior. Cadeias síncronas
+/// legítimas são curtas; o teto trava ciclos (listener que se
+/// re-adiciona, continuações que se alimentam) sem recursão.
+const MAX_TASK_DELIVERIES_PER_TRIGGER: usize = 4096;
+
+/// Enfileira uma entrega e, se ninguém estiver a entregar, drena a
+/// fila iterativamente. O ESTADO das Tasks grava-se sempre de
+/// imediato no settle — só a notificação (listeners/pendings) é que
+/// passa pela fila quando há reentrância.
+fn queue_task_delivery(vm: &mut Engine, d: TaskDelivery) -> Result<(), VmExit> {
+    vm.fw.gms.task_queue.push_back(d);
+    if vm.fw.gms.task_delivering {
+        return Ok(());
+    }
+    vm.fw.gms.task_delivering = true;
+    let result = drain_task_queue(vm);
+    vm.fw.gms.task_delivering = false;
+    vm.fw.gms.task_queue.clear();
+    result
+}
+
+fn drain_task_queue(vm: &mut Engine) -> Result<(), VmExit> {
+    let mut budget = MAX_TASK_DELIVERIES_PER_TRIGGER;
+    while let Some(d) = vm.fw.gms.task_queue.pop_front() {
+        match d {
+            TaskDelivery::Settled {
+                task,
+                success,
+                failure,
+                complete,
+                canceled_ls,
+                result,
+                exception,
+                successful,
+                canceled,
+            } => {
+                if canceled {
+                    for l in canceled_ls {
+                        let _ = call_dex_any(vm, l, "onCanceled", &["()V"], Vec::new())?;
+                    }
+                } else if successful {
+                    for l in success {
+                        let _ = call_dex_any(
+                            vm,
+                            l,
+                            "onSuccess",
+                            &["(Ljava/lang/Object;)V"],
+                            vec![result.clone()],
+                        )?;
+                    }
+                } else if let Some(e) = &exception {
+                    for l in failure {
+                        let _ = call_dex_any(
+                            vm,
+                            l,
+                            "onFailure",
+                            &["(Ljava/lang/Exception;)V", "(Ljava/lang/Object;)V"],
+                            vec![e.clone()],
+                        )?;
+                    }
+                }
+                for l in complete {
+                    let _ = call_dex_any(
+                        vm,
+                        l,
+                        "onComplete",
+                        &[
+                            "(Lcom/google/android/gms/tasks/Task;)V",
+                            "(Ljava/lang/Object;)V",
+                        ],
+                        vec![Value::Obj(task)],
+                    )?;
+                }
+                let pendings = vm.fw.gms.pending.remove(&task).unwrap_or_default();
+                for p in pendings {
+                    run_pending(vm, task, p)?;
+                }
+            }
+            TaskDelivery::Listener {
+                task,
+                kind,
+                listener,
+            } => {
+                deliver_task_listener(vm, task, kind, listener)?;
+            }
         }
-    } else if ok {
-        for l in success_ls {
+        budget = budget.saturating_sub(1);
+        if budget == 0 {
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// Disparo imediato de um listener registado numa Task já completa
+/// (estado relido: pós-settle é imutável).
+fn deliver_task_listener(
+    vm: &mut Engine,
+    task: ObjRef,
+    kind: u8,
+    listener: ObjRef,
+) -> Result<(), VmExit> {
+    let Some(st) = task_state(vm, task) else {
+        return Ok(());
+    };
+    if !st.complete {
+        return Ok(());
+    }
+    match (kind, st.canceled, st.successful) {
+        (0, false, true) => {
             let _ = call_dex_any(
                 vm,
-                l,
+                listener,
                 "onSuccess",
                 &["(Ljava/lang/Object;)V"],
-                vec![res.clone()],
+                vec![st.result.clone()],
             )?;
         }
-    } else if let Some(e) = &exc {
-        for l in failure_ls {
+        (1, false, false) => {
+            if let Some(e) = st.exception.clone() {
+                let _ = call_dex_any(
+                    vm,
+                    listener,
+                    "onFailure",
+                    &["(Ljava/lang/Exception;)V", "(Ljava/lang/Object;)V"],
+                    vec![e],
+                )?;
+            }
+        }
+        (2, _, _) => {
             let _ = call_dex_any(
                 vm,
-                l,
-                "onFailure",
-                &["(Ljava/lang/Exception;)V", "(Ljava/lang/Object;)V"],
-                vec![e.clone()],
+                listener,
+                "onComplete",
+                &[
+                    "(Lcom/google/android/gms/tasks/Task;)V",
+                    "(Ljava/lang/Object;)V",
+                ],
+                vec![Value::Obj(task)],
             )?;
         }
+        (3, true, _) => {
+            let _ = call_dex_any(vm, listener, "onCanceled", &["()V"], Vec::new())?;
+        }
+        _ => {}
     }
-    for l in complete_ls {
-        let _ = call_dex_any(
-            vm,
-            l,
-            "onComplete",
-            &[
-                "(Lcom/google/android/gms/tasks/Task;)V",
-                "(Ljava/lang/Object;)V",
-            ],
-            vec![Value::Obj(r)],
-        )?;
-    }
-    let pendings = vm.fw.gms.pending.remove(&r).unwrap_or_default();
-    for p in pendings {
-        run_pending(vm, r, p)?;
-    }
-    Ok(true)
+    Ok(())
 }
 fn settle_task(
     vm: &mut Engine,
@@ -1162,45 +1313,17 @@ fn add_listener(
     if !st.complete {
         return Ok(());
     }
-    match (kind, st.canceled, st.successful) {
-        (0, false, true) => {
-            let _ = call_dex_any(
-                vm,
-                listener,
-                "onSuccess",
-                &["(Ljava/lang/Object;)V"],
-                vec![st.result.clone()],
-            )?;
-        }
-        (1, false, false) => {
-            if let Some(e) = st.exception.clone() {
-                let _ = call_dex_any(
-                    vm,
-                    listener,
-                    "onFailure",
-                    &["(Ljava/lang/Exception;)V", "(Ljava/lang/Object;)V"],
-                    vec![e],
-                )?;
-            }
-        }
-        (2, _, _) => {
-            let _ = call_dex_any(
-                vm,
-                listener,
-                "onComplete",
-                &[
-                    "(Lcom/google/android/gms/tasks/Task;)V",
-                    "(Ljava/lang/Object;)V",
-                ],
-                vec![Value::Obj(task)],
-            )?;
-        }
-        (3, true, _) => {
-            let _ = call_dex_any(vm, listener, "onCanceled", &["()V"], Vec::new())?;
-        }
-        _ => {}
-    }
-    Ok(())
+    // Task já completa: o disparo imediato passa pela fila — um
+    // listener que se re-adiciona no próprio callback não recursia
+    // até ao SIGABRT (ver queue_task_delivery).
+    queue_task_delivery(
+        vm,
+        TaskDelivery::Listener {
+            task,
+            kind,
+            listener,
+        },
+    )
 }
 
 fn tasks_static(vm: &mut Engine, name: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
