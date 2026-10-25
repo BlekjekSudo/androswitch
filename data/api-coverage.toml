@@ -140,43 +140,43 @@ key_apis = ["android.app.job.JobScheduler.schedule", "android.app.job.JobInfo.Bu
 id = "android-app-admin"
 prefix = "android.app.admin"
 domain = "app-lifecycle"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "future"
-notes = "DevicePolicyManager and device/profile-owner administration have no host model."
-evidence = ["docs/compat-matrix.md"]
+notes = "Partial: SystemUpdatePolicy automatic/windowed/postpone factories (with [0,1440) window validation), getters, isValid/validateType and toString are guest-visible; FreezePeriod is modelled and setFreezePeriods performs AOSP freeze validation (365-day canonicalization, duplicate/overlap, 90-day maximum, 60-day minimum separation, ValidationFailedException codes 2/3/4, unmodifiable getFreezePeriods). DevicePolicyManager obtained via Context.DEVICE_POLICY_SERVICE models AOSP's null-IDevicePolicyManager branches: isAdminActive/getActiveAdmins/hasGrantedPolicy, password-quality/minimum getters returning unspecified/0, storage-encryption unsupported, no device/profile owner, USER_NULL device-owner id, default strong-auth timeout, silent no-op setters, parent-instance SecurityExceptions, and the unchecked isProvisioningAllowed NullPointerException. No active-admin enrollment, device/profile-owner provisioning, policy enforcement, password validation, DeviceAdminReceiver dispatch or DeviceAdminInfo XML parsing exists."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/api-coverage.md"]
 gap_id = "gap-android-app-admin"
-key_apis = ["android.app.admin.DevicePolicyManager.isAdminActive"]
+key_apis = ["android.app.admin.DevicePolicyManager.isAdminActive", "android.app.admin.DevicePolicyManager.getPasswordQuality", "android.app.admin.SystemUpdatePolicy.createWindowedInstallPolicy", "android.app.admin.DevicePolicyManager.getSystemUpdatePolicy", "android.app.admin.SystemUpdatePolicy.setFreezePeriods", "android.app.admin.FreezePeriod.getStart"]
 
 [[surface]]
 id = "android-app-backup"
 prefix = "android.app.backup"
 domain = "app-lifecycle"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "BackupManager/BackupAgent transport and restore are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-app-backup"
-key_apis = ["android.app.backup.BackupManager.dataChanged"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "BackupManager is modelled with no backup system service (IBackupManager stays null, as when the service is not published): dataChanged/dataChanged(String)/dataChangedForUser, setBackupEnabled, setAutoRestore, setFrameworkSchedulingEnabled, setBackupServiceActive, backupNow, cancelBackups, setAncestralSerialNumber, excludeKeysFromRestore, updateTransportAttributes and reportDelayedRestoreResult are dropped, isBackupEnabled/isBackupServiceActive/isAppEligibleForBackup are false, getCurrentTransport/getCurrentTransportComponent/listAllTransports/selectBackupTransport/getConfigurationIntent/getDestinationString/getDataManagementIntent/getDataManagementIntentLabel/getDataManagementLabel/getUserForAncestralSerialNumber are null, getAvailableRestoreToken is 0, beginRestoreSession is null, requestBackup returns -1, and requestRestore returns -1 unconditionally as since Android P. BackupAgent provides its stable onBind binder, the onCreate overload chain (user/destination storage, event-logger creation in the three-argument form), no-op onDestroy/onRestoreFinished/onQuotaExceeded, and getBackupRestoreEventLogger, with BackupManager.getBackupRestoreEventLogger enforcing the initialised-agent IllegalStateException and getDelayedRestoreLogger returning a fresh restore logger whose logging results are empty (with its operation type and clearData/clearBackupRestoreEventLogger wired); RestoreObserver and BackupObserver base callbacks are no-ops. No backup transport, BackupAgent onBackup/onRestore data flow, key/value or full-backup helpers, restore sessions, or transport selection effects are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-app-backup-transport-restore"
+key_apis = ["android.app.backup.BackupManager.dataChanged", "android.app.backup.BackupManager.isBackupEnabled", "android.app.backup.BackupManager.requestBackup", "android.app.backup.BackupManager.requestRestore", "android.app.backup.BackupAgent.onBind", "android.app.backup.BackupAgent.getBackupRestoreEventLogger"]
 
 [[surface]]
 id = "android-app-slice"
 prefix = "android.app.slice"
 domain = "app-lifecycle"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
-milestone = "future"
-notes = "Slices provider/host rendering is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-app-slice"
-key_apis = ["android.app.slice.SliceProvider.onBindSlice"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "The slice data model is implemented as in AOSP: SliceSpec (type/revision, canRender revision ordering, equals, SliceSpec{type,revision} toString), SliceItem (all three constructors with their distinct null-hints behavior, format/subtype/hints accessors with ArrayUtils.contains semantics, typed payload getters with AOSP cast/unboxing ClassCastException/NullPointerException behavior, action items exposing both the PendingIntent and the child slice, hasHints skipping empty hints), Slice (uri/spec/items/hints, caller-needed check, recursive toString), and Slice.Builder (uri/spec/parent-builder constructors including the generated _gen/0 child uri, caller-needed and hint management, addText/addIcon/addRemoteInput/addInt/addLong/addTimestamp/addBundle/addSubSlice/addAction with AOSP null checks, hints copying from child slices, and addAction detaching the child slice's spec). There is no slice system service: SliceManager construction fails with ServiceNotFoundException exactly as ServiceManager.getServiceOrThrow does, and manager calls on a service-less instance dereference null. SliceProvider binding/rendering, pin specifications against the system, slice permissions, and Parcel round trips are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-app-slice-provider-host"
+key_apis = ["android.app.slice.Slice.Builder.build", "android.app.slice.Slice.Builder.addText", "android.app.slice.Slice.Builder.addAction", "android.app.slice.SliceItem.getInt", "android.app.slice.SliceSpec.canRender", "android.app.slice.SliceManager.pinSlice"]
 
 [[surface]]
 id = "android-content"
@@ -267,43 +267,55 @@ key_apis = ["android.view.inputmethod.InputConnection.commitText", "android.view
 id = "android-view-animation"
 prefix = "android.view.animation"
 domain = "view-ui"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/framework"
-code = ["crates/rd-vm/src/framework.rs", "crates/rd-vm/src/choreographer.rs", "crates/rd-vm/src/classpath.rs"]
-milestone = "M3+"
-notes = "Animation/interpolator types and timing hooks exist mainly as hierarchy/fallback; deterministic frame-accurate view animation is not claimed."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-view-animation-stub"
-key_apis = ["android.view.animation.Animation", "android.view.animation.LinearInterpolator.getInterpolation"]
+module = "rd-vm/android-sysservices"
+code = [
+    "crates/rd-vm/src/framework.rs",
+    "crates/rd-vm/src/choreographer.rs",
+    "crates/rd-vm/src/classpath.rs",
+    "crates/rd-vm/src/android_sysservices.rs",
+]
+milestone = "M3+/AA1"
+notes = "Pure android.view.animation interpolators (Linear, Accelerate, Decelerate, AccelerateDecelerate, Anticipate, Overshoot, AnticipateOvershoot, Bounce and Cycle) evaluate AOSP easing formulas. View Animation transformation and timeline playback remain incomplete."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch1.rs",
+]
+gap_id = "gap-android-view-animation-partial"
+key_apis = [
+    "android.view.animation.LinearInterpolator.getInterpolation",
+    "android.view.animation.AccelerateInterpolator.getInterpolation",
+    "android.view.animation.CycleInterpolator.getInterpolation",
+]
 
 [[surface]]
 id = "android-view-textservice"
 prefix = "android.view.textservice"
 domain = "view-ui"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
-milestone = "future"
-notes = "Spell checker/text services manager integration is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-view-textservice"
-key_apis = ["android.view.textservice.TextServicesManager.newSpellCheckerSession"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "No-current/enabled-checker TextServicesManager returns empty enabled lists and null sessions; TextInfo, SuggestionsInfo, SentenceSuggestionsInfo and SpellCheckerSubtype preserve AOSP values and validation; SpellCheckerSessionParams.Builder and a directly constructed disconnected SpellCheckerSession are modeled. No installed SpellCheckerInfo construction, Binder spell-check service, suggestion callbacks, span-preserving TextInfo beyond a String snapshot, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-view-textservice-service-callbacks"
+key_apis = ["android.view.textservice.TextServicesManager.newSpellCheckerSession", "android.view.textservice.TextInfo.getText", "android.view.textservice.SuggestionsInfo.getSuggestionAt", "android.view.textservice.SentenceSuggestionsInfo.getOffsetAt", "android.view.textservice.SpellCheckerSubtype.getExtraValueOf", "android.view.textservice.SpellCheckerSession.isSessionDisconnected"]
 
 [[surface]]
 id = "android-view-translation"
 prefix = "android.view.translation"
 domain = "view-ui"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
-milestone = "future"
-notes = "On-device UI translation APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-view-translation"
-key_apis = ["android.view.translation.TranslationManager.createOnDeviceTranslator"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "TranslationSpec, TranslationRequestValue, ViewTranslationRequest and its Builder, TranslationContext and its Builder, and TranslationCapability model AOSP values/equality, while TranslationManager exposes a no-service profile with empty capabilities and null synchronous translator creation. No Translator sessions or translations, async Executor callback delivery, response classes/builders, UiTranslationController/service discovery, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-view-translation-service-responses"
+key_apis = ["android.view.translation.TranslationManager.getOnDeviceTranslationCapabilities", "android.view.translation.TranslationManager.createOnDeviceTranslator", "android.view.translation.TranslationSpec.getLocale", "android.view.translation.ViewTranslationRequest.getValue", "android.view.translation.TranslationContext.getTranslationFlags", "android.view.translation.TranslationCapability.getState"]
 
 [[surface]]
 id = "android-widget"
@@ -323,15 +335,15 @@ key_apis = ["android.widget.TextView.setText", "android.widget.Button.setOnClick
 id = "android-webkit"
 prefix = "android.webkit"
 domain = "view-ui"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/platform_base.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/platform_base.rs"]
 milestone = "M11"
-notes = "WebView/WebSettings hierarchy placeholders may let class loading proceed, but there is no Chromium/WebView renderer, JS engine or network page loading in this runtime path."
-evidence = ["docs/compat-matrix.md"]
+notes = "WebSettings persisted state/defaults and WebView in-memory URL, navigation-history, progress, pause/resume and destroy state execute host-side. loadUrl records a navigation only; there is no Chromium renderer, network fetch, DOM, JavaScript execution, or WebViewClient callback delivery."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-webkit-renderer"
-key_apis = ["android.webkit.WebView.loadUrl", "android.webkit.WebSettings.setJavaScriptEnabled"]
+key_apis = ["android.webkit.WebView.loadUrl", "android.webkit.WebView.goBack", "android.webkit.WebSettings.setJavaScriptEnabled", "android.webkit.WebSettings.getTextZoom"]
 
 # ===================== Graphics =====================
 [[surface]]
@@ -366,43 +378,43 @@ key_apis = ["android.graphics.drawable.Drawable.draw", "android.graphics.drawabl
 id = "android-graphics-pdf"
 prefix = "android.graphics.pdf"
 domain = "graphics"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "PdfDocument/PdfRenderer are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Partial: PdfDocument.PageInfo/Builder validation and values plus the PdfDocument startPage/finishPage/getPages/writeTo/close lifecycle are guest-visible; a started page exposes a host Canvas over a same-sized Bitmap target and writeTo emits a structurally valid PDF with the finished pages' MediaBox/CropBox geometry. Canvas drawing operations are not yet serialized into PDF content streams; PdfRenderer has no PDFium backend, so non-null construction fails (seekability IOException/IllegalArgumentException path) and only closed-renderer/page state checks and render-mode constants are modelled. No PDF parsing/rendering of real documents."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/api-coverage.md"]
 gap_id = "gap-android-graphics-pdf"
-key_apis = ["android.graphics.pdf.PdfDocument.startPage", "android.graphics.pdf.PdfRenderer.openPage"]
+key_apis = ["android.graphics.pdf.PdfDocument.startPage", "android.graphics.pdf.PdfDocument.writeTo", "android.graphics.pdf.PdfDocument.PageInfo.Builder.create", "android.graphics.pdf.PdfRenderer.getPageCount"]
 
 [[surface]]
 id = "android-opengl"
 prefix = "android.opengl"
 domain = "graphics"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M10/M11"
-notes = "GLSurfaceView/EGL/GLES Java bindings are not a RustyDroid renderer yet. Native EGL/GLES symbols are a separate NDK surface."
-evidence = ["docs/compat-matrix.md"]
+notes = "The complete deterministic android.opengl.Matrix float-array API is modelled with AOSP multiplication, transpose, Cramer's-rule inversion, identity/scale/translate/rotate operations, orthographic/frustum/perspective projections, Euler conversions (including the deprecated Y-axis behavior), look-at construction, offset handling, and its distinct explicit versus implicit array/argument validation. GLSurfaceView, EGL/GLES bindings, GLUtils, contexts, and rendering are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-opengl"
-key_apis = ["android.opengl.GLSurfaceView.setRenderer", "android.opengl.EGLDisplay"]
+key_apis = ["android.opengl.Matrix.multiplyMM", "android.opengl.Matrix.multiplyMV", "android.opengl.Matrix.invertM", "android.opengl.Matrix.setIdentityM", "android.opengl.Matrix.setRotateEulerM2", "android.opengl.Matrix.setLookAtM"]
 
 [[surface]]
 id = "android-renderscript"
 prefix = "android.renderscript"
 domain = "graphics"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Deprecated RenderScript has no host runtime."
-evidence = ["docs/compat-matrix.md"]
+notes = "Partial: deprecated RenderScript is modelled in the AOSP config.disable_renderscript profile. Pure-Java Float2/Float3/Float4 vector arithmetic and Matrix2f/Matrix3f/Matrix4f operations (including Matrix4f inverse/projection builders) plus Element sub-element state and DataType/DataKind/ContextType enum metadata are guest-visible; RenderScript.create/createMultiContext follow internalCreate's disabled path (null for sdk<23/multi-context, the sdk>=23 process-context NullPointerException, releaseAllContexts no-op). No Allocation/Type/Script/ScriptGroup/native RS runtime or GPU/CPU kernel execution exists."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/api-coverage.md"]
 gap_id = "gap-android-renderscript-legacy"
-key_apis = ["android.renderscript.RenderScript.create"]
+key_apis = ["android.renderscript.RenderScript.create", "android.renderscript.Float4.add", "android.renderscript.Matrix4f.loadOrtho", "android.renderscript.Element.getSubElementCount"]
 
 # ===================== Text =====================
 [[surface]]
@@ -423,15 +435,27 @@ key_apis = ["android.text.TextUtils.isEmpty", "android.text.SpannableStringBuild
 id = "android-text-format"
 prefix = "android.text.format"
 domain = "text"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/jtext-format"
-code = ["crates/rd-vm/src/jtext_format.rs", "crates/rd-vm/src/jtime.rs", "crates/rd-vm/src/classpath.rs"]
-milestone = "M8+"
-notes = "Java text/date support exists nearby, but android.text.format DateFormat/Formatter is mainly hierarchy/fallback rather than a complete model."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-text-format-stub"
-key_apis = ["android.text.format.DateFormat.format", "android.text.format.Formatter.formatFileSize"]
+module = "rd-vm/android-sysservices"
+code = [
+    "crates/rd-vm/src/jtext_format.rs",
+    "crates/rd-vm/src/jtime.rs",
+    "crates/rd-vm/src/classpath.rs",
+    "crates/rd-vm/src/android_sysservices.rs",
+]
+milestone = "M8+/AA1"
+notes = "Formatter file-size/IPv4 formatting and DateFormat.format/date-order helpers run over the deterministic en-US/UTC model with AOSP rounding. Locale/ICU DateFormat factories, android.text.format.Time/DateUtils and bidi wrapping remain incomplete."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch1.rs",
+]
+gap_id = "gap-android-text-format-partial"
+key_apis = [
+    "android.text.format.DateFormat.format",
+    "android.text.format.Formatter.formatFileSize",
+    "android.text.format.Formatter.formatIpAddress",
+]
 
 [[surface]]
 id = "android-text-method"
@@ -465,17 +489,25 @@ key_apis = ["android.text.style.ForegroundColorSpan", "android.text.style.StyleS
 id = "android-text-util"
 prefix = "android.text.util"
 domain = "text"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/android-text"
-code = ["crates/rd-vm/src/android_text.rs", "crates/rd-vm/src/classpath.rs"]
-milestone = "M8+"
-notes = "Linkify/Rfc822 helpers are not a complete host model; do not infer linkification fidelity from TextUtils support."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-text-util-stub"
-key_apis = ["android.text.util.Linkify.addLinks", "android.text.util.Rfc822Tokenizer"]
-
-# ===================== OS/IPC =====================
+module = "rd-vm/android-sysservices"
+code = [
+    "crates/rd-vm/src/android_text.rs",
+    "crates/rd-vm/src/classpath.rs",
+    "crates/rd-vm/src/android_sysservices.rs",
+]
+milestone = "M8+/AA1"
+notes = "Rfc822Tokenizer and Rfc822Token parse, quote and format RFC 822 address lists with AOSP token boundaries. Linkify link detection and span application are not implemented."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch1.rs",
+]
+gap_id = "gap-android-text-util-partial"
+key_apis = [
+    "android.text.util.Rfc822Tokenizer.tokenize",
+    "android.text.util.Rfc822Token.toString",
+]
 [[surface]]
 id = "android-os"
 prefix = "android.os"
@@ -605,15 +637,15 @@ key_apis = ["android.database.sqlite.SQLiteOpenHelper.getWritableDatabase", "and
 id = "android-provider"
 prefix = "android.provider"
 domain = "database"
-status = "stub"
+status = "partial"
 domain_module = "fd-content"
-module = "rd-vm/content"
-code = ["crates/rd-vm/src/content.rs", "crates/rd-vm/src/classpath.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/content.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M8+"
-notes = "Settings is the supported exception below. Contacts, MediaStore, Calendar, CallLog, Telephony, Downloads and Documents providers are constants/hierarchy or NOT_IMPLEMENTED, not backed by device provider data."
-evidence = ["docs/compat-matrix.md"]
+notes = "Settings remains the separate supported subset. DocumentsContract document/tree/root URI builders and extractors, URI predicates for a profile with no installed DocumentsProvider, query-argument helpers, and DocumentsContract.Path execute over the VM Uri model. Contacts, MediaStore, Calendar, CallLog, Telephony, Downloads, and actual DocumentsProvider/ContentResolver data are still not backed by device data."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-provider-data"
-key_apis = ["android.provider.ContactsContract.Contacts", "android.provider.MediaStore.Images.Media", "android.provider.CalendarContract.Events", "android.provider.DocumentsContract.Document"]
+key_apis = ["android.provider.DocumentsContract.buildDocumentUri", "android.provider.DocumentsContract.getDocumentId", "android.provider.DocumentsContract.buildDocumentUriUsingTree", "android.provider.DocumentsContract.Path.getRootId"]
 
 [[surface]]
 id = "android-provider-settings"
@@ -660,298 +692,313 @@ key_apis = ["android.net.Uri.parse", "android.net.Uri.getQueryParameter", "andro
 id = "android-net-http"
 prefix = "android.net.http"
 domain = "net"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-net"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Legacy AndroidHttpClient/SslError platform package is not modelled; Java/OkHttp paths are separate surfaces."
-evidence = ["docs/compat-matrix.md"]
+notes = "SslError and SslCertificate are fully modelled as deterministic values: the SSL error bitmask with addError/hasError bounds, most-severe primary error, Chromium error-code mapping, certificate issued-to/issued-by DNames with RFC 2253 CN/O/OU extraction, validity dates cloned with Date.clone semantics (dynamic subclass and fields preserved), formatted and parsed in the fixed yyyy-MM-dd HH:mm:ssZ pattern, Bundle saveState/restoreState round trips, and AOSP toString forms. The legacy AndroidHttpClient/HttpResponseCache runtime, certificate view inflation, and any actual TLS/HTTP transport are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-net-http-legacy"
-key_apis = ["android.net.http.AndroidHttpClient.newInstance"]
+key_apis = ["android.net.http.SslError.getPrimaryError", "android.net.http.SslError.addError", "android.net.http.SslCertificate.getIssuedTo", "android.net.http.SslCertificate.saveState", "android.net.http.SslCertificate.restoreState"]
 
 [[surface]]
 id = "android-net-wifi"
 prefix = "android.net.wifi"
 domain = "net"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-net"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "M10"
-notes = "WifiManager scan/connection state and Wi-Fi P2P/Aware/RTT are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "The VM device profile advertises android.hardware.wifi, so Context WIFI_SERVICE returns a WifiManager for a present-but-disabled radio: DISABLED state, API 29+ third-party toggle denial, a default (not-connected) WifiInfo, and no scan results or configured networks. Pure AOSP 14 value semantics are guest-visible: WifiManager signal-level math and suggestion limits, WifiInfo default getters and detailed-state mapping, ScanResult band predicates and channel/frequency/op-class conversions, SupplicantState predicates, and WifiSsid byte/UTF-8/hex factories with equals/hashCode. Scan delivery, network configuration/suggestion/specifier mutation, connection lifecycle, WifiP2pManager/WifiAwareManager/WifiRttManager/WifiScanner services, hotspot/SoftAp, MLO links, and supplicant events are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-net-wifi"
-key_apis = ["android.net.wifi.WifiManager.getConnectionInfo", "android.net.wifi.WifiManager.startScan"]
+key_apis = ["android.net.wifi.WifiManager.getConnectionInfo", "android.net.wifi.WifiManager.calculateSignalLevel", "android.net.wifi.WifiInfo.getDetailedState", "android.net.wifi.ScanResult.convertChannelToFrequencyMhzIfSupported", "android.net.wifi.WifiSsid.fromUtf8Text"]
 
 [[surface]]
 id = "android-net-nsd"
 prefix = "android.net.nsd"
 domain = "net"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-net"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "future"
-notes = "Network service discovery (mDNS/NSD) is not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "NSD models NsdServiceInfo as a guest-visible AOSP value: service name/type, host addresses, port, network/interface fields, attribute validation and limits, canonical TXT-record encoding, tolerant TXT-record parsing with duplicate/invalid record skipping, and exact toString/event-name helpers. This profile publishes no nsd binder, so Context NSD_SERVICE retains ServiceManager.getServiceOrThrow failure; a directly materialised NsdManager retains argument validation and listener-in-use/not-registered bookkeeping before the absent connector. Live mDNS registration/discovery/resolution, daemon and network callbacks, the NetworkRequest discovery overload, and NsdServiceInfo parcel transfer are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-net-nsd"
-key_apis = ["android.net.nsd.NsdManager.discoverServices"]
+key_apis = ["android.net.nsd.NsdManager.discoverServices", "android.net.nsd.NsdServiceInfo.setAttribute", "android.net.nsd.NsdServiceInfo.getTxtRecord", "android.net.nsd.NsdServiceInfo.setTxtRecords", "android.net.nsd.NsdManager.nameOf"]
 
 [[surface]]
 id = "android-net-sip"
 prefix = "android.net.sip"
 domain = "net"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-net"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Deprecated SIP APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Deprecated SIP follows AOSP on a device whose PackageManager profile advertises neither FEATURE_SIP nor FEATURE_SIP_VOIP: support probes and SipManager.newInstance return false/null with null-context failure retained, incoming-call Intent construction/extraction helpers are exact, and a directly constructed SipManager has no sip binder and retains AOSP dead-service SipExceptions after its PendingIntent, VoIP-support, and incoming-call Intent checks. SipProfile parsing/building, SipAudioCall/SipSession media or registration state, the SIP stack/service, and isSipWifiOnly's internal resource lookup are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-net-sip-legacy"
-key_apis = ["android.net.sip.SipManager.newInstance"]
+key_apis = ["android.net.sip.SipManager.newInstance", "android.net.sip.SipManager.isApiSupported", "android.net.sip.SipManager.isVoipSupported", "android.net.sip.SipManager.createIncomingCallBroadcast", "android.net.sip.SipManager.isIncomingCallIntent"]
 
 [[surface]]
 id = "android-net-ipsec-ike"
 prefix = "android.net.ipsec.ike"
 domain = "net"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-net"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "IKEv2/IPsec tunnel APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "AOSP 14 IPsec value/builder validation is guest-visible without any VPN stack: SaProposal/IkeSaProposal/ChildSaProposal builders enforce algorithm ids, AES key-length rules (3DES/ChaCha must not set a length), AEAD-vs-normal mixing rejection, IKE PRF/integrity/DH requirements (INTEGRITY_ALGORITHM_NONE only for AEAD, DH_GROUP_NONE rejected), Child SA supported-algorithm filtering, supported-algorithm sets and algorithm string forms; IkeTrafficSelector enforces address-family/type, selector lengths and port ranges; IkeFqdn/IkeRfc822Addr/IkeKeyId/IkeIpv4Addr identifications validate and store their values; Transport/TunnelModeChildSessionParams builders apply proposal requirements, default full-range traffic selectors, lifetime bounds and copy-construction. IkeSession negotiation, sockets, key exchange, kernel XFRM transforms, IkeSessionParams/TunnelConnectionParams plumbing, and persistable-bundle round trips are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-net-ipsec-ike"
-key_apis = ["android.net.ipsec.ike.IkeSession"]
+key_apis = ["android.net.ipsec.ike.IkeSaProposal.Builder.build", "android.net.ipsec.ike.ChildSaProposal.Builder.addEncryptionAlgorithm", "android.net.ipsec.ike.IkeTrafficSelector", "android.net.ipsec.ike.TransportModeChildSessionParams.Builder.build", "android.net.ipsec.ike.IkeFqdnIdentification"]
 
 # ===================== Media =====================
 [[surface]]
 id = "android-media"
 prefix = "android.media"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M10"
-notes = "MediaPlayer/MediaRecorder/AudioManager/codec playback and recording have no complete host media pipeline. Individual hierarchy stubs must not be read as playback support."
-evidence = ["docs/compat-matrix.md"]
+notes = "The android.media slice models the metadata value layer: MediaMetadata is backed by a real Bundle with AOSP key-type validation, text/long/Rating/Bitmap getters, copied-builder semantics, bitmap-dimension limiting/scaling for stored Bitmap values, size/keySet, MediaDescription derivation (including BT folder extras), and the exact text/long-only equals/hashCode that ignore Rating/Bitmap fields. MediaDescription builders/getters/equals/toString and Rating factories/accessors (including null results for invalid styles or out-of-range values) are guest-visible. MediaPlayer/MediaRecorder/AudioManager/codec playback, recording and extraction still have no host media pipeline and are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-media-pipeline"
-key_apis = ["android.media.MediaPlayer.start", "android.media.MediaRecorder.start", "android.media.AudioManager.getStreamVolume"]
+key_apis = ["android.media.MediaMetadata.Builder.putString", "android.media.MediaMetadata.getDescription", "android.media.MediaDescription.Builder.build", "android.media.Rating.newStarRating"]
 
 [[surface]]
 id = "android-media-session"
 prefix = "android.media.session"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "future"
-notes = "MediaSession/MediaController transport integration is not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Media sessions are modelled as values plus an empty session registry: PlaybackState and CustomAction builders retain defaults, copied custom-action lists, active-state logic and AOSP toString shapes; MediaSession.QueueItem validates description/id and retains equals/toString; MediaSession construction retains context/tag validation before the remote session-creation failure; and MediaSessionManager from MEDIA_SESSION_SERVICE reports no active sessions, no media-key session/package, no Session2 tokens, and local active-session listener bookkeeping. Live MediaSession registration, MediaController transport controls, playback callbacks and media-key dispatch are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-media-session"
-key_apis = ["android.media.session.MediaSession.setActive"]
+key_apis = ["android.media.session.PlaybackState.Builder.build", "android.media.session.MediaSession.QueueItem.getQueueId", "android.media.session.MediaSessionManager.getActiveSessions", "android.media.session.MediaSessionManager.addOnActiveSessionsChangedListener"]
 
 [[surface]]
 id = "android-media-browse"
 prefix = "android.media.browse"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Legacy MediaBrowser APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Legacy MediaBrowser is modelled while disconnected: constructor argument validation and root-hint copying, connect/disconnect state transitions (including IllegalStateException for a second connect while connecting), not-connected failures for root/extras/session token/service component, subscription validation and local callback/options bookkeeping with MediaBrowserUtils page-option replacement rules, unsubscribe removal, and disconnected getItem delivering ItemCallback.onError. MediaBrowser.MediaItem validates a non-empty description media id and exposes flags/playable/browsable/description/toString. Binding to a MediaBrowserService, loading children/items from a service, and search are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-media-browse"
-key_apis = ["android.media.browse.MediaBrowser.connect"]
+key_apis = ["android.media.browse.MediaBrowser.connect", "android.media.browse.MediaBrowser.subscribe", "android.media.browse.MediaBrowser.getItem", "android.media.browse.MediaBrowser.MediaItem.getMediaId"]
 
 [[surface]]
 id = "android-media-projection"
 prefix = "android.media.projection"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "future"
-notes = "MediaProjection screen capture consent/virtual display flow is not modelled as an Android API, even though the agent can screenshot RustyDroid itself."
-evidence = ["docs/compat-matrix.md"]
+notes = "MediaProjection is modelled only up to the consent-token boundary: Context MEDIA_PROJECTION_SERVICE yields a MediaProjectionManager, getMediaProjection returns null for a non-RESULT_OK result, null result data, or a result Intent without the projection binder extra, and absent IMediaProjectionManager service calls retain their NullPointerException paths for active-projection queries after local callback bookkeeping. Removing an unknown manager callback is a no-op, and an explicit MediaProjection token wrapper retains getProjection plus local callback register/unregister bookkeeping. The consent activity Intent/component, IMediaProjection start/stop, VirtualDisplay creation and actual screen capture are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-media-projection"
-key_apis = ["android.media.projection.MediaProjectionManager.getMediaProjection"]
+key_apis = ["android.media.projection.MediaProjectionManager.getMediaProjection", "android.media.projection.MediaProjectionManager.removeCallback", "android.media.projection.MediaProjection.registerCallback", "android.media.projection.MediaProjection.getProjection"]
 
 [[surface]]
 id = "android-media-tv"
 prefix = "android.media.tv"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
-milestone = "future"
-notes = "TV input/interactive TV APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-media-tv"
-key_apis = ["android.media.tv.TvInputManager.getTvInputList"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "TvInputManager uses a service-present/no-input profile: empty input and rating-system lists, null unknown input info, disconnected unknown state, local callback registration, and in-memory parental-control/blocked-rating state. TvContentRating create/unflatten/flatten/contains value semantics (including caller-array sub-rating sorting and null sub-rating list) and TvTrackInfo builders/typed getters/equality are modeled. No TvInputInfo construction, input sessions/tuning/recording, interactive TV apps, XML rating-system loading, settings persistence, broadcasts, service-dispatched callbacks, unmodifiable sub-rating-list wrapper, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-media-tv-sessions-and-services"
+key_apis = ["android.media.tv.TvInputManager.getTvInputList", "android.media.tv.TvInputManager.getInputState", "android.media.tv.TvInputManager.addBlockedRating", "android.media.tv.TvContentRating.createRating", "android.media.tv.TvContentRating.flattenToString", "android.media.tv.TvTrackInfo.getAudioChannelCount"]
 
 [[surface]]
 id = "android-media-audiofx"
 prefix = "android.media.audiofx"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "Audio effects (equalizer, bass boost, visualizer) are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Audio effects follow a device with no loaded native effect library: AudioEffect.Descriptor constructs UUID type/implementation values from strings and retains AOSP equals/hashCode/writeToParcel field order, queryEffects/queryPreProcessings return the empty installed-effect arrays for this profile so isEffectTypeAvailable is false, AudioEffect construction retains null-UUID failure followed by the AOSP ERROR_INVALID_OPERATION mapping to UnsupportedOperationException(Effect library not loaded), and an uninitialized effect retains IllegalStateException checkState behavior plus release-to-uninitialized. Real equalizer/bass-boost/virtualizer/reverb engines, parameters/commands and Visualizer capture are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-media-audiofx"
-key_apis = ["android.media.audiofx.Equalizer.setEnabled"]
+key_apis = ["android.media.audiofx.AudioEffect.queryEffects", "android.media.audiofx.AudioEffect.isEffectTypeAvailable", "android.media.audiofx.AudioEffect.Descriptor.equals", "android.media.audiofx.AudioEffect.release"]
 
 [[surface]]
 id = "android-media-midi"
 prefix = "android.media.midi"
 domain = "media"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
-milestone = "future"
-notes = "MIDI device/service APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-media-midi"
-key_apis = ["android.media.midi.MidiManager.getDevices"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "MidiManager is a no-device profile with empty device arrays/sets and local callback registration/deduplication. MidiDeviceInfo validates port counts, preserves properties/private/protocol fields, synthesizes ordered input/output PortInfo values, and uses ID equality; MidiReceiver implements max-message-size chunking and flush dispatch, with exact-base recording for tests. No device opening, Bluetooth MIDI, MidiDeviceServer, real input/output ports or streams, service status events, timestamp scheduling, USB/BLE transports, or parcel round trips are claimed; a non-positive receiver maximum uses a bounded exception instead of AOSP's non-terminating loop."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-media-midi-devices-and-transports"
+key_apis = ["android.media.midi.MidiManager.getDevices", "android.media.midi.MidiManager.registerDeviceCallback", "android.media.midi.MidiDeviceInfo.getPorts", "android.media.midi.MidiDeviceInfo.getProperties", "android.media.midi.MidiReceiver.send", "android.media.midi.MidiReceiver.flush"]
 
 # ===================== Camera =====================
 [[surface]]
 id = "android-hardware-camera2"
 prefix = "android.hardware.camera2"
 domain = "camera"
-status = "stub"
+status = "partial"
 domain_module = "fd-hardware"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/android_util.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/android_util.rs"]
 milestone = "M10"
-notes = "Camera2 value/hierarchy references may resolve, but there is no camera device, capture session, stream configuration or image reader pipeline."
-evidence = ["docs/compat-matrix.md"]
+notes = "Explicit-data CameraMetadataNative keys/containers, CameraCharacteristics, CaptureRequest/Builder, CaptureResult/TotalCaptureResult, CameraAccessException, and a no-camera CameraManager profile execute host-side. There is no camera HAL/device/session/capture pipeline, generated framework key catalogue, native serialized metadata, or camera callback delivery."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-hardware-camera2"
-key_apis = ["android.hardware.camera2.CameraManager.getCameraIdList", "android.hardware.camera2.CameraManager.openCamera", "android.hardware.camera2.CameraCaptureSession.capture"]
+key_apis = ["android.hardware.camera2.CameraManager.getCameraIdList", "android.hardware.camera2.CameraManager.openCamera", "android.hardware.camera2.CaptureRequest.Builder.build", "android.hardware.camera2.impl.CameraMetadataNative.set"]
 
 [[surface]]
 id = "android-hardware-camera2-params"
 prefix = "android.hardware.camera2.params"
 domain = "camera"
-status = "stub"
+status = "partial"
 domain_module = "fd-hardware"
-module = "rd-vm/android-util"
-code = ["crates/rd-vm/src/android_util.rs", "crates/rd-vm/src/classpath.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/android_util.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M10"
-notes = "StreamConfigurationMap-adjacent Size/Range values can be represented by android.util value support; camera characteristics are not backed by a virtual camera."
-evidence = ["docs/compat-matrix.md"]
+notes = "MeteringRectangle, BlackLevelPattern, RggbChannelVector, ColorSpaceTransform, stream/high-speed/reprocess configuration values, and StreamConfigurationMap format/size/duration calculations execute over caller-supplied configurations. The values do not come from a virtual camera or camera HAL."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-hardware-camera2-params"
-key_apis = ["android.hardware.camera2.params.StreamConfigurationMap.getOutputSizes"]
+key_apis = ["android.hardware.camera2.params.StreamConfigurationMap.getOutputSizes", "android.hardware.camera2.params.StreamConfigurationMap.getOutputFormats", "android.hardware.camera2.params.StreamConfigurationMap.getHighResolutionOutputSizes", "android.hardware.camera2.params.ReprocessFormatsMap.getOutputs"]
 
 [[surface]]
 id = "android-hardware-camera-legacy"
 prefix = "android.hardware.Camera"
 domain = "camera"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Legacy android.hardware.Camera preview/capture is not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Legacy Camera is modelled for a profile with no legacy camera device or camera service: getNumberOfCameras returns zero, open() returns null, getCameraInfo and camera-ID construction retain AOSP/native RuntimeExceptions, openLegacy retains HAL-version validation before connection failure, checkInitErrors is exact, and CameraInfo defaults plus Size/Area public value equality are guest-visible. Connected Camera objects, Parameters flattening/capabilities, preview, capture, callbacks, and camera service access are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-hardware-camera-legacy"
-key_apis = ["android.hardware.Camera.open", "android.hardware.Camera.startPreview"]
+key_apis = ["android.hardware.Camera.getNumberOfCameras", "android.hardware.Camera.open", "android.hardware.Camera.getCameraInfo", "android.hardware.Camera.Size.equals", "android.hardware.Camera.Area.equals"]
 
 # ===================== Hardware =====================
 [[surface]]
 id = "android-hardware"
 prefix = "android.hardware"
 domain = "hardware"
-status = "stub"
+status = "partial"
 domain_module = "fd-hardware"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/android_display.rs", "crates/rd-vm/src/android_util.rs"]
-milestone = "M10"
-notes = "Only display-adjacent/value classes have nearby models. SensorManager and most hardware managers are hierarchy/stub or absent, not virtual devices yet."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-managers"
-key_apis = ["android.hardware.SensorManager.getDefaultSensor", "android.hardware.SensorEventListener.onSensorChanged", "android.hardware.ConsumerIrManager.transmit"]
+module = "rd-vm/android-sysservices"
+code = [
+    "crates/rd-vm/src/classpath.rs",
+    "crates/rd-vm/src/android_display.rs",
+    "crates/rd-vm/src/android_util.rs",
+    "crates/rd-vm/src/android_sysservices.rs",
+    "crates/rd-vm/src/m8.rs",
+]
+milestone = "M10/AA6"
+notes = "SensorManager models a sensorless device: static/dynamic sensor lists are empty, there is no default or handle-addressable sensor, dynamic discovery is unsupported, listener/flush/trigger registration cannot succeed, and the AOSP rotation-matrix, inclination, coordinate-remap, orientation, altitude, angle-change, rotation-vector and quaternion math is implemented. Sensor field getters/reporting-mode and direct-channel flag decoding and ConsumerIrManager's no-emitter state (hasIrEmitter=false, transmit no-op, carrier frequencies=null) are implemented. Physical/virtual sensor event streams, direct channels, trigger delivery and most other android.hardware managers remain incomplete."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch6.rs",
+]
+gap_id = "gap-android-hardware-managers-partial"
+key_apis = [
+    "android.hardware.SensorManager.getSensorList",
+    "android.hardware.SensorManager.getDefaultSensor",
+    "android.hardware.SensorManager.getRotationMatrix",
+    "android.hardware.SensorManager.getOrientation",
+    "android.hardware.ConsumerIrManager.hasIrEmitter",
+]
 
 [[surface]]
 id = "android-location"
 prefix = "android.location"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M10"
-notes = "LocationManager/GNSS/geocoding have no virtual location provider yet. Manifest location permissions are Appendix B only."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-location"
-key_apis = ["android.location.LocationManager.getLastKnownLocation", "android.location.LocationListener.onLocationChanged", "android.location.Geocoder.getFromLocation"]
+notes = "The android.location value classes are modelled deterministically: Location (provider/time/elapsed-realtime fields, latitude/longitude, all optional accuracy/altitude/speed/bearing/MSL fields with AOSP presence-bit semantics (non-MSL values are retained after remove*, while the two MSL getters throw IllegalStateException when unset), bearing normalization into [0,360) with the finite check, mock flag, defensive extras Bundle copies, set/reset/copy construction, isComplete/makeComplete, presence-aware equals using Java Float/Double.compare semantics with extras kindofEquals and Objects.hash-based hashCode, the WGS84 inverse-formula distanceTo/bearingTo/distanceBetween computations, and both Location.convert directions with AOSP validation and Double.parseDouble token handling) and Criteria (range-checked accuracy/power requirements, the legacy setAccuracy/getAccuracy mapping, copy construction, exact toString). There is still no virtual location provider: LocationManager, provider registration and Criteria-based provider selection, last-known locations, location listeners/requests, GNSS status/measurements, geofencing, Address/Geocoder, and Location Parcel round trips or toString are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-location-provider-service"
+key_apis = ["android.location.Location.distanceTo", "android.location.Location.distanceBetween", "android.location.Location.convert", "android.location.Location.setBearing", "android.location.Location.isComplete", "android.location.Criteria.setAccuracy"]
 
 [[surface]]
 id = "android-hardware-usb"
 prefix = "android.hardware.usb"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "USB host/accessory device enumeration and transfers are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-usb"
-key_apis = ["android.hardware.usb.UsbManager.getDeviceList"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "Explicit UsbDevice.Builder, UsbConfiguration, UsbInterface and UsbEndpoint descriptors preserve fields, flattened interfaces, capability flags and the builder serial; libusbhost-compatible bus*1000+device IDs and UsbManager portable function-mask conversions are implemented. UsbManager is a no-device/no-service profile with an empty device map, null accessories/connections and no permissions. No USB enumeration or open file descriptor, UsbDeviceConnection/UsbRequest transfers, accessory mode, permission UI/broadcasts, gadget-function changes, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-usb-transport"
+key_apis = ["android.hardware.usb.UsbManager.getDeviceList", "android.hardware.usb.UsbManager.getAccessoryList", "android.hardware.usb.UsbDevice.getInterface", "android.hardware.usb.UsbDevice.getDeviceId", "android.hardware.usb.UsbConfiguration.getMaxPower", "android.hardware.usb.UsbManager.usbFunctionsFromString"]
 
 [[surface]]
 id = "android-hardware-fingerprint"
 prefix = "android.hardware.fingerprint"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "legacy"
-notes = "Legacy FingerprintManager authentication is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-fingerprint"
-key_apis = ["android.hardware.fingerprint.FingerprintManager.authenticate"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "FingerprintManager uses the AOSP absent-IFingerprintService profile: no hardware or enrolled templates, a null enrolled list, empty sensor properties, and authenticate() validates the callback then sends no success/error callback. Fingerprint identifiers and fingerprint CryptoObject/AuthenticationResult wrappers preserve explicit values with type-filtered crypto getters. No fingerprint HAL, enrollment/removal, real authentication or cancellation dispatch, UDFPS events, sensor-property service data, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-fingerprint-hal"
+key_apis = ["android.hardware.fingerprint.FingerprintManager.isHardwareDetected", "android.hardware.fingerprint.FingerprintManager.hasEnrolledFingerprints", "android.hardware.fingerprint.FingerprintManager.authenticate", "android.hardware.fingerprint.Fingerprint.getBiometricId", "android.hardware.fingerprint.FingerprintManager$CryptoObject.getCipher", "android.hardware.fingerprint.FingerprintManager$AuthenticationResult.getUserId"]
 
 [[surface]]
 id = "android-hardware-biometrics"
 prefix = "android.hardware.biometrics"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "BiometricPrompt/BiometricManager authentication is not modelled; no fake user authentication is reported."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-biometrics"
-key_apis = ["android.hardware.biometrics.BiometricPrompt.authenticate", "android.hardware.biometrics.BiometricManager.canAuthenticate"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "BiometricManager uses the absent-IAuthService profile: canAuthenticate returns BIOMETRIC_ERROR_HW_UNAVAILABLE, sensor-property and localized-string getters take the AOSP null-service dereference, and no authentication success is fabricated. BiometricPrompt.Builder/PromptInfo preserve values and enforce title, negative-button, executor/listener and device-credential combination validation; authenticate validates arguments before the absent-service dereference. Shared CryptoObject and AuthenticationResult values and authenticatorToStr are modeled. No system biometric/credential dialog, HAL/session, enrollment, callbacks from a real sensor, sensor properties, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-biometrics-auth-service"
+key_apis = ["android.hardware.biometrics.BiometricManager.canAuthenticate", "android.hardware.biometrics.BiometricManager.authenticatorToStr", "android.hardware.biometrics.BiometricPrompt.authenticate", "android.hardware.biometrics.BiometricPrompt$Builder.build", "android.hardware.biometrics.BiometricPrompt.getTitle", "android.hardware.biometrics.BiometricPrompt$CryptoObject.getSignature"]
 
 [[surface]]
 id = "android-hardware-hdmi"
 prefix = "android.hardware.hdmi"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "HDMI CEC APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-hdmi"
-key_apis = ["android.hardware.hdmi.HdmiControlManager.getConnectedDevices"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "HdmiControlManager uses a service-present/no-device profile with null typed clients, empty connected-device and port lists, and the invalid local physical address. DeviceFeatures operand decoding/encoding and unknown-status update, HdmiDeviceInfo/HdmiPortInfo builders and values, and HdmiUtils local-port, physical-address validity and relative-position calculations are modeled. No CEC clients or messages, hotplug/device listeners, routing/power/vendor commands, MHL/eARC behavior, HAL state, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-hdmi-cec-clients"
+key_apis = ["android.hardware.hdmi.HdmiControlManager.getConnectedDevices", "android.hardware.hdmi.HdmiControlManager.getPhysicalAddress", "android.hardware.hdmi.DeviceFeatures.fromOperand", "android.hardware.hdmi.HdmiDeviceInfo.getLogicalAddress", "android.hardware.hdmi.HdmiPortInfo.getAddress", "android.hardware.hdmi.HdmiUtils.getHdmiAddressRelativePosition"]
 
 [[surface]]
 id = "android-hardware-display"
@@ -971,384 +1018,384 @@ key_apis = ["android.hardware.display.DisplayManager.getDisplay", "android.hardw
 id = "android-hardware-input"
 prefix = "android.hardware.input"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "InputManager hardware keyboard/gamepad enumeration is not modelled; agent tap/text input is a RustyDroid tool surface, not this Android API."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-input"
-key_apis = ["android.hardware.input.InputManager.getInputDeviceIds"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "InputManager uses a service-present/no-device profile: empty input-device, keyboard-layout and sensor snapshots, null device/layout/Bluetooth lookups, all-false key probes, local listener registration with AOSP null-argument asymmetry, and the Android 14 touchpad-gesture TODO result. InputDevice.Builder, MotionRange, InputDeviceIdentifier and HostUsiVersion preserve explicit values and derived source/keyboard/virtual classifications. No real evdev enumeration, input-event injection or dispatch, key-character maps, persistent layout selection, sensors, vibrators/lights/batteries, device enablement, or parcel round trips are claimed; agent tap/text input remains a separate RustyDroid tool surface."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-input-real-devices"
+key_apis = ["android.hardware.input.InputManager.getInputDeviceIds", "android.hardware.input.InputManager.registerInputDeviceListener", "android.hardware.input.InputManager.deviceHasKeys", "android.hardware.input.InputManager.getInputDevice", "android.hardware.input.InputDeviceIdentifier.getDescriptor", "android.hardware.input.HostUsiVersion.getMajorVersion"]
 
 [[surface]]
 id = "android-hardware-soundtrigger"
 prefix = "android.hardware.soundtrigger"
 domain = "hardware"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "Always-on sound trigger/keyphrase models are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-hardware-soundtrigger"
-key_apis = ["android.hardware.soundtrigger.SoundTriggerDetector.startRecognition"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "The android.hardware.soundtrigger value layer is modeled: SoundModel, GenericSoundModel, KeyphraseSoundModel, Keyphrase, ModelParamRange, RecognitionConfig, ConfidenceLevel, KeyphraseRecognitionExtra and KeyphraseMetadata preserve AOSP null normalization (zero vendor UUID and empty arrays), getters, equality/hash and metadata phrase/locale support. No sound-trigger HAL/module or service session, model loading, recognition start/stop or events, model-parameter queries, assistant integration, android.media.soundtrigger manager/detector behavior, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-hardware-soundtrigger-hal"
+key_apis = ["android.hardware.soundtrigger.SoundTrigger$GenericSoundModel.getVendorUuid", "android.hardware.soundtrigger.SoundTrigger$KeyphraseSoundModel.getKeyphrases", "android.hardware.soundtrigger.SoundTrigger$Keyphrase.getUsers", "android.hardware.soundtrigger.SoundTrigger$KeyphraseRecognitionExtra.getConfidenceLevels", "android.hardware.soundtrigger.KeyphraseMetadata.supportsPhrase", "android.hardware.soundtrigger.KeyphraseMetadata.supportsLocale"]
 
 # ===================== Telephony =====================
 [[surface]]
 id = "android-telephony"
 prefix = "android.telephony"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "M10"
-notes = "TelephonyManager, SubscriptionManager, SmsManager and phone-state APIs have no virtual radio/SIM model. Telephony permissions do not imply telephony behaviour."
-evidence = ["docs/compat-matrix.md"]
+notes = "Bounded no-radio slice (the device profile does not declare android.hardware.telephony, matching a Wi-Fi-only device): TelephonyManager and SubscriptionManager answer with the AOSP binder-absent defaults (SIM_STATE_UNKNOWN, CALL_STATE_IDLE, DATA_DISCONNECTED, NETWORK_TYPE_UNKNOWN, no ICC card, empty operator strings, not roaming, no subscriptions, default subscription ids of -1, and the subscription-id validity predicates); PhoneNumberUtils implements the pure ASCII/Unicode-digit string algorithms (keypad-letter conversion, separator stripping, network/post-dial portion extraction, SMS-address and global-number checks, and the character predicates); ServiceState is a value model of its registration/roaming/operator fields. No modem, SIM/eSIM, SMS/MMS sending, carrier config, cell info, signal strength, or phone-state listener behaviour is claimed; ServiceState does not model its NetworkRegistrationInfo list. Telephony permissions do not imply telephony behaviour."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-telephony"
-key_apis = ["android.telephony.TelephonyManager.getSimState", "android.telephony.SmsManager.sendTextMessage", "android.telephony.SubscriptionManager.getActiveSubscriptionInfoList"]
+key_apis = ["android.telephony.TelephonyManager.getSimState", "android.telephony.TelephonyManager.hasIccCard", "android.telephony.SubscriptionManager.getActiveSubscriptionInfoList", "android.telephony.SubscriptionManager.isUsableSubscriptionId", "android.telephony.PhoneNumberUtils.convertKeypadLettersToDigits", "android.telephony.PhoneNumberUtils.extractNetworkPortion", "android.telephony.ServiceState.getState", "android.telephony.ServiceState.setOperatorName"]
 
 [[surface]]
 id = "android-telephony-gsm"
 prefix = "android.telephony.gsm"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "legacy"
-notes = "Legacy GSM SMS APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-telephony-gsm-legacy"
-key_apis = ["android.telephony.gsm.SmsManager.sendTextMessage"]
+notes = "The deprecated GsmCellLocation value class is fully modelled: lac/cid/psc defaulting to -1, the Bundle constructor reading lac/cid/psc with -1 defaults (NullPointerException on a null bundle), setLacAndCid/setPsc, setStateInvalid, isEmpty, fillInNotifierBundle writing the same keys back, lac^cid hashCode, cast-failure-tolerant equals, and the [lac, cid, psc] toString; CellLocation.requestLocationUpdate drops the request with no telephony service. The legacy GSM SmsManager/SmsMessage wrappers, CellLocation.newFromBundle/getEmpty phone-type selection against a real TelephonyManager, and any radio/cell information source are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-telephony-gsm-legacy-sms"
+key_apis = ["android.telephony.gsm.GsmCellLocation.getLac", "android.telephony.gsm.GsmCellLocation.getCid", "android.telephony.gsm.GsmCellLocation.setStateInvalid", "android.telephony.gsm.GsmCellLocation.fillInNotifierBundle", "android.telephony.gsm.GsmCellLocation.isEmpty", "android.telephony.gsm.GsmCellLocation.toString"]
 
 [[surface]]
 id = "android-telephony-mbms"
 prefix = "android.telephony.mbms"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "MBMS download/streaming services are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Only the pure value classes are modelled: DownloadRequest and its Builder (non-null source/destination validation, service id and subscription id, app-intent round-trip through Intent.toUri/parseUri with the 50000-character limit, version 1, fromDownloadRequest copying, and field-wise equals/hashCode) and FileInfo (URI plus MIME type value semantics). MbmsDownloadManager/MbmsStreamingManager sessions, middleware binding, download execution, DownloadRequest.getHash (no host MessageDigest/Base64 path), and all streaming APIs are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-telephony-mbms"
-key_apis = ["android.telephony.mbms.MbmsDownloadManager"]
+key_apis = ["android.telephony.mbms.DownloadRequest.getFileServiceId", "android.telephony.mbms.DownloadRequest$Builder.build", "android.telephony.mbms.DownloadRequest$Builder.fromDownloadRequest", "android.telephony.mbms.FileInfo.getMimeType"]
 
 [[surface]]
 id = "android-telephony-euicc"
 prefix = "android.telephony.euicc"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "eUICC/eSIM management is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-telephony-euicc"
-key_apis = ["android.telephony.euicc.EuiccManager.isEnabled"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "EuiccManager models the no-IEuiccController branch: disabled, null EID/EuiccInfo, OTA unavailable, empty country lists, no available SIM port, createForCardId, and unavailable-error sends toward supplied callback PendingIntents; EuiccInfo preserves its OS version. No eSIM profile download/delete/switch execution, resolution Activity, subscription metadata, carrier-privilege/permission model, or real PendingIntent result extras/delivery guarantee is claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-telephony-euicc-controller"
+key_apis = ["android.telephony.euicc.EuiccManager.isEnabled", "android.telephony.euicc.EuiccManager.getEuiccInfo", "android.telephony.euicc.EuiccManager.createForCardId", "android.telephony.euicc.EuiccManager.deleteSubscription", "android.telephony.euicc.EuiccInfo.getOsVersion"]
 
 [[surface]]
 id = "android-telephony-cellbroadcast"
-prefix = "android.telephony.cellbroadcast"
+prefix = "android.telephony.CellBroadcastIdRange"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "Cell broadcast service integration is not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Registry correction: the previously listed package android.telephony.cellbroadcast does not exist in AOSP (checked frameworks/base API 34-36 sources and the prebuilts/sdk 34/35/36 public, system and module-lib API files, plus developer.android.com); all cell-broadcast framework classes live directly in android.telephony. The prefix is therefore corrected to the real @SystemApi value class android.telephony.CellBroadcastIdRange, which is now fully modelled (constructor range validation, getters, Objects.hash-based equals/hashCode, and the bracketed toString). No cell-broadcast service integration, SMS CB message delivery, or carrier configuration is claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-telephony-cellbroadcast"
-key_apis = ["android.telephony.cellbroadcast.CellBroadcastService"]
+key_apis = ["android.telephony.CellBroadcastIdRange.getStartId", "android.telephony.CellBroadcastIdRange.getEndId", "android.telephony.CellBroadcastIdRange.isEnabled"]
 
 [[surface]]
 id = "android-telecom"
 prefix = "android.telecom"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "future"
-notes = "TelecomManager, ConnectionService and in-call UI integration are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Value classes plus the no-ITelecomService manager branch: TelecomManager reports CALL_STATE_IDLE, not in-call/ringing, and a null default dialer (consistent with the no-radio profile); PhoneAccountHandle, PhoneAccount and its Builder (automatic tel scheme, de-duplicated URI schemes, capabilities, group id, highlight colour, toBuilder round-trip), DisconnectCause (including the AOSP default telephony cause 36/65535 and the labelled toString), CallAudioState (including the STREAMING route-mask special case), VideoProfile and its CameraCapabilities, and StatusHints are value-modelled against AOSP 14. Call placement, ConnectionService/InCallService lifecycles, call screening/redirection, phone-account registration with the system, and in-call UI integration are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-telecom"
-key_apis = ["android.telecom.TelecomManager.placeCall", "android.telecom.ConnectionService.onCreateIncomingConnection"]
+key_apis = ["android.telecom.TelecomManager.getCallState", "android.telecom.TelecomManager.isInCall", "android.telecom.PhoneAccount.Builder.build", "android.telecom.PhoneAccount.supportsUriScheme", "android.telecom.DisconnectCause.getCode", "android.telecom.CallAudioState.audioRouteToString", "android.telecom.VideoProfile.videoStateToString", "android.telecom.StatusHints.getLabel"]
 
 # ===================== Connectivity =====================
 [[surface]]
 id = "android-bluetooth"
 prefix = "android.bluetooth"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/android_res.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "M10"
-notes = "Bluetooth adapter/device/profile APIs have no virtual Bluetooth controller."
-evidence = ["docs/compat-matrix.md"]
+notes = "Bluetooth follows a profile with no Bluetooth manager service/controller: BluetoothAdapter factories return null, Context BLUETOOTH_SERVICE yields a BluetoothManager whose adapter is null and whose GATT profile validation precedes the absent-adapter failure, and a directly materialised adapter reports STATE_OFF/disabled and no LE scanner/advertiser. BluetoothDevice address construction, uppercase address validation, address types, equality and hash are exact local values. Discovery, bonding, sockets, profiles, GATT connections and adapter state transitions are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-bluetooth"
-key_apis = ["android.bluetooth.BluetoothAdapter.getBondedDevices", "android.bluetooth.BluetoothDevice.connectGatt"]
+key_apis = ["android.bluetooth.BluetoothAdapter.getDefaultAdapter", "android.bluetooth.BluetoothAdapter.checkBluetoothAddress", "android.bluetooth.BluetoothManager.getAdapter", "android.bluetooth.BluetoothDevice.getAddress", "android.bluetooth.BluetoothDevice.equals"]
 
 [[surface]]
 id = "android-bluetooth-le"
 prefix = "android.bluetooth.le"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M10"
-notes = "BLE scanning/advertising is not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Bluetooth LE modelling covers the scan request values and the disabled-adapter boundary: ScanSettings and ScanFilter builders retain AOSP defaults, validation (including ScanFilter's existing-mask checks), getters, ScanFilter equality/hash and EMPTY/isAllFieldsEmpty, while an off adapter returns no BluetoothLeScanner or BluetoothLeAdvertiser. Actual scanning/advertising, scan callbacks/results and record matching against radio traffic are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-bluetooth-le"
-key_apis = ["android.bluetooth.le.BluetoothLeScanner.startScan", "android.bluetooth.le.BluetoothLeAdvertiser.startAdvertising"]
+key_apis = ["android.bluetooth.le.ScanSettings.Builder.build", "android.bluetooth.le.ScanFilter.Builder.build", "android.bluetooth.le.ScanFilter.equals", "android.bluetooth.le.ScanFilter.isAllFieldsEmpty"]
 
 [[surface]]
 id = "android-nfc"
 prefix = "android.nfc"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "M10"
-notes = "NFC adapter, tag dispatch and NDEF reader/writer flows are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "NFC follows the AOSP factory chain on a device whose PackageManager profile advertises no NFC/card-emulation feature and has no NFC service manager: Context NFC_SERVICE yields NfcManager, its constructor resolves the application context and probes the relevant features before storing a null adapter, and NfcAdapter.getDefaultAdapter retains null-context validation before returning that null. Adapter state/control, tag discovery/dispatch, NDEF I/O, reader mode, and peer/handover flows are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-nfc"
-key_apis = ["android.nfc.NfcAdapter.getDefaultAdapter", "android.nfc.Tag"]
+key_apis = ["android.nfc.NfcAdapter.getDefaultAdapter", "android.nfc.NfcManager.getDefaultAdapter"]
 
 [[surface]]
 id = "android-nfc-cardemulation"
 prefix = "android.nfc.cardemulation"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "Host/off-host card emulation services are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "NFC card emulation follows a device without FEATURE_NFC_HOST_CARD_EMULATION: CardEmulation.getInstance retains null-adapter failure, the adapter-context -> PackageManager feature probe, and UnsupportedOperationException. ISO7816 AID syntax/prefix validation and AidGroup construction (empty/too-many/invalid AID rejection, category normalisation to other, uppercase AID storage and exact toString) are guest-visible, and non-payment foreground/selection helpers retain their local AOSP branches. Host/off-host APDU service binding, routing/default selection, dynamic AID registration against an NFC service and APDU exchange are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-nfc-cardemulation"
-key_apis = ["android.nfc.cardemulation.HostApduService.processCommandApdu"]
+key_apis = ["android.nfc.cardemulation.CardEmulation.getInstance", "android.nfc.cardemulation.CardEmulation.isValidAid", "android.nfc.cardemulation.AidGroup.getAids", "android.nfc.cardemulation.AidGroup.getCategory"]
 
 [[surface]]
 id = "android-nfc-tech"
 prefix = "android.nfc.tech"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "NFC tag technologies are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "NFC tag technologies are modelled for explicit mock tags: Tag construction validates/copies tech codes, generates technology class names and padded extras, exposes ID/tech/extras and connected-technology state, and retains mock rediscovery failure. NfcA.get only materialises for an enumerated NFC-A tag, reads SAK/ATQA from its extras, reports disconnected state, enforces connect-before-transceive, and retains the mock/no-service failures including BasicTagTechnology.close finally disconnecting the tag. Physical RF discovery/connect/transceive and the other tag technology classes are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-nfc-tech"
-key_apis = ["android.nfc.tech.Ndef.get", "android.nfc.tech.MifareClassic.get"]
+key_apis = ["android.nfc.tech.NfcA.get", "android.nfc.tech.NfcA.getAtqa", "android.nfc.tech.NfcA.getSak", "android.nfc.tech.NfcA.transceive", "android.nfc.tech.NfcA.close"]
 
 [[surface]]
 id = "android-companion"
 prefix = "android.companion"
 domain = "connectivity"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "CompanionDeviceManager association/presence APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-companion"
-key_apis = ["android.companion.CompanionDeviceManager.associate"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "CompanionDeviceManager uses the guarded absent-ICompanionDeviceManager profile: feature absent, empty associations, no notification access, a null cancellation intent, and no-op guarded associate/disassociate/presence calls without fabricating a device. AssociationRequest, AssociationInfo and classic Bluetooth/BLE/Wi-Fi device-filter builders preserve one-time-use and AOSP validation semantics; companion-facing android.net.MacAddress parsing/formatting/type/matching is modeled. No system association UI, discovery or Bluetooth/Wi-Fi stack, DeviceFilter matching/display-name production, presence observation, transports/messages, notification-access grants, role/permission grants, persistent associations, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-companion-service-and-discovery"
+key_apis = ["android.companion.CompanionDeviceManager.checkFeaturePresent", "android.companion.CompanionDeviceManager.getMyAssociations", "android.companion.AssociationRequest.getDeviceFilters", "android.companion.AssociationInfo.getDeviceMacAddressAsString", "android.companion.BluetoothLeDeviceFilter.getScanFilter", "android.companion.WifiDeviceFilter.getBssidMask"]
 
 # ===================== Security =====================
 [[surface]]
 id = "android-security"
 prefix = "android.security"
 domain = "security"
-status = "stub"
+status = "partial"
 domain_module = "fd-system-services"
-module = "rd-vm/jsecurity"
-code = ["crates/rd-vm/src/jsecurity.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-framework/src/fd_permissions.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/jsecurity.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-framework/src/fd_permissions.rs"]
 milestone = "M10"
-notes = "Java security primitives exist separately; android.security network-security/key-chain/platform attestation APIs are not a hardware-backed Android security model. Appendix B permission decisions are data-backed but are not android.security."
-evidence = ["docs/compat-matrix.md"]
+notes = "Libcore-style no-key NetworkSecurityPolicy defaults and KeyChain algorithm checks, null no-service key/certificate lookups, install Intent, and null-alias callback behavior execute host-side. There is no Android Keystore/KeyChain service, certificate-selection UI, hardware-backed key, or platform attestation model; Appendix B permission decisions remain separate data."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-security-platform"
-key_apis = ["android.security.NetworkSecurityPolicy.isCleartextTrafficPermitted", "android.security.KeyChain.choosePrivateKeyAlias"]
+key_apis = ["android.security.NetworkSecurityPolicy.isCleartextTrafficPermitted", "android.security.KeyChain.choosePrivateKeyAlias", "android.security.KeyChain.isKeyAlgorithmSupported", "android.security.KeyChain.getPrivateKey"]
 
 [[surface]]
 id = "android-security-keystore"
 prefix = "android.security.keystore"
 domain = "security"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "M10"
-notes = "AndroidKeyStore key generation, attestation and StrongBox/TEE-backed keys are not modelled; no hardware-backed key claim is made."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-security-keystore"
-key_apis = ["android.security.keystore.KeyGenParameterSpec.Builder.build", "android.security.keystore.KeyInfo.isInsideSecureHardware"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "KeyGenParameterSpec.Builder including its copy builder, KeyProtection.Builder and direct KeyInfo preserve fields, AOSP defaults/validation and defensive Date/array clones; KeyProperties application/Wi-Fi namespace-to-legacy-UID conversions are implemented. This is parameter metadata only: no AndroidKeyStore JCA provider, key generation/import or key material, certificates/attestation, StrongBox/TEE backing, authentication-bound key enforcement, or KeyStore2 service is claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-security-keystore-provider"
+key_apis = ["android.security.keystore.KeyGenParameterSpec.Builder.build", "android.security.keystore.KeyGenParameterSpec.getCertificateNotAfter", "android.security.keystore.KeyProtection.Builder.build", "android.security.keystore.KeyInfo.isInsideSecureHardware", "android.security.keystore.KeyProperties.namespaceToLegacyUid"]
 
 [[surface]]
 id = "android-security-identity"
 prefix = "android.security.identity"
 domain = "security"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "Identity Credential/mdoc APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "IdentityCredentialStore is modelled in AOSP's documented no-credstore profile: with no android.security.identity binder, both default and direct-access factories return null (including before any Context dereference), the supported ciphersuite constant is exposed, and the public base createPresentationSession implementation retains its UnsupportedOperationException. Credstore connections, hardware-backed credentials, document provisioning, presentation sessions, and mdoc protocols are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-security-identity"
-key_apis = ["android.security.identity.IdentityCredentialStore.getInstance"]
+key_apis = ["android.security.identity.IdentityCredentialStore.getInstance", "android.security.identity.IdentityCredentialStore.getDirectAccessInstance", "android.security.identity.IdentityCredentialStore.createPresentationSession"]
 
 [[surface]]
 id = "android-se-omapi"
 prefix = "android.se.omapi"
 domain = "security"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "Open Mobile API secure-element sessions/channels are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "SEService and Reader are modelled in a no-secure-element-service profile mirroring a device without com.android.se.SecureElementService: constructor argument null checks, the real bind attempt that never connects, isConnected staying false, getVersion reporting 3.3, getReaders/getUiccReader failing as disconnected (with slot-number validation), silent shutdown unbinding, and Reader name/service accessors plus its disconnected openSession/isSecureElementPresent/closeSessions/reset contract. Secure-element readers, sessions, channels, and APDU transport are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-se-omapi"
-key_apis = ["android.se.omapi.SEService.getReaders"]
+key_apis = ["android.se.omapi.SEService.isConnected", "android.se.omapi.SEService.getReaders", "android.se.omapi.SEService.getUiccReader", "android.se.omapi.Reader.openSession", "android.se.omapi.Reader.isSecureElementPresent"]
 
 [[surface]]
 id = "android-service-credentials"
 prefix = "android.service.credentials"
 domain = "security"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "CredentialProviderService/passkey credential manager service integration is not modelled. Appendix C also lists credentials under service extensions; the security domain owns the package here."
-evidence = ["docs/compat-matrix.md"]
+notes = "Partial: provider-side credential value classes are guest-visible with AOSP validation: CallingAppInfo, BeginGetCredentialOption (Bundle copy plus injected BUNDLE_ID_KEY), BeginGetCredentialRequest/Builder, GetCredentialRequest, BeginCreateCredentialRequest (Bundle copy), CreateCredentialRequest, ClearCredentialStateRequest, CredentialEntry/Action/CreateEntry/RemoteEntry Slice holders, BeginGet/BeginCreate credential response builders, the android.credentials.CredentialOption collaborator builder, and CredentialProviderService's final onBind action check plus EXTRA/SERVICE_INTERFACE constants. No CredentialManager system service, provider discovery/enablement, account-selector UI, PendingIntent flows, binder callbacks, passkey/WebAuthn cryptography or credential storage exists. Appendix C also lists credentials under service extensions; the security domain owns the package here."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/api-coverage.md"]
 gap_id = "gap-android-service-credentials"
-key_apis = ["android.service.credentials.CredentialProviderService.onBeginGetCredential"]
+key_apis = ["android.service.credentials.CredentialProviderService.onBind", "android.service.credentials.BeginGetCredentialRequest.Builder.build", "android.service.credentials.BeginGetCredentialOption.getCandidateQueryData", "android.service.credentials.BeginGetCredentialResponse.Builder.build"]
 
 # ===================== Speech/ML =====================
 [[surface]]
 id = "android-speech"
 prefix = "android.speech"
 domain = "speech-ml"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
-milestone = "future"
-notes = "RecognizerIntent/SpeechRecognizer integration is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-speech"
-key_apis = ["android.speech.SpeechRecognizer.createSpeechRecognizer", "android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "SpeechRecognizer follows AOSP when no recognition manager service or on-device recognizer exists: isRecognitionAvailable queries PackageManager intent services (none installed), the factory returns the proxy/impl pair, connect attempts from startListening/checkRecognitionSupport/triggerModelDownload/setTemporaryOnDeviceRecognizer report ERROR_CLIENT to the registered RecognitionListener (delivered inline in the deterministic model), queued stop/cancel/destroy have no observable effect, createOnDeviceSpeechRecognizer throws UnsupportedOperationException, and the exact base class throws UnsupportedOperationException. RecognitionService base defaults (stable onBind binder, onCheckRecognitionSupport reporting ERROR_CANNOT_CHECK_SUPPORT, listener download reporting ERROR_CANNOT_LISTEN_TO_DOWNLOAD_EVENTS, stopListening without a session reporting ERROR_CLIENT, Callback/SupportCallback forwarding, binder reference clearing on destroy), the RecognitionSupport/RecognitionPart/AlternativeSpan data-class builders, validation, equality and toString contracts, and RecognizerIntent.getVoiceDetailsIntent resolution are implemented. No microphone/audio capture, recognition engine or session, model download, binder startListening permission/session dispatch, or Parcel round trips for the value classes are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-speech-recognition-engine"
+key_apis = ["android.speech.SpeechRecognizer.createSpeechRecognizer", "android.speech.SpeechRecognizer.isRecognitionAvailable", "android.speech.RecognitionService.onCheckRecognitionSupport", "android.speech.RecognitionSupport.Builder.build", "android.speech.RecognitionPart.Builder.build", "android.speech.RecognizerIntent.getVoiceDetailsIntent"]
 
 [[surface]]
 id = "android-speech-tts"
 prefix = "android.speech.tts"
 domain = "speech-ml"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
-milestone = "future"
-notes = "TextToSpeech engine/service APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-speech-tts"
-key_apis = ["android.speech.tts.TextToSpeech.speak"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "TextToSpeech follows AOSP when no android.intent.action.TTS_SERVICE engine is installed (the installed-engine set is queried from the real PackageManager): construction fires OnInitListener.onInit(ERROR) exactly once (delivered inline in the deterministic model), getEngines returns TtsEngines' empty result (MATCH_DEFAULT_ONLY query; a null resolve list yields immutable Collections.emptyList(), an empty resolve list a fresh ArrayList), getDefaultEngine/getCurrentEngine are null, and every connection-backed call returns its AOSP no-connection result (speak/playEarcon/playSilentUtterance/stop/synthesizeToFile-to-ParcelFileDescriptor ERROR, setLanguage/isLanguageAvailable/setVoice LANG_NOT_SUPPORTED, language/voice/feature getters null, isSpeaking false). Local bookkeeping works: addSpeech/addEarcon map text to URIs and return SUCCESS, setSpeechRate/setPitch apply the AOSP scaled-int validation into the params bundle (rate 150 for 1.5f), setAudioAttributes stores non-null attributes, listener setters return SUCCESS, areDefaultsEnforced is false and getMaxSpeechInputLength is 4000. Voice (fields, getters, Eclipse-style equals/hashCode, toString dereferencing features), TextToSpeech.EngineInfo, SynthesisRequest (defensive Bundle copy, language/voice/rate/pitch/caller setters), UtteranceProgressListener base defaults (coded onError delegating to onError(String), onRangeStart delegating to onUtteranceRangeStart), and TextToSpeechService onBind (one stable binder only for android.intent.action.TTS_SERVICE; other actions return null and a null intent NPEs) plus the empty default onGetFeaturesForLanguage are implemented. The constructor device-specific session-id lookup (Context.getDeviceId/VirtualDeviceManager), TtsEngines Settings-backed default-engine selection beyond the empty-PackageManager result, UtteranceProgressListener.from wrapping for the deprecated completed-listener setter, and the deprecated HashMap overloads' local Bundle conversion are not modelled. No engine binding/discovery of installed engines, synthesis, audio output, file-creating synthesizeToFile variants, TextToSpeechService synthesis queue/default voice enumeration, or Parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-speech-tts-engine-synthesis"
+key_apis = ["android.speech.tts.TextToSpeech.speak", "android.speech.tts.TextToSpeech.getEngines", "android.speech.tts.TextToSpeech.setSpeechRate", "android.speech.tts.TextToSpeech.addSpeech", "android.speech.tts.Voice.getName", "android.speech.tts.SynthesisRequest.getParams"]
 
 [[surface]]
 id = "android-service-voice"
 prefix = "android.service.voice"
 domain = "speech-ml"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "VoiceInteractionService/AlwaysOnHotwordDetector are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-voice"
-key_apis = ["android.service.voice.VoiceInteractionService.onReady"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "VoiceInteractionService models the state where the voice interaction manager service does not exist: onBind returns the service binder only for the android.service.voice.VoiceInteractionService action, onReady() fails on the missing manager (NullPointerException), and the pre-ready guards behave as in AOSP (showSession and all hotword/visual-query detector factories and createKeyphraseModelManager throw IllegalStateException 'Not available until onReady() is called' after their overload-specific null checks, show-context accessors and non-null setUiHints dereference the absent manager, setUiHints(null) is an IllegalArgumentException, enrollment info is null, keyphrase support is false, supported voice actions are the immutable Collections.emptySet(), and the static isActiveService reads Settings.Secure.voice_interaction_service). VoiceInteractionSession is modelled unattached (window-context fallback in the constructor, token-guarded show/hide/startVoiceActivity/startAssistantActivity/setKeepAwake/closeSystemDialogs/finish/registerVisibleActivityCallback/direct-action calls (with AOSP overload-specific null-check ordering) throwing IllegalStateException 'Can't call before onCreate()', show-context accessors throwing NullPointerException, no-op lifecycle/request callbacks, onHandleAssist(AssistState) dispatching to the focused/secondary callbacks, key events unhandled, onBackPressed/onCloseSystemDialogs/onLockscreenShown/onTaskFinished delegating to hide(), all-false onGetSupportedCommands, null onCreateContentView) with its AssistState and ActivityId value types. HotwordDetectedResult and HotwordRejectedResult implement their DataClass builders, defaults, List.copyOf audio-stream snapshots (immutable results; List.copyOf identity optimization not modelled), proximity mapping into extras, Detected buildUpon (Rejected has none), equals/hashCode/toString with raw confidence ints, Detected onConstructed range validation, and no runtime validation of the @IntDef confidence values, except the native AudioRecord hotword-duration limit and the system-resource extras parcel-size limit, which are not enforced. No voice interaction manager/session attach, session window/UI, hotword detection, sound-trigger hardware, keyphrase enrollment, or Parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-voice-interaction-manager"
+key_apis = ["android.service.voice.VoiceInteractionService.onReady", "android.service.voice.VoiceInteractionService.createAlwaysOnHotwordDetector", "android.service.voice.VoiceInteractionService.isActiveService", "android.service.voice.VoiceInteractionSession.show", "android.service.voice.VoiceInteractionSession.onHandleAssist", "android.service.voice.HotwordDetectedResult.Builder.build"]
 
 [[surface]]
 id = "android-view-textclassifier"
 prefix = "android.view.textclassifier"
 domain = "speech-ml"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/android_text.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/android_text.rs"]
 milestone = "future"
-notes = "TextClassifier types may resolve for editor integration, but no ML text classification model is run."
-evidence = ["docs/compat-matrix.md"]
+notes = "TextSelection/TextClassification/TextLanguage/TextLinks and conversation value builders, EntityConfidence normalization, EntityConfig resolution, a ULocale subset, TextClassificationManager, and the exact NO_OP/default-classifier empty-result behavior execute host-side. No ML model or system text-classification service runs, and non-empty TextLinks span application remains outside this slice."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-view-textclassifier-model"
-key_apis = ["android.view.textclassifier.TextClassifier.classifyText", "android.view.textclassifier.TextClassificationManager.getTextClassifier"]
+key_apis = ["android.view.textclassifier.TextClassificationManager.getTextClassifier", "android.view.textclassifier.TextClassifier.suggestSelection", "android.view.textclassifier.TextClassifier.classifyText", "android.view.textclassifier.TextSelection.Builder.build"]
 
 # ===================== Services ext =====================
 [[surface]]
 id = "android-service-autofill"
 prefix = "android.service.autofill"
 domain = "services-ext"
-status = "stub"
+status = "partial"
 domain_module = "fd-system-services"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/view_props.rs"]
-milestone = "future"
-notes = "Autofill hints/fields on views may be recorded, but AutofillService session/dataset flows are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-autofill"
-key_apis = ["android.service.autofill.AutofillService.onFillRequest"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/platform_base.rs", "crates/rd-vm/src/view_props.rs"]
+milestone = "M11"
+notes = "Service-side Dataset/Field/Presentations, FillResponse, SaveInfo, UserData, validators and sanitizers execute with AOSP builder state/validation; FillRequest, SaveRequest, FillContext, FieldClassification, SavedDatasetsInfo, one-shot FillCallback/SaveCallback, and the AutofillService base binding are modeled host-side. A DEX subclass can implement onFillRequest/onSaveRequest against those objects, but no AutofillManager session initiates or binds a service; AssistStructure capture/traversal, credential/dataset UI, authentication activities, CustomDescription transformations, FillEventHistory, inline IME rendering, and Parcel marshalling are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-autofill-session"
+key_apis = ["android.service.autofill.Dataset.Builder.build", "android.service.autofill.FillResponse.Builder.build", "android.service.autofill.SaveInfo.Builder.build", "android.service.autofill.UserData.Builder.build", "android.service.autofill.FillCallback.onSuccess", "android.service.autofill.AutofillService.onBind"]
 
 [[surface]]
 id = "android-service-quicksettings"
 prefix = "android.service.quicksettings"
 domain = "services-ext"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "Quick Settings TileService lifecycle is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-quicksettings"
-key_apis = ["android.service.quicksettings.TileService.onTileAdded"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "Tile preserves its state/icon/label/subtitle/content/state-description fields, defaults to STATE_INACTIVE, validates that the click PendingIntent is an activity PendingIntent, and updateTile takes the AOSP null-IQSService dereference before binding. TileService models its unbound defaults: no-ops lifecycle hooks, a null QSTile, guarded setStatusIcon, and null-service dereferences in isSecure/isLocked/unlockAndRun/startActivityAndCollapse(PendingIntent). No SystemUI QS binding/IQSService tile supply or updates, listening/click dispatch from SystemUI, dialogs/unlock/activity collapse, requestListeningState, or Tile parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-quicksettings-systemui-binding"
+key_apis = ["android.service.quicksettings.Tile.setState", "android.service.quicksettings.Tile.setActivityLaunchForClick", "android.service.quicksettings.Tile.updateTile", "android.service.quicksettings.TileService.getQsTile", "android.service.quicksettings.TileService.onTileAdded", "android.service.quicksettings.TileService.isSecure"]
 
 [[surface]]
 id = "android-service-wallpaper"
 prefix = "android.service.wallpaper"
 domain = "services-ext"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "WallpaperService engines are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-wallpaper"
-key_apis = ["android.service.wallpaper.WallpaperService.onCreateEngine"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "WallpaperService.Engine models the unattached state: a stable SurfaceHolder object, invisible/not-ambient defaults, zoom state and dispatch, touch/offset/show-for-all-users window-flag state before creation, fixed-size/created flags, default no-ops lifecycle callbacks, a null onCommand/onComputeColors result, and null-engine-wrapper dereferences for wallpaper flags/desired size/preview. No WallpaperManager-service attach, real window or Surface/SurfaceHolder drawing, visibility/offset/command dispatch from the system, color extraction/notification, zoom or dimming application, previews/screenshots, or WallpaperInfo/XML metadata are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-wallpaper-surface-window"
+key_apis = ["android.service.wallpaper.WallpaperService$Engine.getSurfaceHolder", "android.service.wallpaper.WallpaperService$Engine.isVisible", "android.service.wallpaper.WallpaperService$Engine.setTouchEventsEnabled", "android.service.wallpaper.WallpaperService$Engine.setZoom", "android.service.wallpaper.WallpaperService$Engine.onCommand", "android.service.wallpaper.WallpaperService$Engine.getWallpaperFlags"]
 
 [[surface]]
 id = "android-service-dreams"
 prefix = "android.service.dreams"
 domain = "services-ext"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "DreamService/screensaver lifecycle is not modelled. Appendix C shorthand says dream; the AOSP package is dreams."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-dreams"
-key_apis = ["android.service.dreams.DreamService.onAttachedToWindow"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "DreamService models the unattached/no-window state (Appendix C shorthand says dream; the AOSP package is dreams): interactive/fullscreen/screen-bright/windowless flags with AOSP defaults, null window/window-manager, canDoze=false doze state, doze screen-state storage, doze brightness default/clamping, no-ops dreaming hooks, one-shot wakeUp to default onWakeUp/finish state, and getDreamMetadata's immediate null for a null ServiceInfo. No IDreamManager attach or token, dream window/activity/content views or input dispatch, actual dozing/display power changes, overlay service, metadata XML parsing, or dream controller start/stop lifecycle are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-dreams-attach-window"
+key_apis = ["android.service.dreams.DreamService.setInteractive", "android.service.dreams.DreamService.setFullscreen", "android.service.dreams.DreamService.setDozeScreenBrightness", "android.service.dreams.DreamService.startDozing", "android.service.dreams.DreamService.wakeUp", "android.service.dreams.DreamService.getDreamMetadata"]
 
 [[surface]]
 id = "android-service-notification"
@@ -1368,72 +1415,72 @@ key_apis = ["android.service.notification.NotificationListenerService.onNotifica
 id = "android-service-media"
 prefix = "android.service.media"
 domain = "services-ext"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-media"
-module = "none"
-code = []
-milestone = "future"
-notes = "MediaBrowserService/MediaSessionService platform services are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-media"
-key_apis = ["android.service.media.MediaBrowserService.onGetRoot"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "MediaBrowserService models BrowserRoot null-root validation/getters, Result detach/sendResult one-shot state and flags with the base onResultSent, the default onLoadItem not-implemented result and onLoadChildren(options) delegation setup, onCreate/onBind action gating with a stable ServiceBinder, one-time session-token state and validation, IllegalStateException for browser hints/current browser outside a connection callback, and notifyChildrenChanged validation as a no-op with no connected browsers. No IMediaBrowserService client connect/subscription binder flow, onGetRoot/onLoadChildren delivery to MediaBrowser clients, media-session integration beyond token storage, CameraPrewarmService, or parcelled media items are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-media-browser-clients"
+key_apis = ["android.service.media.MediaBrowserService$BrowserRoot.getRootId", "android.service.media.MediaBrowserService$Result.sendResult", "android.service.media.MediaBrowserService$Result.detach", "android.service.media.MediaBrowserService.onLoadItem", "android.service.media.MediaBrowserService.setSessionToken", "android.service.media.MediaBrowserService.notifyChildrenChanged"]
 
 [[surface]]
 id = "android-service-textservice"
 prefix = "android.service.textservice"
 domain = "services-ext"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "SpellCheckerService is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-textservice"
-key_apis = ["android.service.textservice.SpellCheckerService.createSession"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "SpellCheckerService.onBind returns one stable binder for any intent. SpellCheckerService.Session models the uninstalled-internal-session state (getLocale/getBundle/getSupportedAttributes throw NullPointerException before setInternalISpellCheckerSession), the default onGetSuggestionsMultiple loop that forwards each TextInfo to onGetSuggestions and stamps cookie/sequence on the result, empty/null sentence-level requests returning an empty array, empty-locale sentence requests returning an empty array, and no-op onCancel/onClose. InternalISpellCheckerSession stores locale/listener/bundle/attributes, installs itself on the session, delivers multiple/sentence results to the listener, forwards cancel, and nulls the listener on close; the service binder creates the session through createSession/onCreate and reports it through the callback. No WordIterator sentence splitting or reconstruction for a non-empty locale, system TextServicesManager session binding, cross-process Binder transport, or actual spell-check dictionaries/suggestions are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-textservice-sentence-splitting"
+key_apis = ["android.service.textservice.SpellCheckerService.onBind", "android.service.textservice.SpellCheckerService.Session.getLocale", "android.service.textservice.SpellCheckerService.Session.getSupportedAttributes", "android.service.textservice.SpellCheckerService.Session.onGetSuggestionsMultiple", "android.service.textservice.SpellCheckerService.Session.onGetSentenceSuggestionsMultiple", "android.service.textservice.SpellCheckerService.Session.setInternalISpellCheckerSession"]
 
 [[surface]]
 id = "android-service-chooser"
 prefix = "android.service.chooser"
 domain = "services-ext"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "ChooserTargetService direct-share ranking is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-chooser"
-key_apis = ["android.service.chooser.ChooserTargetService.onGetChooserTargets"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "ChooserTarget preserves title/icon/component/extras, enforces the AOSP 0.0..1.0 score comparisons (including NaN passing both comparisons), and implements getters/describeContents/toString. ChooserTargetService.onBind returns null for a wrong action and lazily returns one stable wrapper for the service action; the wrapper invokes onGetChooserTargets and always attempts IChooserTargetResult.sendResult in its finally path. No system chooser/direct-share ranking, realistic cross-process Binder transact/parcelling of targets or results, ShortcutManager direct-share integration, or ChooserTarget parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-chooser-binder-ranking"
+key_apis = ["android.service.chooser.ChooserTarget.getScore", "android.service.chooser.ChooserTarget.getComponentName", "android.service.chooser.ChooserTarget.getIntentExtras", "android.service.chooser.ChooserTargetService.onBind", "android.service.chooser.ChooserTargetService.onGetChooserTargets", "android.service.chooser.IChooserTargetResult.sendResult"]
 
 [[surface]]
 id = "android-service-carrier"
 prefix = "android.service.carrier"
 domain = "services-ext"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "CarrierService/carrier messaging integration is not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-service-carrier"
-key_apis = ["android.service.carrier.CarrierService.onLoadConfig"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
+milestone = "M8+"
+notes = "CarrierIdentifier implements its String and 3GPP 3-byte MCC/MNC constructors with length validation and unknown carrier-id defaults, getters, exact-class equals/Objects.hash, describeContents and user-build IMSI-redacted toString. CarrierService creates and returns its stable ICarrierService wrapper from onBind and the subscription-id onLoadConfig overload delegates to the one-argument implementation. No ICarrierService getCarrierConfig binder delivery, subscription/SIM lookup, carrier-privilege checks or network-change notification, PersistableBundle config application, CarrierMessagingService SMS handling, or CarrierIdentifier parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-service-carrier-config-telephony"
+key_apis = ["android.service.carrier.CarrierIdentifier.getMcc", "android.service.carrier.CarrierIdentifier.getMnc", "android.service.carrier.CarrierIdentifier.getCarrierId", "android.service.carrier.CarrierIdentifier.equals", "android.service.carrier.CarrierService.onBind", "android.service.carrier.CarrierService.onLoadConfig"]
 
 # ===================== System UI =====================
 [[surface]]
 id = "android-app-usage"
 prefix = "android.app.usage"
 domain = "system-ui"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "UsageStatsManager events/statistics are not modelled. RustyDroid runtime metrics are agent tools, not this Android API."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-app-usage"
-key_apis = ["android.app.usage.UsageStatsManager.queryUsageStats"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "UsageStatsManager is a no-history profile returning empty stats/configuration/event lists and maps plus empty UsageEvents, inactive=false and ACTIVE standby defaults; explicit UsageStats copy/getters and AOSP add-merge behavior and UsageEvents.Event copying with list-backed iteration/reset are guest-visible. No persisted usage database or event collection, standby controller, observer callbacks, usage-source accounting, NetworkStats APIs, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-app-usage-database-observers"
+key_apis = ["android.app.usage.UsageStatsManager.queryUsageStats", "android.app.usage.UsageStatsManager.queryEvents", "android.app.usage.UsageStats.add", "android.app.usage.UsageEvents.getNextEvent", "android.app.usage.UsageStatsManager.getAppStandbyBucket"]
 
 [[surface]]
 id = "android-appwidget"
@@ -1453,15 +1500,15 @@ key_apis = ["android.appwidget.AppWidgetManager.updateAppWidget", "android.appwi
 id = "android-print"
 prefix = "android.print"
 domain = "system-ui"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "future"
-notes = "PrintManager/print services/document adapters are not modelled. PDF graphics are also tracked under android.graphics.pdf."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-print"
-key_apis = ["android.print.PrintManager.print"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "PrintAttributes Builder, MediaSize, Resolution and Margins preserve validation, equality/hash, orientation rotation and selected predefined sizes; PageRange and PrinterId constructors/getters are modeled, and PrintManager follows AOSP no-print-service branches with null print/job/icon results and empty jobs/services/recommendations. No print spooler or UI, PrinterDiscoverySession, PrintJob lifecycle, PrintDocumentAdapter/PDF rendering, framework media-size label resources or predefined-instance identity, or parcel round trips are claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-print-spooler-jobs"
+key_apis = ["android.print.PrintManager.print", "android.print.PrintManager.getPrintJobs", "android.print.PrintAttributes.Builder.build", "android.print.PrintAttributes.asLandscape", "android.print.PageRange.contains", "android.print.PrinterId.getLocalId"]
 
 [[surface]]
 id = "android-inputmethodservice"
@@ -1496,29 +1543,48 @@ key_apis = ["android.accessibilityservice.AccessibilityService.onAccessibilityEv
 id = "android-gesture"
 prefix = "android.gesture"
 domain = "misc"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-ui"
-module = "none"
-code = []
-milestone = "legacy"
-notes = "Legacy gesture libraries/prediction are not modelled; agent tap input is separate."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-gesture-legacy"
-key_apis = ["android.gesture.GestureLibraries.fromRawResource"]
+module = "rd-vm/android-sysservices"
+code = ["crates/rd-vm/src/android_sysservices.rs"]
+milestone = "M10/AA6"
+notes = "GesturePoint, GestureStroke, Gesture and OrientedBoundingBox implement AOSP point capture, stroke length/bounding-box geometry, clones, deterministic gesture IDs, total-length truncation and GestureUtils centroid/covariance PCA oriented bounding boxes. GestureLibrary/GestureStore loading, Learner prediction, gesture serialization files, GestureOverlayView and Path/Bitmap rendering are not implemented."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch6.rs",
+]
+gap_id = "gap-android-gesture-legacy-partial"
+key_apis = [
+    "android.gesture.Gesture.addStroke",
+    "android.gesture.Gesture.getBoundingBox",
+    "android.gesture.Gesture.getLength",
+    "android.gesture.GestureStroke.computeOrientedBoundingBox",
+]
 
 [[surface]]
 id = "android-accounts"
 prefix = "android.accounts"
 domain = "misc"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
-milestone = "M10"
-notes = "AccountManager/Authenticator account database and tokens are not modelled; no fake account credentials are returned."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-accounts"
-key_apis = ["android.accounts.AccountManager.getAccounts", "android.accounts.AccountManager.getAuthToken"]
+module = "rd-vm/android-sysservices"
+code = [
+    "crates/rd-vm/src/android_sysservices.rs",
+    "crates/rd-vm/src/m8.rs",
+]
+milestone = "M10/AA1"
+notes = "Account value semantics plus an in-memory AccountManager explicit-account database cover getAccounts/getAccountsByType, passwords, user data and cached auth tokens. Authenticator flows, AccountManagerFuture operations, account visibility/permissions and sync adapters are not implemented."
+evidence = [
+    "docs/compat-matrix.md",
+    "crates/rd-vm/tests/android_sysservices_batch1.rs",
+]
+gap_id = "gap-android-accounts-partial"
+key_apis = [
+    "android.accounts.AccountManager.getAccounts",
+    "android.accounts.AccountManager.addAccountExplicitly",
+    "android.accounts.AccountManager.getPassword",
+    "android.accounts.AccountManager.peekAuthToken",
+]
 
 [[surface]]
 id = "android-preference"
@@ -1538,29 +1604,29 @@ key_apis = ["android.preference.PreferenceManager.getDefaultSharedPreferences", 
 id = "android-animation"
 prefix = "android.animation"
 domain = "misc"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/framework"
-code = ["crates/rd-vm/src/framework.rs", "crates/rd-vm/src/choreographer.rs", "crates/rd-vm/src/classpath.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/choreographer.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M8+"
-notes = "Property animation types/timing hooks have fallback behaviour; frame-accurate ValueAnimator/ObjectAnimator interpolation is not claimed."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-animation-stub"
-key_apis = ["android.animation.ValueAnimator.start", "android.animation.ObjectAnimator.ofFloat"]
+notes = "ValueAnimator and ObjectAnimator run on the deterministic virtual Choreographer clock with int/float/object values, PropertyValuesHolder and Keyframe evaluation, Int/Float/Argb evaluators, repeat/reverse, seek, pause/resume, cancel/end, lifecycle/update listeners, and JavaBeans or android.util.Property target application. AnimatorSet and AnimatorInflater, Path/PathKeyframes, multi-parameter holders, LayoutTransition and StateListAnimator, custom AnimationHandler providers and background pausing, RenderNode execution, Looper-thread confinement, and weak target clearing are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-animation-sets-paths-rendering"
+key_apis = ["android.animation.ValueAnimator.start", "android.animation.ObjectAnimator.ofFloat", "android.animation.ValueAnimator.setCurrentFraction", "android.animation.PropertyValuesHolder.ofKeyframe", "android.animation.ArgbEvaluator.evaluate"]
 
 [[surface]]
 id = "android-transition"
 prefix = "android.transition"
 domain = "misc"
-status = "stub"
+status = "partial"
 domain_module = "fd-ui"
-module = "rd-vm/classpath"
-code = ["crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/framework.rs"]
-milestone = "future"
-notes = "Scene/Transition types are hierarchy/fallback only; shared-element and window transitions are not rendered."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-transition-stub"
-key_apis = ["android.transition.TransitionManager.beginDelayedTransition", "android.transition.Fade"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/choreographer.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/view_props.rs"]
+milestone = "M8+"
+notes = "Transition, Visibility/Fade, TransitionSet/AutoTransition, Scene and TransitionManager model AOSP configuration, target/exclusion and match-order rules, TransitionValues hierarchy capture/matching, start/end/cancel/pause/resume listeners, delayed and scene transitions on the virtual Choreographer clock, Fade transition-alpha animation, and a bounded linear ChangeBounds layout/resize-clip animator. XML transition/attribute inflation, shared-element and window/activity transitions, disappearing-view overlay snapshots, ChangeBounds cross-parent reparenting and PathMotion playback, and real window rendering are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-transition-window-overlay-xml"
+key_apis = ["android.transition.TransitionManager.beginDelayedTransition", "android.transition.Fade.createAnimator", "android.transition.TransitionSet.addTransition", "android.transition.Scene.enter", "android.transition.TransitionManager.getDefaultTransition", "android.transition.ChangeBounds.createAnimator"]
 
 [[surface]]
 id = "android-icu"
@@ -1580,26 +1646,26 @@ key_apis = ["android.icu.text.BreakIterator", "android.icu.text.NumberFormat", "
 id = "android-mtp"
 prefix = "android.mtp"
 domain = "misc"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-hardware"
-module = "none"
-code = []
-milestone = "future"
-notes = "MTP device/database APIs are not modelled."
-evidence = ["docs/compat-matrix.md"]
-gap_id = "gap-android-mtp"
-key_apis = ["android.mtp.MtpDatabase"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
+milestone = "M8+"
+notes = "MtpConstants.isAbstractObject, field-backed MtpDeviceInfo/MtpStorageInfo getters, MtpObjectInfo.Builder unsigned-32-bit value semantics, and an unopened MtpDevice delegating name/ID to an explicit UsbDevice are modeled; open fails and closes the supplied connection, while native-backed queries return documented null/false or IOException failures. No native MTP transport/session, storage/object enumeration or transfer, device events, MtpDatabase/server behavior, or real USB device is claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
+gap_id = "gap-android-mtp-transport-database"
+key_apis = ["android.mtp.MtpDevice.getDeviceName", "android.mtp.MtpDevice.open", "android.mtp.MtpObjectInfo.Builder.build", "android.mtp.MtpDeviceInfo.isOperationSupported", "android.mtp.MtpStorageInfo.getFreeSpace", "android.mtp.MtpConstants.isAbstractObject"]
 
 [[surface]]
 id = "android-system"
 prefix = "android.system"
 domain = "misc"
-status = "stub"
+status = "partial"
 domain_module = "fd-os"
-module = "rd-vm/intrinsics"
-code = ["crates/rd-vm/src/jfile.rs", "crates/rd-vm/src/intrinsics.rs", "crates/rd-vm/src/classpath.rs"]
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/jfile.rs", "crates/rd-vm/src/intrinsics.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "M8+"
-notes = "Java file/IO backends exist, but android.system.Os direct syscall/StructStat semantics are only fallback-level; no guest kernel or raw host syscall passthrough is provided."
-evidence = ["docs/compat-matrix.md"]
+notes = "android.system is partial only for a deterministic virtual-file-system subset, not host syscalls or a guest kernel. OsConstants exposes the registered Linux errno/open/seek/wait constants inspected by tests plus errnoName/gaiName/strerror and S_IS*, CAP_TO_MASK, W* helpers. ErrnoException constructors, message and rethrow-as-IO/socket behavior, and StructStat/StructStatVfs/StructTimespec/StructUtsname value semantics are guest-visible. Os supports byte-array open/read/write/pread/pwrite/lseek/close/dup/dup2, stat/lstat/fstat/statvfs/fstatvfs, access/chmod/fchmod/chown/lchown/fchown, mkdir/remove/unlink/rename/realpath, ftruncate/fsync/fdatasync, environment variables, process/user IDs, isatty and uname against the same VFS used by java.io. Errors throw materialized ErrnoException objects with functionName/errno/message preserved. No sockets, pipes, process creation, mmap/mprotect, signals, host-file passthrough, symlink/hard-link creation, ByteBuffer transfer overloads, or unlinked-open-file retention is provided; Java stream positions remain separate from Os open-description offsets after getFD()."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-system-os"
 key_apis = ["android.system.Os.stat", "android.system.Os.read", "android.system.ErrnoException"]

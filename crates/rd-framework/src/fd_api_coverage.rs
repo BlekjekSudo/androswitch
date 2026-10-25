@@ -700,7 +700,12 @@ mod tests {
             );
         }
         let counts = table.status_counts();
-        assert!(counts["not_implemented"] > counts["supported"]);
+        // Conservatism is measured against `partial`, not `not_implemented`:
+        // the advance-all program intentionally drives not_implemented to
+        // zero with bounded, tested slices, while `supported` must stay the
+        // rare class-narrow claim enforced above.
+        assert!(counts["supported"] <= counts["partial"]);
+        assert!(counts["supported"] <= 8);
     }
 
     #[test]
@@ -733,7 +738,7 @@ mod tests {
         // textclassifier belongs to Speech/ML even though it is nested under android.view.
         let c = table.classify("android.view.textclassifier.TextClassifier");
         assert_eq!(c.domain.as_deref(), Some("speech-ml"));
-        assert_eq!(c.status, "stub");
+        assert_eq!(c.status, "partial");
         let c = table.classify("android.database.sqlite.SQLiteDatabase");
         assert_eq!(c.status, "partial");
         assert_eq!(
