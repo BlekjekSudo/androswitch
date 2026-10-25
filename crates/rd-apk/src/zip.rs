@@ -837,14 +837,17 @@ mod tests {
 
     // ─── ADR 008 Stage 2: ZipSource (whole × paginado) ──────────────────
 
-    fn write_temp_zip(tag: &str, write: impl FnOnce(&mut std::fs::File)) -> std::path::PathBuf {
+    fn write_temp_zip(
+        tag: &str,
+        write: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+    ) -> std::io::Result<std::path::PathBuf> {
         let dir = std::env::temp_dir().join(format!("rd-zip-{tag}-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir)?;
         let path = dir.join("t.zip");
-        let mut f = std::fs::File::create(&path).unwrap();
-        write(&mut f);
+        let mut f = std::fs::File::create(&path)?;
+        write(&mut f)?;
         drop(f);
-        path
+        Ok(path)
     }
 
     /// Paridade total whole × paginado sobre o mesmo container: entradas,
@@ -860,7 +863,7 @@ mod tests {
             ("classes.dex", b"dex-duplicada"),
         ]);
         let whole = Zip::parse(bytes.clone()).unwrap();
-        let path = write_temp_zip("parity", |f| f.write_all(&bytes).unwrap());
+        let path = write_temp_zip("parity", |f| f.write_all(&bytes)).unwrap();
         let paged = Zip::open_paged(&path).unwrap();
 
         assert!(!whole.is_paged() && whole.raw_bytes().is_some());
@@ -891,7 +894,7 @@ mod tests {
         let compressed = deflate_bytes(&content);
         let dbytes =
             handcrafted_zip_deflate(&compressed, content.len() as u32, crc32(&content), "a.bin");
-        let dpath = write_temp_zip("parity-deflate", |f| f.write_all(&dbytes).unwrap());
+        let dpath = write_temp_zip("parity-deflate", |f| f.write_all(&dbytes)).unwrap();
         assert_eq!(
             Zip::open_paged(&dpath).unwrap().read("a.bin").unwrap(),
             content
@@ -921,10 +924,11 @@ mod tests {
         tail[tail_eocd + 16..tail_eocd + 20].copy_from_slice(&(TARGET_CD as u32).to_le_bytes());
 
         let path = write_temp_zip("sparse", |f| {
-            f.write_all(head).unwrap();
-            f.seek(SeekFrom::Start(TARGET_CD)).unwrap();
-            f.write_all(&tail).unwrap();
-        });
+            f.write_all(head)?;
+            f.seek(SeekFrom::Start(TARGET_CD))?;
+            f.write_all(&tail)
+        })
+        .unwrap();
         let z = Zip::open_paged(&path).unwrap();
         assert!(z.is_paged());
         assert_eq!(z.file_len(), TARGET_CD + tail.len() as u64);

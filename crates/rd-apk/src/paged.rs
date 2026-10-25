@@ -251,13 +251,20 @@ impl PagedZip {
     }
     /// Bytes the page cache currently pins (hard-capped at 16 MiB).
     pub fn cached_bytes(&self) -> usize {
-        self.cache
-            .lock()
-            .expect("paged-zip cache lock")
-            .pages
-            .iter()
-            .map(|(_, p)| p.len())
-            .sum()
+        self.lock_cache().pages.iter().map(|(_, p)| p.len()).sum()
+    }
+
+    /// Takes the page-cache lock without panicking on poison. The cache only
+    /// memoizes immutable file pages (payloads are CRC-checked again on
+    /// extraction), so a thread that panicked mid-read cannot leave
+    /// guest-visible state behind; on poison the pages are dropped and the
+    /// cache refills from disk.
+    fn lock_cache(&self) -> std::sync::MutexGuard<'_, LruPageCache> {
+        self.cache.lock().unwrap_or_else(|poisoned| {
+            let mut guard = poisoned.into_inner();
+            guard.pages.clear();
+            guard
+        })
     }
     pub fn find(&self, name: &str) -> Option<&ZipEntry> {
         self.entries.iter().find(|e| e.name == name)
@@ -266,10 +273,7 @@ impl PagedZip {
     /// Janela crua do container (ex.: bloco de assinatura antes do CD) sem
     /// materializar o arquivo — passa pelo cache de páginas (teto 16 MiB).
     pub fn read_range(&self, off: u64, len: usize) -> RdResult<Vec<u8>> {
-        self.cache
-            .lock()
-            .expect("paged-zip cache lock")
-            .read_vec(off, len)
+        self.lock_cache().read_vec(off, len)
     }
 
     pub fn read(&self, name: &str) -> RdResult<Vec<u8>> {
@@ -280,7 +284,7 @@ impl PagedZip {
     }
 
     pub fn read_entry(&self, entry: &ZipEntry) -> RdResult<Vec<u8>> {
-        let mut cache = self.cache.lock().expect("paged-zip cache lock");
+        let mut cache = self.lock_cache();
         let off = entry.local_header_offset;
         if cache.u32_at(off)? != 0x0403_4b50 {
             return Err(RdError::parse(format!(

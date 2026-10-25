@@ -229,7 +229,10 @@ fn detect_signing(zip: &Zip) -> SigningInfo {
     if &trailer[8..24] != signing::APK_SIG_BLOCK_MAGIC {
         return v1_only();
     }
-    let block_size = u64::from_le_bytes(trailer[0..8].try_into().expect("janela de 24 bytes"));
+    let Ok(size_le) = <[u8; 8]>::try_from(&trailer[0..8]) else {
+        return v1_only();
+    };
+    let block_size = u64::from_le_bytes(size_le);
     // Janela = bloco inteiro + o u64 inicial. O teto protege o RSS de um
     // block_size adversarial (blocos reais têm ≪ 1 MiB mesmo com rotação
     // de chaves); acima dele, degrada para v1-only em vez de alocar.
