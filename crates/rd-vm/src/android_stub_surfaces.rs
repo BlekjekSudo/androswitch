@@ -35550,9 +35550,11 @@ fn p35b_new_hash_set(vm: &mut Engine, elems: Vec<Value>) -> Result<Value, VmExit
     )?))
 }
 
-/// Whether any `android.intent.action.TTS_SERVICE` engine is installed.
-/// `PackageManager.GET_META_DATA` (128) mirrors `TtsEngines.getEngines`.
-fn p35b_tts_engine_count(vm: &mut Engine, context: ObjRef) -> Result<i32, VmExit> {
+/// Number of `android.intent.action.TTS_SERVICE` engines reported by
+/// the PackageManager, or `None` when `queryIntentServices` itself
+/// returns null. `TtsEngines.getEngines` queries with
+/// `PackageManager.MATCH_DEFAULT_ONLY` (65536).
+fn p35b_tts_resolve_count(vm: &mut Engine, context: ObjRef) -> Result<Option<i32>, VmExit> {
     let pm = vm.invoke_instance(
         context,
         "getPackageManager",
@@ -35567,13 +35569,17 @@ fn p35b_tts_engine_count(vm: &mut Engine, context: ObjRef) -> Result<i32, VmExit
         pm,
         "queryIntentServices",
         "(Landroid/content/Intent;I)Ljava/util/List;",
-        &[Value::Obj(intent), Value::Int(128)],
+        &[Value::Obj(intent), Value::Int(65536)],
     )?;
     let Value::Obj(list) = list else {
-        return Ok(0);
+        return Ok(None);
     };
     let size = vm.invoke_instance(list, "size", "()I", &[])?;
-    Ok(size.as_int().unwrap_or(0))
+    Ok(Some(size.as_int().unwrap_or(0)))
+}
+
+fn p35b_tts_engine_count(vm: &mut Engine, context: ObjRef) -> Result<i32, VmExit> {
+    Ok(p35b_tts_resolve_count(vm, context)?.unwrap_or(0))
 }
 
 /// AOSP `initTts()` in the no-engine profile: report `ERROR` (-1) to the
@@ -35654,11 +35660,13 @@ fn p35b_tts_instance(
             let Some(context) = field_obj(vm, recv, "rd_context") else {
                 return Err(npe(""));
             };
-            if p35b_tts_engine_count(vm, context)? == 0 {
-                Ok(Some(p35_empty_list(vm)?))
-            } else {
+            match p35b_tts_resolve_count(vm, context)? {
+                // TtsEngines.getEngines: a null resolve list yields
+                // Collections.emptyList(); an empty one a new ArrayList.
+                None => Ok(Some(p35_immutable_empty_list(vm)?)),
+                Some(0) => Ok(Some(p35_empty_list(vm)?)),
                 // Engine enumeration is not modelled.
-                Ok(None)
+                Some(_) => Ok(None),
             }
         }
         ("getDefaultEngine", "()Ljava/lang/String;") => {
@@ -35861,7 +35869,6 @@ fn p35b_engine_info_instance(
             put(vm, recv, "priority", Value::Int(0))?;
             Value::Null
         }
-        ("describeContents", "()I") => Value::Int(0),
         ("toString", "()Ljava/lang/String;") => {
             let engine_name = value_string(vm, &get(vm, recv, "name"))?;
             jstr(vm, format!("EngineInfo{{name={engine_name}}}"))?
@@ -36090,7 +36097,7 @@ fn p35b_tts_service_instance(
     name: &str,
     sig: &str,
     recv: ObjRef,
-    _args: &[Value],
+    args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     let value = match (name, sig) {
         ("<init>", "()V") => {
@@ -36098,7 +36105,17 @@ fn p35b_tts_service_instance(
             Value::Null
         }
         ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
-            Value::Obj(p35b_tts_service_binder(vm, recv)?)
+            // The binder is returned only for the TTS_SERVICE action;
+            // a null intent dereferences getAction() and NPEs.
+            let Some(intent) = oarg(args, 0) else {
+                return Err(npe(""));
+            };
+            let action = vm.invoke_instance(intent, "getAction", "()Ljava/lang/String;", &[])?;
+            if opt_str(vm, Some(&action)).as_deref() == Some("android.intent.action.TTS_SERVICE") {
+                Value::Obj(p35b_tts_service_binder(vm, recv)?)
+            } else {
+                Value::Null
+            }
         }
         (
             "onGetFeaturesForLanguage",
@@ -36196,7 +36213,8 @@ fn p35b_vis_instance(
             Value::Int(0)
         }
         ("onGetSupportedVoiceActions", "(Ljava/util/Set;)Ljava/util/Set;") => {
-            p35b_new_hash_set(vm, Vec::new())?
+            // AOSP returns Collections.emptySet(), not a new HashSet.
+            vm.invoke_static("Ljava/util/Collections;", "emptySet", "()Ljava/util/Set;", &[])?
         }
         ("onLaunchVoiceAssistFromKeyguard", "()V")
         | ("onShutdown", "()V")
@@ -36351,14 +36369,33 @@ fn p35b_session_instance(
         | ("hide", "()V")
         | ("startVoiceActivity", "(Landroid/content/Intent;)V")
         | ("startAssistantActivity", "(Landroid/content/Intent;)V")
-        | ("startAssistantActivity", "(Landroid/content/Intent;Landroid/os/Bundle;)V")
         | ("setKeepAwake", "(Z)V")
         | ("closeSystemDialogs", "()V")
         | ("finish", "()V")
         | (
             "registerVisibleActivityCallback",
             "(Ljava/util/concurrent/Executor;Landroid/service/voice/VisibleActivityCallback;)V",
+        )
+        | (
+            "performDirectAction",
+            "(Landroid/app/DirectAction;Landroid/os/Bundle;Landroid/os/CancellationSignal;Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V",
         ) => return Err(ise(P35B_BEFORE_CREATE)),
+        // Objects.requireNonNull(bundle) runs before the token check.
+        ("startAssistantActivity", "(Landroid/content/Intent;Landroid/os/Bundle;)V") => {
+            if oarg(args, 1).is_none() {
+                return Err(npe(""));
+            }
+            return Err(ise(P35B_BEFORE_CREATE));
+        }
+        // requireNonNull(activityId/resultExecutor/callback) runs
+        // before the token check, in that order.
+        (
+            "requestDirectActions",
+            "(Landroid/service/voice/VoiceInteractionSession$ActivityId;Landroid/os/CancellationSignal;Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V",
+        ) => {
+            p35b_require_args_non_null(args, &[0, 2, 3])?;
+            return Err(ise(P35B_BEFORE_CREATE));
+        }
         ("unregisterVisibleActivityCallback", "(Landroid/service/voice/VisibleActivityCallback;)V") => {
             if oarg(args, 0).is_none() {
                 return Err(npe(""));
@@ -36377,7 +36414,12 @@ fn p35b_session_instance(
             Value::Null
         }
         ("onCreate", "()V")
-        | ("onPrepareShow", "(Landroid/os/Bundle;)V")
+        | ("onPrepareShow", "(Landroid/os/Bundle;I)V")
+        | ("onTaskStarted", "(Landroid/content/Intent;I)V")
+        | (
+            "onDirectActionsInvalidated",
+            "(Landroid/service/voice/VoiceInteractionSession$ActivityId;)V",
+        )
         | ("onShow", "(Landroid/os/Bundle;I)V")
         | ("onHide", "()V")
         | ("onDestroy", "()V")
@@ -36465,7 +36507,7 @@ fn p35b_session_instance(
         ("onBackPressed", "()V")
         | ("onCloseSystemDialogs", "()V")
         | ("onLockscreenShown", "()V")
-        | ("onTaskFinished", "(Landroid/content/Intent;)V") => {
+        | ("onTaskFinished", "(Landroid/content/Intent;I)V") => {
             vm.invoke_instance(recv, "hide", "()V", &[])?
         }
         ("onGetSupportedCommands", "([Ljava/lang/String;)[Z") => {
@@ -36576,6 +36618,23 @@ fn p35b_rejected_confidence_name(value: i32) -> String {
     }
 }
 
+fn p35b_proximity_name(value: i32) -> String {
+    match value {
+        -1 => "PROXIMITY_UNKNOWN".to_string(),
+        1 => "PROXIMITY_NEAR".to_string(),
+        2 => "PROXIMITY_FAR".to_string(),
+        other => format!("{:x}", other as u32),
+    }
+}
+
+fn p35b_limit_name(value: i32) -> String {
+    match value {
+        3_600_000 => "LIMIT_HOTWORD_OFFSET_MAX_VALUE".to_string(),
+        63 => "LIMIT_AUDIO_CHANNEL_MAX_VALUE".to_string(),
+        other => format!("{:x}", other as u32),
+    }
+}
+
 /// Field order and builder bits follow the DataClass declarations.
 /// (field, setter, setter signature, bit, is_int)
 const P35B_DETECTED_FIELDS: [(&str, &str, &str, i64, bool); 11] = [
@@ -36658,13 +36717,23 @@ const P35B_DETECTED_FIELDS: [(&str, &str, &str, i64, bool); 11] = [
     ),
 ];
 
+/// `List.copyOf` over a host-state list: a null list or a null
+/// element NPEs, and the result is an unmodifiable snapshot.
 fn p35b_copy_stream_list(vm: &mut Engine, value: &Value) -> Result<Value, VmExit> {
+    if !matches!(value, Value::Obj(_)) {
+        return Err(npe(""));
+    }
     let items = collection_items(vm, Some(value));
-    Ok(Value::Obj(new_collection(
-        vm,
-        "Ljava/util/ArrayList;",
-        items,
-    )?))
+    if items.iter().any(|v| matches!(v, Value::Null)) {
+        return Err(npe(""));
+    }
+    let snapshot = new_collection(vm, "Ljava/util/ArrayList;", items)?;
+    vm.invoke_static(
+        "Ljava/util/Collections;",
+        "unmodifiableList",
+        "(Ljava/util/List;)Ljava/util/List;",
+        &[Value::Obj(snapshot)],
+    )
 }
 
 fn p35b_detected_build(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
@@ -36687,28 +36756,16 @@ fn p35b_detected_build(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
     let personalized_score = int_of("mPersonalizedScore", 0x80, 0);
     let phrase = int_of("mHotwordPhraseId", 0x100, 0);
     let background = int_of("mBackgroundAudioPower", 0x800, -1);
-    // onConstructed() validation order. The hotword-duration limit
-    // (native AudioRecord maximum) and the extras parcel-size limit
-    // (system resource) are not modelled; see the registry gap note.
-    p35b_check_range(score, 0, 255, "score")?;
-    p35b_check_range(personalized_score, 0, 255, "personalizedScore")?;
-    p35b_check_range(phrase, 0, 63, "hotwordPhraseId")?;
-    if background != -1 {
-        p35b_check_range(background, 0, 255, "backgroundAudioPower")?;
-    }
-    if offset != -1 {
-        p35b_check_range(offset, 0, 3_600_000, "hotwordOffsetMillis")?;
-    }
-    if channel != -1 {
-        p35b_check_range(channel, 0, 63, "audioChannel")?;
-    }
     let media_sync = if set & 0x2 == 0 {
         Value::Null
     } else {
         get(vm, recv, "mMediaSyncEvent")
     };
+    // The generated constructor validates the @NonNull audioStreams
+    // and extras (in that order) before onConstructed() runs the
+    // range checks below.
     let streams = if set & 0x200 == 0 {
-        p35_empty_list(vm)?
+        p35_immutable_empty_list(vm)?
     } else {
         match get(vm, recv, "mAudioStreams") {
             Value::Obj(r) => Value::Obj(r),
@@ -36725,6 +36782,21 @@ fn p35b_detected_build(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
             _ => return Err(npe("")),
         }
     };
+    // onConstructed() validation order. The hotword-duration limit
+    // (native AudioRecord maximum) and the extras parcel-size limit
+    // (system resource) are not modelled; see the registry gap note.
+    p35b_check_range(score, 0, 255, "score")?;
+    p35b_check_range(personalized_score, 0, 255, "personalizedScore")?;
+    p35b_check_range(phrase, 0, 63, "hotwordPhraseId")?;
+    if background != -1 {
+        p35b_check_range(background, 0, 255, "backgroundAudioPower")?;
+    }
+    if offset != -1 {
+        p35b_check_range(offset, 0, 3_600_000, "hotwordOffsetMillis")?;
+    }
+    if channel != -1 {
+        p35b_check_range(channel, 0, 63, "audioChannel")?;
+    }
     for (field, value) in [
         ("mConfidenceLevel", Value::Int(confidence)),
         ("mMediaSyncEvent", media_sync),
@@ -36765,17 +36837,19 @@ fn p35b_detected_instance(
             )
         {
             // BaseBuilder.setAudioStreams: null-checked, but (unlike the
-            // generated setters) it does not reject a used builder.
+            // generated setters) it does not reject a used builder. It
+            // casts `this` to Builder and marks the field bit *before*
+            // List.copyOf can fail on a null element, leaving the old
+            // field value in place.
             let Some(list) = oarg(args, 0) else {
                 return Err(npe("value should not be null"));
             };
-            let items = collection_items(vm, Some(&Value::Obj(list)));
-            if items.iter().any(|v| matches!(v, Value::Null)) {
-                return Err(npe(""));
+            if class_of(vm, recv) != P35B_DETECTED_BUILDER {
+                return Err(throw("Ljava/lang/ClassCastException;", ""));
             }
-            let copy = new_collection(vm, "Ljava/util/ArrayList;", items)?;
             p35_mark_field(vm, recv, 0x200)?;
-            put(vm, recv, "mAudioStreams", Value::Obj(copy))?;
+            let copy = p35b_copy_stream_list(vm, &Value::Obj(list))?;
+            put(vm, recv, "mAudioStreams", copy)?;
             return Ok(Some(Value::Obj(recv)));
         }
         if class == P35B_DETECTED_BUILDER {
@@ -36893,7 +36967,7 @@ fn p35b_detected_instance(
                 vm,
                 format!(
                     "HotwordDetectedResult {{ confidenceLevel = {}, mediaSyncEvent = {media_sync}, hotwordOffsetMillis = {}, hotwordDurationMillis = {}, audioChannel = {}, hotwordDetectionPersonalized = {}, score = {}, personalizedScore = {}, hotwordPhraseId = {}, audioStreams = {streams}, extras = {extras}, backgroundAudioPower = {} }}",
-                    p35b_detected_confidence_name(field_int(vm, recv, "mConfidenceLevel")),
+                    field_int(vm, recv, "mConfidenceLevel"),
                     field_int(vm, recv, "mHotwordOffsetMillis"),
                     field_int(vm, recv, "mHotwordDurationMillis"),
                     field_int(vm, recv, "mAudioChannel"),
@@ -36998,7 +37072,9 @@ fn p35b_rejected_instance(
                 } else {
                     field_int(vm, recv, "mConfidenceLevel")
                 };
-                p35b_check_range(confidence, 0, 3, "confidenceLevel")?;
+                // The @IntDef confidence is not runtime-validated:
+                // AnnotationValidations only special-cases resource
+                // annotations, so any int builds.
                 let result = alloc_obj(
                     vm,
                     P35B_REJECTED,
@@ -37013,25 +37089,11 @@ fn p35b_rejected_instance(
     let value = match (name, sig) {
         ("getConfidenceLevel", "()I") => Value::Int(field_int(vm, recv, "mConfidenceLevel")),
         ("describeContents", "()I") => Value::Int(0),
-        ("buildUpon", "()Landroid/service/voice/HotwordRejectedResult$Builder;") => {
-            let builder = alloc_obj(
-                vm,
-                P35B_REJECTED_BUILDER,
-                vec![
-                    (
-                        "mConfidenceLevel".to_string(),
-                        get(vm, recv, "mConfidenceLevel"),
-                    ),
-                    ("mBuilderFieldsSet".to_string(), Value::Long(0x1)),
-                ],
-            )?;
-            Value::Obj(builder)
-        }
         ("toString", "()Ljava/lang/String;") => jstr(
             vm,
             format!(
                 "HotwordRejectedResult {{ confidenceLevel = {} }}",
-                p35b_rejected_confidence_name(field_int(vm, recv, "mConfidenceLevel"))
+                field_int(vm, recv, "mConfidenceLevel")
             ),
         )?,
         ("hashCode", "()I") => Value::Int(p35_hash_mix(1, field_int(vm, recv, "mConfidenceLevel"))),
@@ -37119,6 +37181,18 @@ pub(crate) fn partial35b_static(
         (P35B_DETECTED, "getMaxScore", "()I") => Value::Int(255),
         (P35B_DETECTED, "getMaxHotwordPhraseId", "()I") => Value::Int(63),
         (P35B_DETECTED, "getMaxBackgroundAudioPower", "()I") => Value::Int(255),
+        (P35B_DETECTED, "confidenceLevelToString", "(I)Ljava/lang/String;") => {
+            jstr(vm, p35b_detected_confidence_name(iarg(args, 0)))?
+        }
+        (P35B_DETECTED, "proximityToString", "(I)Ljava/lang/String;") => {
+            jstr(vm, p35b_proximity_name(iarg(args, 0)))?
+        }
+        (P35B_DETECTED, "limitToString", "(I)Ljava/lang/String;") => {
+            jstr(vm, p35b_limit_name(iarg(args, 0)))?
+        }
+        (P35B_REJECTED, "confidenceLevelToString", "(I)Ljava/lang/String;") => {
+            jstr(vm, p35b_rejected_confidence_name(iarg(args, 0)))?
+        }
         (
             P35B_VIS,
             "isActiveService",
@@ -37186,6 +37260,34 @@ pub(crate) fn partial35b_host_static(
         (P35B_TTS_ENGINE, "KEY_PARAM_COUNTRY") => Some("country"),
         (P35B_TTS_ENGINE, "KEY_PARAM_VARIANT") => Some("variant"),
         (P35B_TTS_ENGINE, "KEY_PARAM_UTTERANCE_ID") => Some("utteranceId"),
+        (P35B_TTS_ENGINE, "DEFAULT_ENGINE") => Some("com.svox.pico"),
+        (P35B_TTS_ENGINE, "ACTION_INSTALL_TTS_DATA") => {
+            Some("android.speech.tts.engine.INSTALL_TTS_DATA")
+        }
+        (P35B_TTS_ENGINE, "ACTION_TTS_DATA_INSTALLED") => {
+            Some("android.speech.tts.engine.TTS_DATA_INSTALLED")
+        }
+        (P35B_TTS_ENGINE, "ACTION_CHECK_TTS_DATA") => {
+            Some("android.speech.tts.engine.CHECK_TTS_DATA")
+        }
+        (P35B_TTS_ENGINE, "ACTION_GET_SAMPLE_TEXT") => {
+            Some("android.speech.tts.engine.GET_SAMPLE_TEXT")
+        }
+        (P35B_TTS_ENGINE, "EXTRA_SAMPLE_TEXT") => Some("sampleText"),
+        (P35B_TTS_ENGINE, "EXTRA_AVAILABLE_VOICES") => Some("availableVoices"),
+        (P35B_TTS_ENGINE, "EXTRA_UNAVAILABLE_VOICES") => Some("unavailableVoices"),
+        (P35B_TTS_ENGINE, "EXTRA_VOICE_DATA_ROOT_DIRECTORY") => Some("dataRoot"),
+        (P35B_TTS_ENGINE, "EXTRA_VOICE_DATA_FILES") => Some("dataFiles"),
+        (P35B_TTS_ENGINE, "EXTRA_VOICE_DATA_FILES_INFO") => Some("dataFilesInfo"),
+        (P35B_TTS_ENGINE, "EXTRA_CHECK_VOICE_DATA_FOR") => Some("checkVoiceDataFor"),
+        (P35B_TTS_ENGINE, "EXTRA_TTS_DATA_INSTALLED") => Some("dataInstalled"),
+        (P35B_TTS_ENGINE, "KEY_PARAM_ENGINE") => Some("engine"),
+        (P35B_TTS_ENGINE, "KEY_FEATURE_NETWORK_SYNTHESIS") => Some("networkTts"),
+        (P35B_TTS_ENGINE, "KEY_FEATURE_EMBEDDED_SYNTHESIS") => Some("embeddedTts"),
+        (P35B_TTS_ENGINE, "KEY_PARAM_SESSION_ID") => Some("sessionId"),
+        (P35B_TTS_ENGINE, "KEY_FEATURE_NOT_INSTALLED") => Some("notInstalled"),
+        (P35B_TTS_ENGINE, "KEY_FEATURE_NETWORK_TIMEOUT_MS") => Some("networkTimeoutMs"),
+        (P35B_TTS_ENGINE, "KEY_FEATURE_NETWORK_RETRIES_COUNT") => Some("networkRetriesCount"),
         (P35B_VIS, "SERVICE_INTERFACE") => Some("android.service.voice.VoiceInteractionService"),
         (P35B_VIS, "SERVICE_META_DATA") => Some("android.voice_interaction"),
         (P35B_SESSION, "KEY_SHOW_SESSION_ID") => Some("android.service.voice.SHOW_SESSION_ID"),
@@ -37194,9 +37296,35 @@ pub(crate) fn partial35b_host_static(
     if let Some(text) = text {
         return jstr(vm, text).map(Some);
     }
+    let float_value = match (class, field) {
+        (P35B_TTS_ENGINE, "DEFAULT_VOLUME") => Some(1.0f32),
+        (P35B_TTS_ENGINE, "DEFAULT_PAN") => Some(0.0f32),
+        _ => None,
+    };
+    if let Some(value) = float_value {
+        return Ok(Some(Value::Float(value)));
+    }
     let int_value = match (class, field) {
         (P35B_TTS, "SUCCESS") => Some(0),
         (P35B_TTS, "ERROR") => Some(-1),
+        (P35B_TTS, "STOPPED") => Some(-2),
+        (P35B_TTS, "ERROR_SYNTHESIS") => Some(-3),
+        (P35B_TTS, "ERROR_SERVICE") => Some(-4),
+        (P35B_TTS, "ERROR_OUTPUT") => Some(-5),
+        (P35B_TTS, "ERROR_NETWORK") => Some(-6),
+        (P35B_TTS, "ERROR_NETWORK_TIMEOUT") => Some(-7),
+        (P35B_TTS, "ERROR_INVALID_REQUEST") => Some(-8),
+        (P35B_TTS, "ERROR_NOT_INSTALLED_YET") => Some(-9),
+        (P35B_TTS_ENGINE, "DEFAULT_RATE") => Some(100),
+        (P35B_TTS_ENGINE, "DEFAULT_PITCH") => Some(100),
+        (P35B_TTS_ENGINE, "USE_DEFAULTS") => Some(0),
+        // AudioManager.STREAM_MUSIC
+        (P35B_TTS_ENGINE, "DEFAULT_STREAM") => Some(3),
+        (P35B_TTS_ENGINE, "CHECK_VOICE_DATA_PASS") => Some(1),
+        (P35B_TTS_ENGINE, "CHECK_VOICE_DATA_FAIL") => Some(0),
+        (P35B_TTS_ENGINE, "CHECK_VOICE_DATA_BAD_DATA") => Some(-1),
+        (P35B_TTS_ENGINE, "CHECK_VOICE_DATA_MISSING_DATA") => Some(-2),
+        (P35B_TTS_ENGINE, "CHECK_VOICE_DATA_MISSING_VOLUME") => Some(-3),
         (P35B_TTS, "QUEUE_FLUSH") => Some(0),
         (P35B_TTS, "QUEUE_ADD") => Some(1),
         (P35B_TTS, "QUEUE_DESTROY") => Some(2),
@@ -37221,6 +37349,12 @@ pub(crate) fn partial35b_host_static(
         (P35B_SESSION, "SHOW_SOURCE_PUSH_TO_TALK") => Some(32),
         (P35B_SESSION, "SHOW_SOURCE_NOTIFICATION") => Some(64),
         (P35B_SESSION, "SHOW_SOURCE_AUTOMOTIVE_SYSTEM_UI") => Some(128),
+        (P35B_SESSION, "SHOW_SOURCE_APPLICATION") => Some(8),
+        (P35B_SESSION, "SHOW_SOURCE_ACTIVITY") => Some(16),
+        (P35B_SESSION, "VOICE_INTERACTION_ACTIVITY_EVENT_START") => Some(1),
+        (P35B_SESSION, "VOICE_INTERACTION_ACTIVITY_EVENT_RESUME") => Some(2),
+        (P35B_SESSION, "VOICE_INTERACTION_ACTIVITY_EVENT_PAUSE") => Some(3),
+        (P35B_SESSION, "VOICE_INTERACTION_ACTIVITY_EVENT_STOP") => Some(4),
         (P35B_DETECTED, "CONFIDENCE_LEVEL_NONE") => Some(0),
         (P35B_DETECTED, "CONFIDENCE_LEVEL_LOW") => Some(1),
         (P35B_DETECTED, "CONFIDENCE_LEVEL_LOW_MEDIUM") => Some(2),

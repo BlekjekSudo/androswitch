@@ -12135,12 +12135,13 @@ fn text_to_speech_without_an_engine_and_values_are_guest_visible() {
 
     // TextToSpeechService base defaults.
     let service = p49_new(&mut engine, P35B_TTS_SERVICE, "()V", &[]);
+    let tts_intent = p41_intent(&mut engine, "android.intent.action.TTS_SERVICE");
     let binder = object(call(
         &mut engine,
         service,
         "onBind",
         "(Landroid/content/Intent;)Landroid/os/IBinder;",
-        &[Value::Null],
+        &[Value::Obj(tts_intent)],
     ));
     assert_eq!(
         engine.heap.class_of(binder).unwrap(),
@@ -12155,7 +12156,7 @@ fn text_to_speech_without_an_engine_and_values_are_guest_visible() {
         service,
         "onBind",
         "(Landroid/content/Intent;)Landroid/os/IBinder;",
-        &[Value::Null],
+        &[Value::Obj(tts_intent)],
     ));
     assert_eq!(binder_again, binder);
     let features = call(
@@ -12589,7 +12590,7 @@ fn hotword_result_builders_are_guest_visible() {
             "()Ljava/lang/String;",
             &[]
         ),
-        "HotwordRejectedResult { confidenceLevel = CONFIDENCE_LEVEL_NONE }"
+        "HotwordRejectedResult { confidenceLevel = 0 }"
     );
     assert_throws(
         engine.invoke_instance(
@@ -12623,7 +12624,7 @@ fn hotword_result_builders_are_guest_visible() {
             "()Ljava/lang/String;",
             &[]
         ),
-        "HotwordRejectedResult { confidenceLevel = CONFIDENCE_LEVEL_MEDIUM }"
+        "HotwordRejectedResult { confidenceLevel = 2 }"
     );
     let builder3 = p49_new(&mut engine, P35B_REJECTED_BUILDER, "()V", &[]);
     call(
@@ -12633,14 +12634,17 @@ fn hotword_result_builders_are_guest_visible() {
         "(I)Landroid/service/voice/HotwordRejectedResult$Builder;",
         &[Value::Int(4)],
     );
-    assert_throws(
-        engine.invoke_instance(
-            builder3,
-            "build",
-            "()Landroid/service/voice/HotwordRejectedResult;",
-            &[],
-        ),
-        "Ljava/lang/IllegalArgumentException;",
+    // The @IntDef confidence is not runtime-validated in AOSP.
+    let rejected3 = object(call(
+        &mut engine,
+        builder3,
+        "build",
+        "()Landroid/service/voice/HotwordRejectedResult;",
+        &[],
+    ));
+    assert_eq!(
+        call(&mut engine, rejected3, "getConfidenceLevel", "()I", &[]),
+        Value::Int(4)
     );
 
     // HotwordDetectedResult defaults.
@@ -12889,6 +12893,331 @@ fn hotword_result_builders_are_guest_visible() {
         ),
         Value::Int(1)
     );
+}
+
+#[test]
+fn tts_and_voice_deep_audit_fixes_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let context = instance(&mut engine, CONTEXT);
+
+    // EngineInfo has no describeContents in AOSP (it is not Parcelable).
+    let engine_info = p49_new(&mut engine, P35B_ENGINE_INFO, "()V", &[]);
+    assert!(engine
+        .invoke_instance(engine_info, "describeContents", "()I", &[])
+        .is_err());
+
+    // TextToSpeechService.onBind is gated on the TTS_SERVICE action.
+    let tts_service = p49_new(&mut engine, P35B_TTS_SERVICE, "()V", &[]);
+    let wrong_intent = p41_intent(&mut engine, "android.intent.action.MAIN");
+    assert_eq!(
+        call(
+            &mut engine,
+            tts_service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Obj(wrong_intent)],
+        ),
+        Value::Null
+    );
+    assert_throws(
+        engine.invoke_instance(
+            tts_service,
+            "onBind",
+            "(Landroid/content/Intent;)Landroid/os/IBinder;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    // onGetSupportedVoiceActions returns the immutable empty set.
+    let vis = p49_new(&mut engine, P35B_VIS, "()V", &[]);
+    let actions = object(call(
+        &mut engine,
+        vis,
+        "onGetSupportedVoiceActions",
+        "(Ljava/util/Set;)Ljava/util/Set;",
+        &[Value::Null],
+    ));
+    let sample = text(&mut engine, "com.example.ACTION");
+    assert_throws(
+        engine.invoke_instance(actions, "add", "(Ljava/lang/Object;)Z", &[sample]),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+    let vis_intent = p41_intent(&mut engine, "android.service.voice.VoiceInteractionService");
+    let binder = object(call(
+        &mut engine,
+        vis,
+        "onBind",
+        "(Landroid/content/Intent;)Landroid/os/IBinder;",
+        &[Value::Obj(vis_intent)],
+    ));
+
+    // Session lifecycle signatures and pre-create guard ordering.
+    let session = p49_new(
+        &mut engine,
+        P35B_SESSION,
+        "(Landroid/content/Context;)V",
+        &[Value::Obj(context)],
+    );
+    let bundle = p41_bundle(&mut engine);
+    call(
+        &mut engine,
+        session,
+        "onPrepareShow",
+        "(Landroid/os/Bundle;I)V",
+        &[Value::Obj(bundle), Value::Int(1)],
+    );
+    call(
+        &mut engine,
+        session,
+        "onTaskStarted",
+        "(Landroid/content/Intent;I)V",
+        &[Value::Null, Value::Int(7)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            session,
+            "onTaskFinished",
+            "(Landroid/content/Intent;I)V",
+            &[Value::Null, Value::Int(7)],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    // requireNonNull(bundle) precedes the token check.
+    assert_throws(
+        engine.invoke_instance(
+            session,
+            "startAssistantActivity",
+            "(Landroid/content/Intent;Landroid/os/Bundle;)V",
+            &[Value::Null, Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            session,
+            "startAssistantActivity",
+            "(Landroid/content/Intent;Landroid/os/Bundle;)V",
+            &[Value::Null, Value::Obj(bundle)],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    let activity_id = p49_new(
+        &mut engine,
+        P35B_ACTIVITY_ID,
+        "(ILandroid/os/IBinder;)V",
+        &[Value::Int(3), Value::Obj(binder)],
+    );
+    let executor = instance(&mut engine, "Ljava/util/concurrent/Executor;");
+    let consumer = instance(&mut engine, "Ljava/util/function/Consumer;");
+    assert_throws(
+        engine.invoke_instance(
+            session,
+            "requestDirectActions",
+            "(Landroid/service/voice/VoiceInteractionSession$ActivityId;Landroid/os/CancellationSignal;Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V",
+            &[Value::Null, Value::Null, Value::Obj(executor), Value::Obj(consumer)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            session,
+            "requestDirectActions",
+            "(Landroid/service/voice/VoiceInteractionSession$ActivityId;Landroid/os/CancellationSignal;Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V",
+            &[Value::Obj(activity_id), Value::Null, Value::Obj(executor), Value::Obj(consumer)],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+    // performDirectAction checks the token before its null checks.
+    assert_throws(
+        engine.invoke_instance(
+            session,
+            "performDirectAction",
+            "(Landroid/app/DirectAction;Landroid/os/Bundle;Landroid/os/CancellationSignal;Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V",
+            &[Value::Null, Value::Null, Value::Null, Value::Null, Value::Null],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    // HotwordDetectedResult: List.copyOf semantics for audio streams.
+    let stream = instance(&mut engine, "Landroid/service/voice/HotwordAudioStream;");
+    let detected_builder = p49_new(&mut engine, P35B_DETECTED_BUILDER, "()V", &[]);
+    let detected = object(call(
+        &mut engine,
+        detected_builder,
+        "build",
+        "()Landroid/service/voice/HotwordDetectedResult;",
+        &[],
+    ));
+    let out_streams = object(call(
+        &mut engine,
+        detected,
+        "getAudioStreams",
+        "()Ljava/util/List;",
+        &[],
+    ));
+    assert_throws(
+        engine.invoke_instance(
+            out_streams,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(stream)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+    // A failing List.copyOf leaves the builder bit set and the old
+    // value in place.
+    let good_list = p49_new(&mut engine, "Ljava/util/ArrayList;", "()V", &[]);
+    call(
+        &mut engine,
+        good_list,
+        "add",
+        "(Ljava/lang/Object;)Z",
+        &[Value::Obj(stream)],
+    );
+    let null_list = p49_new(&mut engine, "Ljava/util/ArrayList;", "()V", &[]);
+    call(
+        &mut engine,
+        null_list,
+        "add",
+        "(Ljava/lang/Object;)Z",
+        &[Value::Null],
+    );
+    let replace_builder = p49_new(&mut engine, P35B_DETECTED_BUILDER, "()V", &[]);
+    call(
+        &mut engine,
+        replace_builder,
+        "setAudioStreams",
+        "(Ljava/util/List;)Landroid/service/voice/HotwordDetectedResult$Builder;",
+        &[Value::Obj(good_list)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            replace_builder,
+            "setAudioStreams",
+            "(Ljava/util/List;)Landroid/service/voice/HotwordDetectedResult$Builder;",
+            &[Value::Obj(null_list)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    let replaced = object(call(
+        &mut engine,
+        replace_builder,
+        "build",
+        "()Landroid/service/voice/HotwordDetectedResult;",
+        &[],
+    ));
+    let kept = call(
+        &mut engine,
+        replaced,
+        "getAudioStreams",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p57_collection_size(&mut engine, kept), 1);
+    // With no previous value, the marked bit makes build() hit the
+    // constructor's @NonNull validation instead of the default.
+    let fresh_builder = p49_new(&mut engine, P35B_DETECTED_BUILDER, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            fresh_builder,
+            "setAudioStreams",
+            "(Ljava/util/List;)Landroid/service/voice/HotwordDetectedResult$Builder;",
+            &[Value::Obj(null_list)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            fresh_builder,
+            "build",
+            "()Landroid/service/voice/HotwordDetectedResult;",
+            &[],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    // @NonNull extras validation precedes the score range check.
+    let order_builder = p49_new(&mut engine, P35B_DETECTED_BUILDER, "()V", &[]);
+    call(
+        &mut engine,
+        order_builder,
+        "setScore",
+        "(I)Landroid/service/voice/HotwordDetectedResult$Builder;",
+        &[Value::Int(256)],
+    );
+    call(
+        &mut engine,
+        order_builder,
+        "setExtras",
+        "(Landroid/os/PersistableBundle;)Landroid/service/voice/HotwordDetectedResult$Builder;",
+        &[Value::Null],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            order_builder,
+            "build",
+            "()Landroid/service/voice/HotwordDetectedResult;",
+            &[],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    // Generated toString prints the raw confidence int; the symbolic
+    // name comes from the static confidenceLevelToString helper.
+    let named_builder = p49_new(&mut engine, P35B_DETECTED_BUILDER, "()V", &[]);
+    call(
+        &mut engine,
+        named_builder,
+        "setConfidenceLevel",
+        "(I)Landroid/service/voice/HotwordDetectedResult$Builder;",
+        &[Value::Int(5)],
+    );
+    let named = object(call(
+        &mut engine,
+        named_builder,
+        "build",
+        "()Landroid/service/voice/HotwordDetectedResult;",
+        &[],
+    ));
+    let named_text = call_text(&mut engine, named, "toString", "()Ljava/lang/String;", &[]);
+    assert!(named_text.starts_with("HotwordDetectedResult { confidenceLevel = 5,"));
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P35B_DETECTED,
+            "confidenceLevelToString",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(6)],
+        ),
+        "CONFIDENCE_LEVEL_VERY_HIGH"
+    );
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P35B_DETECTED,
+            "proximityToString",
+            "(I)Ljava/lang/String;",
+            &[Value::Int(2)],
+        ),
+        "PROXIMITY_FAR"
+    );
+
+    // HotwordRejectedResult has no buildUpon in AOSP.
+    let rejected_builder = p49_new(&mut engine, P35B_REJECTED_BUILDER, "()V", &[]);
+    let rejected = object(call(
+        &mut engine,
+        rejected_builder,
+        "build",
+        "()Landroid/service/voice/HotwordRejectedResult;",
+        &[],
+    ));
+    assert!(engine
+        .invoke_instance(
+            rejected,
+            "buildUpon",
+            "()Landroid/service/voice/HotwordRejectedResult$Builder;",
+            &[],
+        )
+        .is_err());
 }
 
 // ---------------------------------------------------------------------------
