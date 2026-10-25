@@ -21,6 +21,8 @@ pub(crate) mod android_pm;
 pub(crate) mod android_region;
 pub(crate) mod android_res;
 pub(crate) mod android_spannable;
+pub(crate) mod android_stub_surfaces;
+pub(crate) mod android_sysservices;
 pub(crate) mod android_text;
 pub(crate) mod android_uri;
 pub(crate) mod android_util;

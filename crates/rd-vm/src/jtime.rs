@@ -1,6 +1,7 @@
 //! `java.time` core: `LocalDate`, `LocalDateTime`, `Instant`, `ZoneId`,
-//! `ZonedDateTime`, `YearMonth`, `Duration`, `ChronoUnit` and a
-//! `DateTimeFormatter` pattern engine.
+//! `ZonedDateTime`, `YearMonth`, `MonthDay` (of/from/now, atYear with
+//! Feb-29 adjustment, getters, value identity), `Duration`, `ChronoUnit`
+//! and a `DateTimeFormatter` pattern engine.
 //!
 //! Each value is an immutable host object of its exact JDK class with one
 //! scalar field:
@@ -34,6 +35,7 @@ const INST: &str = "Ljava/time/Instant;";
 const ZONE: &str = "Ljava/time/ZoneId;";
 const ZDT: &str = "Ljava/time/ZonedDateTime;";
 const YM: &str = "Ljava/time/YearMonth;";
+const MD: &str = "Ljava/time/MonthDay;";
 const DUR: &str = "Ljava/time/Duration;";
 const FMT: &str = "Ljava/time/format/DateTimeFormatter;";
 const UNIT: &str = "Ljava/time/temporal/ChronoUnit;";
@@ -130,6 +132,70 @@ fn ms_obj(vm: &mut Engine, class: &str, ms: i64) -> Result<Value, VmExit> {
 }
 fn ym(vm: &mut Engine, months: i64) -> Result<Value, VmExit> {
     alloc(vm, YM, vec![("rd_ym", Value::Long(months))])
+}
+
+const MONTH_NAMES: [&str; 12] = [
+    "JANUARY",
+    "FEBRUARY",
+    "MARCH",
+    "APRIL",
+    "MAY",
+    "JUNE",
+    "JULY",
+    "AUGUST",
+    "SEPTEMBER",
+    "OCTOBER",
+    "NOVEMBER",
+    "DECEMBER",
+];
+const MONTH_MAX_LEN: [i64; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+fn date_time_exception(message: String) -> VmExit {
+    VmExit::Exception(crate::err::Throwable::new(
+        "Ljava/time/DateTimeException;",
+        message,
+    ))
+}
+
+/// `MonthDay.of(month, dayOfMonth)` validation mirrors `Month.of` +
+/// `DAY_OF_MONTH.checkValidValue` + the max-length check.
+fn month_day(vm: &mut Engine, month: i64, day: i64) -> Result<Value, VmExit> {
+    if !(1..=12).contains(&month) {
+        return Err(date_time_exception(format!(
+            "Invalid value for MonthOfYear (valid values 1 - 12): {month}"
+        )));
+    }
+    if !(1..=31).contains(&day) {
+        return Err(date_time_exception(format!(
+            "Invalid value for DayOfMonth (valid values 1 - 28/31): {day}"
+        )));
+    }
+    if day > MONTH_MAX_LEN[(month - 1) as usize] {
+        return Err(date_time_exception(format!(
+            "Illegal value for DayOfMonth field, value {day} is not valid for month {}",
+            MONTH_NAMES[(month - 1) as usize]
+        )));
+    }
+    alloc(
+        vm,
+        MD,
+        vec![
+            ("month", Value::Int(month as i32)),
+            ("day", Value::Int(day as i32)),
+        ],
+    )
+}
+
+fn month_day_parts(vm: &Engine, recv: ObjRef) -> (i32, i32) {
+    let m = match vm.heap.get_field(recv, "month") {
+        Ok(Value::Int(v)) => v,
+        _ => 0,
+    };
+    let d = match vm.heap.get_field(recv, "day") {
+        Ok(Value::Int(v)) => v,
+        _ => 0,
+    };
+    (m, d)
 }
 fn zone(vm: &mut Engine) -> Result<Value, VmExit> {
     let k = (ZONE.to_string(), "rd_utc".to_string());
@@ -1171,6 +1237,36 @@ pub fn static_intrinsic(
             ym(vm, y * 12 + m - 1)?
         }
         (YM, "of") => ym(vm, arg_l(args, 0) * 12 + arg_l(args, 1) - 1)?,
+        (MD, "of") if sig == "(II)Ljava/time/MonthDay;" => {
+            month_day(vm, arg_l(args, 0), arg_l(args, 1))?
+        }
+        (MD, "of") if sig == "(Ljava/time/Month;I)Ljava/time/MonthDay;" => {
+            let month = match args.first() {
+                Some(Value::Obj(m)) => {
+                    vm.invoke_instance(*m, "getValue", "()I", &[])
+                        .map(|v| match v {
+                            Value::Int(i) => i as i64,
+                            _ => 0,
+                        })?
+                }
+                _ => {
+                    return Err(VmExit::Exception(crate::err::Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "month",
+                    )))
+                }
+            };
+            month_day(vm, month, arg_l(args, 1))?
+        }
+        (MD, "from") if sig == "(Ljava/time/temporal/TemporalAccessor;)Ljava/time/MonthDay;" => {
+            let ms = temporal_ms(vm, &args[0]).unwrap_or(0);
+            let (_, m, d, ..) = fields(ms);
+            month_day(vm, m, d)?
+        }
+        (MD, "now") => {
+            let (_, m, d, ..) = fields(now_ms(vm));
+            month_day(vm, m, d)?
+        }
         (YM, "from") => {
             let ms = temporal_ms(vm, &args[0]).unwrap_or(0);
             let (y, m, ..) = fields(ms);
@@ -1228,6 +1324,63 @@ pub fn instance_intrinsic(
     }
     if vm.cp.is_subtype(recv_class, CALENDAR) {
         return calendar_instance(vm, recv_class, name, sig, recv, args);
+    }
+    if recv_class == MD {
+        let (month, day) = month_day_parts(vm, recv);
+        let v = match (name, sig) {
+            ("getMonthValue", "()I") => Value::Int(month),
+            ("getDayOfMonth", "()I") => Value::Int(day),
+            ("isValidYear", "(I)Z") => {
+                let year = arg_l(args, 0);
+                let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+                Value::Int(i32::from(!(month == 2 && day == 29 && !leap)))
+            }
+            ("atYear", "(I)Ljava/time/LocalDate;") => {
+                let year = arg_l(args, 0);
+                let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+                let d = if month == 2 && day == 29 && !leap {
+                    28
+                } else {
+                    day
+                };
+                ld(vm, days_from_civil(year, month as i64, d as i64))?
+            }
+            ("equals", "(Ljava/lang/Object;)Z") => {
+                let eq = match args.first().and_then(|v| class_of(vm, v)) {
+                    Some((other, c)) if c == MD => month_day_parts(vm, other) == (month, day),
+                    _ => false,
+                };
+                Value::Int(i32::from(eq))
+            }
+            ("hashCode", "()I") => Value::Int((month << 6) + day),
+            ("compareTo", "(Ljava/time/MonthDay;)I") => {
+                let (om, od) = match args.first() {
+                    Some(Value::Obj(o)) => month_day_parts(vm, *o),
+                    _ => (0, 0),
+                };
+                let cmp = if month != om { month - om } else { day - od };
+                Value::Int(cmp)
+            }
+            ("isAfter", "(Ljava/time/MonthDay;)Z") | ("isBefore", "(Ljava/time/MonthDay;)Z") => {
+                let (om, od) = match args.first() {
+                    Some(Value::Obj(o)) => month_day_parts(vm, *o),
+                    _ => (0, 0),
+                };
+                let mine = (month, day);
+                let other = (om, od);
+                Value::Int(i32::from(if name == "isAfter" {
+                    mine > other
+                } else {
+                    mine < other
+                }))
+            }
+            ("toString", "()Ljava/lang/String;") => Value::Obj(crate::intrinsics::alloc_string(
+                vm,
+                format!("--{month:02}-{day:02}"),
+            )?),
+            _ => return Ok(None),
+        };
+        return Ok(Some(v));
     }
     if !recv_class.starts_with("Ljava/time/") {
         return Ok(None);
