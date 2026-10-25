@@ -478,8 +478,22 @@ pub struct MarkerCfg {
     pub id: String,
 }
 
+/// Evento de listener pendente na fila de entrega (ver `fire_guarded`).
+#[derive(Debug, Clone)]
+pub enum PendingFire {
+    Firestore(String),
+    Rtdb(String),
+    Auth,
+}
+
 #[derive(Debug, Default)]
 pub struct GmsState {
+    /// Entrega de listeners em curso: escritas feitas DENTRO de um
+    /// callback enfileiram em `pending_fires` em vez de recursar
+    /// (sem isto, um listener que escreve no próprio path fazia a
+    /// pilha do hospedeiro transbordar — SIGABRT).
+    pub firing_listeners: bool,
+    pub pending_fires: Vec<PendingFire>,
     pub availability_code: i32,
     pub availability_obj: Option<ObjRef>,
     pub error_notifications: i32,
@@ -1896,6 +1910,10 @@ fn auth_fail(vm: &mut Engine, class: &str, msg: &str) -> Result<Value, VmExit> {
     Ok(Value::Obj(failed_task(vm, class, msg)?))
 }
 fn fire_auth_listeners(vm: &mut Engine) -> Result<(), VmExit> {
+    fire_guarded(vm, PendingFire::Auth)
+}
+
+fn fire_auth_listeners_now(vm: &mut Engine) -> Result<(), VmExit> {
     let Some(auth) = vm.fw.gms.auth_obj else {
         return Ok(());
     };
@@ -2632,7 +2650,52 @@ fn fs_cmp(a: Option<&Value>, b: Option<&Value>) -> std::cmp::Ordering {
         .then(ka.1.partial_cmp(&kb.1).unwrap_or(Equal))
         .then(ka.2.cmp(&kb.2))
 }
+/// Ponto único de entrega de listeners (Firestore/RTDB/Auth) com guarda
+/// de reentrância: a entrega é síncrona, por isso um callback que escreve
+/// (e dispara outro evento) NÃO pode recursir nesta pilha — o evento
+/// aninhado entra na fila e a chamada exterior drena-a iterativamente,
+/// com um teto de eventos por disparo para travar ping-pong infinito
+/// entre listeners (o excesso é descartado, nunca entregue com atraso
+/// escondido: o teto é alto o suficiente para fluxos reais e o descarte
+/// é a alternativa honesta a um abort do processo).
+const MAX_FIRES_PER_TRIGGER: usize = 256;
+
+fn fire_guarded(vm: &mut Engine, ev: PendingFire) -> Result<(), VmExit> {
+    if vm.fw.gms.firing_listeners {
+        vm.fw.gms.pending_fires.push(ev);
+        return Ok(());
+    }
+    vm.fw.gms.firing_listeners = true;
+    let result = fire_drain(vm, ev);
+    vm.fw.gms.firing_listeners = false;
+    vm.fw.gms.pending_fires.clear();
+    result
+}
+
+fn fire_drain(vm: &mut Engine, first: PendingFire) -> Result<(), VmExit> {
+    let mut queue = std::collections::VecDeque::from([first]);
+    let mut budget = MAX_FIRES_PER_TRIGGER;
+    while let Some(ev) = queue.pop_front() {
+        match &ev {
+            PendingFire::Firestore(path) => fs_fire_listeners_now(vm, path)?,
+            PendingFire::Rtdb(path) => rtdb_fire_now(vm, path)?,
+            PendingFire::Auth => fire_auth_listeners_now(vm)?,
+        }
+        let pending = std::mem::take(&mut vm.fw.gms.pending_fires);
+        queue.extend(pending);
+        budget = budget.saturating_sub(1);
+        if budget == 0 {
+            break;
+        }
+    }
+    Ok(())
+}
+
 fn fs_fire_listeners(vm: &mut Engine, changed_doc: &str) -> Result<(), VmExit> {
+    fire_guarded(vm, PendingFire::Firestore(changed_doc.to_string()))
+}
+
+fn fs_fire_listeners_now(vm: &mut Engine, changed_doc: &str) -> Result<(), VmExit> {
     let doc_listeners: Vec<ObjRef> = vm
         .fw
         .gms
@@ -3071,6 +3134,10 @@ fn rtdb_ref_obj(vm: &mut Engine, path: String) -> Result<ObjRef, VmExit> {
     Ok(r)
 }
 fn rtdb_fire(vm: &mut Engine, changed: &str) -> Result<(), VmExit> {
+    fire_guarded(vm, PendingFire::Rtdb(changed.to_string()))
+}
+
+fn rtdb_fire_now(vm: &mut Engine, changed: &str) -> Result<(), VmExit> {
     let affected: Vec<(String, ObjRef)> = vm
         .fw
         .gms
