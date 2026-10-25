@@ -1088,6 +1088,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/view/MotionEvent;" => Some(&["Landroid/view/InputEvent;", "Ljava/lang/Object;"]),
         "Landroid/view/MotionEvent$PointerCoords;"
         | "Landroid/view/MotionEvent$PointerProperties;" => Some(OBJECT),
+        "Landroid/view/VelocityTracker;" => Some(OBJECT),
         "Landroid/graphics/ColorSpace;"
         | "Landroid/graphics/ColorSpace$Named;"
         | "Landroid/graphics/ColorSpace$Model;"
