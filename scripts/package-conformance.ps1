@@ -19,6 +19,12 @@ Copy-Item -LiteralPath $apk -Destination "$sd/apks/AndroSwitchConformance.apk"
 foreach($name in @('CREDITS.md','NOTICE.md','LICENSE-MIT','LICENSE-APACHE')){Copy-Item -LiteralPath "$repo/$name" -Destination "$folder/$name"}
 New-Item -ItemType Directory -Force "$folder/docs","$folder/evidence","$folder/licenses"|Out-Null
 Copy-Item "$repo/docs/CONFORMANCE_SUITE.md" "$folder/docs/CONFORMANCE_SUITE.md"
+New-Item -ItemType Directory -Force "$folder/docs/images","$folder/reports"|Out-Null
+Copy-Item -LiteralPath "$repo/docs/images/conformance-sdk.png" -Destination "$folder/docs/images/conformance-sdk.png"
+foreach($name in @('conformance-mesa-20261025.json','m9-mesa-independent-apps-20261025.json')){
+    $reportPath=Join-Path $repo "reports/$name"
+    if(Test-Path -LiteralPath $reportPath){Copy-Item -LiteralPath $reportPath -Destination "$folder/reports/$name"}
+}
 $suiteReadme=[IO.File]::ReadAllText("$repo/fixtures/conformance/README.md").Replace('../../CREDITS.md','../CREDITS.md').Replace('../../docs/CONFORMANCE_SUITE.md','CONFORMANCE_SUITE.md')
 [IO.File]::WriteAllText("$folder/docs/SUITE-SOURCE-README.md",$suiteReadme)
 Copy-Item "$repo/local-artifacts/conformance/catalog.json" "$folder/evidence/catalog.json"
@@ -67,6 +73,8 @@ https://github.com/nadabgfccvd/RustyDroid
 Riwayat, atribusi, dan lisensi dipertahankan. Lihat CREDITS.md dan NOTICE.md.
 Source runtime dan suite: https://github.com/BlekjekSudo/androswitch
 '@|Set-Content "$folder/MULAI-DI-SINI.md" -Encoding utf8NoBOM
+& python -X utf8 "$PSScriptRoot/prepare-package-docs.py" $folder $build.source_commit
+if($LASTEXITCODE){throw 'Packaged documentation link preparation failed'}
 $manifest=@{
     schema_version=1;kind='development_conformance_bundle';total_cases=$summary.total;acceptance_passed=[bool]$summary.acceptance_passed;diagnostic=[bool]$Diagnostic
     source_commit=$build.source_commit;apk_source_commit=$apkBuild.source_commit;runtime_source_manifest_sha256=$build.source_manifest_sha256;upstream=@{project='RustyDroid';authors='nadabgfccvd and contributors';revision='6388281f66d254c8e01a0fdc7a5a9a30239bc762'}
@@ -80,7 +88,8 @@ $archive=[IO.Compression.ZipFile]::OpenRead($zip)
 try {
     foreach($entry in $archive.Entries){
         if($entry.FullName -match '\.(p12|jks|keystore|keys)$'){throw 'Unexpected private signing/system key in package'}
-        if($entry.FullName -ieq 'switch/androswitch/apks/AndroSwitchConformance.apk'){$stream=$entry.Open();try{$hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($stream)).ToLowerInvariant()}finally{$stream.Dispose()};if($hash -cne $summary.apk_sha256){throw 'ZIP APK checksum mismatch'}}
+        $expected=if($entry.FullName -ieq 'switch/androswitch/apks/AndroSwitchConformance.apk'){$summary.apk_sha256}elseif($entry.FullName -ieq 'switch/androswitch/androswitch.nro'){$summary.nro_sha256}else{$null}
+        if($expected){$stream=$entry.Open();try{$hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($stream)).ToLowerInvariant()}finally{$stream.Dispose()};if($hash -cne $expected){throw "ZIP checksum mismatch: $($entry.FullName)"}}
     }
 }finally{$archive.Dispose()}
 @{schema_version=1;folder=$folder;archive=$zip;sha256=(Get-FileHash $zip).Hash.ToLowerInvariant();manifest=$manifest}|ConvertTo-Json -Depth 16|Set-Content "$repo/local-artifacts/releases/latest-conformance.json" -Encoding utf8NoBOM

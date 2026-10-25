@@ -472,3 +472,15 @@ callback; a DEX subclass now needs the shared AbstractCollection base contract.
 There is still no verified game screen. Both sessions return and SD restoration
 completes. Candy Crush was not rerun on NRO20; its latest observed input-connection
 failure remains the separate NRO19 result.
+
+## Unified-SDK retest (2026-10-25)
+
+After the shared conformance repairs, a separate two-APK run with the Mesa
+NVC0/NVK build still has no first-screen pass. Candy Crush now reaches
+`SimpleInputConnection` construction and needs genuine shared `AtomicInteger`
+state. Mekorama advances into its optional Dynamite module discovery and calls
+the missing `ClassLoader.getSystemClassLoader` contract. Implementing that Java
+contract will not itself supply Google Play Services. Both failures release the
+session and return to the console; the original test SD directory is restored.
+See [exact APK/NRO identities and errors](../reports/m9-mesa-independent-apps-20261025.json).
+The independent-game gate remains open alongside the separate 219-case target.

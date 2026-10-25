@@ -1,0 +1,1578 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-25",
+  "implementation_commit": "0289bf71425776dc85317f0f707526c40ae363a1",
+  "source_relationship": "Post-commit device rebuild produced the identical NRO SHA256 observed by E2E; the APK retains its independent source/file receipt.",
+  "upstream": {
+    "project": "RustyDroid",
+    "authors": "nadabgfccvd and contributors",
+    "revision": "6388281f66d254c8e01a0fdc7a5a9a30239bc762",
+    "url": "https://github.com/nadabgfccvd/RustyDroid"
+  },
+  "acceptance_passed": false,
+  "total": 219,
+  "scope": "All declared cases are repair targets. Exclusions are NOT_RUN, never passes. This suite is not complete Android/CTS or independent game compatibility.",
+  "nro": {
+    "sha256": "1eb775c0876ec44dcff1014776c7f13f01e9892c3d612835ec53f31a00718c53",
+    "bytes": 27234360,
+    "source_manifest_sha256": "4b7f6b9dc13625326dd164e4dced6ae504c3cbfeee01d45074a80073d5a103e5",
+    "target": "aarch64-nintendo-switch-freestanding",
+    "rustc_verbose": "rustc 1.100.0-nightly (787af2b8c 2026-08-25)\r\nbinary: rustc\r\ncommit-hash: 787af2b8c80638c51a4fc8e44f84e6891f243ec7\r\ncommit-date: 2026-08-25\r\nhost: x86_64-pc-windows-gnu\r\nrelease: 1.100.0-nightly\r\nLLVM version: 23.1.0",
+    "c_compiler_version": "15.2.0"
+  },
+  "apk": {
+    "sha256": "f77a08b2463d60fef05e2a2c0130d5126fab77eb10e4c24ff76ccdc42a279157",
+    "bytes": 49761,
+    "catalog_sha256": "0778a8ded8917482b38aa7d9046e286f417c6e4ddc857be989718e65c3e69864",
+    "modified_for_runtime": false,
+    "java_jvm_oracle_cases": 97
+  },
+  "emulator": {
+    "backend": "Horizon via diagnostic Ryujinx; not physical hardware or stock Ryujinx",
+    "counts": {
+      "PASS": 216,
+      "NOT_RUN": 3
+    },
+    "sessions": 20,
+    "nro_launch_return_workflow": true,
+    "original_sd_restore": "restored",
+    "binary_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+    "source_revision": "e2143d43bcb6762340d8a01f20e7b5fdf104f02f",
+    "patches": [
+      "tools/ryujinx-cfg/mrs-runtime-undefined.patch",
+      "tools/ryujinx-cfg/hle-fixed-address-and-thread-ticks.patch"
+    ],
+    "stock_emulator_modified": false,
+    "mode": "isolated headless SDL2",
+    "remaining": [
+      {
+        "id": "host.cpu.clock_hz",
+        "status": "NOT_RUN"
+      },
+      {
+        "id": "host.gpu.clock_hz",
+        "status": "NOT_RUN"
+      },
+      {
+        "id": "host.memory.clock_hz",
+        "status": "NOT_RUN"
+      }
+    ],
+    "remaining_reason": "Ryujinx PCV service lacks the read-only clock-rate command. Runtime uses real clkrst/PCV; physical Switch execution still required.",
+    "vulkan_scope": "Six loader/instance/physical-device/queue/memory/logical-device cases; no Android WSI or rendered Vulkan frame."
+  },
+  "host": {
+    "counts": {
+      "PASS": 176,
+      "UNSUPPORTED": 43
+    },
+    "backend": "portable host; absent native/media/device providers remain UNSUPPORTED"
+  },
+  "regression": {
+    "required_checks": 66,
+    "passed_checks": 66,
+    "command": "./scripts/check-m7-m9.ps1 -NativeHostBackend Msys -ReuseConformanceApk -ContinueAfterFailure",
+    "supplemental_native_command": "./scripts/test-native-abi.ps1 -HostBackend Msys -SkipRustTests",
+    "supplemental_native_scope": "Production CPU accounting, futex waits/wakes, SDK POSIX clocks/allocation/I/O plus ARM64 ABI oracle; Rust checks covered by the full regression."
+  },
+  "ui": {
+    "status": "passed_ui_contracts",
+    "visual_review": "Observed actual initial framebuffer in docs/images/conformance-sdk.png; navigation/export/reset/stop independently verified from callbacks and persisted output",
+    "case_acceptance": false,
+    "evidence": "local-artifacts/m9/external-runs/bc645e30e4da4e969bc96d74a8ccf779/conformance-ui-summary.json"
+  },
+  "mesa": {
+    "source_revision": "0ff52079ca9e9e837ed27eb95a8d239f439a1864",
+    "workflow_run": 38329414110,
+    "artifact_id": 11781503719,
+    "upstream_archive_digest": "sha256:b6af7db8417f8ce8a2eb7f308915aaf9553d99c55b9c5ec121b30a99662f859d",
+    "local_archive_digest_verified": false,
+    "matching_rust_runtime": {
+      "compiler": "1.101.0-nightly (8d1a76430 2026-10-06)",
+      "manifest_url": "https://static.rust-lang.org/dist/2026-10-07/channel-rust-nightly.toml",
+      "url": "https://static.rust-lang.org/dist/2026-10-07/rust-std-nightly-aarch64-unknown-linux-gnu.tar.xz",
+      "sha256": "679115aea4383ea6756d362d78c83c50e87476902e1066029118b366a1294bf9"
+    },
+    "global_toolchains_modified": false
+  },
+  "physical_switch": {
+    "status": "pending",
+    "remaining_clock_queries": [
+      {
+        "id": "host.cpu.clock_hz",
+        "status": "NOT_RUN"
+      },
+      {
+        "id": "host.gpu.clock_hz",
+        "status": "NOT_RUN"
+      },
+      {
+        "id": "host.memory.clock_hz",
+        "status": "NOT_RUN"
+      }
+    ],
+    "bundle_contains_exclusion_files": false
+  },
+  "android_reference": "not_run",
+  "m9_independent_game_first_screen_gate": "open",
+  "reproduce_current_baseline": "./scripts/test-conformance-ryujinx.ps1 -Baseline -Launches 20 -WaitMilliseconds 20000 -TimeoutSeconds 1600 -ExcludeCases host.cpu.clock_hz,host.gpu.clock_hz,host.memory.clock_hz -Ryujinx <isolated-HLE-diagnostic> -RyujinxProfile <isolated-profile> -AllowDesktopEmulator",
+  "strict_gate": "Default runner requires every case PASS; --require-pass correctly rejects this 216/219 baseline.",
+  "group_counts": {
+    "Android identity": {
+      "PASS": 23
+    },
+    "Audio": {
+      "PASS": 2
+    },
+    "Bundle": {
+      "PASS": 11
+    },
+    "CPU": {
+      "PASS": 2
+    },
+    "Clock": {
+      "PASS": 4
+    },
+    "Collections": {
+      "PASS": 12
+    },
+    "DEX": {
+      "PASS": 12
+    },
+    "Display": {
+      "PASS": 8
+    },
+    "Exceptions": {
+      "PASS": 5
+    },
+    "Horizon": {
+      "PASS": 5,
+      "NOT_RUN": 3
+    },
+    "Input": {
+      "PASS": 2
+    },
+    "JNI": {
+      "PASS": 9
+    },
+    "Lifecycle": {
+      "PASS": 4
+    },
+    "Math": {
+      "PASS": 5
+    },
+    "Native": {
+      "PASS": 9
+    },
+    "Numbers": {
+      "PASS": 6
+    },
+    "OpenGL ES": {
+      "PASS": 9
+    },
+    "Package": {
+      "PASS": 5
+    },
+    "Preferences": {
+      "PASS": 7
+    },
+    "Reflection": {
+      "PASS": 9
+    },
+    "SQLite": {
+      "PASS": 4
+    },
+    "Storage": {
+      "PASS": 6
+    },
+    "Text": {
+      "PASS": 14
+    },
+    "Threads": {
+      "PASS": 5
+    },
+    "TimeUnit": {
+      "PASS": 29
+    },
+    "UI": {
+      "PASS": 3
+    },
+    "Vulkan": {
+      "PASS": 6
+    }
+  },
+  "cases": [
+    {
+      "id": "dex.overflow",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "-2147483648"
+    },
+    {
+      "id": "dex.division",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "-5:-2"
+    },
+    {
+      "id": "dex.shift",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "2147483647:2"
+    },
+    {
+      "id": "dex.long",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "-9223372036854775808"
+    },
+    {
+      "id": "dex.loop",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "4950"
+    },
+    {
+      "id": "dex.switch",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "seven"
+    },
+    {
+      "id": "dex.double",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "3.75"
+    },
+    {
+      "id": "dex.nan",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "true"
+    },
+    {
+      "id": "dex.signed-zero",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "true"
+    },
+    {
+      "id": "dex.cast",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "-3"
+    },
+    {
+      "id": "dex.bounds",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "bounds"
+    },
+    {
+      "id": "dex.division-zero",
+      "group": "DEX",
+      "status": "PASS",
+      "detail": "arithmetic"
+    },
+    {
+      "id": "text.utf16-length",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "4"
+    },
+    {
+      "id": "text.substring",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "bc"
+    },
+    {
+      "id": "text.char-at",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "8364"
+    },
+    {
+      "id": "text.equals",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "true"
+    },
+    {
+      "id": "text.builder-char",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "x,true42"
+    },
+    {
+      "id": "text.buffer",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "one2"
+    },
+    {
+      "id": "text.utf8",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "4:226"
+    },
+    {
+      "id": "text.ascii",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "3:67"
+    },
+    {
+      "id": "text.format",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "x:0007:%"
+    },
+    {
+      "id": "text.index",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "2:4"
+    },
+    {
+      "id": "text.replace",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "a+b+c"
+    },
+    {
+      "id": "text.starts-ends",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "true:true"
+    },
+    {
+      "id": "text.null-append",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "null"
+    },
+    {
+      "id": "text.surrogate",
+      "group": "Text",
+      "status": "PASS",
+      "detail": "128512"
+    },
+    {
+      "id": "collections.arraylist",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "b:1"
+    },
+    {
+      "id": "collections.list-null",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "true"
+    },
+    {
+      "id": "collections.list-iterator",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "8"
+    },
+    {
+      "id": "collections.map",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "1:7"
+    },
+    {
+      "id": "collections.set",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "1"
+    },
+    {
+      "id": "collections.cow-snapshot",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "a:false:2"
+    },
+    {
+      "id": "collections.cow-array-copy",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "a"
+    },
+    {
+      "id": "collections.cow-remove-unsupported",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "unsupported"
+    },
+    {
+      "id": "collections.boxed-equals",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "true:false"
+    },
+    {
+      "id": "collections.arraycopy",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "1:1:2:3"
+    },
+    {
+      "id": "collections.array-clone",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "1:9"
+    },
+    {
+      "id": "collections.abstract-subclass",
+      "group": "Collections",
+      "status": "PASS",
+      "detail": "false:true"
+    },
+    {
+      "id": "timeunit.ordinal.0",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "NANOSECONDS:0"
+    },
+    {
+      "id": "timeunit.ordinal.1",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "MICROSECONDS:1"
+    },
+    {
+      "id": "timeunit.ordinal.2",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "MILLISECONDS:2"
+    },
+    {
+      "id": "timeunit.ordinal.3",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "SECONDS:3"
+    },
+    {
+      "id": "timeunit.ordinal.4",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "MINUTES:4"
+    },
+    {
+      "id": "timeunit.ordinal.5",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "HOURS:5"
+    },
+    {
+      "id": "timeunit.ordinal.6",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "DAYS:6"
+    },
+    {
+      "id": "timeunit.convert.nanoseconds.nanoseconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "123456789"
+    },
+    {
+      "id": "timeunit.convert.nanoseconds.seconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "id": "timeunit.convert.nanoseconds.days",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "id": "timeunit.convert.microseconds.nanoseconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "123456789000"
+    },
+    {
+      "id": "timeunit.convert.microseconds.seconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "123"
+    },
+    {
+      "id": "timeunit.convert.microseconds.days",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "id": "timeunit.convert.milliseconds.nanoseconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "123456789000000"
+    },
+    {
+      "id": "timeunit.convert.milliseconds.seconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "123456"
+    },
+    {
+      "id": "timeunit.convert.milliseconds.days",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "1"
+    },
+    {
+      "id": "timeunit.convert.seconds.nanoseconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "123456789000000000"
+    },
+    {
+      "id": "timeunit.convert.seconds.seconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "123456789"
+    },
+    {
+      "id": "timeunit.convert.seconds.days",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "1428"
+    },
+    {
+      "id": "timeunit.convert.minutes.nanoseconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "7407407340000000000"
+    },
+    {
+      "id": "timeunit.convert.minutes.seconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "7407407340"
+    },
+    {
+      "id": "timeunit.convert.minutes.days",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "85733"
+    },
+    {
+      "id": "timeunit.convert.hours.nanoseconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "9223372036854775807"
+    },
+    {
+      "id": "timeunit.convert.hours.seconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "444444440400"
+    },
+    {
+      "id": "timeunit.convert.hours.days",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "5144032"
+    },
+    {
+      "id": "timeunit.convert.days.nanoseconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "9223372036854775807"
+    },
+    {
+      "id": "timeunit.convert.days.seconds",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "10666666569600"
+    },
+    {
+      "id": "timeunit.convert.days.days",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "123456789"
+    },
+    {
+      "id": "timeunit.saturation",
+      "group": "TimeUnit",
+      "status": "PASS",
+      "detail": "9223372036854775807"
+    },
+    {
+      "id": "exceptions.throw-catch",
+      "group": "Exceptions",
+      "status": "PASS",
+      "detail": "detail"
+    },
+    {
+      "id": "exceptions.finally",
+      "group": "Exceptions",
+      "status": "PASS",
+      "detail": "5"
+    },
+    {
+      "id": "exceptions.null",
+      "group": "Exceptions",
+      "status": "PASS",
+      "detail": "null"
+    },
+    {
+      "id": "exceptions.cast",
+      "group": "Exceptions",
+      "status": "PASS",
+      "detail": "cast"
+    },
+    {
+      "id": "exceptions.message",
+      "group": "Exceptions",
+      "status": "PASS",
+      "detail": "true"
+    },
+    {
+      "id": "reflection.name",
+      "group": "Reflection",
+      "status": "PASS",
+      "detail": "org.androswitch.conformance.PureCases"
+    },
+    {
+      "id": "reflection.interface",
+      "group": "Reflection",
+      "status": "PASS",
+      "detail": "true"
+    },
+    {
+      "id": "reflection.assignable",
+      "group": "Reflection",
+      "status": "PASS",
+      "detail": "true:false"
+    },
+    {
+      "id": "reflection.field-static",
+      "group": "Reflection",
+      "status": "PASS",
+      "detail": "61"
+    },
+    {
+      "id": "reflection.field-instance",
+      "group": "Reflection",
+      "status": "PASS",
+      "detail": "field"
+    },
+    {
+      "id": "reflection.private",
+      "group": "Reflection",
+      "status": "PASS",
+      "detail": "47"
+    },
+    {
+      "id": "reflection.missing",
+      "group": "Reflection",
+      "status": "PASS",
+      "detail": "missing"
+    },
+    {
+      "id": "reflection.widening",
+      "group": "Reflection",
+      "status": "PASS",
+      "detail": "12"
+    },
+    {
+      "id": "reflection.method",
+      "group": "Reflection",
+      "status": "PASS",
+      "detail": "hi you"
+    },
+    {
+      "id": "threads.initial",
+      "group": "Threads",
+      "status": "PASS",
+      "detail": "7"
+    },
+    {
+      "id": "threads.stored-null",
+      "group": "Threads",
+      "status": "PASS",
+      "detail": "true"
+    },
+    {
+      "id": "threads.remove",
+      "group": "Threads",
+      "status": "PASS",
+      "detail": "7"
+    },
+    {
+      "id": "threads.monitor",
+      "group": "Threads",
+      "status": "PASS",
+      "detail": "reentrant"
+    },
+    {
+      "id": "threads.atomic",
+      "group": "Threads",
+      "status": "PASS",
+      "detail": "true:true"
+    },
+    {
+      "id": "math.abs.-3",
+      "group": "Math",
+      "status": "PASS",
+      "detail": "3"
+    },
+    {
+      "id": "math.abs.-1",
+      "group": "Math",
+      "status": "PASS",
+      "detail": "1"
+    },
+    {
+      "id": "math.abs.0",
+      "group": "Math",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "id": "math.abs.1",
+      "group": "Math",
+      "status": "PASS",
+      "detail": "1"
+    },
+    {
+      "id": "math.abs.3",
+      "group": "Math",
+      "status": "PASS",
+      "detail": "3"
+    },
+    {
+      "id": "numbers.hex.0",
+      "group": "Numbers",
+      "status": "PASS",
+      "detail": "0"
+    },
+    {
+      "id": "numbers.hex.1",
+      "group": "Numbers",
+      "status": "PASS",
+      "detail": "1"
+    },
+    {
+      "id": "numbers.hex.127",
+      "group": "Numbers",
+      "status": "PASS",
+      "detail": "7f"
+    },
+    {
+      "id": "numbers.hex.128",
+      "group": "Numbers",
+      "status": "PASS",
+      "detail": "80"
+    },
+    {
+      "id": "numbers.hex.255",
+      "group": "Numbers",
+      "status": "PASS",
+      "detail": "ff"
+    },
+    {
+      "id": "numbers.hex.32767",
+      "group": "Numbers",
+      "status": "PASS",
+      "detail": "7fff"
+    },
+    {
+      "id": "cpu.available",
+      "group": "CPU",
+      "status": "PASS",
+      "detail": "allowedProcessors=3"
+    },
+    {
+      "id": "cpu.singleton-gc",
+      "group": "CPU",
+      "status": "PASS",
+      "detail": "same Runtime"
+    },
+    {
+      "id": "host.cpu.allowed_mask",
+      "group": "Horizon",
+      "status": "PASS",
+      "detail": "0x0000000000000007"
+    },
+    {
+      "id": "host.cpu.clock_hz",
+      "group": "Horizon",
+      "status": "NOT_RUN",
+      "detail": "Explicit test-control exclusion (exclude.txt); API was not executed"
+    },
+    {
+      "id": "host.gpu.clock_hz",
+      "group": "Horizon",
+      "status": "NOT_RUN",
+      "detail": "Explicit test-control exclusion (exclude.txt); API was not executed"
+    },
+    {
+      "id": "host.memory.clock_hz",
+      "group": "Horizon",
+      "status": "NOT_RUN",
+      "detail": "Explicit test-control exclusion (exclude.txt); API was not executed"
+    },
+    {
+      "id": "host.tick.frequency_hz",
+      "group": "Horizon",
+      "status": "PASS",
+      "detail": "19200000"
+    },
+    {
+      "id": "host.os.name",
+      "group": "Horizon",
+      "status": "PASS",
+      "detail": "Horizon"
+    },
+    {
+      "id": "host.os.version",
+      "group": "Horizon",
+      "status": "PASS",
+      "detail": "3.0.0"
+    },
+    {
+      "id": "host.renderer.backend",
+      "group": "Horizon",
+      "status": "PASS",
+      "detail": "Horizon Mesa EGL/GLES2 + NVK Vulkan"
+    },
+    {
+      "id": "build.model",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "AndroSwitch"
+    },
+    {
+      "id": "build.manufacturer",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "AndroSwitch"
+    },
+    {
+      "id": "build.brand",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "androswitch"
+    },
+    {
+      "id": "build.device",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "androswitch"
+    },
+    {
+      "id": "build.product",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "androswitch_horizon"
+    },
+    {
+      "id": "build.board",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "horizon"
+    },
+    {
+      "id": "build.hardware",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "horizon"
+    },
+    {
+      "id": "build.id",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "AS26"
+    },
+    {
+      "id": "build.display",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "AndroSwitch API26 compatibility profile v1"
+    },
+    {
+      "id": "build.fingerprint",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "androswitch/horizon/androswitch:8.0.0/AS26/0.1.0:eng/test-keys"
+    },
+    {
+      "id": "build.type",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "eng"
+    },
+    {
+      "id": "build.tags",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "test-keys"
+    },
+    {
+      "id": "build.user",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "androswitch"
+    },
+    {
+      "id": "build.host",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "horizon"
+    },
+    {
+      "id": "build.time",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "buildTime=0"
+    },
+    {
+      "id": "build.abis",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "arm64-v8a count=1"
+    },
+    {
+      "id": "build.version.release",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "8.0.0"
+    },
+    {
+      "id": "build.version.incremental",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "0.1.0-dev"
+    },
+    {
+      "id": "build.version.codename",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "REL"
+    },
+    {
+      "id": "build.version.base_os",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "id": "build.version.security_patch",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "id": "build.version.sdk",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "guestAPI=26"
+    },
+    {
+      "id": "build.version.preview",
+      "group": "Android identity",
+      "status": "PASS",
+      "detail": "preview=0"
+    },
+    {
+      "id": "clock.wall",
+      "group": "Clock",
+      "status": "PASS",
+      "detail": "109326"
+    },
+    {
+      "id": "clock.nano",
+      "group": "Clock",
+      "status": "PASS",
+      "detail": "3000"
+    },
+    {
+      "id": "clock.elapsed",
+      "group": "Clock",
+      "status": "PASS",
+      "detail": "111311"
+    },
+    {
+      "id": "clock.uptime",
+      "group": "Clock",
+      "status": "PASS",
+      "detail": "112279"
+    },
+    {
+      "id": "display.metrics",
+      "group": "Display",
+      "status": "PASS",
+      "detail": "1280x720 density=2"
+    },
+    {
+      "id": "display.configuration",
+      "group": "Display",
+      "status": "PASS",
+      "detail": "orientation=2 density=320 dp=640x360"
+    },
+    {
+      "id": "display.rotation",
+      "group": "Display",
+      "status": "PASS",
+      "detail": "rotation=0"
+    },
+    {
+      "id": "display.requested-orientation",
+      "group": "Display",
+      "status": "PASS",
+      "detail": "requested=-1"
+    },
+    {
+      "id": "display.landscape",
+      "group": "Display",
+      "status": "PASS",
+      "detail": "landscape requested; physical rotation is separate"
+    },
+    {
+      "id": "display.portrait",
+      "group": "Display",
+      "status": "PASS",
+      "detail": "portrait requested; physical rotation is separate"
+    },
+    {
+      "id": "display.window",
+      "group": "Display",
+      "status": "PASS",
+      "detail": "window and decor"
+    },
+    {
+      "id": "display.keep-screen-on",
+      "group": "Display",
+      "status": "PASS",
+      "detail": "read/write window flags"
+    },
+    {
+      "id": "package.identity",
+      "group": "Package",
+      "status": "PASS",
+      "detail": "org.androswitch.conformance"
+    },
+    {
+      "id": "package.info",
+      "group": "Package",
+      "status": "PASS",
+      "detail": "0.1.0/1"
+    },
+    {
+      "id": "package.apk-stream",
+      "group": "Package",
+      "status": "PASS",
+      "detail": "PK"
+    },
+    {
+      "id": "package.missing",
+      "group": "Package",
+      "status": "PASS",
+      "detail": "NameNotFoundException"
+    },
+    {
+      "id": "package.assets",
+      "group": "Package",
+      "status": "PASS",
+      "detail": "AS asset"
+    },
+    {
+      "id": "storage.write-read",
+      "group": "Storage",
+      "status": "PASS",
+      "detail": "3,7,11,EOF"
+    },
+    {
+      "id": "storage.append",
+      "group": "Storage",
+      "status": "PASS",
+      "detail": "1,2"
+    },
+    {
+      "id": "storage.name-parent",
+      "group": "Storage",
+      "status": "PASS",
+      "detail": "/data/user/0/org.androswitch.conformance/files"
+    },
+    {
+      "id": "storage.mkdir",
+      "group": "Storage",
+      "status": "PASS",
+      "detail": "/data/user/0/org.androswitch.conformance/files/nested/a"
+    },
+    {
+      "id": "storage.delete",
+      "group": "Storage",
+      "status": "PASS",
+      "detail": "deleted"
+    },
+    {
+      "id": "storage.random-access",
+      "group": "Storage",
+      "status": "PASS",
+      "detail": "seek/read"
+    },
+    {
+      "id": "preferences.int",
+      "group": "Preferences",
+      "status": "PASS",
+      "detail": "committed"
+    },
+    {
+      "id": "preferences.long",
+      "group": "Preferences",
+      "status": "PASS",
+      "detail": "committed"
+    },
+    {
+      "id": "preferences.boolean",
+      "group": "Preferences",
+      "status": "PASS",
+      "detail": "committed"
+    },
+    {
+      "id": "preferences.float",
+      "group": "Preferences",
+      "status": "PASS",
+      "detail": "committed"
+    },
+    {
+      "id": "preferences.string",
+      "group": "Preferences",
+      "status": "PASS",
+      "detail": "escaped string"
+    },
+    {
+      "id": "preferences.remove",
+      "group": "Preferences",
+      "status": "PASS",
+      "detail": "removed"
+    },
+    {
+      "id": "preferences.clear",
+      "group": "Preferences",
+      "status": "PASS",
+      "detail": "cleared"
+    },
+    {
+      "id": "bundle.int",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "int"
+    },
+    {
+      "id": "bundle.long",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "long"
+    },
+    {
+      "id": "bundle.boolean",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "boolean"
+    },
+    {
+      "id": "bundle.float",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "float"
+    },
+    {
+      "id": "bundle.double",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "double"
+    },
+    {
+      "id": "bundle.byte",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "byte"
+    },
+    {
+      "id": "bundle.short",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "short"
+    },
+    {
+      "id": "bundle.char",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "char"
+    },
+    {
+      "id": "bundle.string",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "value"
+    },
+    {
+      "id": "bundle.default",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "91"
+    },
+    {
+      "id": "bundle.nested",
+      "group": "Bundle",
+      "status": "PASS",
+      "detail": "7"
+    },
+    {
+      "id": "ui.view-context",
+      "group": "UI",
+      "status": "PASS",
+      "detail": "actual Context"
+    },
+    {
+      "id": "ui.textview",
+      "group": "UI",
+      "status": "PASS",
+      "detail": "test"
+    },
+    {
+      "id": "ui.button",
+      "group": "UI",
+      "status": "PASS",
+      "detail": "401/button"
+    },
+    {
+      "id": "ui.input-connection",
+      "group": "Input",
+      "status": "PASS",
+      "detail": "aXd"
+    },
+    {
+      "id": "ui.editable-utf16",
+      "group": "Input",
+      "status": "PASS",
+      "detail": "AZ"
+    },
+    {
+      "id": "sqlite.insert",
+      "group": "SQLite",
+      "status": "PASS",
+      "detail": "rows=1"
+    },
+    {
+      "id": "sqlite.rollback",
+      "group": "SQLite",
+      "status": "PASS",
+      "detail": "rows=0"
+    },
+    {
+      "id": "sqlite.commit",
+      "group": "SQLite",
+      "status": "PASS",
+      "detail": "rows=1"
+    },
+    {
+      "id": "sqlite.bind",
+      "group": "SQLite",
+      "status": "PASS",
+      "detail": "bound string"
+    },
+    {
+      "id": "audio.minimum-buffer",
+      "group": "Audio",
+      "status": "PASS",
+      "detail": "minimum=1920"
+    },
+    {
+      "id": "audio.pcm-write",
+      "group": "Audio",
+      "status": "PASS",
+      "detail": "bytes=1920"
+    },
+    {
+      "id": "activity.roundtrip",
+      "group": "Lifecycle",
+      "status": "PASS",
+      "detail": "Actual child lifecycle=CSRPTD"
+    },
+    {
+      "id": "activity.application",
+      "group": "Lifecycle",
+      "status": "PASS",
+      "detail": "org.androswitch.conformance.Recorder"
+    },
+    {
+      "id": "activity.intent",
+      "group": "Lifecycle",
+      "status": "PASS",
+      "detail": "attached Intent"
+    },
+    {
+      "id": "activity.handler-order",
+      "group": "Lifecycle",
+      "status": "PASS",
+      "detail": "Handler order=12"
+    },
+    {
+      "id": "jni.pointer-width",
+      "group": "JNI",
+      "status": "PASS",
+      "detail": "8"
+    },
+    {
+      "id": "jni.mixed-abi",
+      "group": "JNI",
+      "status": "PASS",
+      "detail": "10.75"
+    },
+    {
+      "id": "jni.string-utf8",
+      "group": "JNI",
+      "status": "PASS",
+      "detail": "A€Z"
+    },
+    {
+      "id": "jni.array-copyback",
+      "group": "JNI",
+      "status": "PASS",
+      "detail": "2,-4,6"
+    },
+    {
+      "id": "jni.exception",
+      "group": "JNI",
+      "status": "PASS",
+      "detail": "native-exception"
+    },
+    {
+      "id": "jni.callback-gc",
+      "group": "JNI",
+      "status": "PASS",
+      "detail": "259"
+    },
+    {
+      "id": "jni.local-frame",
+      "group": "JNI",
+      "status": "PASS",
+      "detail": "local frame"
+    },
+    {
+      "id": "jni.thread-attach",
+      "group": "JNI",
+      "status": "PASS",
+      "detail": "21"
+    },
+    {
+      "id": "jni.native-file-sharing",
+      "group": "JNI",
+      "status": "PASS",
+      "detail": "Java/native file shared"
+    },
+    {
+      "id": "native.monotonic",
+      "group": "Native",
+      "status": "PASS",
+      "detail": "monotonic"
+    },
+    {
+      "id": "native.clock-resolution",
+      "group": "Native",
+      "status": "PASS",
+      "detail": "resolution=0:53"
+    },
+    {
+      "id": "native.process-cpu-count",
+      "group": "Native",
+      "status": "PASS",
+      "detail": "nativeOnlineProcessors=3"
+    },
+    {
+      "id": "native.errno",
+      "group": "Native",
+      "status": "PASS",
+      "detail": "ENOENT"
+    },
+    {
+      "id": "native.tls",
+      "group": "Native",
+      "status": "PASS",
+      "detail": "TLS roundtrip"
+    },
+    {
+      "id": "native.malloc-realloc",
+      "group": "Native",
+      "status": "PASS",
+      "detail": "allocation preserved"
+    },
+    {
+      "id": "native.locale-c",
+      "group": "Native",
+      "status": "PASS",
+      "detail": "decimal point ."
+    },
+    {
+      "id": "native.process-clock",
+      "group": "Native",
+      "status": "PASS",
+      "detail": "processCPU=201:84415572 work=9702991005100624961"
+    },
+    {
+      "id": "native.abi",
+      "group": "Native",
+      "status": "PASS",
+      "detail": "pointer=8 long=8 wchar=4"
+    },
+    {
+      "id": "gles.vendor",
+      "group": "OpenGL ES",
+      "status": "PASS",
+      "detail": "Mesa"
+    },
+    {
+      "id": "gles.renderer",
+      "group": "OpenGL ES",
+      "status": "PASS",
+      "detail": "NV12B"
+    },
+    {
+      "id": "gles.version",
+      "group": "OpenGL ES",
+      "status": "PASS",
+      "detail": "OpenGL ES 3.2 Mesa 26.2.4 (git-0ff52079ca)"
+    },
+    {
+      "id": "gles.extensions",
+      "group": "OpenGL ES",
+      "status": "PASS",
+      "detail": "GL_EXT_blend_minmax GL_EXT_multi_draw_arrays GL_EXT_texture_filter_anisotropic GL_EXT_texture_compression_s3tc GL_EXT_texture_compression_dxt1 GL_EXT_texture_compression_rgtc GL_EXT_texture_format_BGRA8888 GL_OES_compressed_ETC1_RGB8_texture GL_OES_depth24 GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_mapbuffer GL_OES_rgb8_rgba8 GL_OES_standard_derivatives GL_OES_stencil8 GL_OES_texture_3D GL_OES_texture_float GL_OES_texture_float_linear GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_texture_npot GL_OES_vertex_half_float GL_EXT_draw_instanced GL_EXT_texture_sRGB_decode GL_OES_EGL_image GL_OES_depth_texture GL_OES_packed_depth_stencil GL_EXT_texture_type_2_10_10_10_REV GL_NV_conditional_render GL_OES_get_program_binary GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_read_format_bgra GL_EXT_texture_storage GL_NV_pack_subimage GL_NV_texture_barrier GL_EXT_frag_depth GL_NV_fbo_color_attachments GL_OES_EGL_image_external GL_OES_EGL_sync GL_OES_vertex_array_object GL_OES_viewport_array GL_ANGLE_pack_reverse_row_order GL_ANGLE_texture_compression_dxt3 GL_ANGLE_texture_compression_dxt5 GL_EXT_occlusion_query_boolean GL_EXT_robustness GL_EXT_sRGB GL_EXT_texture_rg GL_EXT_unpack_subimage GL_NV_draw_buffers GL_NV_read_buffer GL_NV_read_depth GL_NV_read_depth_stencil GL_NV_read_stencil GL_APPLE_sync GL_EXT_draw_buffers GL_EXT_instanced_arrays GL_EXT_map_buffer_range GL_EXT_shadow_samplers GL_KHR_debug GL_KHR_robustness GL_KHR_texture_compression_astc_ldr GL_NV_generate_mipmap_sRGB GL_NV_pixel_buffer_object GL_OES_depth_texture_cube_map GL_OES_required_internalformat GL_OES_surfaceless_context GL_EXT_color_buffer_float GL_EXT_debug_label GL_EXT_sRGB_write_control GL_EXT_separate_shader_objects GL_EXT_shader_group_vote GL_EXT_shader_implicit_conversions GL_EXT_shader_integer_mix GL_EXT_tessellation_point_size GL_EXT_tessellation_shader GL_ANDROID_extension_pack_es31a GL_EXT_base_instance GL_EXT_compressed_ETC1_RGB8_sub_texture GL_EXT_copy_image GL_EXT_draw_buffers_indexe [truncated]"
+    },
+    {
+      "id": "gles.clear-readback",
+      "group": "OpenGL ES",
+      "status": "PASS",
+      "detail": "rgba=255,0,0,255"
+    },
+    {
+      "id": "gles.shader-valid",
+      "group": "OpenGL ES",
+      "status": "PASS",
+      "detail": "compile=1"
+    },
+    {
+      "id": "gles.shader-invalid",
+      "group": "OpenGL ES",
+      "status": "PASS",
+      "detail": "compile=0"
+    },
+    {
+      "id": "gles.buffer-roundtrip",
+      "group": "OpenGL ES",
+      "status": "PASS",
+      "detail": "bufferBytes=16"
+    },
+    {
+      "id": "gles.texture-framebuffer",
+      "group": "OpenGL ES",
+      "status": "PASS",
+      "detail": "fbo=36053 green=255"
+    },
+    {
+      "id": "vulkan.loader",
+      "group": "Vulkan",
+      "status": "PASS",
+      "detail": "Vulkan Android entrypoint available; not a rendering pass"
+    },
+    {
+      "id": "vulkan.instance",
+      "group": "Vulkan",
+      "status": "PASS",
+      "detail": "instance created"
+    },
+    {
+      "id": "vulkan.physical-device",
+      "group": "Vulkan",
+      "status": "PASS",
+      "detail": "gpu=NVIDIA Tegra X1 (GM20B) (NVK GM20B) vendor=10de device=0fe0 api=4211042"
+    },
+    {
+      "id": "vulkan.queue-families",
+      "group": "Vulkan",
+      "status": "PASS",
+      "detail": "queueFamilies=1 graphics=0"
+    },
+    {
+      "id": "vulkan.logical-device",
+      "group": "Vulkan",
+      "status": "PASS",
+      "detail": "logical device created and destroyed; no queue work submitted"
+    },
+    {
+      "id": "vulkan.memory-heaps",
+      "group": "Vulkan",
+      "status": "PASS",
+      "detail": "heaps=1 types=2 advertisedBytes=2582642688"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "local-artifacts/m9/external-runs/6322f45503574cde9bb47ef95fdbd868/conformance-summary.json",
+      "sha256": "4f5b2e50d548a287b1952410e6c0823cd3cea8601215ece6a28f4dca5d9eaecf"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/6322f45503574cde9bb47ef95fdbd868/conformance-report.json",
+      "sha256": "4c2f65ea1f72d495fac7ec130c2fee687e58c089a3ad994277d3a0291a50677d"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/6322f45503574cde9bb47ef95fdbd868/verification.json",
+      "sha256": "4051e78424be357ca2b83727df9a7069d9a4eba5420c6fdc36dd37765d10c95c"
+    },
+    {
+      "path": "local-artifacts/m9/external-runs/bc645e30e4da4e969bc96d74a8ccf779/conformance-ui-summary.json",
+      "sha256": "242c8401cf85f1497d544fea3aa71c90b68ed9c0a310cb3adf0e846f83adf7c3"
+    },
+    {
+      "path": "target/evidence/product-build.json",
+      "sha256": "b0998125165f6406edee8323686a310c458fea6f5b21167e8ff07611ea104177"
+    },
+    {
+      "path": "target/evidence/product-source.json",
+      "sha256": "4b7f6b9dc13625326dd164e4dced6ae504c3cbfeee01d45074a80073d5a103e5"
+    },
+    {
+      "path": "target/evidence/m9-checks.json",
+      "sha256": "601a6416d1bc563354a8650b4028a3ea189f6ee6ffa6d3bd5baaece7e7827c69"
+    },
+    {
+      "path": "target/evidence/conformance-sdk-abi-final-2.log",
+      "sha256": "ec59733f8460a5d45fed03d35ac9b7f66e598277579a1fd23b7ccab32243a328"
+    },
+    {
+      "path": "target/evidence/conformance-mesa-elf-svc-audit.json",
+      "sha256": "146196267b016ae76a536c4965906c2ebf17c5be97987149ce6d1584a251fbed"
+    },
+    {
+      "path": "target/evidence/ryujinx-hle-baseline-probe.json",
+      "sha256": "215a0ad7025f8f68c5a0ede01e85e91622823b90d3b764b42e970f541a1d8adc"
+    },
+    {
+      "path": "target/evidence/ryujinx-hle-reproduction-target.log",
+      "sha256": "d5c05a70b0a0909254fc385f63593263e29f7e417e0b00a88747afe2c85f57a9"
+    },
+    {
+      "path": "target/evidence/ryujinx-hle-reproduction-probe.log",
+      "sha256": "dd178722a18cbcd231a2d852975c0adeb1fc50d27c96901f0bfc5048826cb55c"
+    },
+    {
+      "path": "local-artifacts/conformance/host-5794000f/report.json",
+      "sha256": "85779e159a41a354537970cc179825ec08cfa6552c5630d51e4457ebde61a07e"
+    },
+    {
+      "path": "target/evidence/conformance-mesa-acceptance-negative.log",
+      "sha256": "425902f0198d896431278a320d5625e76a5587099dce1a58f29bb84330197eed"
+    }
+  ]
+}

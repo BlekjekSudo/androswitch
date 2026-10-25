@@ -44,8 +44,8 @@ native property and display improvements advance startup further. An original
 portrait fixture renders real 720x1280 EGL buffers and returns cleanly to the
 launcher. Mekorama and Candy Crush still have **no first-screen compatibility
 pass**. See [M9 independent-app work](docs/M9_EXTERNAL_APPS.md) and the separate
-[display evidence](docs/HORIZON_DISPLAY.md). Full candidate regression and
-independent compatibility gates remain open.
+[display evidence](docs/HORIZON_DISPLAY.md). The 66 required regression checks pass; independent-game compatibility gates
+remain open.
 M8 adds persistent XML SharedPreferences, native SQLite, boxed collections and
 DEX method reflection. M9 adds a repeated host corpus, external APK evaluation
 and startup/frame/heap measurements. See [exact evidence and limitations](docs/M8_M9_E2E.md).

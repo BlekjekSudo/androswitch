@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-25",
+  "implementation_commit": "0289bf71425776dc85317f0f707526c40ae363a1",
+  "nro_sha256": "1eb775c0876ec44dcff1014776c7f13f01e9892c3d612835ec53f31a00718c53",
+  "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+  "status": "blocked_runtime",
+  "first_screen_pass": false,
+  "physical_hardware": "not_run",
+  "sd_original_restore": "restored",
+  "no_package_specific_runtime_fixes": true,
+  "evidence": {
+    "path": "local-artifacts/m9/external-runs/272aa73f19c34ade9475cfef438f6794/verification.json",
+    "sha256": "b16ad005051d922ee0c23d8b22ce75412d8d3524a1d1e2556f4b1f64d12b01b7"
+  },
+  "cases": [
+    {
+      "apk": "candycrush.apk",
+      "apk_sha256": "5333375f18796d2b31150869bb6ebd33b0870ddd85cffa92db2032dc26b70738",
+      "runtime_status": "failed",
+      "error": "API_UNAVAILABLE [rd-vm]: new-instance Ljava/util/concurrent/atomic/AtomicInteger;: platform state for Ljava/util/concurrent/atomic/AtomicInteger; is unavailable [pc 0xb: Insn { opcode: 34, fmt: F21c, size: 2, kind: RegIndex(0, 9673) }]\n  at Lcom/king/core/SimpleInputConnection;-><init>(Landroid/view/View;Z)V\n  at Lcom/king/core/GameView;-><init>(Landroid/app/Activity;Lcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;JLcom/king/core/GameView$InitializationOptions;)V\n  at Lcom/king/main/EngineActivity;->onCreate(Landroid/os/Bundle;J)V\n  at Lcom/king/candycrushsaga/CandyCrushSagaActivity;->onCreate(Landroid/os/Bundle;)V",
+      "returned_to_launcher": true,
+      "first_screen": "not_reached"
+    },
+    {
+      "apk": "mekorama-1-7-2.apk",
+      "apk_sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+      "runtime_status": "failed",
+      "error": "NOT_FOUND [rd-vm]: método Ljava/lang/ClassLoader;->getSystemClassLoader()Ljava/lang/ClassLoader; não resolvido [pc 0x2c: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 0, idx: 62895, regs: [0, 0, 0, 0, 0] } }]\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->zza(Landroid/content/Context;Ljava/lang/String;Z)I\n  at Lcom/google/android/gms/dynamite/zze;->zzb(Landroid/content/Context;Ljava/lang/String;Z)I\n  at Lcom/google/android/gms/dynamite/zzi;->selectModule(Landroid/content/Context;Ljava/lang/String;Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy$IVersions;)Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy$SelectionResult;\n  at Lcom/google/android/gms/dynamite/DynamiteModule;->load(Landroid/content/Context;Lcom/google/android/gms/dynamite/DynamiteModule$VersionPolicy;Ljava/lang/String;)Lcom/google/android/gms/dynamite/DynamiteModule;\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzf(Landroid/content/Context;Z)Lcom/google/android/gms/internal/measurement/zzcc;\n  at Lcom/google/android/gms/internal/measurement/zzcx;->zza()V\n  at Lcom/google/android/gms/internal/measurement/zzdu;->run()V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: exception java.util.concurrent.RejectedExecutionException: Executor is shut down or failed\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzu(Lcom/google/android/gms/internal/measurement/zzef;Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzee;->onActivityPaused(Landroid/app/Activity;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V",
+      "returned_to_launcher": true,
+      "first_screen": "not_reached"
+    }
+  ]
+}
