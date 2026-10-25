@@ -3,7 +3,8 @@
 //! e modo lazy paginado sob demanda (`Strings::parse_lazy`, ADR 008 Stage 1b);
 //! offsets brutos preservados (Lei 2).
 
-use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
 
 use crate::error::{RdError, RdResult};
 use crate::mutf8;
@@ -11,11 +12,18 @@ use crate::read::Reader;
 
 pub const NO_INDEX: u32 = 0xFFFF_FFFF;
 
-/// Orçamento máximo absoluto de bytes decodificados no modo eager (`Strings::parse`),
-/// escalado também por `data.len()` para impedir amplificação `O(N * L)` quando
-/// múltiplos `string_id_item` apontam para o mesmo `string_data_off` ou sufixos
-/// sobrepostos (#285).
+/// Orçamento máximo absoluto de bytes decodificados (`Strings::parse`,
+/// `Strings::parse_lazy` e `LazyDex`), escalado também por `data.len()` para
+/// impedir amplificação `O(N * L)` quando múltiplos `string_id_item` apontam
+/// para o mesmo `string_data_off` ou sufixos sobrepostos (#285, #332).
 const MAX_EAGER_STRING_BYTES: usize = 64 * 1024 * 1024;
+
+#[inline]
+pub(crate) fn string_byte_budget(data_len: usize) -> usize {
+    data_len
+        .saturating_mul(4)
+        .clamp(64 * 1024, MAX_EAGER_STRING_BYTES)
+}
 
 const CACHE_PAGE_SHIFT: usize = 8;
 const CACHE_PAGE_LEN: usize = 1 << CACHE_PAGE_SHIFT; // 256 strings/página
@@ -44,15 +52,22 @@ impl Clone for StringCachePage {
 
 /// Cache paginado de 2 níveis (`256` strings por página) para materialização
 /// lock-free sob demanda: um DEX de 65.536 strings aloca apenas ~4 KiB no mount
-/// em vez de ~1,5 MiB quando não tocado.
+/// em vez de ~1,5 MiB quando não tocado, respeitando `byte_budget` acumulado.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct PagedStringCache {
     len: usize,
     pages: Box<[OnceLock<Box<StringCachePage>>]>,
+    decoded_bytes: Arc<AtomicUsize>,
+    byte_budget: usize,
 }
 
 impl PagedStringCache {
+    #[allow(dead_code)]
     pub(crate) fn with_len(len: usize) -> Self {
+        Self::with_len_and_budget(len, MAX_EAGER_STRING_BYTES)
+    }
+
+    pub(crate) fn with_len_and_budget(len: usize, byte_budget: usize) -> Self {
         if len == 0 {
             return Self::default();
         }
@@ -61,7 +76,43 @@ impl PagedStringCache {
             .map(|_| OnceLock::new())
             .collect::<Vec<_>>()
             .into_boxed_slice();
-        Self { len, pages }
+        Self {
+            len,
+            pages,
+            decoded_bytes: Arc::new(AtomicUsize::new(0)),
+            byte_budget,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn byte_budget(&self) -> usize {
+        self.byte_budget
+    }
+
+    #[inline]
+    pub(crate) fn remaining_budget(&self) -> usize {
+        self.byte_budget
+            .saturating_sub(self.decoded_bytes.load(Ordering::Relaxed))
+    }
+
+    pub(crate) fn try_charge(&self, str_bytes: usize) -> bool {
+        let cost = str_bytes.saturating_add(1);
+        let mut cur = self.decoded_bytes.load(Ordering::Relaxed);
+        loop {
+            let next = cur.saturating_add(cost);
+            if next > self.byte_budget {
+                return false;
+            }
+            match self.decoded_bytes.compare_exchange_weak(
+                cur,
+                next,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => return true,
+                Err(actual) => cur = actual,
+            }
+        }
     }
 
     #[inline]
@@ -129,10 +180,7 @@ impl Strings {
     pub fn parse(data: &[u8], count: u32, off: u32) -> RdResult<Strings> {
         let window = Self::validate_ids_window(data, count, off)?;
         let count = count as usize;
-        let byte_budget = data
-            .len()
-            .saturating_mul(4)
-            .clamp(64 * 1024, MAX_EAGER_STRING_BYTES);
+        let byte_budget = string_byte_budget(data.len());
         let mut total_bytes = 0usize;
         let mut offsets = Vec::with_capacity(count);
         let mut values = Vec::with_capacity(count.min(1 << 16));
@@ -184,7 +232,7 @@ impl Strings {
         Ok(Strings {
             offsets,
             values: Vec::new(),
-            lazy: PagedStringCache::with_len(count),
+            lazy: PagedStringCache::with_len_and_budget(count, string_byte_budget(data_len)),
         })
     }
 
@@ -242,10 +290,23 @@ impl Strings {
             return Ok(None);
         };
         let abs = abs_u32 as usize;
-        let decoded = read_string_data(data, abs)
-            .map_err(|e| RdError::parse(format!("string #{i} @ 0x{abs_u32:x}: {}", e.cause)))?
-            .into_boxed_str();
-        let _ = cell.set(decoded);
+        let raw = read_string_slice(data, abs)
+            .map_err(|e| RdError::parse(format!("string #{i} @ 0x{abs_u32:x}: {}", e.cause)))?;
+        if raw.len() > self.lazy.remaining_budget() {
+            return Err(RdError::parse(format!(
+                "strings (lazy): string #{i} ({} bytes) excede orçamento restante (limite {} bytes)",
+                raw.len(),
+                self.lazy.byte_budget()
+            )));
+        }
+        let decoded_str = mutf8::decode(raw);
+        if !self.lazy.try_charge(decoded_str.len()) {
+            return Err(RdError::parse(format!(
+                "strings (lazy): volume decodificado acumulado excede orçamento ({} bytes)",
+                self.lazy.byte_budget()
+            )));
+        }
+        let _ = cell.set(decoded_str.into_boxed_str());
         Ok(cell.get().map(Box::as_ref))
     }
 
@@ -264,15 +325,17 @@ impl Strings {
             return Some(cached);
         }
         let abs = *self.offsets.get(i)? as usize;
+        let raw = read_string_slice(data, abs).ok()?;
+        if raw.len() > self.lazy.remaining_budget() {
+            return None;
+        }
+        let decoded_str = mutf8::decode(raw);
+        if !self.lazy.try_charge(decoded_str.len()) {
+            return None;
+        }
         let cell = self.lazy.cell(i)?;
-        Some(
-            cell.get_or_init(|| {
-                read_string_data(data, abs)
-                    .unwrap_or_default()
-                    .into_boxed_str()
-            })
-            .as_ref(),
-        )
+        let _ = cell.set(decoded_str.into_boxed_str());
+        cell.get().map(Box::as_ref)
     }
 
     /// Resolve índice sob demanda para rendering tolerante (`NO_INDEX`/inválido → `""`).
@@ -381,6 +444,7 @@ pub(crate) fn read_string_slice(data: &[u8], off: usize) -> RdResult<&[u8]> {
 }
 
 /// Lê um string_data_item: `uleb128 utf16_len` + bytes MUTF-8 + terminador 0x00.
+#[cfg(test)]
 pub(crate) fn read_string_data(data: &[u8], off: usize) -> RdResult<String> {
     let raw = read_string_slice(data, off)?;
     Ok(mutf8::decode(raw))

@@ -447,9 +447,20 @@ impl CodeItem {
                 }
                 handlers.push(h);
             }
-            // valida tries dentro da stream
+            // valida tries dentro da stream (overflow-safe em usize 32/64 bits)
             for t in &tries {
-                let end = t.start_addr as usize + t.insn_count as usize;
+                let Some(end) = t
+                    .start_addr
+                    .checked_add(t.insn_count as u32)
+                    .and_then(|end_u32| usize::try_from(end_u32).ok())
+                else {
+                    return Err(RdError::invalid_format(format!(
+                        "code_item: try [0x{:x}, +{}) excede a stream ({} units)",
+                        t.start_addr,
+                        t.insn_count,
+                        insns.len()
+                    )));
+                };
                 if end > insns.len() {
                     return Err(RdError::invalid_format(format!(
                         "code_item: try [0x{:x}, +{}) excede a stream ({} units)",
