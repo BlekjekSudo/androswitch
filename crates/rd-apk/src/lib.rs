@@ -208,7 +208,7 @@ impl Apk {
 /// inteiro. `SigningInfo` não tem canal de erro: janela ilegível ou
 /// adversarial degrada para "só v1" (META-INF), como um APK sem bloco v2.
 fn detect_signing(zip: &Zip) -> SigningInfo {
-    if let Some(bytes) = zip.raw_bytes() {
+    if let Some(bytes) = zip.whole_bytes() {
         // issue #35: o Zip já resolveu o EOCD (incluindo ZIP64) — reusar
         // o offset em vez de re-variar (o scan duplicado tinha off-by-one
         // em i==start e perdia o sentinela ZIP64 → APK v2-only reportado

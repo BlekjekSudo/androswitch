@@ -484,10 +484,19 @@ impl Zip {
         self.cd_offset
     }
 
-    /// Bytes brutos do container quando ele está inteiro em memória.
-    /// `None` no modo paginado — use [`Zip::read_range`] para janelas
-    /// (a detecção do bloco de assinatura lê só o trailer antes do CD).
-    pub fn raw_bytes(&self) -> Option<&[u8]> {
+    /// Bytes brutos do container (contrato público estável: a assinatura
+    /// não muda com a fonte paginada). No modo paginado devolve um slice
+    /// **vazio**, porque o arquivo nunca é materializado. Quem precisa
+    /// distinguir os modos usa [`Zip::whole_bytes`] / [`Zip::is_paged`];
+    /// janelas sob demanda saem de [`Zip::read_range`].
+    pub fn raw_bytes(&self) -> &[u8] {
+        self.whole_bytes().unwrap_or(&[])
+    }
+
+    /// Bytes brutos quando o container está inteiro em memória; `None` no
+    /// modo paginado (a detecção do bloco de assinatura lê só a janela que
+    /// termina no CD).
+    pub fn whole_bytes(&self) -> Option<&[u8]> {
         match &self.source {
             ZipSource::Whole(d) => Some(d),
             ZipSource::Paged(_) => None,
@@ -866,8 +875,12 @@ mod tests {
         let path = write_temp_zip("parity", |f| f.write_all(&bytes)).unwrap();
         let paged = Zip::open_paged(&path).unwrap();
 
-        assert!(!whole.is_paged() && whole.raw_bytes().is_some());
-        assert!(paged.is_paged() && paged.raw_bytes().is_none());
+        assert!(!whole.is_paged() && whole.whole_bytes().is_some());
+        assert!(paged.is_paged() && paged.whole_bytes().is_none());
+        // contrato estável de `raw_bytes`: inteiro = bytes do arquivo,
+        // paginado = vazio (nunca materializa)
+        assert_eq!(whole.raw_bytes().len() as u64, whole.file_len());
+        assert!(paged.raw_bytes().is_empty());
         assert_eq!(paged.entries(), whole.entries());
         assert_eq!(paged.duplicates(), whole.duplicates());
         assert_eq!(paged.cd_offset(), whole.cd_offset());
