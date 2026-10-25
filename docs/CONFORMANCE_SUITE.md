@@ -56,8 +56,8 @@ The optional `androswitch.host.*` keys use ordinary `System.getProperty` and an
 explicit platform resource provider. On an Android reference or a host without
 that provider, absence is **UNSUPPORTED**, not a guessed Horizon value. These
 are documented AndroSwitch observations, not standard Android property names.
-`renderer.backend` is reserved and remains unavailable until a backend can
-report its identity. GPU identity is read through the real graphics APIs.
+`renderer.backend` now reports the compiled platform backend: the optional unified
+SDK identifies Mesa NVC0/NVK. GPU identity still comes from the real graphics APIs.
 
 The guest profile declares ARM64, Android API26 / release8.0.0, AndroSwitch
 model/manufacturer, `eng/test-keys`, no security patch date, no base OS, preview0
@@ -82,9 +82,10 @@ Missing `libvulkan.so`/entrypoints are unsupported, not successful empty devices
 [mesa-switch](https://github.com/danfromtico/mesa-switch) is tracked as a platform
 reference in `third_party/mesa-switch-reference.json`. Its native GL paths and
 direct Vulkan library need platform integration plus an Android ABI/surface
-bridge. This change does not install that SDK, replace the current Mesa build,
-or claim Vulkan rendering. Test selection in the APK does not switch the
-runtime's active Mesa driver.
+bridge. An optional pinned Mesa 26.2.4 NVC0/NVK build is now available; see
+[integration, reproduction and boundaries](MESA_SWITCH_PORT.md). It preserves
+the legacy toolchain and still does not provide Vulkan Android presentation.
+Test selection in the APK does not switch the runtime's active Mesa driver.
 
 ## Results and evidence
 
@@ -141,3 +142,15 @@ Those cases remain **NOT_RUN**, with the excluded IDs and seed hashes recorded.
 The ordinary APK accepts an optional app-private `exclude.txt`, one exact case
 ID per line. Physical-device runs without this control file still execute
 all queries. No package/emulator switch is added to the runtime.
+
+The Ryujinx wrapper now requires all 219 PASS by default. Explicit repair runs
+must use `-Baseline` with any `-ExcludeCases`; completion of such a baseline is
+separate from acceptance. The latest baseline is **216 PASS / 3 NOT_RUN** over
+20 sessions, with no other non-PASS status. All nine GLES cases use real Mesa
+pbuffers, buffers/textures/shaders/FBOs/pixel reads; all six declared Vulkan
+discovery/device cases pass. See [frozen evidence](../reports/conformance-mesa-20261025.json).
+
+The separate touch-driven UI run verifies category navigation, the bottom
+result-navigation row, 219-row report export, reset history and Stop/save's
+persistent autorun control. Its empty journal is a UI test, not another
+compatibility pass. [Observed framebuffer](images/conformance-sdk.png).

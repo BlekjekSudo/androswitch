@@ -86,7 +86,7 @@ not evidence of complete Android application startup or physical Switch support.
 
 The exact full source publish needs `Ryujinx.LibHac` version
 `0.21.0-alpha.116`, which was unavailable from the reachable public feed. The
-recorded diagnostic therefore preserves the stock 1.3.3 single-file executable
+earlier MRS diagnostic therefore preserves the stock 1.3.3 single-file executable
 and replaces only `ARMeilleure.dll` with the exact-source assembly built above.
 It is a patched stock bundle, not a full clean emulator rebuild.
 
@@ -111,3 +111,89 @@ separate from stock Ryujinx results. Do not replace the user's emulator or reuse
 a profile implicitly. `--no-gui --help` reaches the command-line help parser
 before configuration loading. Help alone does not resolve every emulator subsystem;
 a real NRO run is a separate validation step.
+
+## Fixed GPU addresses and legacy thread CPU ticks
+
+`hle-fixed-address-and-thread-ticks.patch` applies to the same `e2143d4` source.
+It fixes a general `NvHostAsGpuDeviceFile.AllocSpace` error: fixed allocations
+returned the floor of the containing free gap instead of the requested address.
+The reservation was consequently registered at the wrong address, and Mesa's
+subsequent fixed buffer mapping failed. The patch preserves the requested
+address, prevents registering a failed map, and checks the entire mapping
+against the reservation end. Alignment, overflow and overlap checks remain.
+
+The same patch routes kernel info type `0xF0000002` (legacy ThreadTickCount) to
+the existing scheduler accounting implementation for modern type 25. It does
+not replace CPU time with wall time or guessed values. The NRO's firmware-aware
+libnx query is unchanged. No PCV clock service is fabricated by this diagnostic.
+
+The production-method probe reproduces the original wrong `4096` return for
+requested address `0x1ffff80000` (two checks), then verifies the fixed code with
+12 checks: exact addresses, multiple gaps, overlap, alignment, zero length,
+overflow, reservation boundaries, automatic allocation and the legacy ABI enum.
+It never opens an emulator window, GPU, profile, firmware or key file.
+
+### Build the HLE assembly
+
+Use an isolated checkout. Apply the HLE patch with `git apply`, retaining the
+earlier MRS patch if starting from that checkout. The unavailable alpha LibHac
+package is supplied by extracting the **exact stock assembly**, without method
+stubs, version substitution or decompilation:
+
+```powershell
+$stock = 'path/to/mrs-diagnostic/Ryujinx.exe'
+$stockHash = '9f3cd3d239e895b5d7e818aa8b9bf0e76bc8056deeeff39b636b73755904e0be'
+$libHac = "$sourcePath/../stock-assemblies/LibHac.dll"
+python tools/ryujinx-cfg/extract-entry.py $stock $libHac --entry LibHac.dll --expected-sha $stockHash
+# Expected LibHac SHA256: 3a78bd2a9db4183534691049fc57796d5b86f26ba3eb3c3d7ec38c5756fffaeb
+foreach ($project in @('Ryujinx.HLE','Ryujinx.Horizon')) {
+    $file = "$sourcePath/src/$project/$project.csproj"
+    [xml]$xml = Get-Content -LiteralPath $file -Raw
+    $old = $xml.SelectSingleNode("//PackageReference[@Include='Ryujinx.LibHac']")
+    if (!$old) { throw 'Expected original LibHac package reference' }
+    $reference = $xml.CreateElement('Reference')
+    $reference.SetAttribute('Include','LibHac')
+    $hint = $xml.CreateElement('HintPath'); $hint.InnerText = [IO.Path]::GetFullPath($libHac)
+    $null = $reference.AppendChild($hint)
+    $null = $old.ParentNode.ReplaceChild($reference,$old)
+    $xml.Save($file)
+}
+$runtimeDirectory = 'C:/Program Files/dotnet/shared/Microsoft.NETCore.App/9.0.13'
+$contracts = "$repoRoot/tools/ryujinx-cfg/use-runtime-contracts.targets"
+& $dotnetTool build "$sourcePath/src/Ryujinx.HLE/Ryujinx.HLE.csproj" -c Release `
+    -p:LangVersion=13.0 -p:Version=1.3.3 -p:AssemblyVersion=1.3.3.0 -p:FileVersion=1.3.3.0 `
+    -p:InformationalVersion=1.3.3+e2143d4.androswitch-hle `
+    -p:IncludeSourceRevisionInInformationalVersion=false -p:NuGetAudit=false `
+    "-p:CustomBeforeMicrosoftCommonTargets=$contracts" "-p:RyujinxRuntimeDirectory=$runtimeDirectory" `
+    -p:UseSharedCompilation=false --disable-build-servers -maxcpucount:1
+```
+
+The stock trimmed LibHac assembly references System.Private.CoreLib directly.
+The target file uses matching .NET 9 runtime metadata for HLE/Horizon to avoid
+mixing that identity with old System.Runtime NuGet facades. Normal SDK source
+generators remain enabled. SDK 10.0.100 with C# 13 was used; C# 14 changes span
+overload resolution in this older source. Other projects retain ordinary SDK
+reference contracts. The recorded build had zero errors; platform analyzer
+warnings are retained in its log. None of these compiler metadata files replace
+the installed .NET runtime or bundled BCL.
+
+```powershell
+& $dotnetTool build tools/ryujinx-cfg/hle-probe/HleProbe.csproj -c Release -p:NuGetAudit=false
+$hleDirectory = "$sourcePath/src/Ryujinx.HLE/bin/Release/net9.0"
+python tools/ryujinx-cfg/extract-entry.py $stock "$hleDirectory/Ryujinx.HLE.original.dll" --entry Ryujinx.HLE.dll --expected-sha $stockHash
+$probe = "$repoRoot/local-artifacts/m9/ryujinx-cfg-fix/hle-probe/bin/Release/net9.0/HleProbe.dll"
+& $runtimeTool $probe "$hleDirectory/Ryujinx.HLE.original.dll" baseline
+& $runtimeTool $probe $hleDirectory fixed
+python tools/ryujinx-cfg/rebundle.py $stock "$hleDirectory/Ryujinx.HLE.dll" `
+    'path/to/new-isolated-diagnostic/Ryujinx.exe' --entry Ryujinx.HLE.dll --expected-sha $stockHash
+```
+
+Copy the original native support DLLs, licenses and optional `alsoft.ini` beside
+the **new** executable, as above; SDL2.dll is necessary for headless SDL2 too.
+Only HLE is replaced in this step; the earlier MRS fix and every other bundled
+assembly remain. The recorded diagnostic SHA256 is
+`cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c`.
+Its 20-session SDK APK baseline is 216 PASS, three explicitly NOT_RUN PCV clock
+queries. This is separately identified diagnostic-emulator evidence, not stock
+Ryujinx or physical Switch verification. See
+[the evidence record](../../reports/conformance-mesa-20261025.json).

@@ -1155,7 +1155,7 @@ uint64_t as_native_system_symbol(const char *library, const char *name, int *dat
   }
   if (!strcmp(library,"libdl.so")) return as_bionic_dlfcn_import(name);
   if (as_media_library && as_media_library(library)) {
-    int belongs = (!strcmp(library,"libEGL.so") && !strncmp(name,"egl",3)) ||
+    int belongs = (!strcmp(library,"libvulkan.so") && !strncmp(name,"vk",2)) || (!strcmp(library,"libEGL.so") && !strncmp(name,"egl",3)) ||
       (!strcmp(library,"libGLESv2.so") && !strncmp(name,"gl",2)) ||
       (!strcmp(library,"libaaudio.so") && !strncmp(name,"AAudio",6)) ||
       (!strcmp(library,"libOpenSLES.so") && (!strncmp(name,"sl",2)||!strncmp(name,"SL_",3))) ||

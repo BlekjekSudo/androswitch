@@ -226,7 +226,12 @@ static void check_policy(void) {
     assert(!as_display_begin_cpu(1));
     assert(window.width == 1280 && window.height == 720 && !window.transform);
     assert(as_display_rotation() == r);
-    assert(as_display_set_rotation((r + 1) % 4) == -ENOTSUP);
+    int calls_before=dimension_calls;
+    window.slots_configured=7;
+    assert(!as_display_set_rotation((r+1)%4));
+    assert(as_display_rotation()==(r+1)%4);
+    assert(dimension_calls==calls_before && window.width==1280 && window.height==720 && !window.transform);
+    window.slots_configured=0;
     assert(as_display_begin_gpu() == -EBUSY);
     assert(!as_display_reset());
   }

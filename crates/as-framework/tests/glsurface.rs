@@ -322,7 +322,7 @@ fn negotiated_portrait_updates_real_framework_state_and_active_rotation_fails_cl
 }
 #[test]
 #[ignore = "requires scripts/build-glsurface-fixture.ps1"]
-fn negotiated_portrait_cpu_frame_has_portrait_layout_and_rejects_active_changes() {
+fn negotiated_portrait_cpu_frame_recreates_on_active_orientation_changes() {
     let (mut app, backend) = make("surface", true);
     app.vm
         .invoke_static(
@@ -337,12 +337,14 @@ fn negotiated_portrait_cpu_frame_has_portrait_layout_and_rejects_active_changes(
     assert_eq!((app.frame.width, app.frame.height), (360, 640));
     assert_eq!(app.android.views()[0].bounds, [0, 0, 360, 640]);
     assert!(app.frame.pixels.iter().all(|pixel| *pixel == 0xff336699));
-    assert!(request_orientation(&mut app, 0)
-        .unwrap_err()
-        .to_string()
-        .contains("DISPLAY_ORIENTATION_UNAVAILABLE"));
+    let before = app.android.activity_object().unwrap();
+    request_orientation(&mut app, 0).unwrap();
+    assert_eq!(requested_orientation(&mut app), 0);
+    app.draw().unwrap();
+    assert_ne!(app.android.activity_object().unwrap(), before);
+    // This app explicitly requests portrait again in each onCreate.
     assert_eq!(requested_orientation(&mut app), 1);
-    assert_eq!(*backend.rotations.borrow(), [1]);
+    assert_eq!(*backend.rotations.borrow(), [1, 0, 1]);
 }
 #[test]
 #[ignore = "requires scripts/build-glsurface-fixture.ps1"]

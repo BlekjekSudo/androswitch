@@ -57,6 +57,18 @@ additions use the same **MIT OR Apache-2.0** license choice. Current Switch
 compatibility claims belong to this fork's reports, rather than the upstream
 Linux documentation.
 
+## Optional Mesa Switch renderer
+
+The optional unified graphics build uses [danfromtico/mesa-switch](https://github.com/danfromtico/mesa-switch)
+at `0ff52079ca9e9e837ed27eb95a8d239f439a1864`, based on Mesa 26.2.4, by
+Mesa, Nouveau, NVK, Collabora, NVIDIA and Mesa Switch contributors. It retains
+their licenses and provenance. It provides the actual Horizon EGL/NVC0/NVK
+driver implementations; AndroSwitch supplies Android ABI/lifetime/TLS bridges.
+The SDK's shader compiler requires its matching Rust 1.101.0 nightly component.
+This is separate from the portable RustyDroid VM, which remains `no_std+alloc`.
+See [renderer port details](docs/MESA_SWITCH_PORT.md) for pinned artifacts,
+platform adapters, limits and verification; a successful link is not a GPU pass.
+
 ## Platform, tooling and test sources
 
 M8 adds native **SQLite 3.54.1**, by the SQLite authors/contributors (public

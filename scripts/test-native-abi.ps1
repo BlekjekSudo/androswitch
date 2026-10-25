@@ -88,6 +88,9 @@ try {
   Invoke-HostContract 'multibyte' @('fixtures/m9/native-abi/multibyte.c','platform/switch-smoke/bionic_locale.c','platform/switch-smoke/bionic_multibyte.c')
   Invoke-HostContract 'random' @('fixtures/m9/native-abi/random.c','platform/switch-smoke/bionic_random.c')
   Invoke-HostContract 'finalization' @('fixtures/m9/native-abi/finalization.c','platform/switch-smoke/bionic_finalize.c','platform/switch-smoke/bionic_cxx.c','platform/switch-smoke/bionic_keys.c')
+  Invoke-HostContract 'cpu-time' @('fixtures/m9/native-abi/cpu-time/contracts.c','platform/androswitch/cpu_time.c') @('-Ifixtures/m9/native-abi/cpu-time','-Iplatform/androswitch')
+  Invoke-HostContract 'sdk-futex' @('fixtures/m9/native-abi/sdk-futex/contracts.c','platform/androswitch/sdk_futex.c') @('-Ifixtures/m9/native-abi/sdk-futex','-Iplatform/androswitch')
+  Invoke-HostContract 'sdk-compat' @('fixtures/m9/native-abi/sdk-compat/contracts.c','platform/androswitch/sdk_compat.c') @('-Ifixtures/m9/native-abi/sdk-compat','-Iplatform/androswitch')
   # The POSIX DLL/tool directory is needed only by host C compilation/runs.
   # Restore Windows Python/Cargo/linker lookup before the target/oracle phase.
   $env:PATH = $previousPath

@@ -1,0 +1,18 @@
+<Project>
+  <!-- Exact stock LibHac references System.Private.CoreLib. Preserve that type
+       identity using the corresponding NET 9 runtime metadata, not mixed
+       legacy NuGet facades. Retain normal SDK framework source generators. -->
+  <PropertyGroup><NoStdLib>true</NoStdLib></PropertyGroup>
+  <Target Name="UseExactRuntimeContracts" BeforeTargets="CoreCompile"
+          Condition="'$(MSBuildProjectName)' == 'Ryujinx.HLE' Or '$(MSBuildProjectName)' == 'Ryujinx.Horizon'">
+    <Error Condition="!Exists('$(RyujinxRuntimeDirectory)/System.Private.CoreLib.dll')" Text="Pass the matching NET 9 -p:RyujinxRuntimeDirectory" />
+    <ItemGroup>
+      <_ExactRuntime Include="$(RyujinxRuntimeDirectory)/System.*.dll;$(RyujinxRuntimeDirectory)/Microsoft.CSharp.dll;$(RyujinxRuntimeDirectory)/Microsoft.VisualBasic*.dll;$(RyujinxRuntimeDirectory)/netstandard.dll"
+                     Exclude="$(RyujinxRuntimeDirectory)/System.IO.Compression.Native.dll" />
+      <ReferencePath Remove="@(ReferencePath)" Condition="$([System.String]::Copy('%(Filename)').StartsWith('System.')) Or '%(Filename)' == 'mscorlib' Or '%(Filename)' == 'netstandard' Or '%(Filename)' == 'Microsoft.CSharp' Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.VisualBasic'))" />
+      <ReferencePathWithRefAssemblies Remove="@(ReferencePathWithRefAssemblies)" Condition="$([System.String]::Copy('%(Filename)').StartsWith('System.')) Or '%(Filename)' == 'mscorlib' Or '%(Filename)' == 'netstandard' Or '%(Filename)' == 'Microsoft.CSharp' Or $([System.String]::Copy('%(Filename)').StartsWith('Microsoft.VisualBasic'))" />
+      <ReferencePath Include="@(_ExactRuntime)" />
+      <ReferencePathWithRefAssemblies Include="@(_ExactRuntime)" />
+    </ItemGroup>
+  </Target>
+</Project>

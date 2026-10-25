@@ -4,6 +4,15 @@ $repo=Split-Path -Parent $PSScriptRoot
 Push-Location $repo
 try {
     if(-not $SkipBuild){& ./fixtures/conformance/build.ps1;if($LASTEXITCODE){throw 'APK build failed'}}
+    else {
+        $frozen=Get-Content local-artifacts/conformance/build-receipt.json -Raw|ConvertFrom-Json
+        $currentSources=@(Get-ChildItem fixtures/conformance -Recurse -File)
+        if($currentSources.Count -ne $frozen.sources.Count){throw 'Conformance source inventory changed; rebuild the APK'}
+        foreach($file in @($frozen.sources)+@($frozen.artifacts)){
+            $path=if([IO.Path]::IsPathRooted($file.path)){$file.path}else{Join-Path $repo $file.path}
+            if((Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant() -cne $file.sha256){throw "Frozen conformance input changed: $path; rebuild the APK"}
+        }
+    }
     $output=Join-Path $repo ('local-artifacts/conformance/host-'+[guid]::NewGuid().ToString('N').Substring(0,8))
     New-Item -ItemType Directory -Path $output|Out-Null
     $classes=Join-Path $output 'journal-classes';New-Item -ItemType Directory -Path $classes|Out-Null

@@ -6,12 +6,27 @@ use as_platform::{PlatformError, RuntimeResources};
 extern "C" {
     fn as_platform_available_processors(value: *mut u32) -> i32;
     fn as_platform_resource_query(kind: u32, value: *mut u64) -> i32;
+    fn as_platform_renderer_name() -> *const core::ffi::c_char;
 }
 struct HorizonResources;
 impl RuntimeResources for HorizonResources {
     fn system_property(&self, key: &str) -> Result<Option<String>, PlatformError> {
         if key == "androswitch.host.os.name" {
             return Ok(Some("Horizon".into()));
+        }
+        if key == "androswitch.host.renderer.backend" {
+            // SAFETY: platform returns a process-owned static NUL-terminated
+            // provider identity, or null when the product media backend is absent.
+            #[allow(unsafe_code)]
+            let name = unsafe {
+                let pointer = as_platform_renderer_name();
+                if pointer.is_null() {
+                    None
+                } else {
+                    core::ffi::CStr::from_ptr(pointer).to_str().ok()
+                }
+            };
+            return Ok(name.map(String::from));
         }
         let kind = match key {
             "androswitch.host.cpu.allowed_mask" => 0,

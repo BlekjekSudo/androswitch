@@ -574,6 +574,9 @@ impl Android {
                 }
                 continue;
             }
+            if self.services.glsurface.apply_pending_rotation(self, vm)? {
+                continue;
+            }
             let next = {
                 let mut s = self.state.borrow_mut();
                 s.tasks.sort_by_key(|t| (t.due, t.order));
@@ -630,6 +633,122 @@ impl Android {
         if previous.is_none() {
             self.state.borrow_mut().finished = true;
         }
+        Ok(())
+    }
+    fn configuration_changed(&self, vm: &mut Engine, activity: ObjRef) -> Result<()> {
+        let active = self
+            .state
+            .borrow()
+            .activities
+            .last()
+            .cloned()
+            .ok_or_else(|| error("ACTIVITY_STATE", "no foreground activity"))?;
+        if active.object != activity {
+            return Err(error(
+                "ACTIVITY_STATE",
+                "configuration target is not foreground",
+            ));
+        }
+        let declaration = self
+            .apk
+            .manifest
+            .application
+            .components
+            .iter()
+            .find(|c| descriptor(&c.class_name) == active.class);
+        let flags = declaration
+            .and_then(|c| c.config_changes.as_deref())
+            .unwrap_or("");
+        let mask = flags
+            .strip_prefix("0x")
+            .and_then(|v| u32::from_str_radix(v, 16).ok())
+            .or_else(|| flags.parse::<u32>().ok())
+            .unwrap_or_else(|| {
+                flags.split('|').fold(0, |mask, name| {
+                    mask | match name.trim() {
+                        "orientation" => 0x80,
+                        "screenSize" => 0x400,
+                        _ => 0,
+                    }
+                })
+            });
+        if mask & 0x480 == 0x480 {
+            let configuration = self.services.glsurface.configuration(self, vm)?;
+            self.callback(
+                vm,
+                activity,
+                "onConfigurationChanged",
+                "(Landroid/content/res/Configuration;)V",
+                &[Value::Obj(configuration)],
+            )?;
+            self.record(&active.class, "onConfigurationChanged");
+            self.layout();
+            return Ok(());
+        }
+        self.callback(vm, activity, "onPause", "()V", &[])?;
+        self.record(&active.class, "onPause");
+        let saved = self.save_state(vm)?;
+        for method in ["onStop", "onDestroy"] {
+            self.callback(vm, activity, method, "()V", &[])?;
+            self.record(&active.class, method);
+        }
+        // Pin the saved state and Intent across replacement allocation. A GC
+        // inside a constructor/callback sees the new Activity's owned edges.
+        let root_mark = {
+            let mut state = self.state.borrow_mut();
+            let mark = state.roots.len();
+            state.roots.push(saved);
+            state.roots.extend(active.intent);
+            state.activities.pop();
+            mark
+        };
+        let object = shell(vm, &active.class)?;
+        {
+            let mut state = self.state.borrow_mut();
+            state.activities.push(Activity {
+                object,
+                class: active.class.clone(),
+                root: None,
+                intent: active.intent,
+                saved_state: Some(saved),
+            });
+            state.roots.truncate(root_mark);
+        }
+        self.services
+            .glsurface
+            .inherit_orientation(activity, object);
+        self.callback(vm, object, "<init>", "()V", &[])?;
+        let application = self
+            .state
+            .borrow()
+            .application
+            .ok_or_else(|| error("APPLICATION_STATE", "missing Application"))?;
+        self.callback(
+            vm,
+            object,
+            "attachBaseContext",
+            "(Landroid/content/Context;)V",
+            &[Value::Obj(application)],
+        )?;
+        for (method, sig, args) in [
+            (
+                "onCreate",
+                "(Landroid/os/Bundle;)V",
+                vec![Value::Obj(saved)],
+            ),
+            ("onStart", "()V", vec![]),
+            (
+                "onRestoreInstanceState",
+                "(Landroid/os/Bundle;)V",
+                vec![Value::Obj(saved)],
+            ),
+            ("onResume", "()V", vec![]),
+        ] {
+            self.callback(vm, object, method, sig, &args)?;
+            self.record(&active.class, method);
+        }
+        self.state.borrow_mut().focus = 0;
+        self.layout();
         Ok(())
     }
     pub fn back(&self, vm: &mut Engine) -> Result<()> {
@@ -1873,6 +1992,13 @@ impl FrameworkHost for Android {
                     services::application_lifecycle::Event::Created,
                     args,
                 )?;
+                Value::Null
+            }
+            ("onRestoreInstanceState", "(Landroid/os/Bundle;)V")
+            | ("onConfigurationChanged", "(Landroid/content/res/Configuration;)V")
+                if platform == "Landroid/app/Activity;"
+                    || platform == "Landroid/app/NativeActivity;" =>
+            {
                 Value::Null
             }
             ("onSaveInstanceState", "(Landroid/os/Bundle;)V")

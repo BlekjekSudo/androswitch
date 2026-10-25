@@ -5,9 +5,12 @@
 #include "../../third_party/android/jni.h"
 #include "bionic_errno.h"
 #include "display.h"
+#include "cpu_time.h"
 #include "display_geometry.h"
 #include "glsurface.h"
 #include "media_format.h"
+#include "vulkan_bridge.h"
+#include "bionic_dlfcn.h"
 #include "ppm_publish.h"
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
@@ -757,7 +760,7 @@ int as_media_keep_screen_on(int enabled) {
 void as_media_gl_fail(int code) { failure(code); }
 static void *guest_proc(const char *name) {
   uint64_t fn = media_lookup(name);
-  return fn ? (void *)as_native_veneer(fn) : NULL;
+  return fn ? (void *)as_bionic_function_veneer(fn) : NULL;
 }
 
 /* All exposed audio APIs use this real 48 kHz stereo PCM16 output. Requests
@@ -1068,6 +1071,12 @@ static void activity_finish(AsActivity *a) {
     failure(-2040);
 }
 static int guest_clock(int id, struct timespec *out) {
+  if (!out) { errno=EFAULT;return -1; }
+  if (id==2 || id==3) {
+    uint64_t ns=0;int rc=as_cpu_time_query(id==3,&ns);
+    if(rc) { errno=-rc;return -1; }
+    out->tv_sec=ns/1000000000;out->tv_nsec=ns%1000000000;return 0;
+  }
   if (id != 0 && id != 1) {
     errno = EINVAL;
     return -1;
@@ -1080,9 +1089,9 @@ static int guest_clock(int id, struct timespec *out) {
   return 0;
 }
 static int guest_clock_resolution(int id, struct timespec *out) {
-  if(id!=0 && id!=1) { errno=EINVAL;return -1; }
+  if(id<0 || id>3) { errno=EINVAL;return -1; }
   uint64_t ns=1000000000;
-  if(id==1) {
+  if(id!=0) {
     uint64_t frequency=armGetSystemTickFreq();
     if(!frequency) { errno=ENOSYS;return -1; }
     ns=(1000000000+frequency-1)/frequency;
@@ -1106,6 +1115,8 @@ static int guest_usleep(unsigned micros) {
   return 0;
 }
 int as_media_reset(void) {
+  int vulkan = as_vulkan_reset();
+  if (vulkan) return vulkan;
   as_teardown_phase("media_reset");
   extern void as_sl_reset(void);
   as_sl_reset();
@@ -1148,6 +1159,9 @@ int as_media_reset(void) {
   return 0;
 }
 int as_media_library(const char *name) {
+#ifdef ANDROSWITCH_MESA_UNIFIED
+  if (!strcmp(name,"libvulkan.so")) return 1;
+#endif
   return !strcmp(name, "libEGL.so") || !strcmp(name, "libGLESv2.so") ||
          !strcmp(name, "libmediandk.so") || !strcmp(name, "libaaudio.so") ||
          !strcmp(name, "libOpenSLES.so");
@@ -1260,8 +1274,17 @@ static uint64_t media_lookup(const char *name) {
 }
 uint64_t as_media_import(const char *name) {
   extern uint64_t as_sl_import(const char *);
-  uint64_t address = media_lookup(name);
+  uint64_t address = as_vulkan_import(name);
+  if (!address) address = media_lookup(name);
   if (!address)
     address = as_media_format_import(name);
   return address ? address : as_sl_import(name);
+}
+
+const char *as_media_renderer_name(void) {
+#ifdef ANDROSWITCH_MESA_UNIFIED
+ return "Horizon Mesa EGL/GLES2 + NVK Vulkan";
+#else
+ return "Horizon EGL/GLES2 via Mesa";
+#endif
 }

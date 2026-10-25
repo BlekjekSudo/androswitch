@@ -49,7 +49,11 @@ int as_display_set_rotation(int requested) {
   mutexLock(&display_mutex);
   int error = 0;
   if (requested != rotation) {
-    if (presentation)
+    if (presentation == 1) {
+      // Software presentation always retains the physical 1280x720 buffer.
+      // Logical frames and input rotate through the existing shared mapping.
+      __atomic_store_n(&rotation, requested, __ATOMIC_RELEASE);
+    } else if (presentation)
       error = -ENOTSUP;
     else if (nwindowGetDefault()->slots_configured)
       error = -EBUSY;

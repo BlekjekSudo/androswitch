@@ -8,11 +8,13 @@ param(
     [string]$Nro='',
     [string[]]$ExcludeCases=@(),
     [string]$ResumeEvidenceDirectory='',
+    [switch]$Baseline,
     [switch]$PrepareOnly,
     [switch]$AllowDesktopEmulator
 )
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
+if($ExcludeCases.Count -and -not $Baseline){throw 'Case exclusions are allowed only with -Baseline; full acceptance requires all 219 PASS'}
 $output=Join-Path $repo 'local-artifacts/conformance'
 $package='org.androswitch.conformance'
 $catalogPath=Join-Path $output 'catalog.json'
@@ -63,7 +65,8 @@ $matches=@(Get-ChildItem "$repo/local-artifacts/m9/external-runs" -Directory|For
 if($matches.Count -ne 1){throw "Missing unambiguous external receipt; $failure"}
 $receiptPath=$matches[0].FullName;$run=Split-Path -Parent $receiptPath
 if($PrepareOnly){Write-Output "Prepared unified suite: $receiptPath";if($failure){throw $failure};return}
-& python -X utf8 "$PSScriptRoot/collect-conformance.py" --receipt $receiptPath --catalog $catalogPath --package $package
+$acceptanceArgs=if($Baseline){@()}else{@('--require-pass')}
+& python -X utf8 "$PSScriptRoot/collect-conformance.py" --receipt $receiptPath --catalog $catalogPath --package $package @acceptanceArgs
 if($LASTEXITCODE){throw "Conformance evidence collection failed; $failure"}
 Write-Output "Conformance journal and actual session errors: $run/conformance-summary.json"
 if($failure){Write-Warning "External renderer/session gate remains: $failure"}

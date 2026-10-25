@@ -73,6 +73,7 @@ pub(crate) struct GlSurfaces {
     orientations: RefCell<BTreeMap<ObjRef, i32>>,
     callback_depth: core::cell::Cell<u32>,
     display_started: core::cell::Cell<bool>,
+    pending_rotation: RefCell<Option<(ObjRef, i32)>>,
 }
 struct CallbackScope<'a>(&'a core::cell::Cell<u32>);
 impl Drop for CallbackScope<'_> {
@@ -349,7 +350,17 @@ impl GlSurfaces {
         };
         if rotation != current.rotation {
             if self.display_started.get() {
-                return Err(error("DISPLAY_ORIENTATION_UNAVAILABLE", format!("Activity.setRequestedOrientation({requested}): active display rotation {} -> {rotation} requires surface/configuration lifecycle recreation",current.rotation)));
+                if self.views.borrow().values().any(|s| s.renderer.is_some()) {
+                    return Err(error(
+                        "DISPLAY_ORIENTATION_UNAVAILABLE",
+                        "active GL surface rotation requires renderer suspension/recreation",
+                    ));
+                }
+                // Android requests are asynchronous. Coalesce changes before
+                // the next main-loop boundary; a later request can cancel one.
+                *self.pending_rotation.borrow_mut() = Some((activity, rotation));
+                self.orientations.borrow_mut().insert(activity, requested);
+                return Ok(());
             }
             let next = self.backend()?.set_display_rotation(rotation)?;
             Self::validate_caps(next)?;
@@ -366,8 +377,73 @@ impl GlSurfaces {
             }
             *self.caps.borrow_mut() = Some(next);
         }
+        self.pending_rotation.borrow_mut().take();
         self.orientations.borrow_mut().insert(activity, requested);
         Ok(())
+    }
+    pub(crate) fn inherit_orientation(&self, old: ObjRef, new: ObjRef) {
+        let requested = self.orientations.borrow().get(&old).copied().unwrap_or(-1);
+        self.orientations.borrow_mut().insert(new, requested);
+    }
+    pub(crate) fn apply_pending_rotation(
+        &self,
+        android: &Android,
+        vm: &mut Engine,
+    ) -> Result<bool> {
+        let Some((activity, rotation)) = self.pending_rotation.borrow_mut().take() else {
+            return Ok(false);
+        };
+        if android.activity_object() != Some(activity) {
+            return Ok(false);
+        }
+        let current = self.metrics(android);
+        if rotation == current.rotation {
+            return Ok(false);
+        }
+        let next = self.backend()?.set_display_rotation(rotation)?;
+        Self::validate_caps(next)?;
+        let expected = if (rotation - current.rotation).abs() % 2 == 0 {
+            (current.width, current.height)
+        } else {
+            (current.height, current.width)
+        };
+        if next.rotation != rotation || (next.width, next.height) != expected {
+            return Err(error(
+                "INVALID_DISPLAY_RESULT",
+                "rotation and logical viewport differ from requested display",
+            ));
+        }
+        *self.caps.borrow_mut() = Some(next);
+        if (next.width, next.height) != (current.width, current.height) {
+            android.configuration_changed(vm, activity)?;
+        }
+        Ok(true)
+    }
+    pub(crate) fn configuration(&self, android: &Android, vm: &mut Engine) -> Result<ObjRef> {
+        let caps = self.metrics(android);
+        let configuration = shell(vm, "Landroid/content/res/Configuration;")?;
+        let width = libm::roundf(caps.width as f32 / caps.density) as i32;
+        let height = libm::roundf(caps.height as f32 / caps.density) as i32;
+        for (field, value) in [
+            (
+                "orientation",
+                if caps.width > caps.height {
+                    2
+                } else if caps.height > caps.width {
+                    1
+                } else {
+                    0
+                },
+            ),
+            ("screenWidthDp", width),
+            ("screenHeightDp", height),
+            ("smallestScreenWidthDp", width.min(height)),
+            ("densityDpi", caps.density_dpi),
+        ] {
+            write(vm, configuration, field, Value::Int(value))?;
+        }
+        write(vm, configuration, "fontScale", Value::Float(1.))?;
+        Ok(configuration)
     }
     pub(crate) fn bind_backend(&self, backend: Rc<dyn EglConfigBackend>) {
         *self.backend.borrow_mut() = Some(backend);
@@ -1019,30 +1095,7 @@ impl GlSurfaces {
             ("getConfiguration", "()Landroid/content/res/Configuration;")
                 if class == "Landroid/content/res/Resources;" =>
             {
-                let caps = self.metrics(android);
-                let configuration = shell(vm, "Landroid/content/res/Configuration;")?;
-                let width = libm::roundf(caps.width as f32 / caps.density) as i32;
-                let height = libm::roundf(caps.height as f32 / caps.density) as i32;
-                for (field, value) in [
-                    (
-                        "orientation",
-                        if caps.width > caps.height {
-                            2
-                        } else if caps.height > caps.width {
-                            1
-                        } else {
-                            0
-                        },
-                    ),
-                    ("screenWidthDp", width),
-                    ("screenHeightDp", height),
-                    ("smallestScreenWidthDp", width.min(height)),
-                    ("densityDpi", caps.density_dpi),
-                ] {
-                    write(vm, configuration, field, Value::Int(value))?;
-                }
-                write(vm, configuration, "fontScale", Value::Float(1.))?;
-                Value::Obj(configuration)
+                Value::Obj(self.configuration(android, vm)?)
             }
             ("getProperty", "(Ljava/lang/String;)Ljava/lang/String;")
                 if class == "Landroid/media/AudioManager;" =>
@@ -1141,6 +1194,9 @@ impl GlSurfaces {
             .values()
             .copied()
             .collect::<Vec<_>>();
+        if let Some((activity, _)) = *self.pending_rotation.borrow() {
+            roots.push(activity);
+        }
         for (&view, s) in self.views.borrow().iter() {
             roots.push(view);
             roots.extend(s.renderer);

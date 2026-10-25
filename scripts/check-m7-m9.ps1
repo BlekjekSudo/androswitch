@@ -1,6 +1,7 @@
 param(
   [string]$FromCheck='',
   [switch]$ContinueAfterFailure,
+  [switch]$ReuseConformanceApk,
   [ValidateSet('Wsl','Msys')][string]$NativeHostBackend='Wsl'
 )
 $ErrorActionPreference='Stop'
@@ -64,7 +65,7 @@ try{
     @{id='time-unit-fixture';script='fixtures/m9/time-unit/build.ps1'},
     @{id='runtime-fixture';script='fixtures/m9/runtime/build.ps1'},
     @{id='input-connection-fixture';script='fixtures/m9/input-connection/build.ps1'},
-    @{id='conformance-catalog';script='scripts/test-conformance.ps1'},
+    @{id='conformance-catalog';script='scripts/test-conformance.ps1';script_args=@{SkipBuild=[bool]$ReuseConformanceApk}},
     @{id='framework';args=@('test','-p','as-framework','--features','host','--lib','--tests','--locked','--','--include-ignored','--test-threads=1')},
     @{id='m1-fixture';script='scripts/build-m1-fixture.ps1'},
     @{id='portable-core';args=@('test','-p','as-switch-smoke','--features','host-cli,portable-tests','--test','portable_core','--locked','--','--include-ignored')},

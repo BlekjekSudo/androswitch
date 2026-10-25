@@ -8,3 +8,4 @@ void as_bionic_dlfcn_reset(void);
 int as_native_library(const char *name);
 uint64_t as_native_system_symbol(const char *library, const char *name,
                                  int *data);
+uint64_t as_bionic_function_veneer(uint64_t target);

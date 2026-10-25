@@ -181,8 +181,13 @@ static jstring facts(JNIEnv *e, jclass c, jint mode, jstring missing_path) {
   if (mode == 7) {
     if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &a))
       return text(e, "UNSUPPORTED:process CPU clock unavailable");
-    snprintf(out, sizeof(out), "processCPU=%lld:%ld", (long long)a.tv_sec,
-             a.tv_nsec);
+    volatile uint64_t work = 1;
+    for (unsigned i=0;i<1000000;i++) work=work*1664525u+1013904223u;
+    if(clock_gettime(CLOCK_PROCESS_CPUTIME_ID,&b) || b.tv_sec<a.tv_sec ||
+       (b.tv_sec==a.tv_sec && b.tv_nsec<=a.tv_nsec))
+      return text(e,"FAIL:process CPU clock did not advance during CPU work");
+    snprintf(out, sizeof(out), "processCPU=%lld:%ld work=%llu", (long long)b.tv_sec,
+             b.tv_nsec,(unsigned long long)work);
     return text(e, out);
   }
   if (mode == 8) {

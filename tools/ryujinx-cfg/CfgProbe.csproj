@@ -10,6 +10,7 @@
     <Error Text="Pass -p:RyujinxSource=absolute/path/to/exact/e2143d4/source" />
   </Target>
   <ItemGroup>
+    <Compile Remove="hle-probe/**/*.cs" />
     <ProjectReference Include="$(RyujinxSource)/src/Ryujinx.Cpu/Ryujinx.Cpu.csproj" />
   </ItemGroup>
 </Project>

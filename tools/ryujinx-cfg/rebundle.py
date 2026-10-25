@@ -20,7 +20,7 @@ def writestr(f,s):
     while n>=128: f.write(bytes([(n&127)|128])); n>>=7
     f.write(bytes([n])); f.write(b)
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument('original',type=pathlib.Path); ap.add_argument('replacement',type=pathlib.Path); ap.add_argument('output',type=pathlib.Path); ap.add_argument('--expected-sha',required=True); args=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument('original',type=pathlib.Path); ap.add_argument('replacement',type=pathlib.Path); ap.add_argument('output',type=pathlib.Path); ap.add_argument('--expected-sha',required=True); ap.add_argument('--entry',choices=['ARMeilleure.dll','Ryujinx.HLE.dll'],default='ARMeilleure.dll'); args=ap.parse_args()
     original=args.original.resolve(); output=args.output.resolve()
     if output==original or output.exists(): raise ValueError('Output must be new and distinct')
     data=original.read_bytes(); sha=hashlib.sha256(data).hexdigest()
@@ -36,8 +36,8 @@ def main():
         off,size,compressed,kind=struct.unpack('<QQQB',f.read(25)); name=readstr(f)
         if off+(compressed or size)>header or size>512*1024*1024: raise ValueError('Invalid file range')
         entries.append([off,size,compressed,kind,name])
-    matches=[e for e in entries if e[4]=='ARMeilleure.dll']
-    if len(matches)!=1: raise ValueError('Exactly one ARMeilleure.dll required')
+    matches=[e for e in entries if e[4]==args.entry]
+    if len(matches)!=1: raise ValueError('Exactly one selected assembly entry required')
     entry=matches[0]; old=data[entry[0]:entry[0]+(entry[2] or entry[1])]
     if entry[2]: old=zlib.decompress(old,-15)
     if len(old)!=entry[1]: raise ValueError('Original assembly size mismatch')
@@ -50,6 +50,6 @@ def main():
         h.write(struct.pack('<QQQB',off,size,compressed,kind)); writestr(h,name)
     out.extend(h.getvalue()); struct.pack_into('<Q',out,pointer,newheader)
     output.parent.mkdir(parents=True,exist_ok=True); output.write_bytes(out)
-    receipt={'original':str(original),'original_sha256':sha,'bundle_version':[major,minor],'bundle_entries':count,'replaced_entry':'ARMeilleure.dll','original_assembly_sha256':hashlib.sha256(old).hexdigest(),'replacement_assembly_sha256':hashlib.sha256(new).hexdigest(),'output':str(output),'output_sha256':hashlib.sha256(out).hexdigest(),'scope':'Original apphost and every other bundled payload preserved; manifest refreshed with unique extraction id; no profile, keys or firmware copied.'}
+    receipt={'original':str(original),'original_sha256':sha,'bundle_version':[major,minor],'bundle_entries':count,'replaced_entry':args.entry,'original_assembly_sha256':hashlib.sha256(old).hexdigest(),'replacement_assembly_sha256':hashlib.sha256(new).hexdigest(),'output':str(output),'output_sha256':hashlib.sha256(out).hexdigest(),'scope':'Original apphost and every other bundled payload preserved; manifest refreshed with unique extraction id; no profile, keys or firmware copied.'}
     print(json.dumps(receipt,indent=2))
 if __name__=='__main__': main()

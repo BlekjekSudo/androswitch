@@ -9,6 +9,9 @@ struct Test {
 }
 impl Test {
     fn new() -> Self {
+        Self::configured(None)
+    }
+    fn configured(handled: Option<bool>) -> Self {
         let root = std::env::temp_dir().join(format!(
             "as-foundation-{}-{}",
             std::process::id(),
@@ -28,15 +31,19 @@ impl Test {
                 None,
             )
             .unwrap();
-        let mut app = App::new(
-            pm.load_apk(&record.package, None).unwrap().1,
-            fs,
-            Rc::new(HostPlatform::default()),
-            640,
-            360,
-            None,
-        )
-        .unwrap();
+        let mut apk = pm.load_apk(&record.package, None).unwrap().1;
+        if handled == Some(true) {
+            for component in &mut apk.manifest.application.components {
+                if component.is_launcher {
+                    component.config_changes = Some("orientation|screenSize".into());
+                }
+            }
+        }
+        let mut app = App::new(apk, fs, Rc::new(HostPlatform::default()), 640, 360, None).unwrap();
+        if handled.is_some() {
+            app.android.bind_graphics_caps(caps(0)).unwrap();
+            app.android.bind_egl_backend(Rc::new(Display));
+        }
         app.launch().unwrap();
         Self { app, root }
     }
@@ -370,4 +377,112 @@ fn compiled_sqlite_statements_bind_without_interpolation_keep_database_live_and_
             .invoke_instance(count, "simpleQueryForLong", "()J", &[]),
         "Ljava/lang/IllegalStateException;",
     );
+}
+
+fn caps(rotation: i32) -> as_framework::GraphicsCaps {
+    as_framework::GraphicsCaps {
+        width: if rotation % 2 == 0 { 1280 } else { 720 },
+        height: if rotation % 2 == 0 { 720 } else { 1280 },
+        gles_version: 0x20000,
+        density: 2.,
+        density_dpi: 320,
+        rotation,
+    }
+}
+struct Display;
+impl as_framework::EglConfigBackend for Display {
+    fn set_display_rotation(&self, r: i32) -> Result<as_framework::GraphicsCaps, VmExit> {
+        Ok(caps(r))
+    }
+    fn choose_config(
+        &self,
+        _: u64,
+        _: &[i32],
+        _: usize,
+    ) -> Result<as_framework::EglConfigs, VmExit> {
+        Err(rd_vm::err::vm_error("TEST_NO_GPU", "display-only test backend").into())
+    }
+    fn get_config_attrib(&self, _: u64, _: u64, _: i32) -> Result<i32, VmExit> {
+        Err(rd_vm::err::vm_error("TEST_NO_GPU", "display-only test backend").into())
+    }
+}
+#[test]
+fn software_orientation_recreates_activity_preserves_intent_and_emits_save_restore_lifecycle() {
+    let mut t = Test::configured(Some(false));
+    let before = t.app.android.activity_object().unwrap();
+    let intent = t.call(before, "getIntent", "()Landroid/content/Intent;", &[]);
+    t.call(before, "setRequestedOrientation", "(I)V", &[Value::Int(1)]);
+    assert_eq!(t.app.android.graphics_caps().unwrap().rotation, 0); // Asynchronous request.
+    assert_eq!(
+        t.call(before, "getRequestedOrientation", "()I", &[]),
+        Value::Int(1)
+    );
+    t.app.draw().unwrap();
+    let after = t.app.android.activity_object().unwrap();
+    assert_ne!(before, after);
+    assert_eq!((t.app.frame.width, t.app.frame.height), (360, 640));
+    assert_eq!(
+        t.call(after, "getIntent", "()Landroid/content/Intent;", &[]),
+        intent
+    );
+    let events: Vec<_> = t
+        .app
+        .android
+        .lifecycle()
+        .into_iter()
+        .map(|e| e.event)
+        .collect();
+    assert!(
+        events.windows(8).any(|e| e
+            == [
+                "onPause",
+                "onSaveInstanceState",
+                "onStop",
+                "onDestroy",
+                "onCreate",
+                "onStart",
+                "onRestoreInstanceState",
+                "onResume"
+            ]),
+        "{events:?}"
+    );
+    t.app.vm.gc();
+    assert_eq!(
+        t.call(after, "getRequestedOrientation", "()I", &[]),
+        Value::Int(1)
+    );
+}
+#[test]
+fn handled_configuration_keeps_activity_and_cancelled_requests_do_not_rotate_display() {
+    let mut t = Test::configured(Some(true));
+    let activity = t.app.android.activity_object().unwrap();
+    t.call(
+        activity,
+        "setRequestedOrientation",
+        "(I)V",
+        &[Value::Int(1)],
+    );
+    t.call(
+        activity,
+        "setRequestedOrientation",
+        "(I)V",
+        &[Value::Int(-1)],
+    );
+    t.app.draw().unwrap();
+    assert_eq!(t.app.android.graphics_caps().unwrap().rotation, 0);
+    t.call(
+        activity,
+        "setRequestedOrientation",
+        "(I)V",
+        &[Value::Int(1)],
+    );
+    t.app.draw().unwrap();
+    assert_eq!(t.app.android.activity_object(), Some(activity));
+    assert_eq!(t.app.android.graphics_caps().unwrap().rotation, 1);
+    assert!(t
+        .app
+        .android
+        .lifecycle()
+        .iter()
+        .any(|e| e.event == "onConfigurationChanged"));
 }

@@ -90,6 +90,14 @@ fn rc(operation: &str, code: i32) -> Result<()> {
             ),
             -1205 => ("NATIVE_PROCESS_EXIT", "guest requested process exit"),
             -1206 => ("NATIVE_ABORT", "guest called abort"),
+            -2350 => (
+                "VULKAN_CALLBACK_UNAVAILABLE",
+                "Vulkan guest allocator/pNext callback translation is unavailable",
+            ),
+            -2351 => (
+                "VULKAN_HANDLE_STATE",
+                "Vulkan instance/device lifetime or ownership violation",
+            ),
             -1210 => (
                 "NATIVE_FORTIFY_BOUNDS",
                 "Android fortify object bounds exceeded",

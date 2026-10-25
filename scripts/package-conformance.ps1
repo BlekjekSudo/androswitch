@@ -26,6 +26,15 @@ Copy-Item "$repo/local-artifacts/conformance/jvm-oracle.tsv" "$folder/evidence/j
 Copy-Item "$repo/local-artifacts/conformance/signature-verification.log" "$folder/evidence/signature-verification.log"
 Copy-Item "$repo/local-artifacts/conformance/build-receipt.json" "$folder/evidence/apk-build.json"
 Copy-Item "$repo/target/evidence/product-build.json" "$folder/evidence/nro-build.json"
+if($build.source_manifest_sha256){
+    $sourceManifest="$repo/target/evidence/product-source.json"
+    if((Get-FileHash $sourceManifest).Hash.ToLowerInvariant() -cne $build.source_manifest_sha256){throw 'Runtime source snapshot differs from build receipt'}
+    Copy-Item -LiteralPath $sourceManifest -Destination "$folder/evidence/nro-source.json"
+}
+if($build.mesa_sdk){
+    Copy-Item -LiteralPath "$repo/docs/MESA_SWITCH_PORT.md" -Destination "$folder/docs/MESA_SWITCH_PORT.md"
+    Copy-Item -LiteralPath "$repo/local-artifacts/dependencies/mesa-switch-0ff52079/receipt.json" -Destination "$folder/evidence/mesa-sdk.json"
+}
 foreach($name in @('conformance-report.json','conformance-summary.json','verification.json')){Copy-Item -LiteralPath (Join-Path $evidence $name) -Destination (Join-Path "$folder/evidence" $name)}
 & "$PSScriptRoot/collect-product-licenses.ps1" -OutputRoot "$folder/licenses/dependencies"|Out-Null
 foreach($name in @('fonts/DejaVu.LICENSE','so_util.LICENSE','libnx-framebuffer.LICENSE')){Copy-Item -LiteralPath "$repo/third_party/$name" -Destination (Join-Path "$folder/licenses" ([IO.Path]::GetFileName($name)))}
@@ -60,7 +69,7 @@ Source runtime dan suite: https://github.com/BlekjekSudo/androswitch
 '@|Set-Content "$folder/MULAI-DI-SINI.md" -Encoding utf8NoBOM
 $manifest=@{
     schema_version=1;kind='development_conformance_bundle';total_cases=$summary.total;acceptance_passed=[bool]$summary.acceptance_passed;diagnostic=[bool]$Diagnostic
-    source_commit=$apkBuild.source_commit;upstream=@{project='RustyDroid';authors='nadabgfccvd and contributors';revision='6388281f66d254c8e01a0fdc7a5a9a30239bc762'}
+    source_commit=$build.source_commit;apk_source_commit=$apkBuild.source_commit;runtime_source_manifest_sha256=$build.source_manifest_sha256;upstream=@{project='RustyDroid';authors='nadabgfccvd and contributors';revision='6388281f66d254c8e01a0fdc7a5a9a30239bc762'}
     apk_sha256=$summary.apk_sha256;nro_sha256=$summary.nro_sha256;catalog_sha256=$summary.catalog_sha256
     emulator_counts=$summary.counts;hardware='not_run';android_reference='not_run';m9_independent_game_gate='open'
     files=@(Get-ChildItem $folder -Recurse -File|ForEach-Object {@{path=[IO.Path]::GetRelativePath($folder,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}})

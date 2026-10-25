@@ -19,6 +19,14 @@ inspect results and export JSON from one installation. See [scope and actual
 platform observations](docs/CONFORMANCE_SUITE.md); this is not official CTS or
 complete Android coverage.
 
+Latest unified-SDK Ryujinx baseline: **216 PASS, 3 NOT_RUN** across 20 sessions.
+The remaining CPU/GPU/memory clock queries require physical Switch validation;
+the diagnostic emulator has no PCV implementation. All nine GLES and six Vulkan
+discovery/device cases pass; Vulkan rendering/presentation is outside these six
+cases. The acceptance target remains **219 actual PASS**. See the
+[recorded results](reports/conformance-mesa-20261025.json) and
+[optional Mesa integration](docs/MESA_SWITCH_PORT.md).
+
 
 **M9 validation candidate: one `androswitch.nro`, one SD folder.** The console
 installs, updates and launches supported APKs using the shared RustyDroid

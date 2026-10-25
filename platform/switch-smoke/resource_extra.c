@@ -59,3 +59,8 @@ int as_platform_resource_query(uint32_t kind, uint64_t *output) {
   *output = rate;
   return 0;
 }
+
+const char *as_platform_renderer_name(void) {
+  extern const char *as_media_renderer_name(void) __attribute__((weak));
+  return as_media_renderer_name ? as_media_renderer_name() : 0;
+}

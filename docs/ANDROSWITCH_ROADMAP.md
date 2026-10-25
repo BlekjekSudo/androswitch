@@ -151,3 +151,11 @@ The user-defined acceptance target for this suite is now **all 219 cases actuall
 passing**, with shared runtime/API fixes. A complete baseline journal is not the
 exit gate. Non-PASS cases and emulator exclusions remain open. The 219-case gate
 is additional to the independent-app and physical-device gates above.
+
+The latest [unified-SDK baseline](../reports/conformance-mesa-20261025.json)
+records **216 PASS and 3 NOT_RUN** in 20 diagnostic Ryujinx sessions. No completed
+case is FAIL/ERROR/UNSUPPORTED/INTERRUPTED. The three remaining read-only
+CPU/GPU/memory clock queries are implemented against clkrst/PCV, but still need
+physical-device execution evidence: this emulator's PCV service is empty. They
+remain open, rather than receiving estimated clock rates. The hardware bundle
+contains all 219 cases and none of the emulator exclusion/control files.

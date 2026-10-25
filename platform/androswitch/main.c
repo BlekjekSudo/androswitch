@@ -1,4 +1,5 @@
 #include "display.h"
+#include "cpu_time.h"
 #include "display_geometry.h"
 #include "framebuffer_copy.h"
 #include "glsurface.h"
@@ -274,6 +275,7 @@ static int close_application(uint64_t app) {
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
+  (void)as_cpu_time_init(); // Missing accounting stays an explicit clock error.
   as_memory_log("process_start");
   if (!as_memory_runtime_ready()) {
     as_memory_log("application_override_required");

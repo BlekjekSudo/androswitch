@@ -87,6 +87,21 @@ static void *guest_open(const char *filename, int flags) {
   as_cxx_unlock();
   return library;
 }
+static uint64_t callable_locked(uint64_t target) {
+  if (!target) return 0;
+  for (size_t i = 0; i < veneer_count; i++)
+    if (veneers[i].target == target) return veneers[i].address;
+  if (veneer_count == MAX_VENEERS) return 0;
+  uint64_t address = as_native_veneer(target);
+  if (address) veneers[veneer_count++] = (struct Veneer){target, address};
+  return address;
+}
+uint64_t as_bionic_function_veneer(uint64_t target) {
+  as_cxx_lock();
+  uint64_t address = callable_locked(target);
+  as_cxx_unlock();
+  return address;
+}
 static void *guest_symbol(void *handle, const char *name) {
   if (!name || !*name || strlen(name) > 65536) {
     fail("dlsym", name, "invalid symbol name");
@@ -116,23 +131,12 @@ static void *guest_symbol(void *handle, const char *name) {
     as_cxx_unlock();
     return (void *)(uintptr_t)target;
   }
-  for (size_t i = 0; i < veneer_count; i++)
-    if (veneers[i].target == target) {
-      uint64_t address = veneers[i].address;
-      as_cxx_unlock();
-      return (void *)(uintptr_t)address;
-    }
-  if (veneer_count == MAX_VENEERS) {
-    as_cxx_unlock();
-    fail("dlsym", name, "1024 function veneer budget");
-    return NULL;
-  }
-  uint64_t address = as_native_veneer(target);
-  if (address) veneers[veneer_count++] = (struct Veneer){target, address};
+  uint64_t address = callable_locked(target);
   as_cxx_unlock();
-  if (!address) fail("dlsym", name, "executable veneer allocation failed");
+  if (!address) fail("dlsym", name, "function veneer budget/allocation failed");
   return (void *)(uintptr_t)address;
 }
+
 static int guest_close(void *handle) {
   as_cxx_lock();
   int index = index_of(handle);

@@ -1,9 +1,10 @@
-param([string]$OutputRoot='local-artifacts/product-licenses',[string]$GccVersion='')
+param([string]$OutputRoot='local-artifacts/product-licenses',[string]$GccVersion='',
+      [string]$MesaSourceDirectory='', [string]$WindowsDevkitPro='C:/devkitPro')
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
+$buildPath=Join-Path $projectRoot 'target/evidence/product-build.json'
+$build=if(Test-Path -LiteralPath $buildPath){Get-Content -LiteralPath $buildPath -Raw | ConvertFrom-Json}else{$null}
 if(-not $GccVersion){
-  $buildPath=Join-Path $projectRoot 'target/evidence/product-build.json'
-  $build=if(Test-Path -LiteralPath $buildPath){Get-Content -LiteralPath $buildPath -Raw | ConvertFrom-Json}else{$null}
   $GccVersion=if($build.c_compiler_version){$build.c_compiler_version}elseif($build.link_backend -eq 'Windows'){'15.2.0'}else{'16.1.0'}
 }
 if($GccVersion -notin @('15.2.0','16.1.0')){throw "No pinned runtime license reference for GCC $GccVersion"}
@@ -18,6 +19,32 @@ $sources=@(
   @{name='gcc-COPYING3';version="GCC $GccVersion GPLv3; see Runtime Library Exception";url="https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-$GccVersion/COPYING3";sha256='8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903'}
 )
 $inventory=[Collections.Generic.List[object]]::new()
+if($build.mesa_sdk){
+  # This SDK replaces the legacy Mesa/libdrm archives. Do not label its notices
+  # as 20.1 or silently omit its shader compiler's matching Rust component.
+  $sources=@($sources | Where-Object {$_.name -notin @('mesa.txt','nouveau.txt')})
+  if(-not $MesaSourceDirectory){
+    $MesaSourceDirectory=Join-Path $projectRoot 'local-artifacts/dependencies/mesa-switch-0ff52079/source'
+    if(-not(Test-Path "$MesaSourceDirectory/docs/license.rst")){$MesaSourceDirectory=Join-Path $env:USERPROFILE '.cache/androswitch/mesa-switch-0ff52079'}
+  }
+  $revision=(& git -C $MesaSourceDirectory -c core.fsmonitor=false rev-parse HEAD | Out-String).Trim()
+  if($LASTEXITCODE -or $revision -cne '0ff52079ca9e9e837ed27eb95a8d239f439a1864'){throw 'Pinned Mesa source required for SDK copyright notices; pass -MesaSourceDirectory'}
+  & python -X utf8 "$projectRoot/scripts/collect-mesa-notices.py" $MesaSourceDirectory "$output/platform/mesa-switch"
+  if($LASTEXITCODE){throw 'Mesa source notices collection failed'}
+  $runtimeRoot=Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $build.mesa_rust_libraries))))
+  foreach($name in @('COPYRIGHT','LICENSE-MIT','LICENSE-APACHE')){
+    New-Item -ItemType Directory -Force "$output/rust/mesa-shader-runtime"|Out-Null
+    Copy-Item -LiteralPath "$runtimeRoot/$name" -Destination "$output/rust/mesa-shader-runtime/$name"
+  }
+  Copy-Item -LiteralPath "$projectRoot/third_party/mesa-switch-rust.lock.json" -Destination "$output/rust/mesa-shader-runtime/source-lock.json"
+  foreach($component in @('switch-zlib','switch-libzstd')){
+    New-Item -ItemType Directory -Force "$output/platform/$component"|Out-Null
+    Get-ChildItem "$WindowsDevkitPro/portlibs/switch/licenses/$component" -File|ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination "$output/platform/$component/$($_.Name)"}
+  }
+  Copy-Item -LiteralPath "$WindowsDevkitPro/portlibs/switch/include/expat.h" -Destination "$output/platform/expat-notice-and-header.h"
+  $sdkFiles=@(Get-ChildItem "$output/platform/mesa-switch","$output/rust/mesa-shader-runtime","$output/platform/switch-zlib","$output/platform/switch-libzstd","$output/platform/expat-notice-and-header.h" -Recurse -File|ForEach-Object {@{path=[IO.Path]::GetRelativePath($output,$_.FullName).Replace('\','/');sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}})
+  $inventory.Add(@{component='Mesa 26.2.4 NVC0/NVK SDK and matching Rust shader runtime; expat/zlib/zstd';source="https://github.com/danfromtico/mesa-switch/tree/$revision";scope='Conservative source copyright/license notices, not a claim that every source component is linked';files=$sdkFiles})
+}
 $charsetFiles=@()
 foreach($name in @('LICENSE','SOURCE.md')){
   $destination=Join-Path $output "android/charset/$name"

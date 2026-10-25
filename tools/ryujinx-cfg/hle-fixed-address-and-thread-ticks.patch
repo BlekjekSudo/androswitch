@@ -1,0 +1,42 @@
+diff --git a/src/Ryujinx.HLE/HOS/Kernel/SupervisorCall/InfoType.cs b/src/Ryujinx.HLE/HOS/Kernel/SupervisorCall/InfoType.cs
+index cbaae87..6b6cf37 100644
+--- a/src/Ryujinx.HLE/HOS/Kernel/SupervisorCall/InfoType.cs
++++ b/src/Ryujinx.HLE/HOS/Kernel/SupervisorCall/InfoType.cs
+@@ -35,2 +35,3 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
+         MesosphereCurrentProcess = 65001,
++        ThreadTickCountDeprecated = 0xF0000002,
+     }
+diff --git a/src/Ryujinx.HLE/HOS/Kernel/SupervisorCall/Syscall.cs b/src/Ryujinx.HLE/HOS/Kernel/SupervisorCall/Syscall.cs
+index c672206..2750e09 100644
+--- a/src/Ryujinx.HLE/HOS/Kernel/SupervisorCall/Syscall.cs
++++ b/src/Ryujinx.HLE/HOS/Kernel/SupervisorCall/Syscall.cs
+@@ -2139,2 +2139,3 @@ namespace Ryujinx.HLE.HOS.Kernel.SupervisorCall
+                 case InfoType.ThreadTickCount:
++                case InfoType.ThreadTickCountDeprecated:
+                     {
+diff --git a/src/Ryujinx.HLE/HOS/Services/Nv/NvDrvServices/NvHostAsGpu/NvHostAsGpuDeviceFile.cs b/src/Ryujinx.HLE/HOS/Services/Nv/NvDrvServices/NvHostAsGpu/NvHostAsGpuDeviceFile.cs
+index f21efce..21a8377 100644
+--- a/src/Ryujinx.HLE/HOS/Services/Nv/NvDrvServices/NvHostAsGpu/NvHostAsGpuDeviceFile.cs
++++ b/src/Ryujinx.HLE/HOS/Services/Nv/NvDrvServices/NvHostAsGpu/NvHostAsGpuDeviceFile.cs
+@@ -136,3 +136,5 @@ namespace Ryujinx.HLE.HOS.Services.Nv.NvDrvServices.NvHostAsGpu
+                         _memoryAllocator.AllocateRange(arguments.Offset, size, freeAddressStartPosition);
+-                        address = freeAddressStartPosition;
++                        // The free-range floor is allocator bookkeeping. Fixed
++                        // allocations must preserve the requested GPU address.
++                        address = arguments.Offset;
+                     }
+@@ -315,3 +317,3 @@ namespace Ryujinx.HLE.HOS.Services.Nv.NvDrvServices.NvHostAsGpu
+                 }
+-                else
++                else if (result == NvInternalResult.Success)
+                 {
+diff --git a/src/Ryujinx.HLE/HOS/Services/Nv/NvDrvServices/NvHostAsGpu/Types/AddressSpaceContext.cs b/src/Ryujinx.HLE/HOS/Services/Nv/NvDrvServices/NvHostAsGpu/Types/AddressSpaceContext.cs
+index 9dd52e6..dca2b9b 100644
+--- a/src/Ryujinx.HLE/HOS/Services/Nv/NvDrvServices/NvHostAsGpu/Types/AddressSpaceContext.cs
++++ b/src/Ryujinx.HLE/HOS/Services/Nv/NvDrvServices/NvHostAsGpu/Types/AddressSpaceContext.cs
+@@ -61,3 +61,4 @@ namespace Ryujinx.HLE.HOS.Services.Nv.NvDrvServices.NvHostAsGpu.Types
+             // Check if region is reserved.
+-            if (BinarySearch(_reservations, address) == null)
++            Range reservation = BinarySearch(_reservations, address);
++            if (reservation == null || mapEnd > reservation.End)
+             {
