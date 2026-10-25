@@ -2587,3 +2587,537 @@ fn rtdb_listener_writing_in_callback_is_bounded_not_recursive() {
     );
     assert!(e.gms_rtdb_value("loop").is_some());
 }
+
+// ── Regressões (auditoria de estabilização, Tasks):
+// (a) um OnCompleteListener que se re-adiciona à mesma Task abortava o
+//     processo (entrega síncrona recursiva sem guarda);
+// (b) de bytecode real, o arm GMS_TASK do M10 sequestrava TODAS as
+//     Tasks do shim com defaults rd_complete/rd_success=1 — Tasks
+//     pendentes/falhadas liam-se como sucesso com getResult() null.
+//     Os testes via call_instance directo não viam (b); estes passam
+//     pelo interpretador (vm.call).
+#[test]
+fn task_listener_readding_itself_is_bounded_not_recursive() {
+    let mut b = DexBuilder::new();
+    let cls = b.class("LTLoop;", "Ljava/lang/Object;");
+    b.static_field(cls, "calls", "I", common::SVal::Int(0));
+    let f_calls = b.field_idx("LTLoop;", "I", "calls");
+    let p_add = b.proto_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        vec!["Lcom/google/android/gms/tasks/OnCompleteListener;".into()],
+    );
+    let m_add = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_add,
+        "addOnCompleteListener",
+    );
+    b.r#virtual(
+        cls,
+        "onComplete",
+        "V",
+        vec!["Lcom/google/android/gms/tasks/Task;"],
+        ACC_PUBLIC,
+        Some(b.code(5, 2, 2, {
+            let mut u = op21c(0x60, 0, f_calls);
+            u.extend(op11n(0x12, 1, 1));
+            u.extend(op23x(0x90, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_calls));
+            u.extend(op35c(0x6E, 2, m_add, [4, 3, 0, 0, 0])); // task.add(this)
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    let t = ov(cs!(
+        e,
+        TASKS,
+        "forResult",
+        "(Ljava/lang/Object;)Lcom/google/android/gms/tasks/Task;",
+        [Value::Int(7)]
+    )
+    .unwrap());
+    let lis = obj(&mut e, "LTLoop;");
+    let r = ci!(
+        e,
+        TASK,
+        "addOnCompleteListener",
+        "(Lcom/google/android/gms/tasks/OnCompleteListener;)Lcom/google/android/gms/tasks/Task;",
+        t,
+        [Value::Obj(lis)]
+    );
+    assert!(r.is_ok(), "o registo conclui sem crash: {r:?}");
+    let calls = match e.statics.get(&("LTLoop;".to_string(), "calls".to_string())) {
+        Some(Value::Int(n)) => *n,
+        _ => 0,
+    };
+    assert!(calls > 1, "entregas iterativas aconteceram (calls={calls})");
+    assert!(calls <= 4096, "limitadas pelo teto (calls={calls})");
+}
+
+#[test]
+fn gms_tasks_are_observed_correctly_from_bytecode() {
+    // Classe-sonda DEX: lê isComplete/isSuccessful e regista um
+    // OnSuccessListener — tudo via invoke-virtual do interpretador.
+    let mut b = DexBuilder::new();
+    let probe = b.class("LTaskProbe;", "Ljava/lang/Object;");
+    b.static_field(probe, "complete", "I", common::SVal::Int(-1));
+    b.static_field(probe, "successful", "I", common::SVal::Int(-1));
+    let f_complete = b.field_idx("LTaskProbe;", "I", "complete");
+    let f_successful = b.field_idx("LTaskProbe;", "I", "successful");
+    let lis = b.class("LProbeLis;", "Ljava/lang/Object;");
+    b.static_field(lis, "calls", "I", common::SVal::Int(0));
+    b.static_field(lis, "last", "Ljava/lang/Object;", common::SVal::Int(0));
+    let f_calls = b.field_idx("LProbeLis;", "I", "calls");
+    let f_last = b.field_idx("LProbeLis;", "Ljava/lang/Object;", "last");
+    let p_task = b.proto_idx("Lcom/google/android/gms/tasks/Task;", vec![]);
+    let p_bool = b.proto_idx("Z", vec![]);
+    let p_add = b.proto_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        vec!["Lcom/google/android/gms/tasks/OnSuccessListener;".into()],
+    );
+    let m_complete = b.method_idx("Lcom/google/android/gms/tasks/Task;", p_bool, "isComplete");
+    let m_successful = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_bool,
+        "isSuccessful",
+    );
+    let m_add = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_add,
+        "addOnSuccessListener",
+    );
+    let _ = p_task;
+    // static observe(Task, Object listener)
+    b.direct(
+        probe,
+        "observe",
+        "V",
+        vec!["Lcom/google/android/gms/tasks/Task;", "Ljava/lang/Object;"],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(4, 2, 2, {
+            // ins=2: v2=task, v3=listener
+            let mut u = op35c(0x6E, 1, m_complete, [2, 0, 0, 0, 0]);
+            u.extend(op11x(0x0A, 0)); // move-result v0
+            u.extend(op21c(0x67, 0, f_complete));
+            u.extend(op35c(0x6E, 1, m_successful, [2, 0, 0, 0, 0]));
+            u.extend(op11x(0x0A, 0));
+            u.extend(op21c(0x67, 0, f_successful));
+            u.extend(op35c(0x6E, 2, m_add, [2, 3, 0, 0, 0]));
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    b.r#virtual(
+        lis,
+        "onSuccess",
+        "V",
+        vec!["Ljava/lang/Object;"],
+        ACC_PUBLIC,
+        Some(b.code(5, 2, 2, {
+            let mut u = op21c(0x60, 0, f_calls);
+            u.extend(op11n(0x12, 1, 1));
+            u.extend(op23x(0x90, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_calls));
+            u.extend(op21c(0x69, 4, f_last)); // sput-object v4(arg), last
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+
+    let mut e = engine_of(&b);
+    // Task pendente via TaskCompletionSource (host).
+    let tcs = obj(&mut e, TASK_SOURCE);
+    ci!(e, TASK_SOURCE, "<init>", "()V", tcs, []).unwrap();
+    let task = ov(ci!(
+        e,
+        TASK_SOURCE,
+        "getTask",
+        "()Lcom/google/android/gms/tasks/Task;",
+        tcs,
+        []
+    )
+    .unwrap());
+    let listener = obj(&mut e, "LProbeLis;");
+    let sget = |e: &Engine, cls: &str, f: &str| -> Value {
+        e.statics
+            .get(&(cls.to_string(), f.to_string()))
+            .cloned()
+            .unwrap_or(Value::Null)
+    };
+    e.invoke_static(
+        "LTaskProbe;",
+        "observe",
+        "(Lcom/google/android/gms/tasks/Task;Ljava/lang/Object;)V",
+        &[Value::Obj(task), Value::Obj(listener)],
+    )
+    .unwrap();
+    // Pendente: NEM completa NEM com sucesso, listener por disparar.
+    assert_eq!(sget(&e, "LTaskProbe;", "complete"), Value::Int(0));
+    assert_eq!(sget(&e, "LTaskProbe;", "successful"), Value::Int(0));
+    // (estáticos de classes ainda intocadas podem não estar
+    // materializados no mapa — ausência lê-se como 0.)
+    assert!(
+        matches!(sget(&e, "LProbeLis;", "calls"), Value::Int(0) | Value::Null),
+        "listener ainda não disparou"
+    );
+
+    let v = s(&mut e, "quarenta");
+    ci!(
+        e,
+        TASK_SOURCE,
+        "setResult",
+        "(Ljava/lang/Object;)V",
+        tcs,
+        [v]
+    )
+    .unwrap();
+    assert_eq!(sget(&e, "LProbeLis;", "calls"), Value::Int(1));
+    match sget(&e, "LProbeLis;", "last") {
+        Value::Obj(r) => assert_eq!(e.heap.as_str(r).unwrap(), "quarenta"),
+        other => panic!("resultado entregue: {other:?}"),
+    }
+    e.invoke_static(
+        "LTaskProbe;",
+        "observe",
+        "(Lcom/google/android/gms/tasks/Task;Ljava/lang/Object;)V",
+        &[Value::Obj(task), Value::Obj(listener)],
+    )
+    .unwrap();
+    assert_eq!(sget(&e, "LTaskProbe;", "complete"), Value::Int(1));
+    assert_eq!(sget(&e, "LTaskProbe;", "successful"), Value::Int(1));
+}
+
+// ── Regressão (auditoria; achado do 404-Agent no #315): de bytecode,
+// Tasks.forResult era cunhado pelo M10 (campos rd_*) e ficava fora do
+// motor de Tasks do shim — continueWith/getResult quebravam em
+// combinação. Agora forResult cai para o shim como qualquer Task.
+#[test]
+fn tasks_for_result_from_bytecode_lives_in_the_gms_engine() {
+    let mut b = DexBuilder::new();
+    let probe = b.class("LFRProbe;", "Ljava/lang/Object;");
+    b.static_field(probe, "result", "Ljava/lang/Object;", common::SVal::Int(0));
+    let f_result = b.field_idx("LFRProbe;", "Ljava/lang/Object;", "result");
+    let cont = b.class("LFRCont;", "Ljava/lang/Object;");
+    b.static_field(cont, "calls", "I", common::SVal::Int(0));
+    let f_calls = b.field_idx("LFRCont;", "I", "calls");
+    let s_valor = b.intern("valor") as u16;
+    let p_for_result = b.proto_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        vec!["Ljava/lang/Object;".to_string()],
+    );
+    let p_get_result = b.proto_idx("Ljava/lang/Object;", vec![]);
+    let p_cont = b.proto_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        vec!["Lcom/google/android/gms/tasks/Continuation;".to_string()],
+    );
+    let m_for_result = b.method_idx(
+        "Lcom/google/android/gms/tasks/Tasks;",
+        p_for_result,
+        "forResult",
+    );
+    let m_get_result = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_get_result,
+        "getResult",
+    );
+    let m_cont = b.method_idx(
+        "Lcom/google/android/gms/tasks/Task;",
+        p_cont,
+        "continueWith",
+    );
+    // static run(Object cont)
+    b.direct(
+        probe,
+        "run",
+        "V",
+        vec!["Ljava/lang/Object;"],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(4, 1, 2, {
+            // ins=1: v3=cont
+            let mut u = op21c(0x1A, 0, s_valor); // const-string v0, "valor"
+            u.extend(op35c(0x71, 1, m_for_result, [0, 0, 0, 0, 0])); // forResult
+            u.extend(op11x(0x0C, 0)); // move-result-object v0 (task)
+            u.extend(op35c(0x6E, 2, m_cont, [0, 3, 0, 0, 0])); // task.continueWith(cont)
+            u.extend(op11x(0x0C, 1)); // v1 = task2 (ignorar)
+            u.extend(op35c(0x6E, 1, m_get_result, [0, 0, 0, 0, 0])); // task.getResult()
+            u.extend(op11x(0x0C, 0));
+            u.extend(op21c(0x69, 0, f_result)); // sput-object result
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    // Continuation.then(Task)Object: calls++; return null.
+    b.r#virtual(
+        cont,
+        "then",
+        "Ljava/lang/Object;",
+        vec!["Lcom/google/android/gms/tasks/Task;"],
+        ACC_PUBLIC,
+        Some(b.code(5, 2, 2, {
+            let mut u = op21c(0x60, 0, f_calls);
+            u.extend(op11n(0x12, 1, 1));
+            u.extend(op23x(0x90, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_calls));
+            u.extend(op11n(0x12, 0, 0)); // const/4 v0, 0 (null)
+            u.extend(op11x(0x11, 0)); // return-object v0
+            u
+        })),
+    );
+    let mut e = engine_of(&b);
+    let cont_obj = obj(&mut e, "LFRCont;");
+    e.invoke_static(
+        "LFRProbe;",
+        "run",
+        "(Ljava/lang/Object;)V",
+        &[Value::Obj(cont_obj)],
+    )
+    .unwrap();
+    match e
+        .statics
+        .get(&("LFRProbe;".to_string(), "result".to_string()))
+    {
+        Some(Value::Obj(r)) => assert_eq!(e.heap.as_str(*r).unwrap(), "valor"),
+        other => panic!("getResult via bytecode: {other:?}"),
+    }
+    assert_eq!(
+        e.statics
+            .get(&("LFRCont;".to_string(), "calls".to_string())),
+        Some(&Value::Int(1)),
+        "continueWith correu no motor do shim"
+    );
+}
+
+// ── Regressão (auditoria de estabilização): os logs do shim têm de
+// ser limitados. Antes do teto, 200 mil logEvent ficavam TODOS
+// retidos (crescimento ilimitado de RAM do hospedeiro por bytecode
+// em loop); agora retêm-se os mais recentes e os descartados contam.
+#[test]
+fn gms_logs_are_capped_with_dropped_counter() {
+    let mut e = engine_of(&DexBuilder::new());
+    let an = ov(cs!(
+        e,
+        FIREBASE_ANALYTICS,
+        "getInstance",
+        "(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;",
+        [Value::Null]
+    )
+    .unwrap());
+    let total = 25_000;
+    for i in 0..total {
+        let name = s(&mut e, &format!("evt{i}"));
+        ci!(
+            e,
+            FIREBASE_ANALYTICS,
+            "logEvent",
+            "(Ljava/lang/String;Landroid/os/Bundle;)V",
+            an,
+            [name, Value::Null]
+        )
+        .unwrap();
+    }
+    let kept = e.gms_analytics_events();
+    assert!(
+        kept.len() <= 2 * rd_vm::gms::MAX_GMS_LOG_ENTRIES,
+        "retidos limitados pelo teto: {}",
+        kept.len()
+    );
+    assert_eq!(
+        kept.len() + e.gms_dropped_log_entries(),
+        total,
+        "contabilidade retidos+descartados = total"
+    );
+    assert_eq!(
+        kept.last().map(|ev| ev.name.as_str()),
+        Some("evt24999"),
+        "os mais recentes são os retidos"
+    );
+}
+
+// ── Regressão (auditoria): PurchasesUpdatedListener que relança o
+// fluxo no próprio callback (retry em loop) não pode recursar a
+// entrega síncrona até ao SIGABRT do hospedeiro.
+#[test]
+fn billing_listener_relaunching_flow_is_bounded() {
+    let mut b = DexBuilder::new();
+    let cls = b.class("LBillLoop;", "Ljava/lang/Object;");
+    b.static_field(cls, "calls", "I", common::SVal::Int(0));
+    b.static_field(cls, "client", "Ljava/lang/Object;", common::SVal::Int(0));
+    b.static_field(cls, "params", "Ljava/lang/Object;", common::SVal::Int(0));
+    let f_calls = b.field_idx("LBillLoop;", "I", "calls");
+    let f_client = b.field_idx("LBillLoop;", "Ljava/lang/Object;", "client");
+    let f_params = b.field_idx("LBillLoop;", "Ljava/lang/Object;", "params");
+    let p_launch = b.proto_idx(
+        "Lcom/android/billingclient/api/BillingResult;",
+        vec![
+            "Landroid/app/Activity;".to_string(),
+            "Lcom/android/billingclient/api/BillingFlowParams;".to_string(),
+        ],
+    );
+    let m_launch = b.method_idx(
+        "Lcom/android/billingclient/api/BillingClient;",
+        p_launch,
+        "launchBillingFlow",
+    );
+    b.direct(
+        cls,
+        "arm",
+        "V",
+        vec!["Ljava/lang/Object;", "Ljava/lang/Object;"],
+        ACC_PUBLIC | ACC_STATIC,
+        Some(b.code(3, 2, 2, {
+            let mut u = op21c(0x69, 1, f_client);
+            u.extend(op21c(0x69, 2, f_params));
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    b.r#virtual(
+        cls,
+        "onPurchasesUpdated",
+        "V",
+        vec![
+            "Lcom/android/billingclient/api/BillingResult;",
+            "Ljava/util/List;",
+        ],
+        ACC_PUBLIC,
+        Some(b.code(5, 3, 3, {
+            let mut u = op21c(0x60, 0, f_calls);
+            u.extend(op11n(0x12, 1, 1));
+            u.extend(op23x(0x90, 0, 0, 1));
+            u.extend(op21c(0x67, 0, f_calls));
+            u.extend(op21c(0x62, 0, f_client));
+            u.extend(op21c(0x62, 1, f_params));
+            u.extend(op11n(0x12, 2, 0));
+            u.extend(op35c(0x6E, 3, m_launch, [0, 2, 1, 0, 0])); // relança!
+            u.extend(op10x(0x0E));
+            u
+        })),
+    );
+    counter_observer_class(
+        &mut b,
+        "LStateLis2;",
+        "onBillingSetupFinished",
+        vec!["Lcom/android/billingclient/api/BillingResult;"],
+    );
+    counter_observer_class(
+        &mut b,
+        "LSkuLis2;",
+        "onSkuDetailsResponse",
+        vec![
+            "Lcom/android/billingclient/api/BillingResult;",
+            "Ljava/util/List;",
+        ],
+    );
+
+    let mut e = engine_of(&b);
+    e.gms_billing_add_sku(
+        "coins100",
+        "inapp",
+        "R$ 4,99",
+        4_990_000,
+        "BRL",
+        "100 moedas",
+    );
+    let lis = obj(&mut e, "LBillLoop;");
+    let client = billing_client_with_listeners(&mut e, lis);
+    let state_lis = obj(&mut e, "LStateLis2;");
+    ci!(
+        e,
+        BILLING_CLIENT,
+        "startConnection",
+        "(Lcom/android/billingclient/api/BillingClientStateListener;)V",
+        client,
+        [Value::Obj(state_lis)]
+    )
+    .unwrap();
+    let params_builder = ov(cs!(
+        e,
+        SKU_PARAMS,
+        "newBuilder",
+        "()Lcom/android/billingclient/api/SkuDetailsParams$Builder;",
+        []
+    )
+    .unwrap());
+    let id = s(&mut e, "coins100");
+    let skus = host_list(&mut e, vec![id]);
+    ci!(
+        e,
+        SKU_PARAMS_BUILDER,
+        "setSkusList",
+        "(Ljava/util/List;)Lcom/android/billingclient/api/SkuDetailsParams$Builder;",
+        params_builder,
+        [skus]
+    )
+    .unwrap();
+    let typ = s(&mut e, "inapp");
+    ci!(
+        e,
+        SKU_PARAMS_BUILDER,
+        "setType",
+        "(Ljava/lang/String;)Lcom/android/billingclient/api/SkuDetailsParams$Builder;",
+        params_builder,
+        [typ]
+    )
+    .unwrap();
+    let qp = ov(ci!(
+        e,
+        SKU_PARAMS_BUILDER,
+        "build",
+        "()Lcom/android/billingclient/api/SkuDetailsParams;",
+        params_builder,
+        []
+    )
+    .unwrap());
+    let sku_listener = obj(&mut e, "LSkuLis2;");
+    ci!(e, BILLING_CLIENT, "querySkuDetailsAsync",
+        "(Lcom/android/billingclient/api/SkuDetailsParams;Lcom/android/billingclient/api/SkuDetailsResponseListener;)V",
+        client, [Value::Obj(qp), Value::Obj(sku_listener)]).unwrap();
+    let sku_obj = *e
+        .fw
+        .gms
+        .sku_details_objs
+        .keys()
+        .next()
+        .expect("SkuDetails cunhado");
+    let flow_builder = ov(cs!(
+        e,
+        FLOW_PARAMS,
+        "newBuilder",
+        "()Lcom/android/billingclient/api/BillingFlowParams$Builder;",
+        []
+    )
+    .unwrap());
+    ci!(e, FLOW_PARAMS_BUILDER, "setSkuDetails",
+        "(Lcom/android/billingclient/api/SkuDetails;)Lcom/android/billingclient/api/BillingFlowParams$Builder;",
+        flow_builder, [Value::Obj(sku_obj)]).unwrap();
+    let flow = ov(ci!(
+        e,
+        FLOW_PARAMS_BUILDER,
+        "build",
+        "()Lcom/android/billingclient/api/BillingFlowParams;",
+        flow_builder,
+        []
+    )
+    .unwrap());
+    e.invoke_static(
+        "LBillLoop;",
+        "arm",
+        "(Ljava/lang/Object;Ljava/lang/Object;)V",
+        &[Value::Obj(client), Value::Obj(flow)],
+    )
+    .unwrap();
+    let r = ci!(e, BILLING_CLIENT, "launchBillingFlow",
+        "(Landroid/app/Activity;Lcom/android/billingclient/api/BillingFlowParams;)Lcom/android/billingclient/api/BillingResult;",
+        client, [Value::Null, Value::Obj(flow)]);
+    assert!(r.is_ok(), "o lançamento exterior conclui: {r:?}");
+    let calls = match e
+        .statics
+        .get(&("LBillLoop;".to_string(), "calls".to_string()))
+    {
+        Some(Value::Int(n)) => *n,
+        _ => 0,
+    };
+    assert!(calls > 1, "relançamentos aconteceram (calls={calls})");
+    assert!(calls <= 16, "limitados pelo fusível (calls={calls})");
+    assert!(e.gms_dropped_callbacks() >= 1, "o excesso foi contado");
+}
