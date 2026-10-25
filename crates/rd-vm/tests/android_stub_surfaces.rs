@@ -24533,6 +24533,45 @@ fn telecom_values_and_no_service_manager_are_guest_visible() {
         ),
         ""
     );
+
+    // Deep audit: PhoneAccountHandle.checkParameters only logs — null
+    // component, id and user handle are all stored without rejection,
+    // and equality/hash tolerate the null fields.
+    let null_handle_a = p49_new(
+        &mut engine,
+        P36I_HANDLE,
+        "(Landroid/content/ComponentName;Ljava/lang/String;Landroid/os/UserHandle;)V",
+        &[Value::Null, Value::Null, Value::Null],
+    );
+    let null_handle_b = p49_new(
+        &mut engine,
+        P36I_HANDLE,
+        "(Landroid/content/ComponentName;Ljava/lang/String;Landroid/os/UserHandle;)V",
+        &[Value::Null, Value::Null, Value::Null],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            null_handle_a,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(null_handle_b)]
+        ),
+        Value::Int(1)
+    );
+    let hash_a = call(&mut engine, null_handle_a, "hashCode", "()I", &[]);
+    let hash_b = call(&mut engine, null_handle_b, "hashCode", "()I", &[]);
+    assert_eq!(hash_a, hash_b);
+    assert_eq!(
+        call(
+            &mut engine,
+            null_handle_a,
+            "getId",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        Value::Null
+    );
 }
 
 #[test]
