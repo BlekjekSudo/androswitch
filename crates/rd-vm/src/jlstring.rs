@@ -40,6 +40,32 @@ fn npe(msg: &str) -> VmExit {
 fn new_str(vm: &mut Engine, s: String) -> Result<Value, VmExit> {
     Ok(Value::Obj(crate::intrinsics::alloc_string(vm, s)?))
 }
+
+/// Rejects host-side `String` allocations that would exceed `vm.heap.budget()`
+/// before allocating multi-gigabyte buffers in the global Rust allocator (#270).
+fn check_string_budget(vm: &Engine, byte_len: Option<usize>) -> Result<usize, VmExit> {
+    let budget = vm.heap.budget();
+    let used = vm.heap.used();
+    let oom = |req: usize| {
+        exc(
+            "Ljava/lang/OutOfMemoryError;",
+            format!("alocação de {req} bytes excede o heap de {budget} bytes"),
+        )
+    };
+    let Some(len) = byte_len else {
+        return Err(oom(usize::MAX));
+    };
+    let Some(heap_cost) = len.checked_mul(2).and_then(|b| b.checked_add(32)) else {
+        return Err(oom(usize::MAX));
+    };
+    if used
+        .checked_add(heap_cost)
+        .map_or(true, |total| total > budget)
+    {
+        return Err(oom(heap_cost));
+    }
+    Ok(len)
+}
 fn u16s(s: &str) -> Vec<u16> {
     s.encode_utf16().collect()
 }
@@ -169,10 +195,35 @@ pub(crate) fn encode(s: &str, cs: &str) -> Vec<u8> {
             .chars()
             .map(|c| if c.is_ascii() { c as u8 } else { b'?' })
             .collect(),
-        "UTF-16" | "UTF-16BE" => s.encode_utf16().flat_map(|u| u.to_be_bytes()).collect(),
-        "UTF-16LE" => s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect(),
+        "UTF-16" | "UTF_16" | "UTF-16BE" | "UTF_16BE" | "X-UTF-16BE" | "UNICODEBIGUNMARKED" => {
+            s.encode_utf16().flat_map(|u| u.to_be_bytes()).collect()
+        }
+        "UTF-16LE" | "UTF_16LE" | "X-UTF-16LE" | "UNICODELITTLEUNMARKED" => {
+            s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect()
+        }
         _ => s.as_bytes().to_vec(),
     }
+}
+
+fn decode_utf16_units(b: &[u8], little_endian: bool) -> String {
+    let mut units = Vec::with_capacity(b.len() / 2);
+    let chunks = b.chunks_exact(2);
+    let has_rem = !chunks.remainder().is_empty();
+    for pair in chunks {
+        let u = if little_endian {
+            u16::from_le_bytes([pair[0], pair[1]])
+        } else {
+            u16::from_be_bytes([pair[0], pair[1]])
+        };
+        units.push(u);
+    }
+    let mut out: String = char::decode_utf16(units)
+        .map(|r| r.unwrap_or('\u{FFFD}'))
+        .collect();
+    if has_rem {
+        out.push('\u{FFFD}');
+    }
+    out
 }
 
 pub(crate) fn decode(b: &[u8], cs: &str) -> String {
@@ -182,8 +233,46 @@ pub(crate) fn decode(b: &[u8], cs: &str) -> String {
             .iter()
             .map(|&x| if x < 128 { x as char } else { '\u{FFFD}' })
             .collect(),
+        "UTF-16" | "UTF_16" => {
+            if let Some(rest) = b.strip_prefix(&[0xFE, 0xFF]) {
+                decode_utf16_units(rest, false)
+            } else if let Some(rest) = b.strip_prefix(&[0xFF, 0xFE]) {
+                decode_utf16_units(rest, true)
+            } else {
+                decode_utf16_units(b, false)
+            }
+        }
+        "UTF-16BE" | "UTF_16BE" | "X-UTF-16BE" | "UNICODEBIGUNMARKED" => {
+            decode_utf16_units(b, false)
+        }
+        "UTF-16LE" | "UTF_16LE" | "X-UTF-16LE" | "UNICODELITTLEUNMARKED" => {
+            decode_utf16_units(b, true)
+        }
         _ => String::from_utf8_lossy(b).into_owned(),
     }
+}
+
+fn string_matches(input: &str, pat: &str) -> Result<bool, VmExit> {
+    // Validate raw pattern syntax and 64 KiB cap first.
+    compile(pat)?;
+    let body = crate::jregex::translate(pat, 0);
+    let build = |s: &str| -> Result<fancy_regex::Regex, Box<fancy_regex::Error>> {
+        fancy_regex::RegexBuilder::new(s)
+            .backtrack_limit(100_000)
+            .delegate_size_limit(2 << 20)
+            .delegate_dfa_size_limit(2 << 20)
+            .build()
+            .map_err(Box::new)
+    };
+    let full = build(&format!(r"\A(?:{body})\z"))
+        .or_else(|_| build(&format!("\\A(?:{body}\n)\\z")))
+        .map_err(|e| {
+            exc(
+                "Ljava/util/regex/PatternSyntaxException;",
+                format!("{pat}: not supported by RustyDroid's regex engine ({e})"),
+            )
+        })?;
+    full.is_match(input).map_err(crate::jregex::runtime_error)
 }
 
 pub(crate) fn instance_intrinsic(
@@ -322,9 +411,10 @@ pub(crate) fn instance_intrinsic(
             let p = u16s(&charseq(vm, &args[0])?);
             let u = u16s(&this);
             let off = int(1);
-            b(off >= 0
-                && (off as usize) + p.len() <= u.len()
-                && u[off as usize..off as usize + p.len()] == p[..])
+            b(usize::try_from(off)
+                .ok()
+                .and_then(|o| o.checked_add(p.len()).map(|end| (o, end)))
+                .is_some_and(|(o, end)| end <= u.len() && u[o..end] == p[..]))
         }
         ("regionMatches", "(ILjava/lang/String;II)Z")
         | ("regionMatches", "(ZILjava/lang/String;II)Z") => {
@@ -347,8 +437,9 @@ pub(crate) fn instance_intrinsic(
             } else if len <= 0 {
                 b(true)
             } else {
-                let x = from_u16(&a[to as usize..(to + len) as usize]);
-                let y = from_u16(&o[oo as usize..(oo + len) as usize]);
+                let (to_u, oo_u, len_u) = (to as usize, oo as usize, len as usize);
+                let x = from_u16(&a[to_u..to_u + len_u]);
+                let y = from_u16(&o[oo_u..oo_u + len_u]);
                 b(if ic {
                     x.to_lowercase() == y.to_lowercase()
                 } else {
@@ -403,12 +494,25 @@ pub(crate) fn instance_intrinsic(
                     format!("count is negative: {n}"),
                 ));
             }
-            new_str(vm, this.repeat(n as usize))?
+            if n == 0 || this.is_empty() {
+                new_str(vm, String::new())?
+            } else if n == 1 {
+                Value::Obj(recv)
+            } else {
+                check_string_budget(vm, this.len().checked_mul(n as usize))?;
+                new_str(vm, this.repeat(n as usize))?
+            }
         }
         ("replace", "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;") => {
             let (t, r) = (charseq(vm, &args[0])?, charseq(vm, &args[1])?);
             if t.is_empty() {
                 // JDK: empty target inserts the replacement between every char
+                let n_chars = this.chars().count();
+                let est = n_chars
+                    .checked_add(1)
+                    .and_then(|k| k.checked_mul(r.len()))
+                    .and_then(|b| b.checked_add(this.len()));
+                check_string_budget(vm, est)?;
                 let mut out = r.clone();
                 for c in this.chars() {
                     out.push(c);
@@ -439,9 +543,7 @@ pub(crate) fn instance_intrinsic(
         }
         ("matches", "(Ljava/lang/String;)Z") => {
             let p = charseq(vm, &args[0])?;
-            b(compile(&format!(r"\A(?:{p})\z"))?
-                .is_match(&this)
-                .map_err(crate::jregex::runtime_error)?)
+            b(string_matches(&this, &p)?)
         }
         ("getBytes", "()[B") => byte_array(vm, this.as_bytes())?,
         ("getBytes", "(Ljava/lang/String;)[B") | ("getBytes", "(Ljava/nio/charset/Charset;)[B") => {
@@ -471,30 +573,37 @@ fn string_ctor(
         "([BII)V" | "([BIILjava/lang/String;)V" | "([BIILjava/nio/charset/Charset;)V" => {
             let all = int_elems(vm, &args[0])?;
             let (o, n) = (args[1].as_int()?, args[2].as_int()?);
-            if o < 0 || n < 0 || (o + n) as usize > all.len() {
+            let Some((start, end)) = usize::try_from(o)
+                .ok()
+                .zip(usize::try_from(n).ok())
+                .and_then(|(s, len)| s.checked_add(len).map(|e| (s, e)))
+                .filter(|&(_, end)| end <= all.len())
+            else {
                 return Err(exc(
                     "Ljava/lang/StringIndexOutOfBoundsException;",
                     format!("offset {o}, count {n}, length {}", all.len()),
                 ));
-            }
-            let b: Vec<u8> = all[o as usize..(o + n) as usize]
-                .iter()
-                .map(|x| *x as u8)
-                .collect();
+            };
+            let b: Vec<u8> = all[start..end].iter().map(|x| *x as u8).collect();
             let cs = charset_name(vm, args.get(3))?;
             decode(&b, &cs)
         }
         "([III)V" => {
             let all = int_elems(vm, &args[0])?;
             let (o, n) = (args[1].as_int()?, args[2].as_int()?);
-            if o < 0 || n < 0 || (o + n) as usize > all.len() {
+            let Some((start, end)) = usize::try_from(o)
+                .ok()
+                .zip(usize::try_from(n).ok())
+                .and_then(|(s, len)| s.checked_add(len).map(|e| (s, e)))
+                .filter(|&(_, end)| end <= all.len())
+            else {
                 return Err(exc(
                     "Ljava/lang/StringIndexOutOfBoundsException;",
                     format!("offset {o}, count {n}"),
                 ));
-            }
+            };
             let mut out = String::new();
-            for cp in &all[o as usize..(o + n) as usize] {
+            for cp in &all[start..end] {
                 match char::from_u32(*cp as u32) {
                     Some(c) => out.push(c),
                     None => {
@@ -661,7 +770,12 @@ pub(crate) fn java_format(
         }
         let mut explicit: Option<usize> = None;
         if i < chars.len() && chars[i] == '$' && !num.is_empty() {
-            explicit = num.parse::<usize>().ok().map(|n| n.saturating_sub(1));
+            let idx_1based = num
+                .parse::<usize>()
+                .ok()
+                .filter(|&n| n >= 1)
+                .ok_or_else(|| bad(format!("{num}$")))?;
+            explicit = Some(idx_1based - 1);
             i += 1;
         } else {
             i = start;
@@ -671,12 +785,12 @@ pub(crate) fn java_format(
             flags.push(chars[i]);
             i += 1;
         }
-        let mut width = String::new();
+        let mut width_str = String::new();
         while i < chars.len() && chars[i].is_ascii_digit() {
-            width.push(chars[i]);
+            width_str.push(chars[i]);
             i += 1;
         }
-        let mut prec: Option<usize> = None;
+        let mut prec_str: Option<String> = None;
         if i < chars.len() && chars[i] == '.' {
             i += 1;
             let mut p = String::new();
@@ -684,13 +798,43 @@ pub(crate) fn java_format(
                 p.push(chars[i]);
                 i += 1;
             }
-            prec = p.parse().ok();
+            prec_str = Some(p);
         }
         let Some(&conv) = chars.get(i) else {
             return Err(bad("%".into()));
         };
         i += 1;
-        let width: usize = width.parse().unwrap_or(0);
+        let width: usize = if width_str.is_empty() {
+            0
+        } else {
+            match width_str.parse::<usize>() {
+                Ok(w) => {
+                    check_string_budget(vm, out.len().checked_add(w))?;
+                    w
+                }
+                Err(_) => {
+                    check_string_budget(vm, None)?;
+                    0
+                }
+            }
+        };
+        let prec: Option<usize> = match &prec_str {
+            None => None,
+            Some(ps) if ps.is_empty() => Some(0),
+            Some(ps) => match ps.parse::<usize>() {
+                Ok(p) => {
+                    if matches!(conv, 'f' | 'e' | 'E' | 'g' | 'G') {
+                        check_string_budget(vm, out.len().checked_add(p))?;
+                    }
+                    Some(p)
+                }
+                Err(_) if matches!(conv, 'f' | 'e' | 'E' | 'g' | 'G') => {
+                    check_string_budget(vm, None)?;
+                    None
+                }
+                Err(_) => Some(usize::MAX),
+            },
+        };
         let mut take = || -> Result<Value, VmExit> {
             let idx = explicit.unwrap_or_else(|| {
                 let k = next_arg;
@@ -776,7 +920,9 @@ pub(crate) fn java_format(
                 let n = match as_num(vm, &v) {
                     Some(Num::I(x)) => x,
                     _ if matches!(v, Value::Null) => {
-                        out.push_str(&pad("null".into(), width, &flags));
+                        let chunk = pad("null".into(), width, &flags);
+                        check_string_budget(vm, out.len().checked_add(chunk.len()))?;
+                        out.push_str(&chunk);
                         continue;
                     }
                     _ => {
@@ -834,7 +980,9 @@ pub(crate) fn java_format(
                         ))
                     }
                     None if matches!(v, Value::Null) => {
-                        out.push_str(&pad("null".into(), width, &flags));
+                        let chunk = pad("null".into(), width, &flags);
+                        check_string_budget(vm, out.len().checked_add(chunk.len()))?;
+                        out.push_str(&chunk);
                         continue;
                     }
                     None => {
@@ -917,11 +1065,13 @@ pub(crate) fn java_format(
             }
             other => return Err(bad(other.to_string())),
         };
-        if matches!(conv, 'd' | 'f' | 'e' | 'E' | 'g' | 'G') {
-            out.push_str(&body); // sign_pad already applied width
+        let chunk = if matches!(conv, 'd' | 'f' | 'e' | 'E' | 'g' | 'G') {
+            body // sign_pad already applied width
         } else {
-            out.push_str(&pad(body, width, &flags));
-        }
+            pad(body, width, &flags)
+        };
+        check_string_budget(vm, out.len().checked_add(chunk.len()))?;
+        out.push_str(&chunk);
     }
     Ok(out)
 }

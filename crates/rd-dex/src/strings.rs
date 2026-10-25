@@ -11,6 +11,12 @@ use crate::read::Reader;
 
 pub const NO_INDEX: u32 = 0xFFFF_FFFF;
 
+/// Orçamento máximo absoluto de bytes decodificados no modo eager (`Strings::parse`),
+/// escalado também por `data.len()` para impedir amplificação `O(N * L)` quando
+/// múltiplos `string_id_item` apontam para o mesmo `string_data_off` ou sufixos
+/// sobrepostos (#285).
+const MAX_EAGER_STRING_BYTES: usize = 64 * 1024 * 1024;
+
 const CACHE_PAGE_SHIFT: usize = 8;
 const CACHE_PAGE_LEN: usize = 1 << CACHE_PAGE_SHIFT; // 256 strings/página
 const CACHE_PAGE_MASK: usize = CACHE_PAGE_LEN - 1;
@@ -123,12 +129,32 @@ impl Strings {
     pub fn parse(data: &[u8], count: u32, off: u32) -> RdResult<Strings> {
         let window = Self::validate_ids_window(data, count, off)?;
         let count = count as usize;
+        let byte_budget = data
+            .len()
+            .saturating_mul(4)
+            .clamp(64 * 1024, MAX_EAGER_STRING_BYTES);
+        let mut total_bytes = 0usize;
         let mut offsets = Vec::with_capacity(count);
-        let mut values = Vec::with_capacity(count.min(1 << 20));
+        let mut values = Vec::with_capacity(count.min(1 << 16));
         for (i, chunk) in window.chunks_exact(4).enumerate() {
             let abs = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-            let s = read_string_data(data, abs as usize)
+            let raw = read_string_slice(data, abs as usize)
                 .map_err(|e| RdError::parse(format!("string #{i} @ 0x{abs:x}: {}", e.cause)))?;
+            total_bytes = total_bytes.saturating_add(raw.len().saturating_add(1));
+            if total_bytes > byte_budget {
+                return Err(RdError::parse(format!(
+                    "strings: volume acumulado ({total_bytes} bytes) excede orçamento ({byte_budget} bytes) em DEX de {} bytes",
+                    data.len()
+                )));
+            }
+            let s = mutf8::decode(raw);
+            total_bytes = total_bytes.saturating_add(s.len().saturating_sub(raw.len()));
+            if total_bytes > byte_budget {
+                return Err(RdError::parse(format!(
+                    "strings: volume UTF-8 acumulado ({total_bytes} bytes) excede orçamento ({byte_budget} bytes) em DEX de {} bytes",
+                    data.len()
+                )));
+            }
             offsets.push(abs);
             values.push(s);
         }

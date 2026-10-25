@@ -835,7 +835,8 @@ fn make_bytes(vm: &mut Engine, bytes: &[u8]) -> Result<Value, VmExit> {
         .alloc_array(crate::heap::ElemKind::Int, bytes.len(), "[B")?;
     if let Ok(elems) = vm.heap.array_elems_mut(r) {
         elems.clear();
-        elems.extend(bytes.iter().map(|b| Value::Int(*b as i32)));
+        // issue #250: [B guarda byte COM sinal (-128..=127), como o aput-byte.
+        elems.extend(bytes.iter().map(|b| Value::Int(*b as i8 as i32)));
     }
     Ok(Value::Obj(r))
 }
@@ -6167,5 +6168,28 @@ impl Engine {
     /// Nº de Tasks por concluir — diagnóstico de esperas do app.
     pub fn gms_pending_tasks(&self) -> usize {
         self.fw.gms.tasks.values().filter(|t| !t.complete).count()
+    }
+}
+
+#[cfg(test)]
+mod narrow_bytes_250 {
+    use super::*;
+
+    /// issue #250: o `byte[]` criado pelo host guarda valores COM sinal,
+    /// a mesma invariante do aput-byte e do fill-array-data.
+    #[test]
+    fn make_bytes_is_signed() {
+        let mut vm = Engine::new(Vec::new(), Default::default());
+        let Value::Obj(r) = make_bytes(&mut vm, &[0xFF, 0x7F, 0x80, 0x00]).unwrap() else {
+            panic!("make_bytes deve devolver um objeto");
+        };
+        let got: Vec<i32> = vm
+            .heap
+            .array_elems_mut(r)
+            .unwrap()
+            .iter()
+            .map(|v| v.as_int().unwrap())
+            .collect();
+        assert_eq!(got, vec![-1, 127, -128, 0]);
     }
 }

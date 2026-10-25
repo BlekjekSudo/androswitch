@@ -9,6 +9,14 @@ on:
 permissions:
   contents: read
 
+# Concurrency (M12 ops, 2026-10-25): every push to a PR re-runs the whole
+# matrix (14 checks) while the previous run is still queued. With ~30 PRs open
+# that saturates the runner pool and `main` ends up waiting behind PR runs.
+# Pull-request runs are superseded by definition; `main` runs never are.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   docs-integrity:
     name: Docs integrity
@@ -214,6 +222,9 @@ jobs:
       - run: cargo check --workspace
       - run: cargo check -p rd-vm --features jit --locked
       - run: cargo check --workspace --all-features --locked
+      # issue #265: tests/, benches/, examples/ and #[cfg(test)] must also
+      # build on the MSRV (std::iter::repeat_n, 1.82, slipped into a test).
+      - run: cargo check --workspace --all-targets --all-features --locked
 
   fuzz-build:
     name: Fuzz targets build (nightly)

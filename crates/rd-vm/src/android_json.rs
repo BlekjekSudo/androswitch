@@ -16,6 +16,7 @@ const JSON_WRITER: &str = "Landroid/util/JsonWriter;";
 const JSON_TOKEN: &str = "Landroid/util/JsonToken;";
 
 const READER_TEXT: &str = "rd_json_text";
+const READER_BUF: &str = "rd_json_buf";
 const READER_POS: &str = "rd_json_pos";
 const READER_STACK: &str = "rd_json_stack";
 const READER_PATH_NAMES: &str = "rd_json_path_names";
@@ -59,6 +60,13 @@ fn set_string_field(
     field: &str,
     value: Option<&str>,
 ) -> Result<(), VmExit> {
+    match (get(vm, recv, field), value) {
+        (Value::Null, None) => return Ok(()),
+        (Value::Obj(existing), Some(text)) if vm.heap.as_str(existing) == Ok(text) => {
+            return Ok(());
+        }
+        _ => {}
+    }
     let value = match value {
         Some(text) => Value::Obj(crate::intrinsics::alloc_string(vm, text.to_string())?),
         None => Value::Null,
@@ -336,9 +344,7 @@ fn decode_path_names(encoded: Option<&str>, wanted: usize) -> Vec<Option<String>
 }
 
 #[derive(Clone, Debug)]
-struct ReaderState {
-    text: String,
-    text_loaded: bool,
+struct ReaderMeta {
     pos: usize,
     stack: Vec<Scope>,
     path_names: Vec<Option<String>>,
@@ -348,11 +354,9 @@ struct ReaderState {
     lenient: bool,
 }
 
-impl ReaderState {
+impl ReaderMeta {
     fn new() -> Self {
         Self {
-            text: String::new(),
-            text_loaded: false,
             pos: 0,
             stack: vec![Scope::EmptyDocument],
             path_names: vec![None],
@@ -360,6 +364,75 @@ impl ReaderState {
             peeked: None,
             peeked_string: None,
             lenient: false,
+        }
+    }
+
+    fn path(&self) -> String {
+        let mut path = String::from("$");
+        for (index, scope) in self.stack.iter().enumerate() {
+            match scope {
+                Scope::EmptyArray | Scope::NonemptyArray => {
+                    let element = self.path_indices.get(index).copied().unwrap_or(0);
+                    path.push('[');
+                    path.push_str(&element.to_string());
+                    path.push(']');
+                }
+                Scope::EmptyObject | Scope::DanglingName | Scope::NonemptyObject => {
+                    if let Some(Some(name)) = self.path_names.get(index) {
+                        path.push('.');
+                        path.push_str(name);
+                    }
+                }
+                Scope::EmptyDocument | Scope::NonemptyDocument | Scope::Closed => {}
+            }
+        }
+        path
+    }
+
+    fn mark_closed(&mut self) {
+        self.stack = vec![Scope::Closed];
+        self.path_names = vec![None];
+        self.path_indices = vec![0];
+        self.peeked = None;
+        self.peeked_string = None;
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ReaderState<'a> {
+    text: &'a str,
+    pos: usize,
+    stack: Vec<Scope>,
+    path_names: Vec<Option<String>>,
+    path_indices: Vec<i32>,
+    peeked: Option<Token>,
+    peeked_string: Option<String>,
+    lenient: bool,
+}
+
+impl<'a> ReaderState<'a> {
+    fn from_parts(text: &'a str, meta: ReaderMeta) -> Self {
+        Self {
+            text,
+            pos: meta.pos,
+            stack: meta.stack,
+            path_names: meta.path_names,
+            path_indices: meta.path_indices,
+            peeked: meta.peeked,
+            peeked_string: meta.peeked_string,
+            lenient: meta.lenient,
+        }
+    }
+
+    fn into_meta(self) -> ReaderMeta {
+        ReaderMeta {
+            pos: self.pos,
+            stack: self.stack,
+            path_names: self.path_names,
+            path_indices: self.path_indices,
+            peeked: self.peeked,
+            peeked_string: self.peeked_string,
+            lenient: self.lenient,
         }
     }
 
@@ -885,14 +958,6 @@ impl ReaderState {
             }
         }
     }
-
-    fn mark_closed(&mut self) {
-        self.stack = vec![Scope::Closed];
-        self.path_names = vec![None];
-        self.path_indices = vec![0];
-        self.peeked = None;
-        self.peeked_string = None;
-    }
 }
 
 fn is_strict_number(value: &str) -> bool {
@@ -989,40 +1054,107 @@ fn parse_long(value: &str) -> Option<i64> {
     (result as f64 == parsed).then_some(result)
 }
 
-fn drain_reader(vm: &mut Engine, reader: ObjRef) -> Result<String, VmExit> {
+fn drain_reader_inner(vm: &mut Engine, reader: ObjRef, array: ObjRef) -> Result<String, VmExit> {
+    const CHUNK_CHARS: usize = 4096;
     let mut text = String::new();
+    let mut units: Vec<u16> = Vec::with_capacity(CHUNK_CHARS + 1);
+    let mut pending_hi: Option<u16> = None;
     loop {
-        let array = vm
-            .heap
-            .alloc_array_zeroed(ElemKind::Int, 4096, "[C")
-            .map_err(crate::err::oom_throwable)?;
         let count = vm
             .invoke_instance(
                 reader,
                 "read",
                 "([CII)I",
-                &[Value::Obj(array), Value::Int(0), Value::Int(4096)],
+                &[
+                    Value::Obj(array),
+                    Value::Int(0),
+                    Value::Int(CHUNK_CHARS as i32),
+                ],
             )?
             .as_int()
             .unwrap_or(-1);
-        if count <= 0 {
+        if count == 0 {
+            let ch = vm
+                .invoke_instance(reader, "read", "()I", &[])?
+                .as_int()
+                .unwrap_or(-1);
+            if ch < 0 {
+                break;
+            }
+            units.clear();
+            if let Some(hi) = pending_hi.take() {
+                units.push(hi);
+            }
+            units.push(ch as u16);
+        } else if count < 0 {
             break;
+        } else {
+            let elems = vm.heap.as_array_elems(array)?.0;
+            let take = (count as usize).min(elems.len());
+            units.clear();
+            if let Some(hi) = pending_hi.take() {
+                units.push(hi);
+            }
+            units.extend(
+                elems[..take]
+                    .iter()
+                    .map(|value| value.as_int().unwrap_or(0) as u16),
+            );
         }
-        let elems = vm.heap.as_array_elems(array)?.0;
-        let units: Vec<u16> = elems[..(count as usize).min(elems.len())]
-            .iter()
-            .map(|value| value.as_int().unwrap_or(0) as u16)
-            .collect();
-        text.push_str(&String::from_utf16_lossy(&units));
+        if let Some(&last) = units.last() {
+            if (0xD800..=0xDBFF).contains(&last) {
+                pending_hi = units.pop();
+            }
+        }
+        let add_bytes: usize = char::decode_utf16(units.iter().copied())
+            .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER).len_utf8())
+            .sum();
+        let projected = text
+            .len()
+            .saturating_add(add_bytes)
+            .saturating_mul(2)
+            .saturating_add(32);
+        if vm.heap.used().saturating_add(projected) > vm.heap.budget() {
+            return Err(crate::err::oom_throwable(crate::heap::OomError {
+                requested: projected,
+                budget: vm.heap.budget(),
+            }));
+        }
+        text.reserve(add_bytes);
+        for decoded in char::decode_utf16(units.iter().copied()) {
+            text.push(decoded.unwrap_or(char::REPLACEMENT_CHARACTER));
+        }
+    }
+    if pending_hi.is_some() {
+        let add_bytes = char::REPLACEMENT_CHARACTER.len_utf8();
+        let projected = text
+            .len()
+            .saturating_add(add_bytes)
+            .saturating_mul(2)
+            .saturating_add(32);
+        if vm.heap.used().saturating_add(projected) > vm.heap.budget() {
+            return Err(crate::err::oom_throwable(crate::heap::OomError {
+                requested: projected,
+                budget: vm.heap.budget(),
+            }));
+        }
+        text.push(char::REPLACEMENT_CHARACTER);
     }
     Ok(text)
 }
 
-fn reader_load(
-    vm: &mut Engine,
-    recv: ObjRef,
-    drain_if_needed: bool,
-) -> Result<ReaderState, VmExit> {
+fn drain_reader(vm: &mut Engine, recv: ObjRef, reader: ObjRef) -> Result<String, VmExit> {
+    let array = vm
+        .heap
+        .alloc_array_zeroed(ElemKind::Int, 4096, "[C")
+        .map_err(crate::err::oom_throwable)?;
+    put(vm, recv, READER_BUF, Value::Obj(array))?;
+    let result = drain_reader_inner(vm, reader, array);
+    let _ = put(vm, recv, READER_BUF, Value::Null);
+    result
+}
+
+fn reader_load_meta(vm: &Engine, recv: ObjRef) -> ReaderMeta {
     let stack = decode_scopes(string_field(vm, recv, READER_STACK).as_deref());
     let mut path_names = decode_path_names(
         string_field(vm, recv, READER_PATH_NAMES).as_deref(),
@@ -1036,19 +1168,7 @@ fn reader_load(
         .collect();
     path_names.resize(stack.len(), None);
     path_indices.resize(stack.len(), 0);
-    let (text, text_loaded) = match string_field(vm, recv, READER_TEXT) {
-        Some(text) => (text, true),
-        None if drain_if_needed && stack.last() != Some(&Scope::Closed) => {
-            let Value::Obj(reader) = get(vm, recv, "in") else {
-                return Err(throw("Ljava/lang/NullPointerException;", "in == null"));
-            };
-            (drain_reader(vm, reader)?, true)
-        }
-        None => (String::new(), false),
-    };
-    Ok(ReaderState {
-        text,
-        text_loaded,
+    ReaderMeta {
         pos: usize::try_from(long_field(vm, recv, READER_POS, 0)).unwrap_or(0),
         stack,
         path_names,
@@ -1056,30 +1176,44 @@ fn reader_load(
         peeked: Token::from_ordinal(int_field(vm, recv, READER_PEEKED, -1)),
         peeked_string: string_field(vm, recv, READER_PEEKED_STRING),
         lenient: bool_field(vm, recv, JSON_LENIENT, false),
-    })
+    }
 }
 
-fn reader_save(vm: &mut Engine, recv: ObjRef, state: &ReaderState) -> Result<(), VmExit> {
-    set_string_field(
-        vm,
-        recv,
-        READER_TEXT,
-        state.text_loaded.then_some(state.text.as_str()),
-    )?;
+fn reader_ensure_text(
+    vm: &mut Engine,
+    recv: ObjRef,
+    meta: &ReaderMeta,
+) -> Result<Option<ObjRef>, VmExit> {
+    match get(vm, recv, READER_TEXT) {
+        Value::Obj(existing) => Ok(Some(existing)),
+        _ if meta.stack.last() != Some(&Scope::Closed) => {
+            let Value::Obj(reader) = get(vm, recv, "in") else {
+                return Err(throw("Ljava/lang/NullPointerException;", "in == null"));
+            };
+            let drained = drain_reader(vm, recv, reader)?;
+            let text_ref = crate::intrinsics::alloc_string(vm, drained)?;
+            put(vm, recv, READER_TEXT, Value::Obj(text_ref))?;
+            Ok(Some(text_ref))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn reader_save_meta(vm: &mut Engine, recv: ObjRef, meta: &ReaderMeta) -> Result<(), VmExit> {
     put(
         vm,
         recv,
         READER_POS,
-        Value::Long(i64::try_from(state.pos).unwrap_or(i64::MAX)),
+        Value::Long(i64::try_from(meta.pos).unwrap_or(i64::MAX)),
     )?;
-    set_string_field(vm, recv, READER_STACK, Some(&encode_scopes(&state.stack)))?;
+    set_string_field(vm, recv, READER_STACK, Some(&encode_scopes(&meta.stack)))?;
     set_string_field(
         vm,
         recv,
         READER_PATH_NAMES,
-        Some(&encode_path_names(&state.path_names)),
+        Some(&encode_path_names(&meta.path_names)),
     )?;
-    let indices = state
+    let indices = meta
         .path_indices
         .iter()
         .map(i32::to_string)
@@ -1090,15 +1224,15 @@ fn reader_save(vm: &mut Engine, recv: ObjRef, state: &ReaderState) -> Result<(),
         vm,
         recv,
         READER_PEEKED,
-        Value::Int(state.peeked.map_or(-1, Token::ordinal)),
+        Value::Int(meta.peeked.map_or(-1, Token::ordinal)),
     )?;
     set_string_field(
         vm,
         recv,
         READER_PEEKED_STRING,
-        state.peeked_string.as_deref(),
+        meta.peeked_string.as_deref(),
     )?;
-    put(vm, recv, JSON_LENIENT, Value::Int(state.lenient as i32))
+    put(vm, recv, JSON_LENIENT, Value::Int(meta.lenient as i32))
 }
 
 enum ReaderOut {
@@ -1124,86 +1258,36 @@ fn json_reader(
                 return Err(throw("Ljava/lang/NullPointerException;", "in == null"));
             };
             put(vm, recv, "in", reader.clone())?;
-            reader_save(vm, recv, &ReaderState::new())?;
+            put(vm, recv, READER_TEXT, Value::Null)?;
+            reader_save_meta(vm, recv, &ReaderMeta::new())?;
             return Ok(Some(Value::Null));
         }
         ("close", "()V") => {
-            let mut state = reader_load(vm, recv, false)?;
+            let mut meta = reader_load_meta(vm, recv);
             let reader = get(vm, recv, "in");
-            state.mark_closed();
-            reader_save(vm, recv, &state)?;
+            meta.mark_closed();
+            reader_save_meta(vm, recv, &meta)?;
             if let Value::Obj(reader) = reader {
                 vm.invoke_instance(reader, "close", "()V", &[])?;
             }
             return Ok(Some(Value::Null));
         }
+        ("setLenient", "(Z)V") => {
+            let lenient = matches!(args.first(), Some(Value::Int(v)) if *v != 0);
+            put(vm, recv, JSON_LENIENT, Value::Int(lenient as i32))?;
+            return Ok(Some(Value::Null));
+        }
+        ("isLenient", "()Z") => {
+            return Ok(Some(Value::Int(
+                bool_field(vm, recv, JSON_LENIENT, false) as i32
+            )));
+        }
         _ => {}
     }
 
-    let needs_text = !matches!(name, "setLenient" | "isLenient" | "getPath" | "toString");
-    let mut state = reader_load(vm, recv, needs_text)?;
-    let result = (|| -> Result<ReaderOut, VmExit> {
-        Ok(match (name, sig) {
-            ("setLenient", "(Z)V") => {
-                state.lenient = matches!(args.first(), Some(Value::Int(1)));
-                ReaderOut::None
-            }
-            ("isLenient", "()Z") => ReaderOut::Bool(state.lenient),
-            ("beginArray", "()V") => {
-                state.consume(Token::BeginArray)?;
-                ReaderOut::None
-            }
-            ("endArray", "()V") => {
-                state.consume(Token::EndArray)?;
-                ReaderOut::None
-            }
-            ("beginObject", "()V") => {
-                state.consume(Token::BeginObject)?;
-                ReaderOut::None
-            }
-            ("endObject", "()V") => {
-                state.consume(Token::EndObject)?;
-                ReaderOut::None
-            }
-            ("hasNext", "()Z") => {
-                let token = state.peek()?;
-                ReaderOut::Bool(!matches!(
-                    token,
-                    Token::EndArray | Token::EndObject | Token::EndDocument
-                ))
-            }
-            ("peek", "()Landroid/util/JsonToken;") => ReaderOut::Token(state.peek()?),
-            ("nextName", "()Ljava/lang/String;") => {
-                ReaderOut::Text(state.consume(Token::Name)?.unwrap_or_default())
-            }
-            ("nextString", "()Ljava/lang/String;") => ReaderOut::Text(state.next_string()?),
-            ("nextBoolean", "()Z") => {
-                let value = state.consume(Token::Boolean)?.unwrap_or_default();
-                ReaderOut::Bool(value == "true")
-            }
-            ("nextNull", "()V") => {
-                state.consume(Token::Null)?;
-                ReaderOut::None
-            }
-            ("nextDouble", "()D") => ReaderOut::Double(state.next_double()?),
-            ("nextLong", "()J") => ReaderOut::Long(state.next_long()?),
-            ("nextInt", "()I") => ReaderOut::Int(state.next_int()?),
-            ("skipValue", "()V") => {
-                state.skip_value()?;
-                ReaderOut::None
-            }
-            ("getPath", "()Ljava/lang/String;") => ReaderOut::Text(state.path()),
-            ("toString", "()Ljava/lang/String;") => {
-                ReaderOut::Text(format!("JsonReader{}", state.location_suffix()))
-            }
-            _ => return Ok(ReaderOut::None),
-        })
-    })();
     if !matches!(
         (name, sig),
-        ("setLenient", "(Z)V")
-            | ("isLenient", "()Z")
-            | ("beginArray", "()V")
+        ("beginArray", "()V")
             | ("endArray", "()V")
             | ("beginObject", "()V")
             | ("endObject", "()V")
@@ -1222,9 +1306,84 @@ fn json_reader(
     ) {
         return Ok(None);
     }
+
+    if (name, sig) == ("getPath", "()Ljava/lang/String;") {
+        let path = reader_load_meta(vm, recv).path();
+        return Ok(Some(Value::Obj(crate::intrinsics::alloc_string(vm, path)?)));
+    }
+    if (name, sig) == ("toString", "()Ljava/lang/String;") {
+        let meta = reader_load_meta(vm, recv);
+        let text_out = {
+            let text_slice = match get(vm, recv, READER_TEXT) {
+                Value::Obj(r) => vm.heap.as_str(r).unwrap_or(""),
+                _ => "",
+            };
+            let state = ReaderState::from_parts(text_slice, meta);
+            format!("JsonReader{}", state.location_suffix())
+        };
+        return Ok(Some(Value::Obj(crate::intrinsics::alloc_string(
+            vm, text_out,
+        )?)));
+    }
+
+    let meta = reader_load_meta(vm, recv);
+    let text_ref = reader_ensure_text(vm, recv, &meta)?;
+    let (meta, result) = {
+        let text_slice = text_ref.and_then(|r| vm.heap.as_str(r).ok()).unwrap_or("");
+        let mut state = ReaderState::from_parts(text_slice, meta);
+        let result = (|| -> Result<ReaderOut, VmExit> {
+            Ok(match (name, sig) {
+                ("beginArray", "()V") => {
+                    state.consume(Token::BeginArray)?;
+                    ReaderOut::None
+                }
+                ("endArray", "()V") => {
+                    state.consume(Token::EndArray)?;
+                    ReaderOut::None
+                }
+                ("beginObject", "()V") => {
+                    state.consume(Token::BeginObject)?;
+                    ReaderOut::None
+                }
+                ("endObject", "()V") => {
+                    state.consume(Token::EndObject)?;
+                    ReaderOut::None
+                }
+                ("hasNext", "()Z") => {
+                    let token = state.peek()?;
+                    ReaderOut::Bool(!matches!(
+                        token,
+                        Token::EndArray | Token::EndObject | Token::EndDocument
+                    ))
+                }
+                ("peek", "()Landroid/util/JsonToken;") => ReaderOut::Token(state.peek()?),
+                ("nextName", "()Ljava/lang/String;") => {
+                    ReaderOut::Text(state.consume(Token::Name)?.unwrap_or_default())
+                }
+                ("nextString", "()Ljava/lang/String;") => ReaderOut::Text(state.next_string()?),
+                ("nextBoolean", "()Z") => {
+                    let value = state.consume(Token::Boolean)?.unwrap_or_default();
+                    ReaderOut::Bool(value == "true")
+                }
+                ("nextNull", "()V") => {
+                    state.consume(Token::Null)?;
+                    ReaderOut::None
+                }
+                ("nextDouble", "()D") => ReaderOut::Double(state.next_double()?),
+                ("nextLong", "()J") => ReaderOut::Long(state.next_long()?),
+                ("nextInt", "()I") => ReaderOut::Int(state.next_int()?),
+                ("skipValue", "()V") => {
+                    state.skip_value()?;
+                    ReaderOut::None
+                }
+                _ => ReaderOut::None,
+            })
+        })();
+        (state.into_meta(), result)
+    };
     match result {
         Ok(out) => {
-            reader_save(vm, recv, &state)?;
+            reader_save_meta(vm, recv, &meta)?;
             Ok(Some(match out {
                 ReaderOut::None => Value::Null,
                 ReaderOut::Bool(value) => Value::Int(value as i32),
@@ -1236,7 +1395,7 @@ fn json_reader(
             }))
         }
         Err(error) => {
-            let _ = reader_save(vm, recv, &state);
+            let _ = reader_save_meta(vm, recv, &meta);
             Err(error)
         }
     }

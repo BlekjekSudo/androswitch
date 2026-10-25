@@ -465,6 +465,14 @@ pub(crate) fn exec_frame(
                     _ => return bad_kind(insn),
                 };
                 let desc = vm.cp.type_str(dex_idx, type_idx);
+                // issue #250: o ART (interpreter_common.cc, DoFilledNewArray)
+                // só aceita int[] e arrays de referência. long[]/double[]
+                // lançam RuntimeException; os demais primitivos (boolean,
+                // byte, char, short, float) lançam InternalError. Antes os
+                // registradores entravam crus em [B/[Z/[C/[S, fora da faixa.
+                if let Some((class, msg)) = filled_new_array_unsupported(&desc) {
+                    throw_exc!(class, msg);
+                }
                 let Some(elem) = ElemKind::from_array_desc(&desc) else {
                     return Err(err::not_implemented(format!("filled-new-array {desc}")).into());
                 };
@@ -1105,6 +1113,33 @@ fn oom_exception(e: crate::heap::OomError) -> VmExit {
     ))
 }
 
+/// `filled-new-array` com componente primitivo diferente de `int`: a exceção
+/// que o ART lança (classe, mensagem). `None` para `[I` e arrays de
+/// referência, que são os únicos casos suportados.
+fn filled_new_array_unsupported(desc: &str) -> Option<(&'static str, String)> {
+    let pretty = match desc {
+        "[Z" => "boolean",
+        "[B" => "byte",
+        "[C" => "char",
+        "[S" => "short",
+        "[F" => "float",
+        "[J" => "long",
+        "[D" => "double",
+        _ => return None,
+    };
+    Some(if matches!(desc, "[J" | "[D") {
+        (
+            "Ljava/lang/RuntimeException;",
+            format!("Bad filled array request for type {pretty}"),
+        )
+    } else {
+        (
+            "Ljava/lang/InternalError;",
+            format!("Found type {pretty}; filled-new-array not implemented for anything but 'int'"),
+        )
+    })
+}
+
 fn new_filled_array(
     vm: &mut Engine,
     elem: ElemKind,
@@ -1445,11 +1480,12 @@ fn fill_array(
         // issue #48: [C é SEM sinal — decodificar u16. O desc real do array
         // vem do elem_class guardado no HeapObj (class_of devolve "[I"
         // genérico para todos os integrais primitivos)
-        let is_char_array = match vm.heap.get(arr)? {
-            crate::heap::HeapObj::Array { elem_class, .. } => {
-                elem_class == "C" || elem_class == "[C"
-            }
-            _ => false,
+        let (is_char_array, is_bool_array) = match vm.heap.get(arr)? {
+            crate::heap::HeapObj::Array { elem_class, .. } => (
+                elem_class == "C" || elem_class == "[C",
+                elem_class == "Z" || elem_class == "[Z",
+            ),
+            _ => (false, false),
         };
         let mut values = Vec::with_capacity(count as usize);
         for i in 0..count as usize {
@@ -1470,6 +1506,10 @@ fn fill_array(
                     slice.try_into().unwrap_or([0; 8]),
                 ))),
                 _ => match width {
+                    // issue #250: boolean[] guarda 0|1, a mesma invariante do
+                    // aput-boolean (`!= 0`). Com extensão de sinal, um payload
+                    // 0xFF virava −1 num [Z.
+                    1 if is_bool_array => Value::Int((slice[0] != 0) as i32),
                     1 => Value::Int(slice[0] as i8 as i32),
                     // issue #48: char[] decodifica SEM sinal (u16 — payload
                     // 0xFFFD é U+FFFD/65533, não −3); short[] continua i16
