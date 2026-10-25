@@ -183,7 +183,17 @@ pub fn instance_intrinsic(
     let out: Value = match name {
         "<init>" => {
             let init = match ps.first().map(String::as_str) {
-                None | Some("I") => Vec::new(),
+                None => Vec::new(),
+                Some("I") => {
+                    let cap = int(args, 0);
+                    if cap < 0 {
+                        return Err(VmExit::Exception(Throwable::new(
+                            "Ljava/lang/NegativeArraySizeException;",
+                            format!("{cap}"),
+                        )));
+                    }
+                    Vec::new()
+                }
                 Some(_) => match args.first() {
                     Some(Value::Obj(_)) => text_of(vm, args.first())?,
                     _ => {
@@ -202,13 +212,13 @@ pub fn instance_intrinsic(
                 [p, i, j] if p == "[C" && i == "I" && j == "I" => {
                     let all = chars_of(vm, args.first())?;
                     let (o, n) = (int(args, 1), int(args, 2));
-                    if o < 0 || n < 0 || (o + n) as usize > all.len() {
+                    if o < 0 || n < 0 || (o as usize).saturating_add(n as usize) > all.len() {
                         return Err(VmExit::Exception(Throwable::new(
                             "Ljava/lang/IndexOutOfBoundsException;",
                             format!("offset {o}, count {n}, length {}", all.len()),
                         )));
                     }
-                    all[o as usize..(o + n) as usize].to_vec()
+                    all[o as usize..o as usize + n as usize].to_vec()
                 }
                 [_, i, j] if i == "I" && j == "I" => {
                     let all = text_of(vm, args.first())?;
@@ -255,9 +265,10 @@ pub fn instance_intrinsic(
                 [_, p, _, _] if p == "[C" => {
                     let all = chars_of(vm, args.get(1))?;
                     let (o, n) = (int(args, 2), int(args, 3));
-                    all.get(o.max(0) as usize..(o + n).max(0) as usize)
-                        .map(<[u16]>::to_vec)
-                        .ok_or_else(|| sioobe(format!("offset {o}, len {n}")))?
+                    if o < 0 || n < 0 || (o as usize).saturating_add(n as usize) > all.len() {
+                        return Err(sioobe(format!("offset {o}, len {n}")));
+                    }
+                    all[o as usize..o as usize + n as usize].to_vec()
                 }
                 [_, _, _, _] => {
                     let all = text_of(vm, args.get(1))?;
@@ -310,8 +321,25 @@ pub fn instance_intrinsic(
             if n < 0 {
                 return Err(sioobe(format!("String index out of range: {n}")));
             }
-            u.resize(n as usize, 0);
-            set(vm, recv, &u)?;
+            let target = n as usize;
+            if target > len {
+                let avail = vm.heap.budget().saturating_sub(vm.heap.used());
+                let needed = 32usize.saturating_add(target);
+                if needed > avail || target.saturating_mul(2) > vm.heap.budget() {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/OutOfMemoryError;",
+                        format!(
+                            "StringBuilder.setLength({n}) exceeds heap budget ({avail} B remaining)"
+                        ),
+                    )));
+                }
+            }
+            u.resize(target, 0);
+            let s = vm
+                .heap
+                .alloc_string(String::from_utf16_lossy(&u))
+                .map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(recv, "buf", Value::Obj(s)))?;
             Value::Null
         }
         "setCharAt" => {
@@ -379,17 +407,18 @@ pub fn instance_intrinsic(
                     "dst",
                 )));
             };
-            let off = int(args, 3).max(0) as usize;
+            let off = int(args, 3);
             let elems = vm
                 .heap
                 .array_elems_mut(*dst)
                 .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?;
-            if off + (b - a) > elems.len() {
+            if off < 0 || (off as usize).saturating_add(b - a) > elems.len() {
                 return Err(VmExit::Exception(Throwable::new(
                     "Ljava/lang/ArrayIndexOutOfBoundsException;",
                     "getChars",
                 )));
             }
+            let off = off as usize;
             for (k, c) in u[a..b].iter().enumerate() {
                 elems[off + k] = Value::Int(*c as i32);
             }
