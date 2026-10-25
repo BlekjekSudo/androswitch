@@ -23234,3 +23234,125 @@ fn renderscript_matrix4f_multiply_and_rotate_audit_is_guest_visible() {
     assert!((xy - 1.0).abs() < 1e-6, "get(0,1) = {xy}");
     assert!((yx + 1.0).abs() < 1e-6, "get(1,0) = {yx}");
 }
+
+#[test]
+fn graphics_matrix_audit_fixes_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    const MATRIX: &str = "Landroid/graphics/Matrix;";
+    let m = p49_new(&mut engine, MATRIX, "()V", &[]);
+    // AOSP Matrix.hashCode() is literally `return 44`.
+    assert_eq!(call(&mut engine, m, "hashCode", "()I", &[]), Value::Int(44));
+
+    let rectf = |engine: &mut Engine, l: f32, t: f32, r: f32, b: f32| {
+        let rect = instance(engine, "Landroid/graphics/RectF;");
+        engine
+            .heap
+            .put_field(rect, "left", Value::Float(l))
+            .unwrap();
+        engine.heap.put_field(rect, "top", Value::Float(t)).unwrap();
+        engine
+            .heap
+            .put_field(rect, "right", Value::Float(r))
+            .unwrap();
+        engine
+            .heap
+            .put_field(rect, "bottom", Value::Float(b))
+            .unwrap();
+        rect
+    };
+    let fit = |engine: &mut Engine, ordinal: i32| {
+        let e = instance(engine, "Landroid/graphics/Matrix$ScaleToFit;");
+        engine
+            .heap
+            .put_field(e, "rd_ord", Value::Int(ordinal))
+            .unwrap();
+        e
+    };
+    let values = |engine: &mut Engine, matrix: ObjRef| -> Vec<f32> {
+        let array = float_array(engine, 9);
+        call(
+            engine,
+            matrix,
+            "getValues",
+            "([F)V",
+            std::slice::from_ref(&array),
+        );
+        match &array {
+            Value::Obj(r) => engine
+                .heap
+                .as_array_elems(*r)
+                .unwrap()
+                .0
+                .iter()
+                .map(|v| match v {
+                    Value::Float(f) => *f,
+                    _ => 0.0,
+                })
+                .collect(),
+            _ => unreachable!(),
+        }
+    };
+
+    // CENTER: src 10x10 into dst 100x50 -> uniform scale 5, x off by 25.
+    let src = rectf(&mut engine, 0.0, 0.0, 10.0, 10.0);
+    let dst = rectf(&mut engine, 0.0, 0.0, 100.0, 50.0);
+    let center = fit(&mut engine, 2);
+    assert_eq!(
+        call(
+            &mut engine,
+            m,
+            "setRectToRect",
+            "(Landroid/graphics/RectF;Landroid/graphics/RectF;Landroid/graphics/Matrix$ScaleToFit;)Z",
+            &[Value::Obj(src), Value::Obj(dst), Value::Obj(center)],
+        ),
+        Value::Int(1)
+    );
+    let v = values(&mut engine, m);
+    assert_eq!(v[0], 5.0); // MSCALE_X
+    assert_eq!(v[4], 5.0); // MSCALE_Y
+    assert_eq!(v[2], 25.0); // MTRANS_X (centered)
+    assert_eq!(v[5], 0.0); // MTRANS_Y
+
+    // END aligns the far edge: MTRANS_X = 50.
+    let end = fit(&mut engine, 3);
+    call(
+        &mut engine,
+        m,
+        "setRectToRect",
+        "(Landroid/graphics/RectF;Landroid/graphics/RectF;Landroid/graphics/Matrix$ScaleToFit;)Z",
+        &[Value::Obj(src), Value::Obj(dst), Value::Obj(end)],
+    );
+    let v = values(&mut engine, m);
+    assert_eq!(v[2], 50.0);
+
+    // Empty src -> identity + false.
+    let empty = rectf(&mut engine, 5.0, 5.0, 5.0, 9.0);
+    assert_eq!(
+        call(
+            &mut engine,
+            m,
+            "setRectToRect",
+            "(Landroid/graphics/RectF;Landroid/graphics/RectF;Landroid/graphics/Matrix$ScaleToFit;)Z",
+            &[Value::Obj(empty), Value::Obj(dst), Value::Obj(center)],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, m, "isIdentity", "()Z", &[]),
+        Value::Int(1)
+    );
+
+    // mapPoints bounds: mismatched dst/src lengths are AIOOBE (AOSP).
+    let two = float_value_array(&mut engine, &[1.0, 2.0]);
+    let four = float_value_array(&mut engine, &[0.0; 4]);
+    assert_throws(
+        engine.invoke_instance(m, "mapPoints", "([F[F)V", &[two, four.clone()]),
+        "Ljava/lang/ArrayIndexOutOfBoundsException;",
+    );
+    // setValues with fewer than 9 floats is AIOOBE.
+    let short = float_value_array(&mut engine, &[1.0; 4]);
+    assert_throws(
+        engine.invoke_instance(m, "setValues", "([F)V", &[short]),
+        "Ljava/lang/ArrayIndexOutOfBoundsException;",
+    );
+}

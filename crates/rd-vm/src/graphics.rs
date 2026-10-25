@@ -978,6 +978,12 @@ fn float_array(vm: &Engine, v: Option<&Value>) -> Vec<f32> {
         None => Vec::new(),
     }
 }
+fn float_array_len(vm: &Engine, v: Option<&Value>) -> i32 {
+    obj(v)
+        .and_then(|r| vm.heap.as_array_elems(r).ok())
+        .map(|(e, _)| e.len() as i32)
+        .unwrap_or(0)
+}
 fn write_floats(vm: &mut Engine, v: Option<&Value>, xs: &[f32], at: usize) {
     if let Some(r) = obj(v) {
         if let Ok(e) = vm.heap.array_elems_mut(r) {
@@ -2505,30 +2511,53 @@ fn matrix_method(
         }
         "setValues" => {
             let v = float_array(vm, a(0));
-            if v.len() >= 9 {
-                let mut q = [0.0; 9];
-                q.copy_from_slice(&v[..9]);
-                set_matrix(vm, recv, from9(&q));
+            if v.len() < 9 {
+                return Err(exc(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    "setValues",
+                ));
             }
+            let mut q = [0.0; 9];
+            q.copy_from_slice(&v[..9]);
+            set_matrix(vm, recv, from9(&q));
             Value::Null
         }
         "mapPoints" => {
             // mapPoints([F) | mapPoints(dst,src) | mapPoints(dst,dstIndex,src,srcIndex,count)
+            // AOSP Matrix.mapPoints validates via checkPointArrays and the
+            // two-array overload requires equal lengths (AIOOBE otherwise).
             let (dst, src, di, si, n) = match args.len() {
-                1 => (a(0), a(0), 0usize, 0usize, usize::MAX),
-                2 => (a(0), a(1), 0, 0, usize::MAX),
-                _ => (
-                    a(0),
-                    a(2),
-                    it(a(1)) as usize,
-                    it(a(3)) as usize,
-                    it(a(4)) as usize,
-                ),
+                1 => (a(0), a(0), 0i32, 0i32, -1i32),
+                2 => (a(0), a(1), 0, 0, -1),
+                _ => (a(0), a(2), it(a(1)), it(a(3)), it(a(4))),
             };
+            if matches!(dst, None | Some(Value::Null)) || matches!(src, None | Some(Value::Null)) {
+                return Err(exc("Ljava/lang/NullPointerException;", "mapPoints"));
+            }
+            let src_len = float_array_len(vm, src);
+            let dst_len = float_array_len(vm, dst);
+            let count = if n < 0 { src_len / 2 } else { n };
+            if args.len() == 2 && dst_len != src_len {
+                return Err(exc(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    "mapPoints",
+                ));
+            }
+            let (src_stop, dst_stop) = (si + (count << 1), di + (count << 1));
+            if (count | si | di | src_stop | dst_stop) < 0
+                || src_stop > src_len
+                || dst_stop > dst_len
+            {
+                return Err(exc(
+                    "Ljava/lang/ArrayIndexOutOfBoundsException;",
+                    "mapPoints",
+                ));
+            }
             let v = float_array(vm, src);
-            let pts: Vec<f32> = v[si.min(v.len())..]
+            let (si, di) = (si as usize, di as usize);
+            let pts: Vec<f32> = v[si..]
                 .chunks(2)
-                .take(n)
+                .take(count as usize)
                 .flat_map(|c| {
                     let (x, y) = ap(&m, c[0], *c.get(1).unwrap_or(&0.0));
                     [x, y]
@@ -2562,25 +2591,56 @@ fn matrix_method(
             b(m[1] == 0.0 && m[2] == 0.0)
         }
         "setRectToRect" => {
-            let (s, d) = (rect_of(vm, obj(a(0))), rect_of(vm, obj(a(1))));
-            let (sw, sh) = ((s[2] - s[0]).max(1e-6), (s[3] - s[1]).max(1e-6));
-            let (mut sx, mut sy) = ((d[2] - d[0]) / sw, (d[3] - d[1]) / sh);
-            if ord(vm, a(2)) != 0 {
-                let k = sx.min(sy);
-                sx = k;
-                sy = k;
+            // SkMatrix::setRectToRect (AOSP native semantics): empty src ->
+            // identity + false; empty dst -> zero matrix + true; FILL=0,
+            // START=1, CENTER=2 (half diff), END=3 (full diff on the larger
+            // axis only).
+            if obj(a(0)).is_none() || obj(a(1)).is_none() {
+                return Err(exc("Ljava/lang/NullPointerException;", "setRectToRect"));
             }
-            set(
-                vm,
-                mul(&tr(d[0], d[1]), &mul(&sc(sx, sy), &tr(-s[0], -s[1]))),
-            )
+            let (s, d) = (rect_of(vm, obj(a(0))), rect_of(vm, obj(a(1))));
+            if s[0] >= s[2] || s[1] >= s[3] {
+                set(vm, ID);
+                b(false)
+            } else if d[0] >= d[2] || d[1] >= d[3] {
+                set_matrix(vm, recv, [0.0; 6]);
+                b(true)
+            } else {
+                let align = ord(vm, a(2));
+                let (sw, sh) = (s[2] - s[0], s[3] - s[1]);
+                let (dw, dh) = (d[2] - d[0], d[3] - d[1]);
+                let (mut sx, mut sy) = (dw / sw, dh / sh);
+                let mut x_larger = false;
+                if align != 0 {
+                    if sx > sy {
+                        x_larger = true;
+                        sx = sy;
+                    } else {
+                        sy = sx;
+                    }
+                }
+                let mut tx = d[0] - s[0] * sx;
+                let mut ty = d[1] - s[1] * sy;
+                if align == 2 || align == 3 {
+                    let mut diff = if x_larger { dw - sw * sy } else { dh - sh * sy };
+                    if align == 2 {
+                        diff *= 0.5;
+                    }
+                    if x_larger {
+                        tx += diff;
+                    } else {
+                        ty += diff;
+                    }
+                }
+                set(vm, mul(&tr(tx, ty), &sc(sx, sy)));
+                b(true)
+            }
         }
         "equals" => {
             b(matches!(obj(a(0)).and_then(|o| vm.gfx.objs.get(&o)), Some(G::Matrix(o)) if *o == m))
         }
-        "hashCode" => Value::Int(m.iter().fold(0i32, |h, x| {
-            h.wrapping_mul(31).wrapping_add(x.to_bits() as i32)
-        })),
+        // AOSP Matrix.hashCode literally returns 44 ("we take the easy way out").
+        "hashCode" => Value::Int(44),
         _ => return Ok(None),
     }))
 }
