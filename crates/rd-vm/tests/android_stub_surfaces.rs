@@ -10484,6 +10484,17 @@ fn quicksettings_tile_and_unbound_service_are_guest_visible() {
     );
     assert_eq!(field(&engine, service, "mService"), Value::Null);
     assert_eq!(field(&engine, service, "mTileToken"), Value::Null);
+
+    // Deep audit: the Intent overload is banned since targetSdk 34.
+    assert_throws(
+        engine.invoke_instance(
+            service,
+            "startActivityAndCollapse",
+            "(Landroid/content/Intent;)V",
+            &[Value::Obj(bind_intent)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
 }
 
 #[test]
