@@ -2157,6 +2157,24 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Ljava/net/Inet4Address;" | "Ljava/net/Inet6Address;" => {
             Some(&["Ljava/net/InetAddress;", "Ljava/lang/Object;"])
         }
+        // Appendix C Batch 36-I bounded telephony / MBMS / telecom slices.
+        "Landroid/telephony/PhoneNumberUtils;"
+        | "Landroid/telephony/TelephonyManager;"
+        | "Landroid/telephony/SubscriptionManager;"
+        | "Landroid/telephony/ServiceState;"
+        | "Landroid/telephony/CellBroadcastIdRange;"
+        | "Landroid/telephony/mbms/DownloadRequest;"
+        | "Landroid/telephony/mbms/DownloadRequest$Builder;"
+        | "Landroid/telephony/mbms/FileInfo;"
+        | "Landroid/telecom/TelecomManager;"
+        | "Landroid/telecom/PhoneAccountHandle;"
+        | "Landroid/telecom/PhoneAccount;"
+        | "Landroid/telecom/PhoneAccount$Builder;"
+        | "Landroid/telecom/DisconnectCause;"
+        | "Landroid/telecom/CallAudioState;"
+        | "Landroid/telecom/VideoProfile;"
+        | "Landroid/telecom/VideoProfile$CameraCapabilities;"
+        | "Landroid/telecom/StatusHints;" => Some(OBJECT),
         _ => None,
     }
 }
@@ -2816,6 +2834,18 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Landroid/net/wifi/WifiInfo;"
         | "Landroid/net/wifi/ScanResult;"
         | "Landroid/net/wifi/WifiSsid;" => Some(&["Landroid/os/Parcelable;"]),
+        // Interfaces in the Batch 36-I bounded slices.
+        "Landroid/telephony/ServiceState;"
+        | "Landroid/telephony/CellBroadcastIdRange;"
+        | "Landroid/telephony/mbms/DownloadRequest;"
+        | "Landroid/telephony/mbms/FileInfo;"
+        | "Landroid/telecom/PhoneAccountHandle;"
+        | "Landroid/telecom/PhoneAccount;"
+        | "Landroid/telecom/DisconnectCause;"
+        | "Landroid/telecom/CallAudioState;"
+        | "Landroid/telecom/VideoProfile;"
+        | "Landroid/telecom/VideoProfile$CameraCapabilities;"
+        | "Landroid/telecom/StatusHints;" => Some(&["Landroid/os/Parcelable;"]),
         _ => None,
     }
 }

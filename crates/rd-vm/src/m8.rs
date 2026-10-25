@@ -2263,6 +2263,11 @@ const SERVICES: &[(&str, &str)] = &[
     ("wifi", "Landroid/net/wifi/WifiManager;"),
     ("device_policy", "Landroid/app/admin/DevicePolicyManager;"),
     ("telephony", "Landroid/telephony/TelephonyManager;"),
+    (
+        "telephony_subscription_service",
+        "Landroid/telephony/SubscriptionManager;",
+    ),
+    ("telecom", "Landroid/telecom/TelecomManager;"),
     ("shortcut", "Landroid/content/pm/ShortcutManager;"),
     ("appwidget", "Landroid/appwidget/AppWidgetManager;"),
     ("locale", "Landroid/app/LocaleManager;"),

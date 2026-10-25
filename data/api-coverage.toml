@@ -1047,15 +1047,15 @@ key_apis = ["android.hardware.soundtrigger.SoundTrigger$GenericSoundModel.getVen
 id = "android-telephony"
 prefix = "android.telephony"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "M10"
-notes = "TelephonyManager, SubscriptionManager, SmsManager and phone-state APIs have no virtual radio/SIM model. Telephony permissions do not imply telephony behaviour."
-evidence = ["docs/compat-matrix.md"]
+notes = "Bounded no-radio slice (the device profile does not declare android.hardware.telephony, matching a Wi-Fi-only device): TelephonyManager and SubscriptionManager answer with the AOSP binder-absent defaults (SIM_STATE_UNKNOWN, CALL_STATE_IDLE, DATA_DISCONNECTED, NETWORK_TYPE_UNKNOWN, no ICC card, empty operator strings, not roaming, no subscriptions, default subscription ids of -1, and the subscription-id validity predicates); PhoneNumberUtils implements the pure ASCII/Unicode-digit string algorithms (keypad-letter conversion, separator stripping, network/post-dial portion extraction, SMS-address and global-number checks, and the character predicates); ServiceState is a value model of its registration/roaming/operator fields. No modem, SIM/eSIM, SMS/MMS sending, carrier config, cell info, signal strength, or phone-state listener behaviour is claimed; ServiceState does not model its NetworkRegistrationInfo list. Telephony permissions do not imply telephony behaviour."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-telephony"
-key_apis = ["android.telephony.TelephonyManager.getSimState", "android.telephony.SmsManager.sendTextMessage", "android.telephony.SubscriptionManager.getActiveSubscriptionInfoList"]
+key_apis = ["android.telephony.TelephonyManager.getSimState", "android.telephony.TelephonyManager.hasIccCard", "android.telephony.SubscriptionManager.getActiveSubscriptionInfoList", "android.telephony.SubscriptionManager.isUsableSubscriptionId", "android.telephony.PhoneNumberUtils.convertKeypadLettersToDigits", "android.telephony.PhoneNumberUtils.extractNetworkPortion", "android.telephony.ServiceState.getState", "android.telephony.ServiceState.setOperatorName"]
 
 [[surface]]
 id = "android-telephony-gsm"
@@ -1075,15 +1075,15 @@ key_apis = ["android.telephony.gsm.GsmCellLocation.getLac", "android.telephony.g
 id = "android-telephony-mbms"
 prefix = "android.telephony.mbms"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "MBMS download/streaming services are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Only the pure value classes are modelled: DownloadRequest and its Builder (non-null source/destination validation, service id and subscription id, app-intent round-trip through Intent.toUri/parseUri with the 50000-character limit, version 1, fromDownloadRequest copying, and field-wise equals/hashCode) and FileInfo (URI plus MIME type value semantics). MbmsDownloadManager/MbmsStreamingManager sessions, middleware binding, download execution, DownloadRequest.getHash (no host MessageDigest/Base64 path), and all streaming APIs are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-telephony-mbms"
-key_apis = ["android.telephony.mbms.MbmsDownloadManager"]
+key_apis = ["android.telephony.mbms.DownloadRequest.getFileServiceId", "android.telephony.mbms.DownloadRequest$Builder.build", "android.telephony.mbms.DownloadRequest$Builder.fromDownloadRequest", "android.telephony.mbms.FileInfo.getMimeType"]
 
 [[surface]]
 id = "android-telephony-euicc"
@@ -1101,31 +1101,31 @@ key_apis = ["android.telephony.euicc.EuiccManager.isEnabled", "android.telephony
 
 [[surface]]
 id = "android-telephony-cellbroadcast"
-prefix = "android.telephony.cellbroadcast"
+prefix = "android.telephony.CellBroadcastIdRange"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs"]
 milestone = "future"
-notes = "Cell broadcast service integration is not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Registry correction: the previously listed package android.telephony.cellbroadcast does not exist in AOSP (checked frameworks/base API 34-36 sources and the prebuilts/sdk 34/35/36 public, system and module-lib API files, plus developer.android.com); all cell-broadcast framework classes live directly in android.telephony. The prefix is therefore corrected to the real @SystemApi value class android.telephony.CellBroadcastIdRange, which is now fully modelled (constructor range validation, getters, Objects.hash-based equals/hashCode, and the bracketed toString). No cell-broadcast service integration, SMS CB message delivery, or carrier configuration is claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-telephony-cellbroadcast"
-key_apis = ["android.telephony.cellbroadcast.CellBroadcastService"]
+key_apis = ["android.telephony.CellBroadcastIdRange.getStartId", "android.telephony.CellBroadcastIdRange.getEndId", "android.telephony.CellBroadcastIdRange.isEnabled"]
 
 [[surface]]
 id = "android-telecom"
 prefix = "android.telecom"
 domain = "telephony"
-status = "not_implemented"
+status = "partial"
 domain_module = "fd-system-services"
-module = "none"
-code = []
+module = "rd-vm/android-stub-surfaces"
+code = ["crates/rd-vm/src/android_stub_surfaces.rs", "crates/rd-vm/src/classpath.rs", "crates/rd-vm/src/m8.rs"]
 milestone = "future"
-notes = "TelecomManager, ConnectionService and in-call UI integration are not modelled."
-evidence = ["docs/compat-matrix.md"]
+notes = "Value classes plus the no-ITelecomService manager branch: TelecomManager reports CALL_STATE_IDLE, not in-call/ringing, and a null default dialer (consistent with the no-radio profile); PhoneAccountHandle, PhoneAccount and its Builder (automatic tel scheme, de-duplicated URI schemes, capabilities, group id, highlight colour, toBuilder round-trip), DisconnectCause (including the AOSP default telephony cause 36/65535 and the labelled toString), CallAudioState (including the STREAMING route-mask special case), VideoProfile and its CameraCapabilities, and StatusHints are value-modelled against AOSP 14. Call placement, ConnectionService/InCallService lifecycles, call screening/redirection, phone-account registration with the system, and in-call UI integration are not claimed."
+evidence = ["crates/rd-vm/tests/android_stub_surfaces.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-telecom"
-key_apis = ["android.telecom.TelecomManager.placeCall", "android.telecom.ConnectionService.onCreateIncomingConnection"]
+key_apis = ["android.telecom.TelecomManager.getCallState", "android.telecom.TelecomManager.isInCall", "android.telecom.PhoneAccount.Builder.build", "android.telecom.PhoneAccount.supportsUriScheme", "android.telecom.DisconnectCause.getCode", "android.telecom.CallAudioState.audioRouteToString", "android.telecom.VideoProfile.videoStateToString", "android.telecom.StatusHints.getLabel"]
 
 # ===================== Connectivity =====================
 [[surface]]

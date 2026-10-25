@@ -3847,9 +3847,15 @@ mod tests {
         assert_eq!(v["api_coverage"]["data"], "data/api-coverage.toml");
         assert_eq!(v["api_coverage"]["domains"], 17);
         assert!(v["api_coverage"]["surfaces"].as_u64() >= Some(100), "{v}");
+        // Invariante de honestidade: `supported` é apenas o subconjunto
+        // documentado de cada superfície (nunca o pacote AOSP inteiro), por
+        // isso permanece uma minoria pequena frente ao miolo `partial` —
+        // o registro não pode fingir Android completo mesmo com zero
+        // superfícies `not_implemented`.
+        let supported = v["api_coverage"]["by_status"]["supported"].as_u64();
+        let partial = v["api_coverage"]["by_status"]["partial"].as_u64();
         assert!(
-            v["api_coverage"]["by_status"]["not_implemented"].as_u64()
-                > v["api_coverage"]["by_status"]["supported"].as_u64(),
+            partial > supported && supported <= Some(8),
             "registro não pode fingir Android completo: {v}"
         );
     }

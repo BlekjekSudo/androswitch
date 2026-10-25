@@ -85,7 +85,7 @@ Regras, dependências e limites em [engine-registry.md](engine-registry.md); fon
 
 ## Superfície android.* (Apêndice C — registro, não execução)
 
-**106 superfícies em 17 domínios** (supported 4, partial 98, stub 0, not_implemented 4). Fonte executável: `data/api-coverage.toml`; relatório completo em [api-coverage.md](api-coverage.md), programa literal e bloqueadores em [appendix-c-literal-completion.md](appendix-c-literal-completion.md), consulta via `rd api-coverage` e classificação estática no MCP `get_api_usage`. `supported` é apenas o subconjunto documentado de cada superfície — nunca o pacote AOSP inteiro; cobertura de execução continua sendo `get_coverage`.
+**106 superfícies em 17 domínios** (supported 4, partial 102, stub 0, not_implemented 0). Fonte executável: `data/api-coverage.toml`; relatório completo em [api-coverage.md](api-coverage.md), programa literal e bloqueadores em [appendix-c-literal-completion.md](appendix-c-literal-completion.md), consulta via `rd api-coverage` e classificação estática no MCP `get_api_usage`. `supported` é apenas o subconjunto documentado de cada superfície — nunca o pacote AOSP inteiro; cobertura de execução continua sendo `get_coverage`.
 
 | Domínio | Superfícies/pacotes principais | Status das superfícies | Módulos |
 |---|---|---|---|
@@ -99,7 +99,7 @@ Regras, dependências e limites em [engine-registry.md](engine-registry.md); fon
 | Media | `android.media`, `android.media.audiofx`, `android.media.browse`, `android.media.midi`, `android.media.projection`, `android.media.session`, `android.media.tv` | partial 7 | `rd-vm/android-stub-surfaces` |
 | Camera | `android.hardware.Camera`, `android.hardware.camera2`, `android.hardware.camera2.params` | partial 3 | `rd-vm/android-stub-surfaces` |
 | Hardware | `android.hardware`, `android.hardware.biometrics`, `android.hardware.display`, `android.hardware.fingerprint`, `android.hardware.hdmi`, `android.hardware.input`, `android.hardware.soundtrigger`, `android.hardware.usb`, `android.location` | partial 9 | `rd-vm/android-display`, `rd-vm/android-stub-surfaces`, `rd-vm/android-sysservices` |
-| Telephony | `android.telecom`, `android.telephony`, `android.telephony.cellbroadcast`, `android.telephony.euicc`, `android.telephony.gsm`, `android.telephony.mbms` | partial 2 · not_implemented 4 | `none`, `rd-vm/android-stub-surfaces` |
+| Telephony | `android.telecom`, `android.telephony`, `android.telephony.CellBroadcastIdRange`, `android.telephony.euicc`, `android.telephony.gsm`, `android.telephony.mbms` | partial 6 | `rd-vm/android-stub-surfaces` |
 | Connectivity | `android.bluetooth`, `android.bluetooth.le`, `android.companion`, `android.nfc`, `android.nfc.cardemulation`, `android.nfc.tech` | partial 6 | `rd-vm/android-stub-surfaces` |
 | Security | `android.se.omapi`, `android.security`, `android.security.identity`, `android.security.keystore`, `android.service.credentials` | partial 5 | `rd-vm/android-stub-surfaces` |
 | Speech/ML | `android.service.voice`, `android.speech`, `android.speech.tts`, `android.view.textclassifier` | partial 4 | `rd-vm/android-stub-surfaces` |

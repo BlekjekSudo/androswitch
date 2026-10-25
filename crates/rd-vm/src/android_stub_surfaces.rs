@@ -461,6 +461,9 @@ pub(crate) fn host_static(
     if let Some(value) = partial36h_host_static(vm, owner, field)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36i_host_static(vm, owner, field)? {
+        return Ok(Some(value));
+    }
     let v = match (owner, field) {
         (WEB_SETTINGS, "LOAD_DEFAULT") => Value::Int(-1),
         (WEB_SETTINGS, "LOAD_NORMAL") => Value::Int(0),
@@ -641,6 +644,9 @@ pub(crate) fn static_intrinsic(
     if let Some(value) = partial36h_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = partial36i_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     match class {
         DOCUMENTS_CONTRACT => documents_static(vm, name, sig, args),
         NETWORK_SECURITY_POLICY => network_policy_static(vm, name, sig, args),
@@ -752,6 +758,9 @@ pub(crate) fn instance_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = partial36h_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = partial36i_instance(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(value));
     }
     let class = if is_stub_class(recv_class) {
@@ -51505,4 +51514,1887 @@ fn partial36h_instance(
         return p36h_params_getters(vm, name, recv);
     }
     Ok(None)
+}
+
+// Appendix C Batch 36-I: android.telephony + android.telephony.mbms +
+// android.telephony.cellbroadcast + android.telecom.
+//
+// Device profile: the VM feature set does NOT advertise
+// `android.hardware.telephony` (see android_pm.rs), so this batch models a
+// device with no radio/SIM: TelephonyManager and SubscriptionManager are
+// still obtainable (as on Wi-Fi-only tablets) and every answer below is the
+// AOSP 14 result when the ITelephony/ISub binders are absent (SIM state
+// UNKNOWN, call state IDLE, DATA_DISCONNECTED, NETWORK_TYPE_UNKNOWN, no ICC
+// card, empty operator properties, no subscriptions). TelecomManager
+// likewise returns its no-ITelecomService defaults. No modem, SIM, SMS,
+// call, or MBMS middleware behavior is emulated.
+//
+// The remaining classes reproduce AOSP 14 pure value semantics from
+// frameworks/base (telephony/java + telecomm/java) @ android-14.0.0_r1:
+// PhoneNumberUtils string algorithms, ServiceState defaults,
+// CellBroadcastIdRange validation, MBMS DownloadRequest/FileInfo, and the
+// telecom PhoneAccount/PhoneAccountHandle/DisconnectCause/CallAudioState/
+// VideoProfile/StatusHints values.
+//
+// Note on the cellbroadcast surface: AOSP has no
+// `android.telephony.cellbroadcast` package in the API 26-36 system or
+// module-lib surfaces (verified against prebuilts/sdk API text files for
+// API 34/35/36); the cell-broadcast API classes live in `android.telephony`.
+// The registry row is therefore anchored on the real class
+// `android.telephony.CellBroadcastIdRange`, implemented below.
+const P36I_PHONE_NUMBER_UTILS: &str = "Landroid/telephony/PhoneNumberUtils;";
+const P36I_TELEPHONY_MANAGER: &str = "Landroid/telephony/TelephonyManager;";
+const P36I_SUBSCRIPTION_MANAGER: &str = "Landroid/telephony/SubscriptionManager;";
+const P36I_SERVICE_STATE: &str = "Landroid/telephony/ServiceState;";
+const P36I_CB_ID_RANGE: &str = "Landroid/telephony/CellBroadcastIdRange;";
+const P36I_DOWNLOAD_REQUEST: &str = "Landroid/telephony/mbms/DownloadRequest;";
+const P36I_DOWNLOAD_BUILDER: &str = "Landroid/telephony/mbms/DownloadRequest$Builder;";
+const P36I_FILE_INFO: &str = "Landroid/telephony/mbms/FileInfo;";
+const P36I_TELECOM_MANAGER: &str = "Landroid/telecom/TelecomManager;";
+const P36I_ACCOUNT_HANDLE: &str = "Landroid/telecom/PhoneAccountHandle;";
+const P36I_PHONE_ACCOUNT: &str = "Landroid/telecom/PhoneAccount;";
+const P36I_ACCOUNT_BUILDER: &str = "Landroid/telecom/PhoneAccount$Builder;";
+const P36I_DISCONNECT_CAUSE: &str = "Landroid/telecom/DisconnectCause;";
+const P36I_CALL_AUDIO_STATE: &str = "Landroid/telecom/CallAudioState;";
+const P36I_VIDEO_PROFILE: &str = "Landroid/telecom/VideoProfile;";
+const P36I_CAMERA_CAPS: &str = "Landroid/telecom/VideoProfile$CameraCapabilities;";
+const P36I_STATUS_HINTS: &str = "Landroid/telecom/StatusHints;";
+
+// PhoneNumberUtils.PAUSE/WAIT/WILD as UTF-16 code units.
+const P36I_PAUSE: u32 = ',' as u32;
+const P36I_WAIT: u32 = ';' as u32;
+const P36I_WILD: u32 = 'N' as u32;
+
+fn p36i_is_iso_digit(c: u32) -> bool {
+    (b'0' as u32..=b'9' as u32).contains(&c)
+}
+fn p36i_is_12_key(c: u32) -> bool {
+    p36i_is_iso_digit(c) || c == '*' as u32 || c == '#' as u32
+}
+fn p36i_is_dialable(c: u32) -> bool {
+    p36i_is_12_key(c) || c == '+' as u32 || c == P36I_WILD
+}
+fn p36i_is_really_dialable(c: u32) -> bool {
+    p36i_is_12_key(c) || c == '+' as u32
+}
+fn p36i_is_non_separator(c: u32) -> bool {
+    p36i_is_dialable(c) || c == P36I_PAUSE || c == P36I_WAIT
+}
+fn p36i_is_starts_post_dial(c: u32) -> bool {
+    c == P36I_PAUSE || c == P36I_WAIT
+}
+
+// java.lang.Character.digit(c, 10) for the common decimal-digit blocks.
+fn p36i_java_digit(c: char) -> Option<u32> {
+    let v = c as u32;
+    match v {
+        0x30..=0x39 => Some(v - 0x30),       // ASCII
+        0xFF10..=0xFF19 => Some(v - 0xFF10), // fullwidth
+        0x0660..=0x0669 => Some(v - 0x0660), // Arabic-Indic
+        0x06F0..=0x06F9 => Some(v - 0x06F0), // Extended Arabic-Indic
+        0x0966..=0x096F => Some(v - 0x0966), // Devanagari
+        0x09E6..=0x09EF => Some(v - 0x09E6), // Bengali
+        _ => None,
+    }
+}
+
+fn p36i_keypad_digit(c: char) -> char {
+    // ITU E.161 mapping used by PhoneNumberUtils.KEYPAD_MAP.
+    match c {
+        'a'..='c' | 'A'..='C' => '2',
+        'd'..='f' | 'D'..='F' => '3',
+        'g'..='i' | 'G'..='I' => '4',
+        'j'..='l' | 'J'..='L' => '5',
+        'm'..='o' | 'M'..='O' => '6',
+        'p'..='s' | 'P'..='S' => '7',
+        't'..='v' | 'T'..='V' => '8',
+        'w'..='z' | 'W'..='Z' => '9',
+        _ => c,
+    }
+}
+
+fn p36i_convert_keypad(input: &str) -> String {
+    input.chars().map(p36i_keypad_digit).collect()
+}
+
+fn p36i_extract_network_portion(input: &str) -> String {
+    let mut ret = String::new();
+    for c in input.chars() {
+        if let Some(d) = p36i_java_digit(c) {
+            ret.push(char::from_digit(d, 10).unwrap_or(c));
+        } else if c == '+' {
+            // Allowed as first character or after a CLIR MMI prefix.
+            if ret.is_empty() || ret == "*31#" || ret == "#31#" {
+                ret.push(c);
+            }
+        } else if p36i_is_dialable(c as u32) {
+            ret.push(c);
+        } else if p36i_is_starts_post_dial(c as u32) {
+            break;
+        }
+    }
+    ret
+}
+
+// java.util.Objects.equals on guest values.
+fn p36i_guest_equals(vm: &mut Engine, a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Null, Value::Null) => true,
+        (Value::Obj(x), Value::Obj(y)) => {
+            x == y
+                || matches!(
+                    vm.invoke_instance(
+                        *x,
+                        "equals",
+                        "(Ljava/lang/Object;)Z",
+                        std::slice::from_ref(b)
+                    ),
+                    Ok(Value::Int(1))
+                )
+        }
+        _ => a == b,
+    }
+}
+
+// java.util.Objects.hashCode on a guest value.
+fn p36i_guest_hash(vm: &mut Engine, value: &Value) -> i32 {
+    match value {
+        Value::Null => 0,
+        Value::Int(v) => *v,
+        Value::Obj(r) => match vm.invoke_instance(*r, "hashCode", "()I", &[]) {
+            Ok(Value::Int(h)) => h,
+            _ => 0,
+        },
+        _ => 0,
+    }
+}
+
+// java.util.Objects.hash over pre-computed element hashes.
+fn p36i_objects_hash(parts: &[i32]) -> i32 {
+    let mut h: i32 = 1;
+    for p in parts {
+        h = h.wrapping_mul(31).wrapping_add(*p);
+    }
+    h
+}
+
+fn p36i_value_text(vm: &mut Engine, value: &Value) -> Option<String> {
+    if let Some(s) = opt_str(vm, Some(value)) {
+        return Some(s);
+    }
+    match value {
+        Value::Obj(r) => match vm.invoke_instance(*r, "toString", "()Ljava/lang/String;", &[]) {
+            Ok(v) => opt_str(vm, Some(&v)),
+            Err(_) => None,
+        },
+        _ => None,
+    }
+}
+
+fn p36i_service_state_init(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    // ServiceState.init()
+    put(vm, recv, "mVoiceRegState", Value::Int(1))?;
+    put(vm, recv, "mDataRegState", Value::Int(1))?;
+    put(vm, recv, "mChannelNumber", Value::Int(-1))?;
+    let empty = new_int_array(vm, &[])?;
+    put(vm, recv, "mCellBandwidths", empty)?;
+    put(vm, recv, "mOperatorAlphaLong", Value::Null)?;
+    put(vm, recv, "mOperatorAlphaShort", Value::Null)?;
+    put(vm, recv, "mOperatorNumeric", Value::Null)?;
+    put(vm, recv, "mIsManualNetworkSelection", Value::Int(0))?;
+    put(vm, recv, "mIsEmergencyOnly", Value::Int(0))?;
+    put(vm, recv, "rd_voice_roaming_type", Value::Int(0))?;
+    put(vm, recv, "rd_data_roaming_type", Value::Int(0))?;
+    Ok(())
+}
+
+fn partial36i_host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    let v = match (owner, field) {
+        (P36I_PHONE_NUMBER_UTILS, "PAUSE") => Value::Int(P36I_PAUSE as i32),
+        (P36I_PHONE_NUMBER_UTILS, "WAIT") => Value::Int(P36I_WAIT as i32),
+        (P36I_PHONE_NUMBER_UTILS, "WILD") => Value::Int(P36I_WILD as i32),
+        (P36I_SERVICE_STATE, "STATE_IN_SERVICE") => Value::Int(0),
+        (P36I_SERVICE_STATE, "STATE_OUT_OF_SERVICE") => Value::Int(1),
+        (P36I_SERVICE_STATE, "STATE_EMERGENCY_ONLY") => Value::Int(2),
+        (P36I_SERVICE_STATE, "STATE_POWER_OFF") => Value::Int(3),
+        (P36I_TELEPHONY_MANAGER, "SIM_STATE_UNKNOWN") => Value::Int(0),
+        (P36I_TELEPHONY_MANAGER, "CALL_STATE_IDLE") => Value::Int(0),
+        (P36I_SUBSCRIPTION_MANAGER, "INVALID_SUBSCRIPTION_ID") => Value::Int(-1),
+        (P36I_SUBSCRIPTION_MANAGER, "DEFAULT_SUBSCRIPTION_ID") => Value::Int(i32::MAX),
+        _ => return Ok(None),
+    };
+    let _ = vm;
+    Ok(Some(v))
+}
+
+fn partial36i_telephony_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if class == P36I_PHONE_NUMBER_UTILS {
+        let char_arg = |args: &[Value]| (iarg(args, 0) & 0xFFFF) as u32;
+        let v = match (name, sig) {
+            ("isISODigit", "(C)Z") => bool_value(p36i_is_iso_digit(char_arg(args))),
+            ("is12Key", "(C)Z") => bool_value(p36i_is_12_key(char_arg(args))),
+            ("isDialable", "(C)Z") => bool_value(p36i_is_dialable(char_arg(args))),
+            ("isReallyDialable", "(C)Z") => bool_value(p36i_is_really_dialable(char_arg(args))),
+            ("isNonSeparator", "(C)Z") => bool_value(p36i_is_non_separator(char_arg(args))),
+            ("isStartsPostDial", "(C)Z") => bool_value(p36i_is_starts_post_dial(char_arg(args))),
+            ("convertKeypadLettersToDigits", "(Ljava/lang/String;)Ljava/lang/String;") => {
+                match opt_str(vm, args.first()) {
+                    None => Value::Null,
+                    Some(s) if s.is_empty() => args.first().cloned().unwrap_or(Value::Null),
+                    Some(s) => jstr(vm, p36i_convert_keypad(&s))?,
+                }
+            }
+            ("extractNetworkPortion", "(Ljava/lang/String;)Ljava/lang/String;") => {
+                match opt_str(vm, args.first()) {
+                    None => Value::Null,
+                    Some(s) => jstr(vm, p36i_extract_network_portion(&s))?,
+                }
+            }
+            ("extractNetworkPortionAlt", "(Ljava/lang/String;)Ljava/lang/String;") => {
+                match opt_str(vm, args.first()) {
+                    None => Value::Null,
+                    Some(s) => {
+                        let mut ret = String::new();
+                        let mut seen_plus = false;
+                        for c in s.chars() {
+                            if c == '+' {
+                                if seen_plus {
+                                    continue;
+                                }
+                                seen_plus = true;
+                            }
+                            if p36i_is_dialable(c as u32) {
+                                ret.push(c);
+                            } else if p36i_is_starts_post_dial(c as u32) {
+                                break;
+                            }
+                        }
+                        jstr(vm, ret)?
+                    }
+                }
+            }
+            ("stripSeparators", "(Ljava/lang/String;)Ljava/lang/String;") => {
+                match opt_str(vm, args.first()) {
+                    None => Value::Null,
+                    Some(s) => {
+                        let mut ret = String::new();
+                        for c in s.chars() {
+                            if let Some(d) = p36i_java_digit(c) {
+                                ret.push(char::from_digit(d, 10).unwrap_or(c));
+                            } else if p36i_is_non_separator(c as u32) {
+                                ret.push(c);
+                            }
+                        }
+                        jstr(vm, ret)?
+                    }
+                }
+            }
+            ("convertAndStrip", "(Ljava/lang/String;)Ljava/lang/String;") => {
+                match opt_str(vm, args.first()) {
+                    None => Value::Null,
+                    Some(s) => {
+                        let converted = p36i_convert_keypad(&s);
+                        let mut ret = String::new();
+                        for c in converted.chars() {
+                            if let Some(d) = p36i_java_digit(c) {
+                                ret.push(char::from_digit(d, 10).unwrap_or(c));
+                            } else if p36i_is_non_separator(c as u32) {
+                                ret.push(c);
+                            }
+                        }
+                        jstr(vm, ret)?
+                    }
+                }
+            }
+            ("extractPostDialPortion", "(Ljava/lang/String;)Ljava/lang/String;") => {
+                match opt_str(vm, args.first()) {
+                    None => Value::Null,
+                    Some(s) => {
+                        let chars: Vec<char> = s.chars().collect();
+                        let p_index = chars.iter().position(|c| *c == ',').map(|i| i as i32);
+                        let w_index = chars.iter().position(|c| *c == ';').map(|i| i as i32);
+                        let trim = match (p_index, w_index) {
+                            (Some(a), Some(b)) => a.min(b),
+                            (Some(a), None) => a,
+                            (None, Some(b)) => b,
+                            (None, None) => -1,
+                        };
+                        let start = if trim < 0 { chars.len() } else { trim as usize };
+                        let mut ret = String::new();
+                        for c in chars.iter().skip(start) {
+                            if p36i_is_non_separator(*c as u32) {
+                                ret.push(*c);
+                            }
+                        }
+                        jstr(vm, ret)?
+                    }
+                }
+            }
+            ("isWellFormedSmsAddress", "(Ljava/lang/String;)Z") => {
+                let s = opt_str(vm, args.first()).ok_or_else(|| npe("address"))?;
+                let np = p36i_extract_network_portion(&s);
+                bool_value(
+                    np != "+" && !np.is_empty() && np.chars().all(|c| p36i_is_dialable(c as u32)),
+                )
+            }
+            ("isGlobalPhoneNumber", "(Ljava/lang/String;)Z") => {
+                // AOSP pattern: [\\+]?[0-9.-]+ (full match)
+                let ok = match opt_str(vm, args.first()) {
+                    None => false,
+                    Some(s) => {
+                        let body: &str = s.strip_prefix('+').unwrap_or(&s);
+                        !body.is_empty()
+                            && body
+                                .chars()
+                                .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
+                    }
+                };
+                bool_value(ok)
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(v));
+    }
+    if class == P36I_TELEPHONY_MANAGER && name == "getSimStateForSlotIndex" && sig == "(I)I" {
+        // No ITelephony binder is published in this VM.
+        return Ok(Some(Value::Int(0))); // SIM_STATE_UNKNOWN
+    }
+    if class == P36I_SUBSCRIPTION_MANAGER {
+        let v = match (name, sig) {
+            ("isValidSubscriptionId", "(I)Z") => bool_value(iarg(args, 0) > -1),
+            ("isUsableSubscriptionId", "(I)Z") | ("isUsableSubIdValue", "(I)Z") => {
+                let id = iarg(args, 0);
+                bool_value((0..i32::MAX).contains(&id))
+            }
+            // No ISub binder: the property caches yield their default value.
+            ("getDefaultSubscriptionId", "()I")
+            | ("getDefaultDataSubscriptionId", "()I")
+            | ("getDefaultSmsSubscriptionId", "()I")
+            | ("getDefaultVoiceSubscriptionId", "()I")
+            | ("getActiveDataSubscriptionId", "()I") => Value::Int(-1),
+            _ => return Ok(None),
+        };
+        return Ok(Some(v));
+    }
+    if class == P36I_DOWNLOAD_REQUEST {
+        let v = match (name, sig) {
+            ("getMaxAppIntentSize", "()I") | ("getMaxDestinationUriSize", "()I") => {
+                Value::Int(50000)
+            }
+            _ => return Ok(None),
+        };
+        return Ok(Some(v));
+    }
+    Ok(None)
+}
+
+fn p36i_telephony_manager(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // No-radio profile: ITelephony is absent, so AOSP null-service defaults.
+    let empty = |vm: &mut Engine| jstr(vm, "");
+    let v = match (name, sig) {
+        ("<init>", _) => {
+            if let Some(ctx) = args.first() {
+                put(vm, recv, "mContext", ctx.clone())?;
+            }
+            Value::Null
+        }
+        ("getSimState", "()I") | ("getSimState", "(I)I") => Value::Int(0), // SIM_STATE_UNKNOWN
+        ("getCallState", "()I")
+        | ("getCallState", "(I)I")
+        | ("getCallStateForSubscription", "()I") => {
+            Value::Int(0) // CALL_STATE_IDLE
+        }
+        ("getDataState", "()I") => Value::Int(0), // DATA_DISCONNECTED
+        ("getDataActivity", "()I") => Value::Int(0), // DATA_ACTIVITY_NONE
+        ("hasIccCard", "()Z") | ("hasIccCard", "(I)Z") => bool_value(false),
+        ("getNetworkType", "()I")
+        | ("getNetworkType", "(I)I")
+        | ("getDataNetworkType", "()I")
+        | ("getDataNetworkType", "(I)I")
+        | ("getVoiceNetworkType", "()I")
+        | ("getVoiceNetworkType", "(I)I") => Value::Int(0), // NETWORK_TYPE_UNKNOWN
+        // TelephonyProperties-backed getters: no modem sets the properties.
+        ("getSimOperator", "()Ljava/lang/String;")
+        | ("getSimOperator", "(I)Ljava/lang/String;")
+        | ("getSimOperatorNumeric", "()Ljava/lang/String;")
+        | ("getSimOperatorName", "()Ljava/lang/String;")
+        | ("getSimOperatorName", "(I)Ljava/lang/String;")
+        | ("getNetworkOperator", "()Ljava/lang/String;")
+        | ("getNetworkOperator", "(I)Ljava/lang/String;")
+        | ("getNetworkOperatorName", "()Ljava/lang/String;")
+        | ("getNetworkOperatorName", "(I)Ljava/lang/String;") => empty(vm)?,
+        ("isNetworkRoaming", "()Z") | ("isNetworkRoaming", "(I)Z") => bool_value(false),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_subscription_manager(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // No ISub binder in this VM.
+    let v = match (name, sig) {
+        ("<init>", _) => {
+            if let Some(ctx) = args.first() {
+                put(vm, recv, "mContext", ctx.clone())?;
+            }
+            Value::Null
+        }
+        ("getActiveSubscriptionInfoList", "()Ljava/util/List;")
+        | ("getActiveSubscriptionInfoList", "(Z)Ljava/util/List;") => Value::Null,
+        ("getCompleteActiveSubscriptionInfoList", "()Ljava/util/List;") => {
+            p49_list_value(vm, Vec::new())?
+        }
+        ("getActiveSubscriptionInfoCount", "()I")
+        | ("getActiveSubscriptionInfoCountMax", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_service_state(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "()V") => {
+            put(vm, recv, "mVoiceRegState", Value::Int(1))?; // STATE_OUT_OF_SERVICE
+            put(vm, recv, "mDataRegState", Value::Int(1))?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/telephony/ServiceState;)V") => {
+            let src = oarg(args, 0).ok_or_else(|| npe("s"))?;
+            for f in [
+                "mVoiceRegState",
+                "mDataRegState",
+                "mOperatorAlphaLong",
+                "mOperatorAlphaShort",
+                "mOperatorNumeric",
+                "mIsManualNetworkSelection",
+                "mIsEmergencyOnly",
+                "mChannelNumber",
+                "mCellBandwidths",
+                "rd_voice_roaming_type",
+                "rd_data_roaming_type",
+            ] {
+                put(vm, recv, f, get(vm, src, f))?;
+            }
+            Value::Null
+        }
+        ("getState", "()I") | ("getVoiceRegState", "()I") => {
+            Value::Int(field_int(vm, recv, "mVoiceRegState"))
+        }
+        ("getDataRegState", "()I") => Value::Int(field_int(vm, recv, "mDataRegState")),
+        ("setVoiceRegState", "(I)V") => {
+            put(vm, recv, "mVoiceRegState", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setDataRegState", "(I)V") => {
+            put(vm, recv, "mDataRegState", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getRoaming", "()Z") => bool_value(
+            field_int(vm, recv, "rd_voice_roaming_type") != 0
+                || field_int(vm, recv, "rd_data_roaming_type") != 0,
+        ),
+        ("getVoiceRoaming", "()Z") => bool_value(field_int(vm, recv, "rd_voice_roaming_type") != 0),
+        ("getDataRoaming", "()Z") => bool_value(field_int(vm, recv, "rd_data_roaming_type") != 0),
+        ("getVoiceRoamingType", "()I") => Value::Int(field_int(vm, recv, "rd_voice_roaming_type")),
+        ("getDataRoamingType", "()I") => Value::Int(field_int(vm, recv, "rd_data_roaming_type")),
+        ("setVoiceRoamingType", "(I)V") => {
+            put(vm, recv, "rd_voice_roaming_type", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setDataRoamingType", "(I)V") => {
+            put(vm, recv, "rd_data_roaming_type", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("setRoaming", "(Z)V") => {
+            // setRoaming maps to ROAMING_TYPE_UNKNOWN(1)/NOT_ROAMING(0).
+            let t = if iarg(args, 0) != 0 { 1 } else { 0 };
+            put(vm, recv, "rd_voice_roaming_type", Value::Int(t))?;
+            put(vm, recv, "rd_data_roaming_type", Value::Int(t))?;
+            Value::Null
+        }
+        ("getOperatorAlphaLong", "()Ljava/lang/String;") => get(vm, recv, "mOperatorAlphaLong"),
+        ("getOperatorAlphaShort", "()Ljava/lang/String;") => get(vm, recv, "mOperatorAlphaShort"),
+        ("getOperatorNumeric", "()Ljava/lang/String;") => get(vm, recv, "mOperatorNumeric"),
+        ("setOperatorName", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V") => {
+            put(
+                vm,
+                recv,
+                "mOperatorAlphaLong",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                recv,
+                "mOperatorAlphaShort",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                recv,
+                "mOperatorNumeric",
+                args.get(2).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("getIsManualSelection", "()Z") => {
+            bool_value(field_bool(vm, recv, "mIsManualNetworkSelection"))
+        }
+        ("setIsManualSelection", "(Z)V") => {
+            put(
+                vm,
+                recv,
+                "mIsManualNetworkSelection",
+                Value::Int(iarg(args, 0)),
+            )?;
+            Value::Null
+        }
+        ("isEmergencyOnly", "()Z") => bool_value(field_bool(vm, recv, "mIsEmergencyOnly")),
+        ("setEmergencyOnly", "(Z)V") => {
+            put(vm, recv, "mIsEmergencyOnly", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getChannelNumber", "()I") => Value::Int(field_int(vm, recv, "mChannelNumber")),
+        ("setChannelNumber", "(I)V") => {
+            put(vm, recv, "mChannelNumber", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getCellBandwidths", "()[I") => {
+            let v = get(vm, recv, "mCellBandwidths");
+            if matches!(v, Value::Null) {
+                new_int_array(vm, &[])?
+            } else {
+                v
+            }
+        }
+        ("setCellBandwidths", "([I)V") => {
+            put(
+                vm,
+                recv,
+                "mCellBandwidths",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("getNetworkRegistrationInfoList", "()Ljava/util/List;") => {
+            // NetworkRegistrationInfo entries are not modelled; the default
+            // (pre-init) list is empty.
+            p49_list_value(vm, Vec::new())?
+        }
+        ("setStateOutOfService", "()V") => {
+            p36i_service_state_init(vm, recv)?;
+            Value::Null
+        }
+        ("setStateOff", "()V") => {
+            p36i_service_state_init(vm, recv)?;
+            put(vm, recv, "mVoiceRegState", Value::Int(3))?; // STATE_POWER_OFF
+            put(vm, recv, "mDataRegState", Value::Int(3))?;
+            Value::Null
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_cb_id_range(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(IIIZ)V") => {
+            let start = iarg(args, 0);
+            let end = iarg(args, 1);
+            if start < 0 || end < 0 || start > 0xFFFF || end > 0xFFFF {
+                return Err(iae("invalid id".to_string()));
+            }
+            if end < start {
+                return Err(iae(
+                    "endId must be greater than or equal to startId".to_string()
+                ));
+            }
+            put(vm, recv, "mStartId", Value::Int(start))?;
+            put(vm, recv, "mEndId", Value::Int(end))?;
+            put(vm, recv, "mType", Value::Int(iarg(args, 2)))?;
+            put(vm, recv, "mIsEnabled", Value::Int(iarg(args, 3)))?;
+            Value::Null
+        }
+        ("getStartId", "()I") => Value::Int(field_int(vm, recv, "mStartId")),
+        ("getEndId", "()I") => Value::Int(field_int(vm, recv, "mEndId")),
+        ("getType", "()I") => Value::Int(field_int(vm, recv, "mType")),
+        ("isEnabled", "()Z") => bool_value(field_bool(vm, recv, "mIsEnabled")),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(o) if class_of(vm, o) == P36I_CB_ID_RANGE => {
+                    field_int(vm, recv, "mStartId") == field_int(vm, o, "mStartId")
+                        && field_int(vm, recv, "mEndId") == field_int(vm, o, "mEndId")
+                        && field_int(vm, recv, "mType") == field_int(vm, o, "mType")
+                        && field_bool(vm, recv, "mIsEnabled") == field_bool(vm, o, "mIsEnabled")
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("hashCode", "()I") => Value::Int(p36i_objects_hash(&[
+            field_int(vm, recv, "mStartId"),
+            field_int(vm, recv, "mEndId"),
+            field_int(vm, recv, "mType"),
+            if field_bool(vm, recv, "mIsEnabled") {
+                1231
+            } else {
+                1237
+            },
+        ])),
+        ("toString", "()Ljava/lang/String;") => jstr(
+            vm,
+            format!(
+                "CellBroadcastIdRange[{}, {}, {}, {}]",
+                field_int(vm, recv, "mStartId"),
+                field_int(vm, recv, "mEndId"),
+                field_int(vm, recv, "mType"),
+                field_bool(vm, recv, "mIsEnabled")
+            ),
+        )?,
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_file_info(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/net/Uri;Ljava/lang/String;)V") => {
+            put(
+                vm,
+                recv,
+                "uri",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(
+                vm,
+                recv,
+                "mimeType",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("getUri", "()Landroid/net/Uri;") => get(vm, recv, "uri"),
+        ("getMimeType", "()Ljava/lang/String;") => get(vm, recv, "mimeType"),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(o) if class_of(vm, o) == P36I_FILE_INFO => {
+                    p36i_guest_equals(vm, &get(vm, recv, "uri"), &get(vm, o, "uri"))
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "mimeType"),
+                            &get(vm, o, "mimeType"),
+                        )
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("hashCode", "()I") => Value::Int(p36i_objects_hash(&[
+            p36i_guest_hash(vm, &get(vm, recv, "uri")),
+            p36i_guest_hash(vm, &get(vm, recv, "mimeType")),
+        ])),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_download_builder(
+    vm: &mut Engine,
+    name: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let this = Value::Obj(recv);
+    let v = match name {
+        "<init>" => {
+            let source = args.first().cloned().unwrap_or(Value::Null);
+            let dest = args.get(1).cloned().unwrap_or(Value::Null);
+            if matches!(source, Value::Null) || matches!(dest, Value::Null) {
+                return Err(iae(
+                    "Source and destination URIs must be non-null.".to_string()
+                ));
+            }
+            put(vm, recv, "source", source)?;
+            put(vm, recv, "destination", dest)?;
+            put(vm, recv, "version", Value::Int(1))?;
+            Value::Null
+        }
+        "setServiceId" => {
+            put(
+                vm,
+                recv,
+                "fileServiceId",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            this
+        }
+        "setServiceInfo" => {
+            let info = oarg(args, 0).ok_or_else(|| npe("serviceInfo"))?;
+            let id = vm.invoke_instance(info, "getServiceId", "()Ljava/lang/String;", &[])?;
+            put(vm, recv, "fileServiceId", id)?;
+            this
+        }
+        "setSubscriptionId" => {
+            put(vm, recv, "subscriptionId", Value::Int(iarg(args, 0)))?;
+            this
+        }
+        "setAppIntent" => {
+            let intent = oarg(args, 0).ok_or_else(|| npe("intent"))?;
+            let uri =
+                vm.invoke_instance(intent, "toUri", "(I)Ljava/lang/String;", &[Value::Int(0)])?;
+            if let Some(text) = opt_str(vm, Some(&uri)) {
+                if text.encode_utf16().count() > 50000 {
+                    return Err(iae("App intent must not exceed length 50000".to_string()));
+                }
+            }
+            put(vm, recv, "appIntent", uri)?;
+            this
+        }
+        "build" => {
+            let req = alloc_obj(vm, P36I_DOWNLOAD_REQUEST, Vec::new())?;
+            put(vm, req, "fileServiceId", get(vm, recv, "fileServiceId"))?;
+            put(vm, req, "sourceUri", get(vm, recv, "source"))?;
+            put(vm, req, "destinationUri", get(vm, recv, "destination"))?;
+            put(vm, req, "subscriptionId", get(vm, recv, "subscriptionId"))?;
+            put(
+                vm,
+                req,
+                "serializedResultIntentForApp",
+                get(vm, recv, "appIntent"),
+            )?;
+            put(vm, req, "version", get(vm, recv, "version"))?;
+            Value::Obj(req)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_download_request(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("getFileServiceId", "()Ljava/lang/String;") => get(vm, recv, "fileServiceId"),
+        ("getSourceUri", "()Landroid/net/Uri;") => get(vm, recv, "sourceUri"),
+        ("getDestinationUri", "()Landroid/net/Uri;") => get(vm, recv, "destinationUri"),
+        ("getSubscriptionId", "()I") => Value::Int(field_int(vm, recv, "subscriptionId")),
+        ("getVersion", "()I") => Value::Int(field_int(vm, recv, "version")),
+        ("getIntentForApp", "()Landroid/content/Intent;") => {
+            let serialized = get(vm, recv, "serializedResultIntentForApp");
+            match vm.invoke_static(
+                "Landroid/content/Intent;",
+                "parseUri",
+                "(Ljava/lang/String;I)Landroid/content/Intent;",
+                &[serialized, Value::Int(0)],
+            ) {
+                Ok(v) => v,
+                Err(VmExit::Exception(t)) if t.class == "Ljava/net/URISyntaxException;" => {
+                    Value::Null
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(o) if class_of(vm, o) == P36I_DOWNLOAD_REQUEST => {
+                    field_int(vm, recv, "subscriptionId") == field_int(vm, o, "subscriptionId")
+                        && field_int(vm, recv, "version") == field_int(vm, o, "version")
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "fileServiceId"),
+                            &get(vm, o, "fileServiceId"),
+                        )
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "sourceUri"),
+                            &get(vm, o, "sourceUri"),
+                        )
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "destinationUri"),
+                            &get(vm, o, "destinationUri"),
+                        )
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "serializedResultIntentForApp"),
+                            &get(vm, o, "serializedResultIntentForApp"),
+                        )
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("hashCode", "()I") => Value::Int(p36i_objects_hash(&[
+            p36i_guest_hash(vm, &get(vm, recv, "fileServiceId")),
+            p36i_guest_hash(vm, &get(vm, recv, "sourceUri")),
+            p36i_guest_hash(vm, &get(vm, recv, "destinationUri")),
+            field_int(vm, recv, "subscriptionId"),
+            p36i_guest_hash(vm, &get(vm, recv, "serializedResultIntentForApp")),
+            field_int(vm, recv, "version"),
+        ])),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+// ---- android.telecom (Batch 36-I) ----
+
+fn p36i_my_user_handle(vm: &mut Engine) -> Result<Value, VmExit> {
+    // Process.myUserHandle(): the VM runs apps as the owner user.
+    match vm.invoke_static(
+        "Landroid/os/Process;",
+        "myUserHandle",
+        "()Landroid/os/UserHandle;",
+        &[],
+    ) {
+        Ok(v @ Value::Obj(_)) => Ok(v),
+        _ => {
+            let r = alloc_obj(vm, "Landroid/os/UserHandle;", Vec::new())?;
+            put(vm, r, "mHandle", Value::Int(0))?;
+            Ok(Value::Obj(r))
+        }
+    }
+}
+
+fn p36i_account_handle(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/content/ComponentName;Ljava/lang/String;)V") => {
+            // Null component/user are only logged in AOSP, never rejected.
+            put(
+                vm,
+                recv,
+                "mComponentName",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(vm, recv, "mId", args.get(1).cloned().unwrap_or(Value::Null))?;
+            let user = p36i_my_user_handle(vm)?;
+            put(vm, recv, "mUserHandle", user)?;
+            Value::Null
+        }
+        (
+            "<init>",
+            "(Landroid/content/ComponentName;Ljava/lang/String;Landroid/os/UserHandle;)V",
+        ) => {
+            put(
+                vm,
+                recv,
+                "mComponentName",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            put(vm, recv, "mId", args.get(1).cloned().unwrap_or(Value::Null))?;
+            put(
+                vm,
+                recv,
+                "mUserHandle",
+                args.get(2).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("getComponentName", "()Landroid/content/ComponentName;") => {
+            get(vm, recv, "mComponentName")
+        }
+        ("getId", "()Ljava/lang/String;") => get(vm, recv, "mId"),
+        ("getUserHandle", "()Landroid/os/UserHandle;") => get(vm, recv, "mUserHandle"),
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(o) if class_of(vm, o) == P36I_ACCOUNT_HANDLE => {
+                    p36i_guest_equals(
+                        vm,
+                        &get(vm, recv, "mComponentName"),
+                        &get(vm, o, "mComponentName"),
+                    ) && p36i_guest_equals(vm, &get(vm, recv, "mId"), &get(vm, o, "mId"))
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "mUserHandle"),
+                            &get(vm, o, "mUserHandle"),
+                        )
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("hashCode", "()I") => Value::Int(p36i_objects_hash(&[
+            p36i_guest_hash(vm, &get(vm, recv, "mComponentName")),
+            p36i_guest_hash(vm, &get(vm, recv, "mId")),
+            p36i_guest_hash(vm, &get(vm, recv, "mUserHandle")),
+        ])),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_account_builder_init(vm: &mut Engine, recv: ObjRef) -> Result<(), VmExit> {
+    put(vm, recv, "mCapabilities", Value::Int(0))?;
+    put(vm, recv, "mSupportedAudioRoutes", Value::Int(0x1F))?; // ROUTE_ALL
+    put(vm, recv, "mHighlightColor", Value::Int(0))?; // NO_HIGHLIGHT_COLOR
+    let schemes = p49_list_value(vm, Vec::new())?;
+    put(vm, recv, "mSupportedUriSchemes", schemes)?;
+    put(vm, recv, "mIsEnabled", Value::Int(0))?;
+    let group = jstr(vm, "")?;
+    put(vm, recv, "mGroupId", group)?;
+    Ok(())
+}
+
+fn p36i_add_uri_scheme(vm: &mut Engine, recv: ObjRef, scheme: Value) -> Result<(), VmExit> {
+    let text = match opt_str(vm, Some(&scheme)) {
+        Some(t) if !t.is_empty() => t,
+        _ => return Ok(()),
+    };
+    let mut items = collection_items(vm, Some(&get(vm, recv, "mSupportedUriSchemes")));
+    let exists = items
+        .iter()
+        .any(|v| opt_str(vm, Some(v)).as_deref() == Some(text.as_str()));
+    if !exists {
+        items.push(scheme);
+        let list = p49_list_value(vm, items)?;
+        put(vm, recv, "mSupportedUriSchemes", list)?;
+    }
+    Ok(())
+}
+
+fn p36i_account_builder(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let this = Value::Obj(recv);
+    let arg0 = args.first().cloned().unwrap_or(Value::Null);
+    let v = match (name, sig) {
+        ("<init>", "(Landroid/telecom/PhoneAccountHandle;Ljava/lang/CharSequence;)V") => {
+            p36i_account_builder_init(vm, recv)?;
+            put(vm, recv, "mAccountHandle", arg0)?;
+            put(
+                vm,
+                recv,
+                "mLabel",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/telecom/PhoneAccount;)V") => {
+            p36i_account_builder_init(vm, recv)?;
+            let src = oarg(args, 0).ok_or_else(|| npe("phoneAccount"))?;
+            for (getter, gsig, field) in [
+                (
+                    "getAccountHandle",
+                    "()Landroid/telecom/PhoneAccountHandle;",
+                    "mAccountHandle",
+                ),
+                ("getAddress", "()Landroid/net/Uri;", "mAddress"),
+                (
+                    "getSubscriptionAddress",
+                    "()Landroid/net/Uri;",
+                    "mSubscriptionAddress",
+                ),
+                ("getLabel", "()Ljava/lang/CharSequence;", "mLabel"),
+                (
+                    "getShortDescription",
+                    "()Ljava/lang/CharSequence;",
+                    "mShortDescription",
+                ),
+                ("getIcon", "()Landroid/graphics/drawable/Icon;", "mIcon"),
+                ("getExtras", "()Landroid/os/Bundle;", "mExtras"),
+                ("getGroupId", "()Ljava/lang/String;", "mGroupId"),
+            ] {
+                let value = vm.invoke_instance(src, getter, gsig, &[])?;
+                put(vm, recv, field, value)?;
+            }
+            for (getter, field) in [
+                ("getCapabilities", "mCapabilities"),
+                ("getHighlightColor", "mHighlightColor"),
+                ("getSupportedAudioRoutes", "mSupportedAudioRoutes"),
+            ] {
+                let value = vm.invoke_instance(src, getter, "()I", &[])?;
+                put(vm, recv, field, value)?;
+            }
+            let enabled = vm.invoke_instance(src, "isEnabled", "()Z", &[])?;
+            put(vm, recv, "mIsEnabled", enabled)?;
+            let schemes =
+                vm.invoke_instance(src, "getSupportedUriSchemes", "()Ljava/util/List;", &[])?;
+            let items = collection_items(vm, Some(&schemes));
+            let list = p49_list_value(vm, items)?;
+            put(vm, recv, "mSupportedUriSchemes", list)?;
+            Value::Null
+        }
+        ("setLabel", _) => {
+            put(vm, recv, "mLabel", arg0)?;
+            this
+        }
+        ("setAddress", _) => {
+            put(vm, recv, "mAddress", arg0)?;
+            this
+        }
+        ("setSubscriptionAddress", _) => {
+            put(vm, recv, "mSubscriptionAddress", arg0)?;
+            this
+        }
+        ("setCapabilities", _) => {
+            put(vm, recv, "mCapabilities", Value::Int(iarg(args, 0)))?;
+            this
+        }
+        ("setIcon", _) => {
+            put(vm, recv, "mIcon", arg0)?;
+            this
+        }
+        ("setHighlightColor", _) => {
+            put(vm, recv, "mHighlightColor", Value::Int(iarg(args, 0)))?;
+            this
+        }
+        ("setShortDescription", _) => {
+            put(vm, recv, "mShortDescription", arg0)?;
+            this
+        }
+        ("setExtras", _) => {
+            put(vm, recv, "mExtras", arg0)?;
+            this
+        }
+        ("setGroupId", _) => {
+            put(vm, recv, "mGroupId", arg0)?;
+            this
+        }
+        ("setSupportedAudioRoutes", _) => {
+            put(vm, recv, "mSupportedAudioRoutes", Value::Int(iarg(args, 0)))?;
+            this
+        }
+        ("addSupportedUriScheme", _) => {
+            p36i_add_uri_scheme(vm, recv, arg0)?;
+            this
+        }
+        ("setSupportedUriSchemes", _) => {
+            let empty = p49_list_value(vm, Vec::new())?;
+            put(vm, recv, "mSupportedUriSchemes", empty)?;
+            if !matches!(arg0, Value::Null) {
+                for item in collection_items(vm, Some(&arg0)) {
+                    p36i_add_uri_scheme(vm, recv, item)?;
+                }
+            }
+            this
+        }
+        ("build", _) => {
+            // If no supported URI schemes were defined, assume "tel".
+            let mut schemes = collection_items(vm, Some(&get(vm, recv, "mSupportedUriSchemes")));
+            if schemes.is_empty() {
+                schemes.push(jstr(vm, "tel")?);
+            }
+            let account = alloc_obj(vm, P36I_PHONE_ACCOUNT, Vec::new())?;
+            for f in [
+                "mAccountHandle",
+                "mAddress",
+                "mSubscriptionAddress",
+                "mCapabilities",
+                "mIcon",
+                "mHighlightColor",
+                "mLabel",
+                "mShortDescription",
+                "mExtras",
+                "mSupportedAudioRoutes",
+                "mIsEnabled",
+                "mGroupId",
+            ] {
+                put(vm, account, f, get(vm, recv, f))?;
+            }
+            let list = p49_list_value(vm, schemes)?;
+            put(vm, account, "mSupportedUriSchemes", list)?;
+            Value::Obj(account)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_phone_account(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("getAccountHandle", "()Landroid/telecom/PhoneAccountHandle;") => {
+            get(vm, recv, "mAccountHandle")
+        }
+        ("getAddress", "()Landroid/net/Uri;") => get(vm, recv, "mAddress"),
+        ("getSubscriptionAddress", "()Landroid/net/Uri;") => get(vm, recv, "mSubscriptionAddress"),
+        ("getCapabilities", "()I") => Value::Int(field_int(vm, recv, "mCapabilities")),
+        ("getIcon", "()Landroid/graphics/drawable/Icon;") => get(vm, recv, "mIcon"),
+        ("getHighlightColor", "()I") => Value::Int(field_int(vm, recv, "mHighlightColor")),
+        ("getLabel", "()Ljava/lang/CharSequence;") => get(vm, recv, "mLabel"),
+        ("getShortDescription", "()Ljava/lang/CharSequence;") => get(vm, recv, "mShortDescription"),
+        ("getSupportedUriSchemes", "()Ljava/util/List;") => {
+            let items = collection_items(vm, Some(&get(vm, recv, "mSupportedUriSchemes")));
+            p49_list_value(vm, items)?
+        }
+        ("supportsUriScheme", "(Ljava/lang/String;)Z") => {
+            let want = opt_str(vm, args.first());
+            let ok = match want {
+                None => false,
+                Some(w) => collection_items(vm, Some(&get(vm, recv, "mSupportedUriSchemes")))
+                    .iter()
+                    .any(|v| opt_str(vm, Some(v)).as_deref() == Some(w.as_str())),
+            };
+            bool_value(ok)
+        }
+        ("getExtras", "()Landroid/os/Bundle;") => get(vm, recv, "mExtras"),
+        ("getSupportedAudioRoutes", "()I") => {
+            Value::Int(field_int(vm, recv, "mSupportedAudioRoutes"))
+        }
+        ("isEnabled", "()Z") => bool_value(field_bool(vm, recv, "mIsEnabled")),
+        ("getGroupId", "()Ljava/lang/String;") => get(vm, recv, "mGroupId"),
+        ("toBuilder", "()Landroid/telecom/PhoneAccount$Builder;") => {
+            let builder = alloc_obj(vm, P36I_ACCOUNT_BUILDER, Vec::new())?;
+            vm.invoke_instance(
+                builder,
+                "<init>",
+                "(Landroid/telecom/PhoneAccount;)V",
+                &[Value::Obj(recv)],
+            )?;
+            Value::Obj(builder)
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_disconnect_cause(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", _) => {
+            // Defaults: ToneGenerator.TONE_UNKNOWN=-1,
+            // telephony DisconnectCause.ERROR_UNSPECIFIED=36,
+            // PreciseDisconnectCause.ERROR_UNSPECIFIED=0xFFFF.
+            put(vm, recv, "mToneToPlay", Value::Int(-1))?;
+            put(vm, recv, "mTelephonyDisconnectCause", Value::Int(36))?;
+            put(
+                vm,
+                recv,
+                "mTelephonyPreciseDisconnectCause",
+                Value::Int(0xFFFF),
+            )?;
+            put(vm, recv, "mDisconnectCode", Value::Int(iarg(args, 0)))?;
+            match sig {
+                "(I)V" => {}
+                "(ILjava/lang/String;)V" => {
+                    put(
+                        vm,
+                        recv,
+                        "mDisconnectReason",
+                        args.get(1).cloned().unwrap_or(Value::Null),
+                    )?;
+                }
+                _ => {
+                    put(
+                        vm,
+                        recv,
+                        "mDisconnectLabel",
+                        args.get(1).cloned().unwrap_or(Value::Null),
+                    )?;
+                    put(
+                        vm,
+                        recv,
+                        "mDisconnectDescription",
+                        args.get(2).cloned().unwrap_or(Value::Null),
+                    )?;
+                    put(
+                        vm,
+                        recv,
+                        "mDisconnectReason",
+                        args.get(3).cloned().unwrap_or(Value::Null),
+                    )?;
+                    if args.len() > 4 {
+                        put(vm, recv, "mToneToPlay", Value::Int(iarg(args, 4)))?;
+                    }
+                    if args.len() > 7 {
+                        put(
+                            vm,
+                            recv,
+                            "mTelephonyDisconnectCause",
+                            Value::Int(iarg(args, 5)),
+                        )?;
+                        put(
+                            vm,
+                            recv,
+                            "mTelephonyPreciseDisconnectCause",
+                            Value::Int(iarg(args, 6)),
+                        )?;
+                        put(
+                            vm,
+                            recv,
+                            "mImsReasonInfo",
+                            args.get(7).cloned().unwrap_or(Value::Null),
+                        )?;
+                    }
+                }
+            }
+            Value::Null
+        }
+        ("getCode", "()I") => Value::Int(field_int(vm, recv, "mDisconnectCode")),
+        ("getLabel", "()Ljava/lang/CharSequence;") => get(vm, recv, "mDisconnectLabel"),
+        ("getDescription", "()Ljava/lang/CharSequence;") => get(vm, recv, "mDisconnectDescription"),
+        ("getReason", "()Ljava/lang/String;") => get(vm, recv, "mDisconnectReason"),
+        ("getTone", "()I") => Value::Int(field_int(vm, recv, "mToneToPlay")),
+        ("getTelephonyDisconnectCause", "()I") => {
+            Value::Int(field_int(vm, recv, "mTelephonyDisconnectCause"))
+        }
+        ("getTelephonyPreciseDisconnectCause", "()I") => {
+            Value::Int(field_int(vm, recv, "mTelephonyPreciseDisconnectCause"))
+        }
+        ("getImsReasonInfo", "()Landroid/telephony/ims/ImsReasonInfo;") => {
+            get(vm, recv, "mImsReasonInfo")
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(o) if class_of(vm, o) == P36I_DISCONNECT_CAUSE => {
+                    field_int(vm, recv, "mDisconnectCode") == field_int(vm, o, "mDisconnectCode")
+                        && field_int(vm, recv, "mToneToPlay") == field_int(vm, o, "mToneToPlay")
+                        && field_int(vm, recv, "mTelephonyDisconnectCause")
+                            == field_int(vm, o, "mTelephonyDisconnectCause")
+                        && field_int(vm, recv, "mTelephonyPreciseDisconnectCause")
+                            == field_int(vm, o, "mTelephonyPreciseDisconnectCause")
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "mDisconnectLabel"),
+                            &get(vm, o, "mDisconnectLabel"),
+                        )
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "mDisconnectDescription"),
+                            &get(vm, o, "mDisconnectDescription"),
+                        )
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "mDisconnectReason"),
+                            &get(vm, o, "mDisconnectReason"),
+                        )
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "mImsReasonInfo"),
+                            &get(vm, o, "mImsReasonInfo"),
+                        )
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("hashCode", "()I") => {
+            // AOSP DisconnectCause.hashCode is a plain sum of field hashes.
+            let h = field_int(vm, recv, "mDisconnectCode")
+                .wrapping_add(p36i_guest_hash(vm, &get(vm, recv, "mDisconnectLabel")))
+                .wrapping_add(p36i_guest_hash(
+                    vm,
+                    &get(vm, recv, "mDisconnectDescription"),
+                ))
+                .wrapping_add(p36i_guest_hash(vm, &get(vm, recv, "mDisconnectReason")))
+                .wrapping_add(field_int(vm, recv, "mToneToPlay"))
+                .wrapping_add(field_int(vm, recv, "mTelephonyDisconnectCause"))
+                .wrapping_add(field_int(vm, recv, "mTelephonyPreciseDisconnectCause"))
+                .wrapping_add(p36i_guest_hash(vm, &get(vm, recv, "mImsReasonInfo")));
+            Value::Int(h)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let code = field_int(vm, recv, "mDisconnectCode");
+            let code_name = match code {
+                0 => "UNKNOWN".to_string(),
+                1 => "ERROR".to_string(),
+                2 => "LOCAL".to_string(),
+                3 => "REMOTE".to_string(),
+                4 => "CANCELED".to_string(),
+                5 => "MISSED".to_string(),
+                6 => "REJECTED".to_string(),
+                7 => "BUSY".to_string(),
+                8 => "RESTRICTED".to_string(),
+                9 => "OTHER".to_string(),
+                10 => "CONNECTION_MANAGER_NOT_SUPPORTED".to_string(),
+                11 => "ANSWERED_ELSEWHERE".to_string(),
+                12 => "CALL_PULLED".to_string(),
+                other => format!("invalid code: {other}"),
+            };
+            let label = p36i_value_text(vm, &get(vm, recv, "mDisconnectLabel")).unwrap_or_default();
+            let description =
+                p36i_value_text(vm, &get(vm, recv, "mDisconnectDescription")).unwrap_or_default();
+            let reason =
+                p36i_value_text(vm, &get(vm, recv, "mDisconnectReason")).unwrap_or_default();
+            let ims_value = get(vm, recv, "mImsReasonInfo");
+            let ims = if matches!(ims_value, Value::Null) {
+                "null".to_string()
+            } else {
+                p36i_value_text(vm, &ims_value).unwrap_or_default()
+            };
+            jstr(
+                vm,
+                format!(
+                    "DisconnectCause [ Code: ({code_name}) Label: ({label}) Description: ({description}) Reason: ({reason}) Tone: ({}) TelephonyCause: {}/{} ImsReasonInfo: {ims}]",
+                    field_int(vm, recv, "mToneToPlay"),
+                    field_int(vm, recv, "mTelephonyDisconnectCause"),
+                    field_int(vm, recv, "mTelephonyPreciseDisconnectCause")
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_audio_route_to_string(route: i32) -> String {
+    if route == 0 || (route & !0x1F) != 0 {
+        return "UNKNOWN".to_string();
+    }
+    let mut parts: Vec<&str> = Vec::new();
+    if route & 0x01 == 0x01 {
+        parts.push("EARPIECE");
+    }
+    if route & 0x02 == 0x02 {
+        parts.push("BLUETOOTH");
+    }
+    if route & 0x04 == 0x04 {
+        parts.push("WIRED_HEADSET");
+    }
+    if route & 0x08 == 0x08 {
+        parts.push("SPEAKER");
+    }
+    if route & 0x10 == 0x10 {
+        parts.push("STREAMING");
+    }
+    parts.join(", ")
+}
+
+fn p36i_call_audio_state(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(ZII)V") => {
+            put(vm, recv, "isMuted", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "route", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "supportedRouteMask", Value::Int(iarg(args, 2)))?;
+            let empty = p49_list_value(vm, Vec::new())?;
+            put(vm, recv, "supportedBluetoothDevices", empty)?;
+            Value::Null
+        }
+        ("<init>", "(Landroid/telecom/CallAudioState;)V") => {
+            let src = oarg(args, 0).ok_or_else(|| npe("state"))?;
+            for f in [
+                "isMuted",
+                "route",
+                "supportedRouteMask",
+                "activeBluetoothDevice",
+                "supportedBluetoothDevices",
+            ] {
+                put(vm, recv, f, get(vm, src, f))?;
+            }
+            Value::Null
+        }
+        ("isMuted", "()Z") => bool_value(field_bool(vm, recv, "isMuted")),
+        ("getRoute", "()I") => Value::Int(field_int(vm, recv, "route")),
+        ("getSupportedRouteMask", "()I") => {
+            // ROUTE_STREAMING masks everything else out.
+            if field_int(vm, recv, "route") == 0x10 {
+                Value::Int(0x10)
+            } else {
+                Value::Int(field_int(vm, recv, "supportedRouteMask"))
+            }
+        }
+        ("getActiveBluetoothDevice", "()Landroid/bluetooth/BluetoothDevice;") => {
+            get(vm, recv, "activeBluetoothDevice")
+        }
+        ("getSupportedBluetoothDevices", "()Ljava/util/Collection;") => {
+            get(vm, recv, "supportedBluetoothDevices")
+        }
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(o) if class_of(vm, o) == P36I_CALL_AUDIO_STATE => {
+                    let mine =
+                        collection_items(vm, Some(&get(vm, recv, "supportedBluetoothDevices")));
+                    let theirs =
+                        collection_items(vm, Some(&get(vm, o, "supportedBluetoothDevices")));
+                    mine.len() == theirs.len()
+                        && mine
+                            .iter()
+                            .all(|d| theirs.iter().any(|t| p36i_guest_equals(vm, d, t)))
+                        && p36i_guest_equals(
+                            vm,
+                            &get(vm, recv, "activeBluetoothDevice"),
+                            &get(vm, o, "activeBluetoothDevice"),
+                        )
+                        && field_bool(vm, recv, "isMuted") == field_bool(vm, o, "isMuted")
+                        && field_int(vm, recv, "route") == field_int(vm, o, "route")
+                        && field_int(vm, recv, "supportedRouteMask")
+                            == field_int(vm, o, "supportedRouteMask")
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("toString", "()Ljava/lang/String;") => {
+            let devices = collection_items(vm, Some(&get(vm, recv, "supportedBluetoothDevices")));
+            let mut addrs: Vec<String> = Vec::new();
+            for d in &devices {
+                if let Value::Obj(dr) = d {
+                    if let Ok(a) =
+                        vm.invoke_instance(*dr, "getAddress", "()Ljava/lang/String;", &[])
+                    {
+                        if let Some(t) = opt_str(vm, Some(&a)) {
+                            addrs.push(t);
+                        }
+                    }
+                }
+            }
+            let active = get(vm, recv, "activeBluetoothDevice");
+            let active_text = if matches!(active, Value::Null) {
+                "null".to_string()
+            } else {
+                p36i_value_text(vm, &active).unwrap_or_default()
+            };
+            jstr(
+                vm,
+                format!(
+                    "[AudioState isMuted: {}, route: {}, supportedRouteMask: {}, activeBluetoothDevice: [{}], supportedBluetoothDevices: [{}]]",
+                    field_bool(vm, recv, "isMuted"),
+                    p36i_audio_route_to_string(field_int(vm, recv, "route")),
+                    p36i_audio_route_to_string(field_int(vm, recv, "supportedRouteMask")),
+                    active_text,
+                    addrs.join(", ")
+                ),
+            )?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_video_state_to_string(state: i32) -> String {
+    let mut s = "Audio".to_string();
+    if state == 0 {
+        s.push_str(" Only");
+    } else {
+        if state & 0x1 == 0x1 {
+            s.push_str(" Tx");
+        }
+        if state & 0x2 == 0x2 {
+            s.push_str(" Rx");
+        }
+        if state & 0x4 == 0x4 {
+            s.push_str(" Pause");
+        }
+    }
+    s
+}
+
+fn p36i_video_profile(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(I)V") => {
+            put(vm, recv, "mVideoState", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mQuality", Value::Int(4))?; // QUALITY_DEFAULT
+            Value::Null
+        }
+        ("<init>", "(II)V") => {
+            put(vm, recv, "mVideoState", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mQuality", Value::Int(iarg(args, 1)))?;
+            Value::Null
+        }
+        ("getVideoState", "()I") => Value::Int(field_int(vm, recv, "mVideoState")),
+        ("getQuality", "()I") => Value::Int(field_int(vm, recv, "mQuality")),
+        ("toString", "()Ljava/lang/String;") => jstr(
+            vm,
+            format!(
+                "[VideoProfile videoState = {} videoQuality = {}]",
+                p36i_video_state_to_string(field_int(vm, recv, "mVideoState")),
+                field_int(vm, recv, "mQuality")
+            ),
+        )?,
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_camera_caps(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(II)V") => {
+            put(vm, recv, "mWidth", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mHeight", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mZoomSupported", Value::Int(0))?;
+            put(vm, recv, "mMaxZoom", Value::Float(1.0))?;
+            Value::Null
+        }
+        ("<init>", "(IIZF)V") => {
+            put(vm, recv, "mWidth", Value::Int(iarg(args, 0)))?;
+            put(vm, recv, "mHeight", Value::Int(iarg(args, 1)))?;
+            put(vm, recv, "mZoomSupported", Value::Int(iarg(args, 2)))?;
+            put(
+                vm,
+                recv,
+                "mMaxZoom",
+                args.get(3).cloned().unwrap_or(Value::Float(1.0)),
+            )?;
+            Value::Null
+        }
+        ("getWidth", "()I") => Value::Int(field_int(vm, recv, "mWidth")),
+        ("getHeight", "()I") => Value::Int(field_int(vm, recv, "mHeight")),
+        ("isZoomSupported", "()Z") => bool_value(field_bool(vm, recv, "mZoomSupported")),
+        ("getMaxZoom", "()F") => Value::Float(field_float(vm, recv, "mMaxZoom")),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_validate_icon_boundary(vm: &mut Engine, icon: Value) -> Value {
+    // StatusHints.validateAccountIconUserBoundary with calling user 0:
+    // URI-based icons encoding a different user id are dropped.
+    if let Value::Obj(r) = icon {
+        if let Ok(Value::Int(t)) = vm.invoke_instance(r, "getType", "()I", &[]) {
+            // Icon.TYPE_URI = 4, TYPE_URI_ADAPTIVE_BITMAP = 6
+            if t == 4 || t == 6 {
+                if let Ok(uri @ Value::Obj(u)) =
+                    vm.invoke_instance(r, "getUri", "()Landroid/net/Uri;", &[])
+                {
+                    let _ = uri;
+                    if let Ok(info) =
+                        vm.invoke_instance(u, "getEncodedUserInfo", "()Ljava/lang/String;", &[])
+                    {
+                        if let Some(text) = opt_str(vm, Some(&info)) {
+                            if let Ok(id) = text.parse::<i32>() {
+                                if id != 0 {
+                                    return Value::Null;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    icon
+}
+
+fn p36i_status_hints(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        (
+            "<init>",
+            "(Ljava/lang/CharSequence;Landroid/graphics/drawable/Icon;Landroid/os/Bundle;)V",
+        ) => {
+            put(
+                vm,
+                recv,
+                "mLabel",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            let icon = p36i_validate_icon_boundary(vm, args.get(1).cloned().unwrap_or(Value::Null));
+            put(vm, recv, "mIcon", icon)?;
+            put(
+                vm,
+                recv,
+                "mExtras",
+                args.get(2).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        (
+            "<init>",
+            "(Landroid/content/ComponentName;Ljava/lang/CharSequence;ILandroid/os/Bundle;)V",
+        ) => {
+            let res_id = iarg(args, 2);
+            let icon = if res_id == 0 {
+                Value::Null
+            } else {
+                let component = oarg(args, 0).ok_or_else(|| npe("packageName"))?;
+                let pkg =
+                    vm.invoke_instance(component, "getPackageName", "()Ljava/lang/String;", &[])?;
+                vm.invoke_static(
+                    "Landroid/graphics/drawable/Icon;",
+                    "createWithResource",
+                    "(Ljava/lang/String;I)Landroid/graphics/drawable/Icon;",
+                    &[pkg, Value::Int(res_id)],
+                )?
+            };
+            put(
+                vm,
+                recv,
+                "mLabel",
+                args.get(1).cloned().unwrap_or(Value::Null),
+            )?;
+            let icon = p36i_validate_icon_boundary(vm, icon);
+            put(vm, recv, "mIcon", icon)?;
+            put(
+                vm,
+                recv,
+                "mExtras",
+                args.get(3).cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("setIcon", "(Landroid/graphics/drawable/Icon;)V") => {
+            put(
+                vm,
+                recv,
+                "mIcon",
+                args.first().cloned().unwrap_or(Value::Null),
+            )?;
+            Value::Null
+        }
+        ("getPackageName", "()Landroid/content/ComponentName;") => {
+            // Deprecated shim: new ComponentName("", "")
+            let component = alloc_obj(vm, "Landroid/content/ComponentName;", Vec::new())?;
+            let e1 = jstr(vm, "")?;
+            let e2 = jstr(vm, "")?;
+            let _ = vm.invoke_instance(
+                component,
+                "<init>",
+                "(Ljava/lang/String;Ljava/lang/String;)V",
+                &[e1, e2],
+            );
+            Value::Obj(component)
+        }
+        ("getLabel", "()Ljava/lang/CharSequence;") => get(vm, recv, "mLabel"),
+        ("getIconResId", "()I") => Value::Int(0),
+        ("getIcon", "()Landroid/graphics/drawable/Icon;") => get(vm, recv, "mIcon"),
+        ("getExtras", "()Landroid/os/Bundle;") => get(vm, recv, "mExtras"),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_telecom_manager(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    // No ITelecomService binder in this VM: AOSP null-service defaults.
+    let v = match (name, sig) {
+        ("<init>", _) => {
+            if let Some(ctx) = args.first() {
+                put(vm, recv, "mContext", ctx.clone())?;
+            }
+            Value::Null
+        }
+        ("getCallState", "()I") => Value::Int(0), // CALL_STATE_IDLE
+        ("isInCall", "()Z") | ("isInManagedCall", "()Z") | ("isRinging", "()Z") => {
+            bool_value(false)
+        }
+        ("isVoiceMailNumber", "(Landroid/telecom/PhoneAccountHandle;Ljava/lang/String;)Z") => {
+            bool_value(false)
+        }
+        ("getDefaultDialerPackage", "()Ljava/lang/String;") => Value::Null,
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn partial36i_telecom_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (class, name, sig) {
+        (P36I_CALL_AUDIO_STATE, "audioRouteToString", "(I)Ljava/lang/String;") => {
+            jstr(vm, p36i_audio_route_to_string(iarg(args, 0)))?
+        }
+        (P36I_VIDEO_PROFILE, "isAudioOnly", "(I)Z") => {
+            let s = iarg(args, 0);
+            bool_value(s & 0x1 != 0x1 && s & 0x2 != 0x2)
+        }
+        (P36I_VIDEO_PROFILE, "isTransmissionEnabled", "(I)Z") => {
+            bool_value(iarg(args, 0) & 0x1 == 0x1)
+        }
+        (P36I_VIDEO_PROFILE, "isReceptionEnabled", "(I)Z") => {
+            bool_value(iarg(args, 0) & 0x2 == 0x2)
+        }
+        (P36I_VIDEO_PROFILE, "isBidirectional", "(I)Z") => {
+            bool_value(iarg(args, 0) & 0x3 == 0x3)
+        }
+        (P36I_VIDEO_PROFILE, "isPaused", "(I)Z") => bool_value(iarg(args, 0) & 0x4 == 0x4),
+        (P36I_VIDEO_PROFILE, "videoStateToString", "(I)Ljava/lang/String;") => {
+            jstr(vm, p36i_video_state_to_string(iarg(args, 0)))?
+        }
+        (
+            P36I_ACCOUNT_HANDLE,
+            "areFromSamePackage",
+            "(Landroid/telecom/PhoneAccountHandle;Landroid/telecom/PhoneAccountHandle;)Z",
+        ) => {
+            let pkg_of = |vm: &mut Engine, handle: &Value| -> Result<Option<String>, VmExit> {
+                match handle {
+                    Value::Obj(h) => {
+                        let component = get(vm, *h, "mComponentName");
+                        match component {
+                            Value::Obj(c) => {
+                                let pkg = vm.invoke_instance(
+                                    c,
+                                    "getPackageName",
+                                    "()Ljava/lang/String;",
+                                    &[],
+                                )?;
+                                Ok(opt_str(vm, Some(&pkg)))
+                            }
+                            _ => Err(npe("getComponentName")),
+                        }
+                    }
+                    _ => Ok(None),
+                }
+            };
+            let a = pkg_of(vm, &args.first().cloned().unwrap_or(Value::Null))?;
+            let b = pkg_of(vm, &args.get(1).cloned().unwrap_or(Value::Null))?;
+            bool_value(a == b)
+        }
+        (
+            P36I_DOWNLOAD_BUILDER,
+            "fromDownloadRequest",
+            "(Landroid/telephony/mbms/DownloadRequest;)Landroid/telephony/mbms/DownloadRequest$Builder;",
+        ) => {
+            let other = oarg(args, 0).ok_or_else(|| npe("other"))?;
+            let source = get(vm, other, "sourceUri");
+            let dest = get(vm, other, "destinationUri");
+            if matches!(source, Value::Null) || matches!(dest, Value::Null) {
+                return Err(iae(
+                    "Source and destination URIs must be non-null.".to_string()
+                ));
+            }
+            let builder = alloc_obj(vm, P36I_DOWNLOAD_BUILDER, Vec::new())?;
+            put(vm, builder, "source", source)?;
+            put(vm, builder, "destination", dest)?;
+            put(vm, builder, "fileServiceId", get(vm, other, "fileServiceId"))?;
+            put(vm, builder, "subscriptionId", get(vm, other, "subscriptionId"))?;
+            put(
+                vm,
+                builder,
+                "appIntent",
+                get(vm, other, "serializedResultIntentForApp"),
+            )?;
+            put(vm, builder, "version", Value::Int(1))?;
+            Value::Obj(builder)
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn partial36i_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if let Some(v) = partial36i_telephony_static(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    partial36i_telecom_static(vm, class, name, sig, args)
+}
+
+fn partial36i_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    _mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    match recv_class {
+        P36I_TELEPHONY_MANAGER => p36i_telephony_manager(vm, name, sig, recv, args),
+        P36I_SUBSCRIPTION_MANAGER => p36i_subscription_manager(vm, name, sig, recv, args),
+        P36I_SERVICE_STATE => p36i_service_state(vm, name, sig, recv, args),
+        P36I_CB_ID_RANGE => p36i_cb_id_range(vm, name, sig, recv, args),
+        P36I_FILE_INFO => p36i_file_info(vm, name, sig, recv, args),
+        P36I_DOWNLOAD_BUILDER => p36i_download_builder(vm, name, recv, args),
+        P36I_DOWNLOAD_REQUEST => p36i_download_request(vm, name, sig, recv, args),
+        P36I_TELECOM_MANAGER => p36i_telecom_manager(vm, name, sig, recv, args),
+        P36I_ACCOUNT_HANDLE => p36i_account_handle(vm, name, sig, recv, args),
+        P36I_ACCOUNT_BUILDER => p36i_account_builder(vm, name, sig, recv, args),
+        P36I_PHONE_ACCOUNT => p36i_phone_account(vm, name, sig, recv, args),
+        P36I_DISCONNECT_CAUSE => p36i_disconnect_cause(vm, name, sig, recv, args),
+        P36I_CALL_AUDIO_STATE => p36i_call_audio_state(vm, name, sig, recv, args),
+        P36I_VIDEO_PROFILE => p36i_video_profile(vm, name, sig, recv, args),
+        P36I_CAMERA_CAPS => p36i_camera_caps(vm, name, sig, recv, args),
+        P36I_STATUS_HINTS => p36i_status_hints(vm, name, sig, recv, args),
+        _ => Ok(None),
+    }
 }

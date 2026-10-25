@@ -50,8 +50,15 @@ fn embedded_appendix_c_check_works_outside_the_repository() {
     assert_eq!(v["domains"], 17);
     assert!(v["surfaces"].as_u64() >= Some(100), "{v}");
     assert_eq!(v["execution_claimed"], false);
+    // Honesty invariant: `supported` covers only the documented subset of
+    // each surface (never the whole AOSP package), so it stays a small
+    // minority next to the `partial` bulk — the registry must not pretend
+    // the whole Android surface is done even with no `not_implemented`
+    // surfaces left.
+    let supported = v["by_status"]["supported"].as_u64();
+    let partial = v["by_status"]["partial"].as_u64();
     assert!(
-        v["by_status"]["not_implemented"].as_u64() > v["by_status"]["supported"].as_u64(),
+        partial > supported && supported <= Some(8),
         "the registry must not pretend the whole Android surface is done: {v}"
     );
 }
