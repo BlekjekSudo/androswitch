@@ -60,7 +60,7 @@ export PATH="$HOME/.cargo/bin:$PATH"   # rustc 1.99.1 em 2026-10-25
 ## Checklist
 
 - [x] S0 Branch + baseline (`rd-framework` 24 testes ok) + este ledger
-- [ ] S1 `data/jetpack.toml` + `data/gms.toml` (inventário completo da spec)
+- [x] S1 `data/jetpack.toml` (44 libs/6 categorias) + `data/gms.toml` (21 serviços/3 categorias) + `docs/appendix-d-e.md` — status = realidade em `main`
 - [ ] S2 `fd_jetpack.rs` + `fd_gms.rs` + testes unitários
 - [ ] S3 CLI `rd jetpack`/`rd gms` + testes CLI
 - [ ] S4 xtask + docs gerados + spec D/E + ADR 011 + ledger D/E
@@ -74,3 +74,4 @@ export PATH="$HOME/.cargo/bin:$PATH"   # rustc 1.99.1 em 2026-10-25
 - 2026-10-25 S0: clone, branch criada de `main@89bbe8f`, rustup stable
   1.99.1, `cargo test -p rd-framework --lib` = 24 passed. PRs 191/192
   mapeados via `refs/pull/*/head` (refs locais `pr-191`/`pr-192`, só leitura).
+- 2026-10-25 S1: inventários TOML validados (parse + unicidade); statuses iniciais conservadores (D: 5 partial m8/m9, 3 stub, resto not_implemented; E: tudo not_implemented).
