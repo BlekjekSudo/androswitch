@@ -237,3 +237,51 @@ fn issue_295_null_contracts_throw_typed() {
         "Ljava/lang/NullPointerException;",
     );
 }
+
+#[test]
+fn issue_295_format_long_is_exact_and_object_is_gated() {
+    let mut e = engine();
+    let df = new_df(&mut e, "#,##0");
+    let fmt_long = "(J)Ljava/lang/String;";
+    let fmt_obj = "(Ljava/lang/Object;)Ljava/lang/String;";
+
+    // format(long) exato além de 2^53 (antes: …808 via f64).
+    let max = match e
+        .invoke_instance(df, "format", fmt_long, &[Value::Long(i64::MAX)])
+        .unwrap()
+    {
+        Value::Obj(r) => e.heap.as_str(r).unwrap().to_string(),
+        v => panic!("format(long) inesperado: {v:?}"),
+    };
+    assert_eq!(max, "9,223,372,036,854,775,807");
+
+    // format(Object) com Long box: também exato.
+    let boxed = match e
+        .invoke_static(
+            "Ljava/lang/Long;",
+            "valueOf",
+            "(J)Ljava/lang/Long;",
+            &[Value::Long((1i64 << 53) + 1)],
+        )
+        .unwrap()
+    {
+        Value::Obj(r) => r,
+        v => panic!("Long.valueOf inesperado: {v:?}"),
+    };
+    let via_obj = match e
+        .invoke_instance(df, "format", fmt_obj, &[Value::Obj(boxed)])
+        .unwrap()
+    {
+        Value::Obj(r) => e.heap.as_str(r).unwrap().to_string(),
+        v => panic!("format(Object=Long) inesperado: {v:?}"),
+    };
+    assert_eq!(via_obj, "9,007,199,254,740,993");
+
+    // format(Object) com String "123" -> IllegalArgumentException
+    // (antes formatava a String como se fosse número).
+    let txt = Value::Obj(s(&mut e, "123"));
+    assert_exc_class(
+        e.invoke_instance(df, "format", fmt_obj, &[txt]),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+}

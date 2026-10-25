@@ -281,6 +281,26 @@ pub(crate) fn format_number(f: &Fmt, x: f64) -> String {
     }
     let s = round(v, f.pat.max_frac, &f.rounding);
     let (ip, fp) = s.split_once('.').unwrap_or((&s, ""));
+    assemble_number(f, neg, ip, fp)
+}
+
+/// Núcleo EXATO de `NumberFormat.format(long)` (issue #295 item 2):
+/// `l as f64` corrompe `|l| > 2^53` (`Long.MAX_VALUE` virava
+/// `…808`). O produto `long × multiplier` é inteiro (`i128`), logo
+/// os dígitos são exatos e a fração é só zeros (aparados até
+/// `min_frac` em `assemble_number`, como no caminho `double`).
+pub(crate) fn format_long_exact(f: &Fmt, x: i64) -> String {
+    let v = x as i128 * f.pat.multiplier as i128;
+    let neg = v < 0;
+    let ip = v.unsigned_abs().to_string();
+    let fp = "0".repeat(f.pat.max_frac.max(0) as usize);
+    assemble_number(f, neg, &ip, &fp)
+}
+
+/// Monta `afixos + parte inteira (pad/agrupamento) + fração` a
+/// partir de dígitos crus — compartilhado pelos caminhos `f64`
+/// (`format_number`, já arredondado) e `long` (`format_long_exact`).
+fn assemble_number(f: &Fmt, neg: bool, ip: &str, fp: &str) -> String {
     let mut fp = fp.to_string();
     while fp.len() as i32 > f.pat.min_frac && fp.ends_with('0') {
         fp.pop();
@@ -450,34 +470,48 @@ fn fmt_of(vm: &Engine, r: ObjRef) -> Fmt {
     }
 }
 
-fn number_of(vm: &mut Engine, v: Option<&Value>) -> Result<f64, VmExit> {
+/// O argumento numérico de `format`, PRESERVANDO a distinção do
+/// JDK entre `format(long)` (exato) e `format(double)` — issue
+/// #295 item 2: converter `Long` para `f64` corrompia `|l| > 2^53`.
+enum NumVal {
+    Long(i64),
+    Double(f64),
+}
+
+fn number_of(vm: &mut Engine, v: Option<&Value>) -> Result<NumVal, VmExit> {
+    let not_a_number = || {
+        exc(
+            "Ljava/lang/IllegalArgumentException;",
+            "Cannot format given Object as a Number",
+        )
+    };
     Ok(match v {
-        Some(Value::Int(i)) => *i as f64,
-        Some(Value::Long(l)) => *l as f64,
-        Some(Value::Float(f)) => *f as f64,
-        Some(Value::Double(d)) => *d,
+        Some(Value::Int(i)) => NumVal::Long(*i as i64),
+        Some(Value::Long(l)) => NumVal::Long(*l),
+        Some(Value::Float(f)) => NumVal::Double(*f as f64),
+        Some(Value::Double(d)) => NumVal::Double(*d),
         Some(Value::Obj(r)) => match vm.heap.get_field(*r, "value") {
-            Ok(Value::Int(i)) => i as f64,
-            Ok(Value::Long(l)) => l as f64,
-            Ok(Value::Float(f)) => f as f64,
-            Ok(Value::Double(d)) => d,
+            Ok(Value::Int(i)) => NumVal::Long(i as i64),
+            Ok(Value::Long(l)) => NumVal::Long(l),
+            Ok(Value::Float(f)) => NumVal::Double(f as f64),
+            Ok(Value::Double(d)) => NumVal::Double(d),
             _ => {
+                // JDK: `format(Object)` exige `Number` — uma String
+                // "123" NÃO é formatável (issue #295 item 2), mesmo
+                // que o seu toString parseie como número.
+                let is_number = vm
+                    .heap
+                    .class_of(*r)
+                    .is_ok_and(|cls| vm.cp.is_subtype(cls, "Ljava/lang/Number;"));
+                if !is_number {
+                    return Err(not_a_number());
+                }
                 // BigDecimal/BigInteger and other Numbers: via toString.
                 let s = crate::intrinsics::object_to_string(vm, *r)?;
-                s.trim().parse::<f64>().map_err(|_| {
-                    exc(
-                        "Ljava/lang/IllegalArgumentException;",
-                        "Cannot format given Object as a Number",
-                    )
-                })?
+                NumVal::Double(s.trim().parse::<f64>().map_err(|_| not_a_number())?)
             }
         },
-        _ => {
-            return Err(exc(
-                "Ljava/lang/IllegalArgumentException;",
-                "Cannot format given Object as a Number",
-            ))
-        }
+        _ => return Err(not_a_number()),
     })
 }
 
@@ -672,8 +706,11 @@ fn decimal_format(
             Value::Null
         }
         "format" => {
-            let x = number_of(vm, args.first())?;
-            let s = format_number(&fmt_of(vm, recv), x);
+            let f = fmt_of(vm, recv);
+            let s = match number_of(vm, args.first())? {
+                NumVal::Long(l) => format_long_exact(&f, l),
+                NumVal::Double(d) => format_number(&f, d),
+            };
             if sig.contains("StringBuffer") {
                 // format(Object|double|long, StringBuffer, FieldPosition)
                 if let Some(Value::Obj(sb)) = args.get(1) {
@@ -966,5 +1003,31 @@ mod tests {
         assert_eq!(parse_number(&money, "-$9.90"), Some(-9.9));
         assert_eq!(parse_number(&money, "$9.90"), Some(9.9));
         assert_eq!(parse_number(&money, "xyz"), None);
+    }
+    #[test]
+    fn long_format_is_exact_beyond_2pow53() {
+        // Issue #295 (item 2): via f64, Long.MAX_VALUE virava …808.
+        let grouped = f("#,##0", '.', ',');
+        assert_eq!(
+            format_long_exact(&grouped, i64::MAX),
+            "9,223,372,036,854,775,807"
+        );
+        assert_eq!(
+            format_long_exact(&grouped, (1i64 << 53) + 1),
+            "9,007,199,254,740,993"
+        );
+        assert_eq!(
+            format_long_exact(&grouped, i64::MIN),
+            "-9,223,372,036,854,775,808"
+        );
+        // Fração mínima e multiplier (%) comportam-se como no double.
+        assert_eq!(format_long_exact(&f("#,##0.00", '.', ','), 5), "5.00");
+        assert_eq!(format_long_exact(&f("#,##0%", '.', ','), 1), "100%");
+        assert_eq!(format_long_exact(&grouped, 0), "0");
+        // Consistência com o caminho f64 onde ele é exato (|x| <= 2^53).
+        assert_eq!(
+            format_long_exact(&f("#,##0.##", '.', ','), -1234567),
+            format_number(&f("#,##0.##", '.', ','), -1234567.0)
+        );
     }
 }
