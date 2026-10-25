@@ -7,6 +7,7 @@ param(
     [string]$RyujinxProfile="$env:APPDATA/Ryujinx",
     [string]$Nro='',
     [string[]]$ExcludeCases=@(),
+    [string]$ResumeEvidenceDirectory='',
     [switch]$PrepareOnly,
     [switch]$AllowDesktopEmulator
 )
@@ -18,6 +19,27 @@ $catalogPath=Join-Path $output 'catalog.json'
 $digest=(Get-FileHash -LiteralPath $catalogPath).Hash.ToLowerInvariant()
 $seed=Join-Path $output ('seeds-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force "$seed/$package/files"|Out-Null
+if($ResumeEvidenceDirectory){
+    $prior=(Get-Item -LiteralPath $ResumeEvidenceDirectory).FullName
+    $receiptPath=Join-Path $prior 'verification.json'
+    $priorReceipt=Get-Content $receiptPath -Raw|ConvertFrom-Json
+    $candidate=if($Nro){$Nro}else{"$repo/local-artifacts/product/androswitch.nro"}
+    if($priorReceipt.sd_original_restore -cne 'restored' -or $priorReceipt.inputs.Count -ne 1 -or
+       $priorReceipt.inputs[0].sha256 -cne (Get-FileHash "$output/AndroSwitchConformance.apk").Hash.ToLowerInvariant() -or
+       $priorReceipt.nro_sha256 -cne (Get-FileHash $candidate).Hash.ToLowerInvariant()){throw 'Resume requires restored SD and exactly the same APK/NRO'}
+    $source=Join-Path $priorReceipt.sd_result "userdata/$package"
+    $items=@(Get-ChildItem -LiteralPath $source -Recurse -Force)
+    if(@($items|Where-Object {$_.Attributes -band [IO.FileAttributes]::ReparsePoint}).Count){throw 'Linked resume files are not allowed'}
+    $files=@($items|Where-Object {-not $_.PSIsContainer})
+    if($files.Count -gt 1023 -or ($files|Measure-Object Length -Sum).Sum -gt 15MB){throw 'Resume files exceed journal seed budget'}
+    foreach($file in $files){
+        $relative=[IO.Path]::GetRelativePath($source,$file.FullName)
+        $destination=Join-Path "$seed/$package" $relative
+        New-Item -ItemType Directory -Force (Split-Path -Parent $destination)|Out-Null
+        Copy-Item -LiteralPath $file.FullName -Destination $destination
+    }
+    @{schema_version=1;receipt=$receiptPath;receipt_sha256=(Get-FileHash $receiptPath).Hash.ToLowerInvariant();nro_sha256=$priorReceipt.nro_sha256;apk_sha256=$priorReceipt.inputs[0].sha256}|ConvertTo-Json|Set-Content "$seed/$package/files/resume-evidence.json" -Encoding utf8NoBOM
+}
 [IO.File]::WriteAllText("$seed/$package/files/autorun.txt",'1')
 $known=@((Get-Content $catalogPath -Raw|ConvertFrom-Json).cases|ForEach-Object id)
 foreach($caseId in $ExcludeCases){if($caseId -cnotin $known){throw "Unknown excluded case: $caseId"}}

@@ -4,7 +4,7 @@ use super::*;
 
 const BUNDLE: &str = "Landroid/os/Bundle;";
 const INTENT: &str = "Landroid/content/Intent;";
-const TYPES: [(&str, &str); 9] = [
+const TYPES: [(&str, &str); 10] = [
     ("Boolean", "Z"),
     ("Byte", "B"),
     ("Char", "C"),
@@ -14,6 +14,7 @@ const TYPES: [(&str, &str); 9] = [
     ("Float", "F"),
     ("Double", "D"),
     ("String", "Ljava/lang/String;"),
+    ("Bundle", BUNDLE),
 ];
 
 fn key(vm: &Engine, value: &Value) -> Result<Option<String>> {
@@ -31,7 +32,7 @@ fn zero(kind: &str) -> Value {
         "J" => Value::Long(0),
         "F" => Value::Float(0.),
         "D" => Value::Double(0.),
-        "Ljava/lang/String;" => Value::Null,
+        "Ljava/lang/String;" | BUNDLE => Value::Null,
         _ => Value::Int(0),
     }
 }
@@ -64,6 +65,17 @@ pub(super) fn call(
                     vm.heap.as_str(reference)?;
                 }
             }
+            if kind == BUNDLE {
+                if let Some(reference) = value.as_ref()? {
+                    if !vm.cp.is_subtype(vm.heap.class_of(reference)?, BUNDLE) {
+                        return Err(Throwable::new(
+                            "Ljava/lang/ClassCastException;",
+                            "Bundle value",
+                        )
+                        .into());
+                    }
+                }
+            }
             let mut state = android.state.borrow_mut();
             let entries = state.bundles.entry(r).or_default();
             if entries.len() >= 1024 && !entries.contains_key(&key) {
@@ -78,9 +90,11 @@ pub(super) fn call(
             format!("get{suffix}")
         };
         let string = kind == "Ljava/lang/String;";
-        let with_default =
-            sig == format!("(Ljava/lang/String;{kind}){kind}") && (!intent || !string);
-        let without_default = sig == format!("(Ljava/lang/String;){kind}") && (!intent || string);
+        let with_default = sig == format!("(Ljava/lang/String;{kind}){kind}")
+            && (!intent || !string)
+            && kind != BUNDLE;
+        let without_default =
+            sig == format!("(Ljava/lang/String;){kind}") && (!intent || string || kind == BUNDLE);
         if name != get_name || !(with_default || without_default) {
             continue;
         }

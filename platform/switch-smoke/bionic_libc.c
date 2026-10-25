@@ -250,6 +250,18 @@ static time_t guest_mktime(GuestTm *value) {
   }
   return result;
 }
+extern int as_platform_available_processors(uint32_t *) __attribute__((weak));
+static long guest_sysconf(int name) {
+  /* Android's numeric ABI differs from newlib and from the host libc. */
+  if(name==0x60 || name==0x61) {
+    uint32_t count=0;
+    if(as_platform_available_processors && !as_platform_available_processors(&count) && count) return (long)count;
+    errno=ENOSYS;return -1;
+  }
+  if(name==0x27 || name==0x28) return 4096; /* Horizon guest mapping page size. */
+  if(name==6) return 100; /* API26 Bionic AT_CLKTCK units, not CPU Hz. */
+  errno=EINVAL;return -1;
+}
 static int64_t guest_clock(void) {
   clock_t value = clock();
   if (value == (clock_t)-1)
@@ -383,6 +395,7 @@ uint64_t as_bionic_libc_import(const char *name) {
   SCALAR(time);
   SCALAR(difftime);
   API("clock", guest_clock);
+  API("sysconf", guest_sysconf);
   API("localtime", guest_localtime);
   API("localtime_r", guest_localtime_r);
   API("gmtime", guest_gmtime);

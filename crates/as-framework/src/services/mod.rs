@@ -177,6 +177,19 @@ impl Services {
         sig: &str,
         args: &[Value],
     ) -> Result<Option<Value>> {
+        if (class, name, sig)
+            == (
+                "Ljava/util/Arrays;",
+                "asList",
+                "([Ljava/lang/Object;)Ljava/util/List;",
+            )
+        {
+            // Arrays.asList requires a fixed-size, array-backed view, not a detached ArrayList.
+            return self
+                .collections
+                .array_list_view(vm, obj(&args[0])?)
+                .map(Some);
+        }
         if let Some(value) = text_utils::call_static(vm, class, name, sig, args)? {
             return Ok(Some(value));
         }

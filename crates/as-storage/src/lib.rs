@@ -337,6 +337,18 @@ impl Databases {
         }
         Ok(rows)
     }
+    pub fn statement_info(
+        &mut self,
+        name: &str,
+        statement: &str,
+    ) -> Result<(usize, usize), PlatformError> {
+        self.open(name)?;
+        let db = self.open.get(name).expect("opened database");
+        if db.poisoned {
+            return Err(error("SQLITE_IO_ERROR", "database requires reopening"));
+        }
+        db.connection.statement_info(statement).map_err(sql)
+    }
     pub fn in_transaction(&self, name: &str) -> bool {
         self.open
             .get(name)

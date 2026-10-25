@@ -20,11 +20,20 @@ struct Helper {
     database: Option<ObjRef>,
     opening: bool,
 }
+#[derive(Clone)]
+struct Statement {
+    database: ObjRef,
+    sql: String,
+    bindings: Vec<SqlValue>,
+    columns: usize,
+    closed: bool,
+}
 pub(super) struct DatabaseService {
     databases: RefCell<Databases>,
     handles: RefCell<BTreeMap<ObjRef, Handle>>,
     cursors: RefCell<BTreeMap<ObjRef, Cursor>>,
     helpers: RefCell<BTreeMap<ObjRef, Helper>>,
+    statements: RefCell<BTreeMap<ObjRef, Statement>>,
 }
 fn exception(class: &str, cause: impl Into<String>) -> VmExit {
     Throwable::new(class, cause).into()
@@ -84,11 +93,14 @@ impl DatabaseService {
             handles: Default::default(),
             cursors: Default::default(),
             helpers: Default::default(),
+            statements: Default::default(),
         }
     }
     pub(super) fn attach(&self, vm: &Engine, class: &str, _r: ObjRef) -> bool {
-        vm.cp
-            .is_subtype(class, "Landroid/database/sqlite/SQLiteOpenHelper;")
+        class == "Landroid/database/sqlite/SQLiteStatement;"
+            || vm
+                .cp
+                .is_subtype(class, "Landroid/database/sqlite/SQLiteOpenHelper;")
     }
     fn open(&self, vm: &mut Engine, name: &str) -> Result<Value> {
         // One connection per filename. Sharing multiple Java handles requires
@@ -126,6 +138,180 @@ impl DatabaseService {
             .borrow_mut()
             .query(name, sql, args)
             .map_err(sql_error)
+    }
+    fn statement(
+        &self,
+        vm: &mut Engine,
+        r: ObjRef,
+        name: &str,
+        sig: &str,
+        args: &[Value],
+    ) -> Result<Option<Value>> {
+        let Some(statement) = self.statements.borrow().get(&r).cloned() else {
+            return Ok(None);
+        };
+        if (name, sig) == ("close", "()V") {
+            let mut statements = self.statements.borrow_mut();
+            let statement = statements.get_mut(&r).expect("statement");
+            statement.closed = true;
+            statement.bindings.clear();
+            return Ok(Some(Value::Null));
+        }
+        if statement.closed {
+            return Err(exception(
+                "Ljava/lang/IllegalStateException;",
+                "statement is closed",
+            ));
+        }
+        let handle = self
+            .handles
+            .borrow()
+            .get(&statement.database)
+            .cloned()
+            .filter(|h| !h.closed)
+            .ok_or_else(|| exception("Ljava/lang/IllegalStateException;", "database is closed"))?;
+        if matches!(
+            (name, sig),
+            ("bindString", "(ILjava/lang/String;)V")
+                | ("bindBlob", "(I[B)V")
+                | ("bindLong", "(IJ)V")
+                | ("bindDouble", "(ID)V")
+                | ("bindNull", "(I)V")
+        ) {
+            let index = int(args, 0)?;
+            if index < 1 || index as usize > statement.bindings.len() {
+                return Err(exception(
+                    "Ljava/lang/IllegalArgumentException;",
+                    "binding index out of range",
+                ));
+            }
+            let value = match name {
+                "bindString" => {
+                    if args[1] == Value::Null {
+                        return Err(exception(
+                            "Ljava/lang/IllegalArgumentException;",
+                            "null string binding",
+                        ));
+                    }
+                    SqlValue::Text(text(vm, &args[1])?)
+                }
+                "bindBlob" => {
+                    if args[1] == Value::Null {
+                        return Err(exception(
+                            "Ljava/lang/IllegalArgumentException;",
+                            "null blob binding",
+                        ));
+                    }
+                    SqlValue::Blob(
+                        vm.heap
+                            .as_array_elems(obj(&args[1])?)?
+                            .0
+                            .iter()
+                            .map(|v| v.as_int().map(|n| n as u8))
+                            .collect::<core::result::Result<Vec<_>, _>>()?,
+                    )
+                }
+                "bindLong" => SqlValue::Integer(args[1].as_long()?),
+                "bindDouble" => SqlValue::Real(args[1].as_double()?),
+                _ => SqlValue::Null,
+            };
+            let size = |v: &SqlValue| match v {
+                SqlValue::Text(v) => v.len(),
+                SqlValue::Blob(v) => v.len(),
+                _ => core::mem::size_of::<SqlValue>(),
+            };
+            let active: usize = self
+                .statements
+                .borrow()
+                .values()
+                .flat_map(|s| s.bindings.iter())
+                .map(size)
+                .sum();
+            if active
+                .saturating_sub(size(&statement.bindings[index as usize - 1]))
+                .saturating_add(size(&value))
+                > 8 << 20
+            {
+                return Err(error("SQLITE_BINDING_BUDGET", "8 MiB bound statement data"));
+            }
+            self.statements
+                .borrow_mut()
+                .get_mut(&r)
+                .expect("statement")
+                .bindings[index as usize - 1] = value;
+            return Ok(Some(Value::Null));
+        }
+        let value = match (name, sig) {
+            ("clearBindings", "()V") => {
+                self.statements
+                    .borrow_mut()
+                    .get_mut(&r)
+                    .expect("statement")
+                    .bindings
+                    .fill(SqlValue::Null);
+                Value::Null
+            }
+            ("execute", "()V") | ("executeInsert", "()J") | ("executeUpdateDelete", "()I") => {
+                if statement.columns != 0 {
+                    return Err(exception(
+                        "Landroid/database/sqlite/SQLiteException;",
+                        "execute cannot return rows; use a query",
+                    ));
+                }
+                self.query(&handle.name, &statement.sql, &statement.bindings)?;
+                if name == "execute" {
+                    Value::Null
+                } else {
+                    let changes =
+                        self.query(&handle.name, "SELECT changes(), last_insert_rowid()", &[])?;
+                    let [SqlValue::Integer(count), SqlValue::Integer(rowid)] =
+                        changes.values[0].as_slice()
+                    else {
+                        return Err(error("SQLITE_ERROR", "change metadata"));
+                    };
+                    if name == "executeInsert" {
+                        Value::Long(if *count == 0 { -1 } else { *rowid })
+                    } else {
+                        Value::Int(*count as i32)
+                    }
+                }
+            }
+            ("simpleQueryForLong", "()J") | ("simpleQueryForString", "()Ljava/lang/String;") => {
+                let rows = self.query(&handle.name, &statement.sql, &statement.bindings)?;
+                let value = rows
+                    .values
+                    .first()
+                    .and_then(|row| row.first())
+                    .ok_or_else(|| {
+                        exception(
+                            "Landroid/database/sqlite/SQLiteDoneException;",
+                            "query returned no rows",
+                        )
+                    })?;
+                // Let SQLite perform its own numeric-prefix, overflow and text
+                // conversions rather than Rust's different string parsing rules.
+                let cast = if name == "simpleQueryForLong" {
+                    "SELECT CAST(? AS INTEGER)"
+                } else {
+                    "SELECT CAST(? AS TEXT)"
+                };
+                let converted = self.query(&handle.name, cast, core::slice::from_ref(value))?;
+                match &converted.values[0][0] {
+                    SqlValue::Integer(n) => Value::Long(*n),
+                    SqlValue::Text(v) => string(vm, v.clone())?,
+                    SqlValue::Null => {
+                        if name == "simpleQueryForLong" {
+                            Value::Long(0)
+                        } else {
+                            Value::Null
+                        }
+                    }
+                    _ => return Err(error("SQLITE_ERROR", "scalar conversion type")),
+                }
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(value))
     }
     fn helper_open(&self, android: &Android, vm: &mut Engine, r: ObjRef) -> Result<Value> {
         let helper = self
@@ -352,6 +538,9 @@ impl DatabaseService {
                 _ => return Ok(None),
             }
         }
+        if self.statements.borrow().contains_key(&r) {
+            return self.statement(vm, r, name, sig, args);
+        }
         let handle = self.handles.borrow().get(&r).cloned();
         if let Some(handle) = handle {
             if name == "isOpen" && sig == "()Z" {
@@ -369,6 +558,32 @@ impl DatabaseService {
             }
             let file = &handle.name;
             let value = match (name, sig) {
+                (
+                    "compileStatement",
+                    "(Ljava/lang/String;)Landroid/database/sqlite/SQLiteStatement;",
+                ) => {
+                    if self.statements.borrow().len() >= 64 {
+                        return Err(error("SQLITE_STATEMENT_BUDGET", "64 statements"));
+                    }
+                    let sql = text(vm, &args[0])?;
+                    let (count, columns) = self
+                        .databases
+                        .borrow_mut()
+                        .statement_info(file, &sql)
+                        .map_err(sql_error)?;
+                    let statement = shell(vm, "Landroid/database/sqlite/SQLiteStatement;")?;
+                    self.statements.borrow_mut().insert(
+                        statement,
+                        Statement {
+                            database: r,
+                            sql,
+                            bindings: vec![SqlValue::Null; count],
+                            columns,
+                            closed: false,
+                        },
+                    );
+                    Value::Obj(statement)
+                }
                 (
                     "execSQL",
                     "(Ljava/lang/String;)V" | "(Ljava/lang/String;[Ljava/lang/Object;)V",
@@ -643,13 +858,19 @@ impl DatabaseService {
         Ok(None)
     }
     pub(super) fn references(&self, r: ObjRef) -> Vec<ObjRef> {
-        self.helpers
+        let mut references: Vec<_> = self
+            .helpers
             .borrow()
             .get(&r)
             .and_then(|h| h.database)
             .into_iter()
-            .collect()
+            .collect();
+        if let Some(statement) = self.statements.borrow().get(&r).filter(|s| !s.closed) {
+            references.push(statement.database);
+        }
+        references
     }
+
     pub(super) fn collect(&self, marked: &[bool]) {
         let dead: Vec<_> = self
             .handles
@@ -663,6 +884,9 @@ impl DatabaseService {
             self.handles.borrow_mut().remove(&r);
         }
         self.helpers
+            .borrow_mut()
+            .retain(|r, _| marked.get(*r as usize).copied().unwrap_or(false));
+        self.statements
             .borrow_mut()
             .retain(|r, _| marked.get(*r as usize).copied().unwrap_or(false));
         self.cursors

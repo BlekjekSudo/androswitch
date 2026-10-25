@@ -14,7 +14,7 @@ public final class NativeCases {
   private static native int[] array(int[] input);
   private static native void raise();
   private static native int callback(int value);
-  private static native String facts(int mode);
+  private static native String facts(int mode, String missingPath);
   private static native String graphics(int mode);
   private static native String vulkan(int mode);
   private static int reenter(int value) {
@@ -73,7 +73,7 @@ public final class NativeCases {
         return result;
       default:
         if (n < 18)
-          return facts(n - 9);
+          return facts(n - 9, new java.io.File(RunBook.activity.getFilesDir(), "androswitch-definitely-missing").getAbsolutePath());
         if (n < 27)
           return graphics(n - 18);
         return vulkan(n - 27);

@@ -213,6 +213,51 @@ impl Connection {
         let _lease = Lease::acquire();
         unsafe { sqlite3_get_autocommit(self.0) != 0 }
     }
+    /// Parse and validate one statement without executing it. SQLite owns the
+    /// placeholder grammar, including quoted question marks and named indexes.
+    pub fn statement_info(&self, sql: &str) -> Result<(usize, usize)> {
+        if sql.len() > 1 << 20 {
+            return Err(failure(18, "SQL text exceeds 1 MiB"));
+        }
+        let sql = CString::new(sql).map_err(|_| failure(21, "SQL contains a NUL"))?;
+        let _lease = Lease::acquire();
+        let statement = self.prepare(&sql)?;
+        Ok(if statement.0.is_null() {
+            (0, 0)
+        } else {
+            // SAFETY: prepare returned a live statement, protected by the lease.
+            unsafe {
+                (
+                    sqlite3_bind_parameter_count(statement.0) as usize,
+                    sqlite3_column_count(statement.0) as usize,
+                )
+            }
+        })
+    }
+    // Caller holds the global lease throughout statement ownership.
+    fn prepare(&self, sql: &CStr) -> Result<Statement> {
+        let mut stmt = ptr::null_mut();
+        let mut tail = ptr::null();
+        let rc = unsafe { sqlite3_prepare_v2(self.0, sql.as_ptr(), -1, &mut stmt, &mut tail) };
+        let statement = Statement(stmt);
+        if rc != 0 {
+            return Err(unsafe { error(self.0, rc) });
+        }
+        if stmt.is_null() {
+            return Ok(statement);
+        }
+        // Reject a second executable statement before stepping the first. SQLite
+        // parses trailing whitespace/comments, so valid comments remain accepted.
+        if !tail.is_null() {
+            let mut extra = ptr::null_mut();
+            let rc = unsafe { sqlite3_prepare_v2(self.0, tail, -1, &mut extra, ptr::null_mut()) };
+            let _extra = Statement(extra);
+            if rc != 0 || !extra.is_null() {
+                return Err(failure(21, "one SQL statement per call"));
+            }
+        }
+        Ok(statement)
+    }
     pub fn query(&self, sql: &str, bindings: &[Value]) -> Result<Rows> {
         if sql.len() > 1 << 20 {
             return Err(failure(18, "SQL text exceeds 1 MiB"));
@@ -241,28 +286,13 @@ impl Connection {
             );
         }
         let _progress = Progress(self.0);
-        let mut stmt = ptr::null_mut();
-        let mut tail = ptr::null();
-        let rc = unsafe { sqlite3_prepare_v2(self.0, sql.as_ptr(), -1, &mut stmt, &mut tail) };
-        let statement = Statement(stmt);
-        if rc != 0 {
-            return Err(unsafe { error(self.0, rc) });
-        }
+        let statement = self.prepare(&sql)?;
+        let stmt = statement.0;
         if stmt.is_null() {
             return Ok(Rows {
                 columns: Vec::new(),
                 values: Vec::new(),
             });
-        }
-        // Reject a second executable statement before stepping the first. SQLite
-        // parses trailing whitespace/comments, so valid comments remain accepted.
-        if !tail.is_null() {
-            let mut extra = ptr::null_mut();
-            let rc = unsafe { sqlite3_prepare_v2(self.0, tail, -1, &mut extra, ptr::null_mut()) };
-            let _extra = Statement(extra);
-            if rc != 0 || !extra.is_null() {
-                return Err(failure(21, "one SQL statement per call"));
-            }
         }
         if unsafe { sqlite3_bind_parameter_count(stmt) } as usize != bindings.len() {
             return Err(failure(25, "SQL binding count mismatch"));

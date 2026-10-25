@@ -113,12 +113,12 @@ fn index(value: i32, len: usize, insert: bool) -> Result<usize> {
     }
     Ok(value as usize)
 }
-struct Pin<'a> {
+pub(super) struct Pin<'a> {
     state: &'a RefCell<Copies>,
     ticket: u64,
 }
 impl Pin<'_> {
-    fn extend(&self, values: impl IntoIterator<Item = ObjRef>) -> Result<()> {
+    pub(super) fn extend(&self, values: impl IntoIterator<Item = ObjRef>) -> Result<()> {
         let mut state = self.state.borrow_mut();
         let mut roots = Vec::new();
         roots.extend(values);
@@ -199,7 +199,7 @@ impl Collections {
             .as_ref()
             .map(|snapshot| snapshot.values.as_ref().clone())
     }
-    fn cow_pin(&self, r: ObjRef, args: &[Value]) -> Result<Pin<'_>> {
+    pub(super) fn cow_pin(&self, r: ObjRef, args: &[Value]) -> Result<Pin<'_>> {
         let ticket = {
             let mut state = self.cow.borrow_mut();
             if state.pins.len() >= 128 {

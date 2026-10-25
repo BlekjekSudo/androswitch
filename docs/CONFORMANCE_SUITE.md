@@ -11,6 +11,34 @@ The parsers, VM and original runtime foundation are credited to
 contributors. AndroSwitch adds the portable Horizon adapters and these original
 tests. Upstream attribution and licenses remain in [CREDITS](../CREDITS.md).
 
+## Runtime acceptance target
+
+All **219 declared cases are runtime repair targets**. Producing an APK, visiting
+every case or collecting a complete journal does not satisfy this target. Every
+`FAIL`, `ERROR`, `INTERRUPTED`, `UNSUPPORTED`, `BLOCKED` and `NOT_RUN` remains open;
+explicit emulator exclusions do not count as coverage. The collector records
+`acceptance_passed` separately from `catalog_completed`, and `--require-pass`
+rejects a catalog with any non-PASS case. The package script requires that gate
+unless explicitly asked for an unfinished `-Diagnostic` hardware/debug bundle.
+This target still does not establish all Android behavior or game compatibility.
+
+Shared repairs include Java text/numeric/array operations, fixed-size array-backed
+`Arrays.asList`, collection virtual `toString`, nested Bundle references, real
+initial launch Intents, RandomAccessFile on the persistent VFS and bound SQLite
+statements on native SQLite. Additional regression contracts check overlap and
+partial arraycopy, backing-array aliasing/GC, EOF/read-only file behavior, SQL
+binding without interpolation, live statement-to-database GC ownership, actual
+row IDs/change counts, scalar SQLite conversions and closed-handle errors.
+
+The native system-provider libdl bridge distinguishes raw data from callable
+host functions and caches TLS/errno veneers. Its current scope is linked system
+libraries; loading additional guest DSOs and `RTLD_NEXT` caller lookup remain
+explicit errors. Android `sysconf` CPU counts describe the cores visible to this
+runtime's guest, matching its process-allowed Horizon mask. The missing-file
+errno case uses a nonexistent child of `getFilesDir`; `/data/local/tmp` was an
+invalid ENOENT assertion because Android permissions may instead return EACCES.
+The assertion still requires ENOENT, and the catalog still contains 219 cases.
+
 ## Facts and compatibility identity
 
 | Observation | Source / meaning |

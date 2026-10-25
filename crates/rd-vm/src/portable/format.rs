@@ -187,8 +187,20 @@ pub(crate) fn call_static(
     if args.len() != array_index + 1 {
         return Err(err::vm_error("INVALID_ARG", "String.format argument count").into());
     }
-    if format_index == 1 && args[0].as_ref()?.is_some() {
-        return Err(unsupported("Locale formatting"));
+    if format_index == 1 {
+        if let Some(locale) = args[0].as_ref()? {
+            let root = vm.heap.class_of(locale)? == "Ljava/util/Locale;"
+                && vm
+                    .heap
+                    .get_field(locale, "language")
+                    .ok()
+                    .and_then(|v| v.as_ref().ok().flatten())
+                    .and_then(|r| vm.heap.as_str(r).ok())
+                    .is_some_and(str::is_empty);
+            if !root {
+                return Err(unsupported("Locale formatting"));
+            }
+        }
     }
     let pattern = args[format_index]
         .as_ref()?

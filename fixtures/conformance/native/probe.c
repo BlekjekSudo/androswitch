@@ -112,7 +112,7 @@ static jstring shared_file(JNIEnv *e, jclass c, jstring path) {
   (*e)->ReleaseStringUTFChars(e, path, p);
   return text(e, ok ? "Java/native file shared" : "FAIL:native file write");
 }
-static jstring facts(JNIEnv *e, jclass c, jint mode) {
+static jstring facts(JNIEnv *e, jclass c, jint mode, jstring missing_path) {
   (void)c;
   char out[256];
   struct timespec a, b;
@@ -137,13 +137,17 @@ static jstring facts(JNIEnv *e, jclass c, jint mode) {
     return text(e, out);
   }
   if (mode == 3) {
+    const char *path = (*e)->GetStringUTFChars(e, missing_path, NULL);
+    if (!path) return text(e, "FAIL:missing-file path");
     errno = 0;
-    FILE *f = fopen("/data/local/tmp/androswitch-definitely-missing", "rb");
+    FILE *f = fopen(path, "rb");
+    int saved_errno = errno;
+    (*e)->ReleaseStringUTFChars(e, missing_path, path);
     if (f) {
       fclose(f);
       return text(e, "FAIL:unexpected file");
     }
-    return text(e, errno == ENOENT ? "ENOENT" : "FAIL:wrong errno");
+    return text(e, saved_errno == ENOENT ? "ENOENT" : "FAIL:wrong errno");
   }
   if (mode == 4) {
     pthread_key_t key;
@@ -212,7 +216,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
       {"array", "([I)[I", (void *)array},
       {"raise", "()V", (void *)raise_java},
       {"callback", "(I)I", (void *)callback},
-      {"facts", "(I)Ljava/lang/String;", (void *)facts},
+      {"facts", "(ILjava/lang/String;)Ljava/lang/String;", (void *)facts},
       {"sharedFile", "(Ljava/lang/String;)Ljava/lang/String;",
        (void *)shared_file},
       {"graphics", "(I)Ljava/lang/String;", (void *)graphics},

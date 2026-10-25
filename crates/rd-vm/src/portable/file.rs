@@ -11,18 +11,18 @@ use alloc::{
 fn exception(class: &str, message: impl Into<String>) -> VmExit {
     Throwable::new(class, message).into()
 }
-fn io(error: as_platform::PlatformError) -> VmExit {
+pub(super) fn io(error: as_platform::PlatformError) -> VmExit {
     exception("Ljava/io/IOException;", error.to_string())
 }
-fn object(value: &Value) -> Result<ObjRef, VmExit> {
+pub(super) fn object(value: &Value) -> Result<ObjRef, VmExit> {
     value
         .as_ref()?
         .ok_or_else(|| exception("Ljava/lang/NullPointerException;", "null argument"))
 }
-fn text(vm: &Engine, value: &Value) -> Result<String, VmExit> {
+pub(super) fn text(vm: &Engine, value: &Value) -> Result<String, VmExit> {
     Ok(vm.heap.as_str(object(value)?)?.to_string())
 }
-fn path(vm: &Engine, value: &Value) -> Result<String, VmExit> {
+pub(super) fn path(vm: &Engine, value: &Value) -> Result<String, VmExit> {
     let r = object(value)?;
     if let Some(file) = vm.portable.files.get(&r) {
         Ok(file.path.clone())
@@ -30,7 +30,7 @@ fn path(vm: &Engine, value: &Value) -> Result<String, VmExit> {
         text(vm, value)
     }
 }
-fn absolute(vm: &Engine, path: &str) -> Result<String, VmExit> {
+pub(super) fn absolute(vm: &Engine, path: &str) -> Result<String, VmExit> {
     let path = if path.starts_with('/') {
         path.to_string()
     } else {
@@ -48,6 +48,9 @@ pub(crate) fn call_static(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = super::text_contracts::call_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     let scalar = match (class, name, sig) {
         ("Ljava/lang/Long;", "toString", "(J)Ljava/lang/String;") => {
             Some(args[0].as_long()?.to_string())
@@ -100,6 +103,12 @@ pub(crate) fn call(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = super::random_access::call(vm, class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = super::text_contracts::call(vm, class, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
     if class == "Ljava/lang/String;" {
         if name == "getBytes" {
             return super::string_encoding::get_bytes(vm, recv, sig, args);
@@ -199,6 +208,17 @@ pub(crate) fn call(
                 "getPath" | "getAbsolutePath" | "getCanonicalPath" | "toString",
                 "()Ljava/lang/String;",
             ) => result_text(vm, file.path),
+            ("getParent", "()Ljava/lang/String;") => match file.path.rsplit_once('/') {
+                Some((parent, _)) => result_text(
+                    vm,
+                    if parent.is_empty() {
+                        "/".into()
+                    } else {
+                        parent.into()
+                    },
+                ),
+                None => Ok(Some(Value::Null)),
+            },
             ("getName", "()Ljava/lang/String;") => {
                 result_text(vm, file.path.rsplit('/').next().unwrap_or("").to_string())
             }

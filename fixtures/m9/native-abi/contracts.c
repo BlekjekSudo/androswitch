@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+static int processors_fail;
+int as_platform_available_processors(uint32_t *count) { if(processors_fail) return -1;*count=3;return 0; }
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t condition = PTHREAD_COND_INITIALIZER;
 static __thread jmp_buf *escape;
@@ -231,6 +233,12 @@ static void *once_worker(void *unused) {
   return NULL;
 }
 int main(void) {
+  long (*guest_sysconf)(int)=(void *)as_bionic_libc_import("sysconf");
+  assert(guest_sysconf && guest_sysconf(0x60)==3 && guest_sysconf(0x61)==3);
+  assert(guest_sysconf(0x27)==4096 && guest_sysconf(0x28)==4096);
+  processors_fail=1;errno=0;assert(guest_sysconf(0x61)==-1 && errno==ENOSYS);processors_fail=0;
+  errno=0;assert(guest_sysconf(-1)==-1 && errno==EINVAL);
+
   /* ARM64 getauxval uses unsigned long for both argument and result. Known
    *
    * zero values preserve errno; absent types must be distinguishable. */

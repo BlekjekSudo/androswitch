@@ -3,8 +3,9 @@
   "project": "mesa-switch",
   "url": "https://github.com/danfromtico/mesa-switch",
   "schema_version": 1,
-  "note": "Existing AndroSwitch Mesa/EGL remains linked. NVK availability is tested rather than inferred. GitHub API revision lookup timed out and was cancelled; no exact external SDK commit is claimed.",
+  "note": "Exact main revision resolved with git ls-remote and cloned into task-local cache. Existing product still links its original Mesa SDK; no new driver incorporated yet.",
   "usage": "Reference only; no driver source or binary incorporated by this suite build",
   "observed_utc": "2026-10-25T08:46:59.6972165Z",
-  "ref": "main"
+  "ref": "main",
+  "revision": "0ff52079ca9e9e837ed27eb95a8d239f439a1864"
 }

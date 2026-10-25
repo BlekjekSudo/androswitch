@@ -500,7 +500,14 @@ impl Android {
         )?;
         self.state.borrow_mut().roots.retain(|r| *r != base);
         self.callback(vm, app, "onCreate", "()V", &[])?;
-        self.start(vm, &descriptor(entry), None)?;
+        let launch_intent = shell(vm, "Landroid/content/Intent;")?;
+        self.state
+            .borrow_mut()
+            .intents
+            .insert(launch_intent, descriptor(entry));
+        let action = string(vm, "android.intent.action.MAIN")?;
+        write(vm, launch_intent, "action", action)?;
+        self.start(vm, &descriptor(entry), Some(launch_intent))?;
         self.tick(vm)
     }
     fn start(&self, vm: &mut Engine, class: &str, intent: Option<ObjRef>) -> Result<()> {
@@ -1549,7 +1556,8 @@ impl FrameworkHost for Android {
                     .map_err(|_| Throwable::new("Ljava/lang/NumberFormatException;", "integer"))?,
             ),
             ("Ljava/lang/String;", "valueOf", _) if sig.ends_with("Ljava/lang/String;") => {
-                string(vm, display(vm, &args[0])?)?
+                let value = display(vm, &args[0])?;
+                string(vm, value)?
             }
             (
                 "Lkotlin/jvm/internal/Intrinsics;",
@@ -2090,9 +2098,15 @@ impl FrameworkHost for Android {
         roots
     }
 }
-fn display(vm: &Engine, value: &Value) -> Result<String> {
+fn display(vm: &mut Engine, value: &Value) -> Result<String> {
     Ok(match value {
-        Value::Obj(r) => vm.heap.as_str(*r)?.to_string(),
+        Value::Obj(r) => match vm.heap.as_str(*r) {
+            Ok(value) => value.to_string(),
+            Err(_) => {
+                let result = vm.invoke_instance(*r, "toString", "()Ljava/lang/String;", &[])?;
+                text(vm, &result)?
+            }
+        },
         Value::Null => "null".into(),
         Value::Int(n) => n.to_string(),
         Value::Long(n) => n.to_string(),

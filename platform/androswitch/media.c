@@ -351,6 +351,7 @@ static int window_geometry(void *w, int width, int height, int format) {
              : -ENOTSUP;
 }
 static EGLSurface surfaces[16];
+static unsigned char surface_windows[16];
 static u32 surface_dimensions[16][2];
 static EGLContext contexts[16];
 static EGLDisplay display;
@@ -380,7 +381,7 @@ static EGLBoolean guest_query_surface(EGLDisplay d, EGLSurface s,
       (attribute == EGL_WIDTH || attribute == EGL_HEIGHT)) {
     mutexLock(&graphics_mutex);
     for (unsigned i = 0; i < 16; i++) {
-      if (s && surfaces[i] == s) {
+      if (s && surfaces[i] == s && surface_windows[i]) {
         u32 width = 0, height = 0;
         NWindow *window = nwindowGetDefault();
         Result rc = nwindowGetDimensions(window, &width, &height);
@@ -429,6 +430,7 @@ static EGLSurface guest_surface(EGLDisplay d, EGLConfig config, void *window,
      * enough ownership for fail-closed teardown. Geometry is observed from
      * the actual registered buffer queue, never copied from requested caps. */
     surfaces[i] = s;
+    surface_windows[i] = 1;
     Result rc = nwindowGetDimensions(native_window, &width, &height);
     surface_dimensions[i][0] = width;
     surface_dimensions[i][1] = height;
@@ -445,6 +447,20 @@ static EGLSurface guest_surface(EGLDisplay d, EGLConfig config, void *window,
   }
   mutexUnlock(&graphics_mutex);
   return s;
+}
+static EGLSurface guest_pbuffer(EGLDisplay d, EGLConfig config, const EGLint *attrs) {
+  mutexLock(&graphics_mutex);
+  unsigned i=0;
+  while(i<16 && surfaces[i]) ++i;
+  EGLSurface s=i==16 ? EGL_NO_SURFACE : eglCreatePbufferSurface(d,config,attrs);
+  if(s) {
+    surfaces[i]=s;
+    surface_windows[i]=0;
+    EGLint w=0,h=0;
+    eglQuerySurface(d,s,EGL_WIDTH,&w);eglQuerySurface(d,s,EGL_HEIGHT,&h);
+    surface_dimensions[i][0]=w;surface_dimensions[i][1]=h;
+  }
+  mutexUnlock(&graphics_mutex);return s;
 }
 static EGLContext guest_context(EGLDisplay d, EGLConfig config,
                                 EGLContext share, const EGLint *attrs) {
@@ -1063,6 +1079,17 @@ static int guest_clock(int id, struct timespec *out) {
   out->tv_nsec = ns % 1000000000;
   return 0;
 }
+static int guest_clock_resolution(int id, struct timespec *out) {
+  if(id!=0 && id!=1) { errno=EINVAL;return -1; }
+  uint64_t ns=1000000000;
+  if(id==1) {
+    uint64_t frequency=armGetSystemTickFreq();
+    if(!frequency) { errno=ENOSYS;return -1; }
+    ns=(1000000000+frequency-1)/frequency;
+  }
+  if(out) { out->tv_sec=ns/1000000000;out->tv_nsec=ns%1000000000; }
+  return 0;
+}
 static int guest_nanosleep(const struct timespec *t,
                            struct timespec *remaining) {
   if (!t || t->tv_sec < 0 || t->tv_nsec < 0 || t->tv_nsec >= 1000000000) {
@@ -1181,10 +1208,12 @@ static uint64_t media_lookup(const char *name) {
   API("ANativeWindow_setBuffersGeometry", window_geometry);
   API("ANativeActivity_finish", activity_finish);
   API("clock_gettime", guest_clock);
+  API("clock_getres", guest_clock_resolution);
   API("nanosleep", guest_nanosleep);
   API("usleep", guest_usleep);
   API("eglGetDisplay", guest_display);
   API("eglCreateWindowSurface", guest_surface);
+  API("eglCreatePbufferSurface", guest_pbuffer);
   API("eglCreateContext", guest_context);
   API("eglMakeCurrent", guest_make_current);
   API("eglDestroySurface", guest_destroy_surface);

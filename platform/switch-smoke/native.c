@@ -5,6 +5,7 @@
  * Apache-2.0. */
 #include "native.h"
 #include "bionic_cxx.h"
+#include "bionic_dlfcn.h"
 #include "bionic_errno.h"
 #include "bionic_finalize.h"
 #include "bionic_locale.h"
@@ -1024,6 +1025,7 @@ int as_native_reset(void) {
   reset_phase("native_reset_admitted");
   extern void as_jni_reset(void);
   as_jni_reset();
+  as_bionic_dlfcn_reset();
   while (mappings) {
     Mapping *before = mappings;
     as_native_release((uint64_t)before);
@@ -1110,7 +1112,9 @@ uint64_t as_native_import(const char *name) {
   extern uint64_t as_bionic_vfs_import(const char *);
   extern uint64_t as_bionic_log_import(const char *);
   extern uint64_t as_bionic_libc_import(const char *);
-  uint64_t address = as_bionic_libc_import(name);
+  uint64_t address = as_bionic_dlfcn_import(name);
+  if (!address)
+    address = as_bionic_libc_import(name);
   if (!address)
     address = as_bionic_vfs_import(name);
   if (!address)
@@ -1139,4 +1143,38 @@ uint64_t as_native_data_import(const char *name) {
   if (!address && as_media_import && !strncmp(name, "SL_IID_", 7))
     address = as_media_import(name);
   return address;
+}
+
+/* Resolve only actual linked providers in the requested library namespace. */
+uint64_t as_native_system_symbol(const char *library, const char *name, int *data) {
+  *data = 0;
+  if (!library) {
+    uint64_t address = as_native_data_import(name);
+    if (address) { *data=1; return address; }
+    return as_native_import(name);
+  }
+  if (!strcmp(library,"libdl.so")) return as_bionic_dlfcn_import(name);
+  if (as_media_library && as_media_library(library)) {
+    int belongs = (!strcmp(library,"libEGL.so") && !strncmp(name,"egl",3)) ||
+      (!strcmp(library,"libGLESv2.so") && !strncmp(name,"gl",2)) ||
+      (!strcmp(library,"libaaudio.so") && !strncmp(name,"AAudio",6)) ||
+      (!strcmp(library,"libOpenSLES.so") && (!strncmp(name,"sl",2)||!strncmp(name,"SL_",3))) ||
+      (!strcmp(library,"libmediandk.so") && !strncmp(name,"AMedia",6));
+    if (!belongs) return 0;
+    if (!strncmp(name,"SL_IID_",7)) *data=1;
+    return as_media_import ? as_media_import(name) : 0;
+  }
+  if (!strcmp(library,"libandroid.so")) return name[0]=='A' && as_media_import ? as_media_import(name) : 0;
+  if (!strcmp(library,"liblog.so")) { extern uint64_t as_bionic_log_import(const char *);return as_bionic_log_import(name); }
+  if (!strcmp(library,"libstdc++.so")) {
+    uint64_t address=as_bionic_cxx_data(name);
+    if(address) { *data=1;return address; } return as_bionic_cxx_import(name);
+  }
+  if (!strcmp(library,"libc.so") || !strcmp(library,"libm.so")) {
+    // Device/media and libdl symbols belong to their own system providers.
+    if (!strncmp(name,"egl",3)||!strncmp(name,"gl",2)||!strncmp(name,"vk",2)||name[0]=='A'||!strncmp(name,"dl",2)||!strncmp(name,"__android_log",13)) return 0;
+    uint64_t address=as_native_data_import(name);
+    if(address) { *data=1;return address; }return as_native_import(name);
+  }
+  return 0;
 }

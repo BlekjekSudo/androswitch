@@ -90,7 +90,28 @@ impl Collections {
         name: &str,
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
+        if class == "Ljava/util/AbstractCollection;" {
+            use rd_vm::framework_host::HostMethodKind::{Constructor, Instance};
+            match (name, sig) {
+                ("<init>", "()V") => return Some(Constructor),
+                ("isEmpty", "()Z") | ("contains", "(Ljava/lang/Object;)Z") => {
+                    return Some(Instance)
+                }
+                _ => {}
+            }
+        }
         copy_on_write::metadata(class, name, sig)
+    }
+    pub(super) fn array_list_view(&self, vm: &mut Engine, array: ObjRef) -> Result<Value> {
+        if vm.heap.as_array_elems(array)?.1 != rd_vm::heap::ElemKind::Obj {
+            return Err(
+                Throwable::new("Ljava/lang/ClassCastException;", "Object[] required").into(),
+            );
+        }
+        Ok(Value::Obj(vm.heap.alloc_instance(
+            "Ljava/util/Arrays$ArrayList;".into(),
+            vec![("backingArray".into(), Value::Obj(array))],
+        )?))
     }
     fn regular_slots(&self) -> usize {
         self.objects
@@ -134,7 +155,7 @@ impl Collections {
             return Ok(true);
         }
         let Some(kind) = kind(vm, class) else {
-            return Ok(false);
+            return Ok(vm.cp.is_subtype(class, "Ljava/util/AbstractCollection;"));
         };
         let container = match kind {
             "list" => Container::List(Vec::new()),
@@ -248,6 +269,126 @@ impl Collections {
             return Ok(Some(value));
         }
         let actual = vm.heap.class_of(r)?.to_string();
+        if matches!(
+            actual.as_str(),
+            "Ljava/util/Arrays$ArrayList;" | "Ljava/util/Arrays$ArrayList$Itr;"
+        ) {
+            let array = obj(&vm.heap.get_field(r, "backingArray")?)?;
+            let length = vm.heap.as_array_elems(array)?.0.len();
+            let indexed = |index: i32| -> Result<usize> {
+                if index < 0 || index as usize >= length {
+                    Err(Throwable::new(
+                        "Ljava/lang/IndexOutOfBoundsException;",
+                        "array-backed list index",
+                    )
+                    .into())
+                } else {
+                    Ok(index as usize)
+                }
+            };
+            let value = match (name, sig) {
+                ("size", "()I") => Value::Int(length as i32),
+                ("isEmpty", "()Z") => Value::Int(i32::from(length == 0)),
+                ("get", "(I)Ljava/lang/Object;") => {
+                    vm.heap.as_array_elems(array)?.0[indexed(int(args, 0)?)?].clone()
+                }
+                ("set", "(ILjava/lang/Object;)Ljava/lang/Object;") => {
+                    let index = indexed(int(args, 0)?)?;
+                    let component = vm.heap.class_of(array)?[1..].to_string();
+                    if let Some(reference) = args[1].as_ref()? {
+                        if !vm.cp.is_subtype(vm.heap.class_of(reference)?, &component) {
+                            return Err(Throwable::new(
+                                "Ljava/lang/ArrayStoreException;",
+                                "array-backed list component",
+                            )
+                            .into());
+                        }
+                    }
+                    let previous = core::mem::replace(
+                        &mut vm.heap.array_elems_mut(array)?[index],
+                        args[1].clone(),
+                    );
+                    previous
+                }
+                ("iterator", "()Ljava/util/Iterator;") => Value::Obj(vm.heap.alloc_instance(
+                    "Ljava/util/Arrays$ArrayList$Itr;".into(),
+                    vec![
+                        ("backingArray".into(), Value::Obj(array)),
+                        ("cursor".into(), Value::Int(0)),
+                    ],
+                )?),
+                ("hasNext", "()Z") => Value::Int(i32::from(
+                    (vm.heap.get_field(r, "cursor")?.as_int()? as usize) < length,
+                )),
+                ("next", "()Ljava/lang/Object;") => {
+                    let index = vm.heap.get_field(r, "cursor")?.as_int()?;
+                    if index < 0 || index as usize >= length {
+                        return Err(Throwable::new(
+                            "Ljava/util/NoSuchElementException;",
+                            "array iterator exhausted",
+                        )
+                        .into());
+                    }
+                    let value = vm.heap.as_array_elems(array)?.0[index as usize].clone();
+                    write(vm, r, "cursor", Value::Int(index + 1))?;
+                    value
+                }
+                ("contains", "(Ljava/lang/Object;)Z") => {
+                    let pin = self.cow_pin(r, args)?;
+                    pin.extend(core::iter::once(array))?;
+                    let mut found = false;
+                    for index in 0..length {
+                        let value = vm.heap.as_array_elems(array)?.0[index].clone();
+                        if equals(vm, &args[0], &value)? {
+                            found = true;
+                            break;
+                        }
+                    }
+                    Value::Int(i32::from(found))
+                }
+                ("add", "(Ljava/lang/Object;)Z")
+                | ("remove", "(I)Ljava/lang/Object;")
+                | ("remove", "()V") => {
+                    return Err(Throwable::new(
+                        "Ljava/lang/UnsupportedOperationException;",
+                        "fixed-size list",
+                    )
+                    .into())
+                }
+                _ => return Ok(None),
+            };
+            return Ok(Some(value));
+        }
+        if vm.cp.is_subtype(&actual, "Ljava/util/AbstractCollection;")
+            && !self.objects.borrow().contains_key(&r)
+        {
+            match (name, sig) {
+                ("<init>", "()V") => return Ok(Some(Value::Null)),
+                ("isEmpty", "()Z") => {
+                    let size = vm.invoke_instance(r, "size", "()I", &[])?.as_int()?;
+                    return Ok(Some(Value::Int(i32::from(size == 0))));
+                }
+                ("contains", "(Ljava/lang/Object;)Z") => {
+                    let pin = self.cow_pin(r, args)?;
+                    let iter =
+                        obj(&vm.invoke_instance(r, "iterator", "()Ljava/util/Iterator;", &[])?)?;
+                    pin.extend(core::iter::once(iter))?;
+                    for _ in 0..10000 {
+                        if vm.invoke_instance(iter, "hasNext", "()Z", &[])?.as_int()? == 0 {
+                            return Ok(Some(Value::Int(0)));
+                        }
+                        let value =
+                            vm.invoke_instance(iter, "next", "()Ljava/lang/Object;", &[])?;
+                        pin.extend(value.as_ref()?)?;
+                        if equals(vm, &args[0], &value)? {
+                            return Ok(Some(Value::Int(1)));
+                        }
+                    }
+                    return Err(error("COLLECTION_BUDGET", "10000 iterator steps"));
+                }
+                _ => {}
+            }
+        }
         if primitive(&actual).is_some() {
             if name == "<init>" && primitive(&actual).is_some_and(|p| sig == format!("({p})V")) {
                 write(vm, r, "value", args[0].clone())?;
@@ -301,14 +442,14 @@ impl Collections {
                     Value::Double(n) => n as i32 as i16 as i32,
                     _ => return Ok(None),
                 }),
-                "toString" => string(
-                    vm,
-                    if actual == "Ljava/lang/Boolean;" {
+                "toString" => {
+                    let value = if actual == "Ljava/lang/Boolean;" {
                         (value.as_int()? != 0).to_string()
                     } else {
                         display(vm, &value)?
-                    },
-                )?,
+                    };
+                    string(vm, value)?
+                }
                 "equals" => Value::Int(equals(vm, &Value::Obj(r), &args[0])? as i32),
                 _ => return Ok(None),
             };
@@ -360,6 +501,23 @@ impl Collections {
                 values.get(int(args, 0)? as usize).cloned().ok_or_else(|| {
                     Throwable::new("Ljava/lang/IndexOutOfBoundsException;", "List.get")
                 })?
+            }
+            ("remove", "(I)Ljava/lang/Object;") => {
+                let Container::List(mut values) = container else {
+                    return Ok(None);
+                };
+                let index = int(args, 0)?;
+                if index < 0 || index as usize >= values.len() {
+                    return Err(Throwable::new(
+                        "Ljava/lang/IndexOutOfBoundsException;",
+                        "List.remove",
+                    )
+                    .into());
+                }
+                let old = values.remove(index as usize);
+                self.change(r);
+                self.objects.borrow_mut().insert(r, Container::List(values));
+                old
             }
             ("set", "(ILjava/lang/Object;)Ljava/lang/Object;") => {
                 let Container::List(mut values) = container else {

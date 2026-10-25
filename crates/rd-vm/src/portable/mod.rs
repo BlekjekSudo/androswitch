@@ -14,7 +14,9 @@ pub(crate) mod execution;
 pub(crate) mod file;
 pub(crate) mod format;
 pub(crate) mod monitor;
+mod random_access;
 mod string_encoding;
+mod text_contracts;
 pub(crate) mod throwables;
 /// Preserve Java's zero/null defaults only for real DEX declarations. Platform
 /// adapters must explicitly populate implemented fields; absence is a missing
@@ -118,7 +120,11 @@ impl Engine {
         let mut current = class.to_string();
         if matches!(
             class,
-            "Ljava/io/File;" | "Ljava/io/FileInputStream;" | "Ljava/io/FileOutputStream;"
+            "Ljava/io/File;"
+                | "Ljava/io/FileInputStream;"
+                | "Ljava/io/FileOutputStream;"
+                | "Ljava/lang/String;"
+                | "Ljava/io/RandomAccessFile;"
         ) {
             return Ok(());
         }
@@ -129,7 +135,11 @@ impl Engine {
             }
             if matches!(
                 current.as_str(),
-                "Ljava/io/File;" | "Ljava/io/FileInputStream;" | "Ljava/io/FileOutputStream;"
+                "Ljava/io/File;"
+                    | "Ljava/io/FileInputStream;"
+                    | "Ljava/io/FileOutputStream;"
+                    | "Ljava/lang/String;"
+                    | "Ljava/io/RandomAccessFile;"
             ) {
                 return Ok(());
             }

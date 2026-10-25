@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$EvidenceDirectory)
+param([Parameter(Mandatory)][string]$EvidenceDirectory, [switch]$Diagnostic)
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
 $evidence=(Get-Item -LiteralPath $EvidenceDirectory).FullName
@@ -9,6 +9,7 @@ $nro="$repo/local-artifacts/product/androswitch.nro";$apk="$repo/local-artifacts
 if($summary.nro_sha256 -cne (Get-FileHash $nro).Hash.ToLowerInvariant() -or $build.nro_sha256 -cne $summary.nro_sha256){throw 'NRO differs from observed evidence'}
 if($summary.apk_sha256 -cne (Get-FileHash $apk).Hash.ToLowerInvariant()){throw 'APK differs from observed evidence'}
 if($summary.original_sd_restore -cne 'restored' -or -not $summary.launcher_completed){throw 'Completed launcher workflow and restored SD required for this test bundle'}
+if(-not $Diagnostic -and -not $summary.acceptance_passed){throw '219-case acceptance is incomplete. Use -Diagnostic only for an explicitly unfinished hardware/debug test bundle.'}
 $id=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8)
 $folder=Join-Path $repo "local-artifacts/releases/androswitch-conformance-$id"
 $sd=Join-Path $folder 'switch/androswitch'
@@ -58,7 +59,7 @@ Riwayat, atribusi, dan lisensi dipertahankan. Lihat CREDITS.md dan NOTICE.md.
 Source runtime dan suite: https://github.com/BlekjekSudo/androswitch
 '@|Set-Content "$folder/MULAI-DI-SINI.md" -Encoding utf8NoBOM
 $manifest=@{
-    schema_version=1;kind='development_conformance_bundle';total_cases=$summary.total
+    schema_version=1;kind='development_conformance_bundle';total_cases=$summary.total;acceptance_passed=[bool]$summary.acceptance_passed;diagnostic=[bool]$Diagnostic
     source_commit=$apkBuild.source_commit;upstream=@{project='RustyDroid';authors='nadabgfccvd and contributors';revision='6388281f66d254c8e01a0fdc7a5a9a30239bc762'}
     apk_sha256=$summary.apk_sha256;nro_sha256=$summary.nro_sha256;catalog_sha256=$summary.catalog_sha256
     emulator_counts=$summary.counts;hardware='not_run';android_reference='not_run';m9_independent_game_gate='open'

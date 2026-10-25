@@ -23,6 +23,15 @@ impl DeviceInfo {
         if let Some(value) = self.fields.borrow().get(&key) {
             return Ok(Some(value.clone()));
         }
+        if (class, name, ty) == ("Ljava/util/Locale;", "ROOT", "Ljava/util/Locale;") {
+            let language = string(vm, "")?;
+            let object = vm
+                .heap
+                .alloc_instance(class.into(), vec![("language".into(), language)])?;
+            let value = Value::Obj(object);
+            self.fields.borrow_mut().insert(key, value.clone());
+            return Ok(Some(value));
+        }
         let property = match (class, name, ty) {
             ("Landroid/os/Build;", "MODEL", "Ljava/lang/String;") => "ro.product.model",
             ("Landroid/os/Build;", "MANUFACTURER", "Ljava/lang/String;") => {

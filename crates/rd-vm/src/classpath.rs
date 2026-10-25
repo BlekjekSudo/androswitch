@@ -1294,6 +1294,13 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
             Some(&["Landroid/content/BroadcastReceiver;", "Ljava/lang/Object;"])
         }
         "Landroid/view/inputmethod/BaseInputConnection;" | "Ljava/lang/Runtime;" => Some(OBJECT),
+        "Ljava/util/Arrays$ArrayList;" => Some(&[
+            "Ljava/util/AbstractList;",
+            "Ljava/util/List;",
+            "Ljava/util/Collection;",
+            "Ljava/lang/Object;",
+        ]),
+        "Ljava/util/Arrays$ArrayList$Itr;" => Some(&["Ljava/util/Iterator;", "Ljava/lang/Object;"]),
         "Landroid/text/Selection;" => Some(OBJECT),
         "Landroid/os/Build;" | "Landroid/os/Build$VERSION;" => Some(OBJECT),
         // M8: FragmentManager legacy (29º gap real) — objeto simples do host.

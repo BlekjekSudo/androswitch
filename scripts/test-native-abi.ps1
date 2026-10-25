@@ -83,6 +83,7 @@ try {
     'platform/switch-smoke/bionic_log.c', 'platform/switch-smoke/bionic_vfs.c',
     'platform/switch-smoke/missing_import.c'
   ) @('-lm')
+  Invoke-HostContract 'dlfcn' @('fixtures/m9/native-abi/dlfcn.c','platform/switch-smoke/bionic_dlfcn.c')
   Invoke-HostContract 'locales' @('fixtures/m9/native-abi/locales.c','platform/switch-smoke/bionic_locale.c','platform/switch-smoke/bionic_multibyte.c')
   Invoke-HostContract 'multibyte' @('fixtures/m9/native-abi/multibyte.c','platform/switch-smoke/bionic_locale.c','platform/switch-smoke/bionic_multibyte.c')
   Invoke-HostContract 'random' @('fixtures/m9/native-abi/random.c','platform/switch-smoke/bionic_random.c')

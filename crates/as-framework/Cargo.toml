@@ -136,3 +136,8 @@ required-features = ["host"]
 name = "input_connection"
 path = "tests/input_connection.rs"
 required-features = ["host"]
+
+[[test]]
+name = "conformance_contracts"
+path = "tests/conformance_contracts.rs"
+required-features = ["host"]

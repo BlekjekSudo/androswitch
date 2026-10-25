@@ -146,3 +146,8 @@ M9 foundation work now includes the [219-case conformance catalog](CONFORMANCE_S
 in one normal Android SDK/NDK APK, without sensor tests. Host, diagnostic Ryujinx,
 Android reference and physical Switch results remain separate. This catalog
 does not close the independent Mekorama/Candy Crush first-screen gate.
+
+The user-defined acceptance target for this suite is now **all 219 cases actually
+passing**, with shared runtime/API fixes. A complete baseline journal is not the
+exit gate. Non-PASS cases and emulator exclusions remain open. The 219-case gate
+is additional to the independent-app and physical-device gates above.
