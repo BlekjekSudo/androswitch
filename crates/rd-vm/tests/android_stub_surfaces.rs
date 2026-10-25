@@ -8181,6 +8181,41 @@ fn input_no_device_profile_and_device_values_are_guest_visible() {
         ),
         Value::Int(1)
     );
+
+    // Deep audit: getMotionRange(axis, source) compares the source exactly
+    // (unlike MotionRange.isFromSource, which is a mask test).
+    assert_eq!(
+        call(
+            &mut engine,
+            device,
+            "getMotionRange",
+            "(II)Landroid/view/InputDevice$MotionRange;",
+            &[Value::Int(0), Value::Int(0x2)]
+        ),
+        Value::Null
+    );
+    let by_axis_source = object(call(
+        &mut engine,
+        device,
+        "getMotionRange",
+        "(II)Landroid/view/InputDevice$MotionRange;",
+        &[Value::Int(0), Value::Int(0x1002)],
+    ));
+    assert_eq!(
+        call(&mut engine, by_axis_source, "getMax", "()F", &[]),
+        Value::Float(1080.0)
+    );
+
+    // Deep audit: getKeyboardLayout rejects a null descriptor with IAE.
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "getKeyboardLayout",
+            "(Ljava/lang/String;)Landroid/hardware/input/KeyboardLayout;",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
 }
 
 #[test]

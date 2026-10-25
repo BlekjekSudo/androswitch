@@ -28042,6 +28042,9 @@ fn p49_input_device_instance2(
                 "(Landroid/hardware/input/InputDeviceIdentifier;Landroid/view/inputmethod/InputMethodInfo;Landroid/view/inputmethod/InputMethodSubtype;)[Landroid/hardware/input/KeyboardLayout;",
             ) => obj_array(vm, "[Landroid/hardware/input/KeyboardLayout;", Vec::new())?,
             ("getKeyboardLayout", "(Ljava/lang/String;)Landroid/hardware/input/KeyboardLayout;") => {
+                if !matches!(args.first(), Some(Value::Obj(_))) {
+                    return Err(iae("keyboardLayoutDescriptor must not be null"));
+                }
                 Value::Null
             }
             (
@@ -28198,7 +28201,7 @@ fn p49_input_device_instance2(
                 .find(|range| match range {
                     Value::Obj(r) => {
                         field_int(vm, *r, "mAxis") == axis
-                            && (field_int(vm, *r, "mSource") & source) == source
+                            && field_int(vm, *r, "mSource") == source
                     }
                     _ => false,
                 })
