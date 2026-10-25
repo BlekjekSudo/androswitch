@@ -17,7 +17,7 @@
 | M7 | Performance + gate piso E5 | ⬜ |
 | M8 | Compat real | **✅ implementado** |
 | M9 | Componentes avançados + NDK | **✅ implementado** |
-| M10 | Dispositivos virtuais | ⬜ |
+| M10 | Dispositivos virtuais | **✅ implementado** |
 | M11 | Engines | ⬜ |
 | M12 | Ecossistema GH | ⬜ |
 

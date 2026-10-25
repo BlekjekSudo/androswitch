@@ -108,7 +108,7 @@ See [the automation guide](docs/mcp-automation.md) for structured host-view sele
 | **M7** | 🟡 **IN PROGRESS** — `rd perf` mede startup cold/warm + RSS no perfil moto-e5 com gate de CI sobre o app trivial (números emulados por fator de CPU); budgets da golden suite, medição em device real e gate de release ainda pendentes |
 | **M8** | ✅ **DONE (v0.9.0)** — Real-world compat: RecyclerView (DEX adapter populate), Fragments (legacy+androidx), Dialogs, OkHttp shim (offline deterministic), SQLite/Room (in-memory), Services/broadcasts/deep links, WorkManager, stateful SharedPreferences — `crates/rd-vm/src/m8.rs`, ADR 003 |
 | **M9** | ✅ **DONE (review pending)** — widgets (RemoteViews/AppWidgetProvider), IME (InputConnection/InputMethodService), accessibility, full notifications, shortcuts + NDK: ELF loader (x86_64/AArch64/ARM) and JNI bridge running `.so` code in an isolated Unicorn worker (feature `native`). 5 real F-Droid APKs make JNI method calls from their real DEX, each with a checked result, on x86_64, arm64-v8a and armeabi-v7a (15/15 runs), e.g. zxing-cpp renders a QR code that zbar decodes — [docs/m9.md](docs/m9.md), ADR 004 |
-| **M10** | Virtual devices: camera, GPS, sensors, biometrics — programmable by the agent |
+| **M10** | ✅ **DONE** — virtual devices programmable by the agent: camera, GPS, sensors, biometrics and the other M10 surfaces ([docs/m10.md](docs/m10.md), [ADR 011](docs/adr/011-m10-virtual-devices.md), #201) |
 | **M11** | ⬜ **PLANNED** — Engines, in the order accepted by [ADR 013](docs/adr/013-m11-engine-execution-strategy.md): WASM → React Native → Mono → Flutter (one real app each in a golden flow; detection alone never counts) |
 | **M12** | Full GitHub ecosystem: docs site, live compat matrix, releases → **v1.0** |
 

@@ -1247,7 +1247,14 @@ fn tasks_static(vm: &mut Engine, name: &str, args: &[Value]) -> Result<Option<Va
             {
                 // Resolve já: fonte sintética qualquer serve de gatilho.
                 if tasks.is_empty() {
-                    settle_task(vm, out, Some(Value::Null), None, false)?;
+                    // whenAllSuccess/whenAllComplete vendem a lista vazia
+                    // (upstream); whenAll vende Void (null).
+                    let v = if name == "whenAll" {
+                        Value::Null
+                    } else {
+                        make_list(vm, Vec::new())?
+                    };
+                    settle_task(vm, out, Some(v), None, false)?;
                 } else {
                     let src = tasks[0];
                     vm.fw.gms.pending.entry(src).or_default().push(p);
