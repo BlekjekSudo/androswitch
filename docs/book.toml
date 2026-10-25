@@ -3,7 +3,6 @@ title = "RustyDroid Documentation"
 description = "Rust-native Android runtime — architecture, MCP tools, compatibility scoreboards, and ADRs"
 authors = ["RustyDroid Contributors"]
 language = "pt-BR"
-multilingual = false
 src = "."
 
 [build]
