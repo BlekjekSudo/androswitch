@@ -5217,6 +5217,165 @@ fn translation_values_context_and_no_service_manager_are_guest_visible() {
         ),
         Value::Null
     );
+
+    // Deep audit: the deprecated TranslationSpec(String, int) constructor
+    // performs no null check, so a null language is stored verbatim with
+    // a root ULocale instead of throwing.
+    let null_spec = instance(&mut engine, "Landroid/view/translation/TranslationSpec;");
+    call(
+        &mut engine,
+        null_spec,
+        "<init>",
+        "(Ljava/lang/String;I)V",
+        &[Value::Null, Value::Int(1)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            null_spec,
+            "getLanguage",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert!(matches!(
+        call(
+            &mut engine,
+            null_spec,
+            "getLocale",
+            "()Landroid/icu/util/ULocale;",
+            &[],
+        ),
+        Value::Obj(_)
+    ));
+
+    // Deep audit: ViewTranslationRequest.Builder.setValue accepts null
+    // keys/values (ArrayMap), and because checkNotUsed only runs when the
+    // map is first created, setValue after build() still mutates the map
+    // that was handed to the built request.
+    let null_key_builder = instance(
+        &mut engine,
+        "Landroid/view/translation/ViewTranslationRequest$Builder;",
+    );
+    call(
+        &mut engine,
+        null_key_builder,
+        "<init>",
+        "(Landroid/view/autofill/AutofillId;)V",
+        &[Value::Obj(autofill_id)],
+    );
+    let k_key = text(&mut engine, "k");
+    call(
+        &mut engine,
+        null_key_builder,
+        "setValue",
+        "(Ljava/lang/String;Landroid/view/translation/TranslationRequestValue;)Landroid/view/translation/ViewTranslationRequest$Builder;",
+        &[k_key, Value::Null],
+    );
+    let null_key_request = object(call(
+        &mut engine,
+        null_key_builder,
+        "build",
+        "()Landroid/view/translation/ViewTranslationRequest;",
+        &[],
+    ));
+    let k_lookup = text(&mut engine, "k");
+    assert_eq!(
+        call(
+            &mut engine,
+            null_key_request,
+            "getValue",
+            "(Ljava/lang/String;)Landroid/view/translation/TranslationRequestValue;",
+            &[k_lookup],
+        ),
+        Value::Null
+    );
+    let late_key = text(&mut engine, "late");
+    call(
+        &mut engine,
+        null_key_builder,
+        "setValue",
+        "(Ljava/lang/String;Landroid/view/translation/TranslationRequestValue;)Landroid/view/translation/ViewTranslationRequest$Builder;",
+        &[late_key, Value::Obj(request_value)],
+    );
+    let late_lookup = text(&mut engine, "late");
+    assert_eq!(
+        call(
+            &mut engine,
+            null_key_request,
+            "getValue",
+            "(Ljava/lang/String;)Landroid/view/translation/TranslationRequestValue;",
+            &[late_lookup],
+        ),
+        Value::Obj(request_value)
+    );
+
+    // Deep audit: TranslationContext.Builder.setActivityId performs no
+    // null validation, and build() marks the builder used before the
+    // constructor validates flags, so a flags failure still consumes it.
+    let bad_context_builder = instance(
+        &mut engine,
+        "Landroid/view/translation/TranslationContext$Builder;",
+    );
+    call(
+        &mut engine,
+        bad_context_builder,
+        "<init>",
+        "(Landroid/view/translation/TranslationSpec;Landroid/view/translation/TranslationSpec;)V",
+        &[Value::Obj(source), Value::Obj(target)],
+    );
+    call(
+        &mut engine,
+        bad_context_builder,
+        "setActivityId",
+        "(Landroid/app/assist/ActivityId;)Landroid/view/translation/TranslationContext$Builder;",
+        &[Value::Null],
+    );
+    call(
+        &mut engine,
+        bad_context_builder,
+        "setTranslationFlags",
+        "(I)Landroid/view/translation/TranslationContext$Builder;",
+        &[Value::Int(8)],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            bad_context_builder,
+            "build",
+            "()Landroid/view/translation/TranslationContext;",
+            &[],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            bad_context_builder,
+            "build",
+            "()Landroid/view/translation/TranslationContext;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+
+    // Deep audit: the no-service capabilities result is
+    // Collections.emptySet(), so adding to it throws.
+    let capabilities_set = object(call(
+        &mut engine,
+        manager,
+        "getOnDeviceTranslationCapabilities",
+        "(II)Ljava/util/Set;",
+        &[Value::Int(1), Value::Int(1)],
+    ));
+    assert_throws(
+        engine.invoke_instance(
+            capabilities_set,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(capability)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
 }
 
 #[test]

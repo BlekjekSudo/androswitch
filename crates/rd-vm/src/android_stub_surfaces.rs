@@ -21034,11 +21034,16 @@ fn p57_translation_spec_instance(
 ) -> Result<Option<Value>, VmExit> {
     Ok(Some(match (name, sig) {
         ("<init>", "(Ljava/lang/String;I)V") => {
+            // AOSP's deprecated constructor performs no null check: a null
+            // language is stored verbatim and ULocale.Builder treats a null
+            // language subtag as a reset (root locale).
             let Some(language) = opt_str_arg(vm, args, 0) else {
-                return Err(npe("language"));
+                let locale = ulocale_from_tag(vm, "")?;
+                put(vm, recv, "mLanguage", Value::Null)?;
+                put(vm, recv, "mLocale", locale)?;
+                put(vm, recv, "mDataFormat", Value::Int(iarg(args, 1)))?;
+                return Ok(Some(Value::Null));
             };
-            // AOSP's ULocale.Builder accepts this as its language subtag.
-            // Keep the deprecated language field verbatim.
             let locale = ulocale_from_tag(vm, &language)?;
             let lang = jstr(vm, language)?;
             put(vm, recv, "mLanguage", lang)?;
@@ -21385,15 +21390,44 @@ fn p57_view_translation_builder_instance(
             Value::Null
         }
         ("setValue", "(Ljava/lang/String;Landroid/view/translation/TranslationRequestValue;)Landroid/view/translation/ViewTranslationRequest$Builder;") => {
-            p57_check_builder_unused(vm, recv)?;
-            let Some(key) = opt_str_arg(vm, args, 0) else {
-                return Err(npe("key"));
+            // AOSP performs no null checks here (the backing ArrayMap
+            // accepts null keys and values), and checkNotUsed only runs
+            // through setTranslationRequestValues when the map is first
+            // created; later calls mutate the map directly, even after
+            // build() has handed the same map to the built request.
+            if field_obj(vm, recv, "mTranslationRequestValues").is_none() {
+                p57_check_builder_unused(vm, recv)?;
+            }
+            let map = p57_ensure_map(vm, recv, "mTranslationRequestValues")?;
+            let key = args.first().cloned().unwrap_or(Value::Null);
+            let value = args.get(1).cloned().unwrap_or(Value::Null);
+            let key_text = opt_str(vm, Some(&key));
+            let existing_keys: Vec<Value> = match vm.fw.objects.get(&map) {
+                Some(HostObj::Map { entries }) => {
+                    entries.iter().map(|(k, _)| k.clone()).collect()
+                }
+                _ => Vec::new(),
             };
-            let Some(_) = oarg(args, 1) else {
-                return Err(npe("value"));
-            };
-            let v = args.get(1).cloned().unwrap();
-            p57_map_put_string(vm, recv, "mTranslationRequestValues", key, v)?;
+            let mut replace_at = None;
+            for (index, k) in existing_keys.iter().enumerate() {
+                let same = match (&key, k) {
+                    (Value::Null, Value::Null) => true,
+                    (Value::Obj(_), Value::Obj(_)) => {
+                        key_text.is_some() && key_text == opt_str(vm, Some(k))
+                    }
+                    _ => false,
+                };
+                if same {
+                    replace_at = Some(index);
+                    break;
+                }
+            }
+            if let Some(HostObj::Map { entries }) = vm.fw.objects.get_mut(&map) {
+                match replace_at {
+                    Some(index) => entries[index].1 = value,
+                    None => entries.push((key, value)),
+                }
+            }
             Value::Obj(recv)
         }
         ("build", "()Landroid/view/translation/ViewTranslationRequest;") => {
@@ -21416,22 +21450,26 @@ fn p57_view_translation_builder_instance(
 }
 
 fn p57_translation_flag_string(flags: i32) -> String {
+    // BitUtils.flagsToString renders each set bit through the single-flag
+    // function (unknown bits become the hex of that single bit) and joins
+    // with '|'; zero flags render the single-flag rendering of 0 ("0").
+    fn single(bit: i32) -> String {
+        match bit {
+            1 => "FLAG_LOW_LATENCY".to_string(),
+            2 => "FLAG_TRANSLITERATION".to_string(),
+            4 => "FLAG_DEFINITIONS".to_string(),
+            other => format!("{:x}", other as u32),
+        }
+    }
     let mut parts: Vec<String> = Vec::new();
-    if flags & 1 != 0 {
-        parts.push("FLAG_LOW_LATENCY".to_string());
-    }
-    if flags & 2 != 0 {
-        parts.push("FLAG_TRANSLITERATION".to_string());
-    }
-    if flags & 4 != 0 {
-        parts.push("FLAG_DEFINITIONS".to_string());
-    }
-    let unknown = flags & !7;
-    if unknown != 0 {
-        parts.push(format!("{unknown:x}"));
+    for i in 0..32 {
+        let bit = 1i32.checked_shl(i).unwrap_or(0);
+        if bit != 0 && flags & bit != 0 {
+            parts.push(single(bit));
+        }
     }
     if parts.is_empty() {
-        "0".to_string()
+        single(0)
     } else {
         parts.join("|")
     }
@@ -21470,20 +21508,22 @@ fn p57_translation_context_instance(
             }
             ("setActivityId", "(Landroid/app/assist/ActivityId;)Landroid/view/translation/TranslationContext$Builder;") => {
                 p57_check_builder_unused(vm, recv)?;
-                let Some(_) = oarg(args, 0) else {
-                    return Err(npe("activityId"));
-                };
-                let v = args.first().cloned().unwrap();
+                // The generated setter stores the value without any null
+                // validation (the context field itself is @Nullable).
+                let v = args.first().cloned().unwrap_or(Value::Null);
                 put(vm, recv, "mActivityId", v)?;
                 Value::Obj(recv)
             }
             ("build", "()Landroid/view/translation/TranslationContext;") => {
                 p57_check_builder_unused(vm, recv)?;
+                // AOSP marks the builder used before the generated
+                // constructor validates the flags, so a failed build still
+                // consumes the builder.
+                put(vm, recv, "rd_used", Value::Int(1))?;
                 let flags = field_int(vm, recv, "mTranslationFlags");
                 if flags & !7 != 0 {
                     return Err(iae(format!("translation flags invalid: {flags}")));
                 }
-                put(vm, recv, "rd_used", Value::Int(1))?;
                 let out = alloc_obj(vm, P57_TRANSLATION_CONTEXT, Vec::new())?;
                 for f in [
                     "mSourceSpec",
@@ -21664,7 +21704,9 @@ fn p57_translation_manager_instance(
         }
         ("getOnDeviceTranslationCapabilities", "(II)Ljava/util/Set;")
         | ("getTranslationCapabilities", "(II)Ljava/util/Set;") => {
-            Value::Obj(new_collection(vm, "Ljava/util/HashSet;", Vec::new())?)
+            // The no-service/failure path in AOSP returns
+            // Collections.emptySet(), whose mutations throw.
+            vm.invoke_static("Ljava/util/Collections;", "emptySet", "()Ljava/util/Set;", &[])?
         }
         ("addOnDeviceTranslationCapabilityUpdateListener", "(Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V")
         | ("addTranslationCapabilityUpdateListener", "(Ljava/util/concurrent/Executor;Ljava/util/function/Consumer;)V") => {
@@ -21679,7 +21721,7 @@ fn p57_translation_manager_instance(
         ("removeOnDeviceTranslationCapabilityUpdateListener", "(Ljava/util/function/Consumer;)V")
         | ("removeTranslationCapabilityUpdateListener", "(Ljava/util/function/Consumer;)V") => {
             if oarg(args, 0).is_none() {
-                return Err(npe("capability listener should not be null"));
+                return Err(npe("capability callback should not be null"));
             }
             Value::Null
         }
