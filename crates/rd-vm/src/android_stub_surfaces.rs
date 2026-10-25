@@ -42520,8 +42520,19 @@ fn p36c_nsd_info_instance(
             Value::Null
         }
         ("getAttributes", "()Ljava/util/Map;") => {
-            let entries = p57_map_entries(vm, recv, "mTxtRecord");
-            p57_new_map(vm, entries)?
+            // AOSP returns Collections.unmodifiableMap(mTxtRecord): the
+            // guest gets a read-only map whose mutations throw
+            // UnsupportedOperationException, not a mutable copy. The
+            // host Collections view snapshots entries (the documented
+            // VM-wide unmodifiable* deviation), so live-view liveness
+            // across later setAttribute calls is not claimed.
+            let backing = p57_ensure_map(vm, recv, "mTxtRecord")?;
+            vm.invoke_static(
+                "Ljava/util/Collections;",
+                "unmodifiableMap",
+                "(Ljava/util/Map;)Ljava/util/Map;",
+                &[Value::Obj(backing)],
+            )?
         }
         ("getTxtRecord", "()[B") => {
             let bytes = p36c_txt_record_bytes(vm, recv);

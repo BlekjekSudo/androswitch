@@ -16826,6 +16826,108 @@ fn nsd_service_info_txt_records_and_unpublished_service_are_guest_visible() {
         "Ljava/lang/IllegalArgumentException;",
     );
 
+    // Deep audit: AOSP wraps the live map in
+    // Collections.unmodifiableMap, so mutating the returned map throws
+    // instead of silently mutating a copy.
+    let extra_key = text(&mut engine, "extra");
+    assert_throws(
+        engine.invoke_instance(
+            attributes,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            &[extra_key, Value::Null],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
+
+    // Deep audit: the 1300-byte accounting double-counts an overwritten
+    // entry (AOSP sizes the future record from the current size plus
+    // the new entry), and a single key+value pair is capped below 255.
+    let sized = p49_new(&mut engine, P36C_NSD_INFO, "()V", &[]);
+    let k_key = text(&mut engine, "k");
+    let long_value = "v".repeat(254);
+    let long_value = text(&mut engine, &long_value);
+    assert_throws(
+        engine.invoke_instance(
+            sized,
+            "setAttribute",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[k_key, long_value],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    // Five entries of 254 counted bytes each reach 1270 of the 1300
+    // budget (each entry stays under the per-entry 255 cap).
+    for index in 0..5 {
+        let key = format!("k{index}");
+        let key = text(&mut engine, &key);
+        let value = "x".repeat(250);
+        let value = text(&mut engine, &value);
+        call(
+            &mut engine,
+            sized,
+            "setAttribute",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[key, value],
+        );
+    }
+    // Overwriting k0 with a 100-byte value would shrink the record,
+    // but AOSP adds the new entry to the current size without
+    // subtracting the replaced one: 1270 + 104 > 1300, so it throws.
+    let a_key = text(&mut engine, "k0");
+    let small_value = "y".repeat(100);
+    let small_value = text(&mut engine, &small_value);
+    assert_throws(
+        engine.invoke_instance(
+            sized,
+            "setAttribute",
+            "(Ljava/lang/String;Ljava/lang/String;)V",
+            &[a_key, small_value],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Deep audit: a wire record "key=" (equals sign as the last byte)
+    // stores a null value, exactly like a boolean record without '='.
+    let equals_only = p49_new(&mut engine, P36C_NSD_INFO, "()V", &[]);
+    let equals_raw = byte_array(&mut engine, &[4, b'k', b'e', b'y', b'=']);
+    call(
+        &mut engine,
+        equals_only,
+        "setTxtRecords",
+        "([B)V",
+        &[equals_raw],
+    );
+    let equals_attributes = object(call(
+        &mut engine,
+        equals_only,
+        "getAttributes",
+        "()Ljava/util/Map;",
+        &[],
+    ));
+    let key_lookup = text(&mut engine, "key");
+    assert_eq!(
+        call(
+            &mut engine,
+            equals_attributes,
+            "containsKey",
+            "(Ljava/lang/Object;)Z",
+            &[key_lookup],
+        ),
+        Value::Int(1)
+    );
+    let key_lookup = text(&mut engine, "key");
+    assert_eq!(
+        call(
+            &mut engine,
+            equals_attributes,
+            "get",
+            "(Ljava/lang/Object;)Ljava/lang/Object;",
+            &[key_lookup],
+        ),
+        Value::Null
+    );
+
     let parsed = p49_new(&mut engine, P36C_NSD_INFO, "()V", &[]);
     let mut raw = Vec::new();
     raw.extend([12]);
@@ -16999,6 +17101,33 @@ fn nsd_manager_validation_and_listener_bookkeeping_are_guest_visible() {
             &[Value::Obj(info), Value::Obj(resolve_listener)],
         ),
         "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Deep audit: checkListener runs inside putListener after the
+    // type/protocol validation, so a null listener NPEs; registerService
+    // dereferences the service info's port before its null check.
+    let service_type = text(&mut engine, "_http._tcp");
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "discoverServices",
+            "(Ljava/lang/String;ILandroid/net/nsd/NsdManager$DiscoveryListener;)V",
+            &[service_type, Value::Int(1), Value::Null],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "registerService",
+            "(Landroid/net/nsd/NsdServiceInfo;ILandroid/net/nsd/NsdManager$RegistrationListener;)V",
+            &[
+                Value::Null,
+                Value::Int(1),
+                Value::Obj(registration_listener),
+            ],
+        ),
+        "Ljava/lang/NullPointerException;",
     );
 }
 
