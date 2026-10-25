@@ -24,7 +24,10 @@ fn register_platform_classes(b: &mut DexBuilder) {
     b.class("Landroid/widget/Button;", "Landroid/widget/TextView;");
     b.class("Landroid/widget/LinearLayout;", "Landroid/view/ViewGroup;");
     b.class("Landroid/widget/FrameLayout;", "Landroid/view/ViewGroup;");
-    b.class("Landroid/widget/ScrollView;", "Landroid/widget/FrameLayout;");
+    b.class(
+        "Landroid/widget/ScrollView;",
+        "Landroid/widget/FrameLayout;",
+    );
     b.class(
         "Landroid/widget/HorizontalScrollView;",
         "Landroid/widget/FrameLayout;",
@@ -107,7 +110,13 @@ fn scrollview_allows_1000dp_tall_children_and_layout_params() {
                 a(true, "id", AxVal::Ref(id_inner)),
                 a(true, "orientation", AxVal::Int(1)),
                 a(true, "layout_width", AxVal::Int(-1)),
-                a(true, "layout_height", AxVal::Dim { raw: (1000 << 8) | 1 }), // 1000dp = 2000px
+                a(
+                    true,
+                    "layout_height",
+                    AxVal::Dim {
+                        raw: (1000 << 8) | 1,
+                    },
+                ), // 1000dp = 2000px
             ],
             vec![
                 AxNode::new(
@@ -115,7 +124,13 @@ fn scrollview_allows_1000dp_tall_children_and_layout_params() {
                     vec![
                         a(true, "text", AxVal::Str("top".into())),
                         a(true, "layout_width", AxVal::Int(-1)),
-                        a(true, "layout_height", AxVal::Dim { raw: (1000 << 8) | 1 }), // 2000px
+                        a(
+                            true,
+                            "layout_height",
+                            AxVal::Dim {
+                                raw: (1000 << 8) | 1,
+                            },
+                        ), // 2000px
                     ],
                     vec![],
                 ),
@@ -194,7 +209,13 @@ fn horizontal_scrollview_allows_1000dp_wide_child() {
             vec![
                 a(true, "id", AxVal::Ref(id_row)),
                 a(true, "orientation", AxVal::Int(0)),
-                a(true, "layout_width", AxVal::Dim { raw: (1000 << 8) | 1 }), // 1000dp = 2000px
+                a(
+                    true,
+                    "layout_width",
+                    AxVal::Dim {
+                        raw: (1000 << 8) | 1,
+                    },
+                ), // 1000dp = 2000px
                 a(true, "layout_height", AxVal::Int(-1)),
             ],
             vec![AxNode::new(
@@ -322,7 +343,10 @@ fn integer_resource_i32_max_rejected_with_typed_inflate_error() {
             .expect_err("ResolvedValue::Integer(i32::MAX) must fail inflation");
         match err {
             VmExit::Error(rd) => {
-                assert_eq!(rd.code, "INFLATE", "case={case}: expected INFLATE, got {rd:?}");
+                assert_eq!(
+                    rd.code, "INFLATE",
+                    "case={case}: expected INFLATE, got {rd:?}"
+                );
                 assert!(
                     rd.cause.contains("2147483647") && rd.cause.contains("viewport"),
                     "case={case}: cause must mention offending px and cap: {}",
@@ -384,7 +408,13 @@ fn scrollview_still_rejects_dimension_above_anti_overflow_cap() {
             "TextView",
             vec![
                 a(true, "layout_width", AxVal::Int(-1)),
-                a(true, "layout_height", AxVal::Dim { raw: (40_000 << 8) | 1 }),
+                a(
+                    true,
+                    "layout_height",
+                    AxVal::Dim {
+                        raw: (40_000 << 8) | 1,
+                    },
+                ),
             ],
             vec![],
         )],

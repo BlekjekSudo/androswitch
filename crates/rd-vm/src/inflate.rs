@@ -635,7 +635,8 @@ fn inflate_children(
                     caps,
                 )?;
             } else {
-                let view = inflate_element_depth(vm, &included.root, depth + 1, count, context, caps)?;
+                let view =
+                    inflate_element_depth(vm, &included.root, depth + 1, count, context, caps)?;
                 // Os atributos android:* do include sobrescrevem atributos
                 // correspondentes da view raiz incluída (notavelmente id).
                 apply_attrs(vm, view, child, caps)?;
