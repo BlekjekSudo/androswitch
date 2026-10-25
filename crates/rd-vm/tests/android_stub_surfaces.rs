@@ -6824,6 +6824,71 @@ fn fingerprint_absent_service_and_values_are_guest_visible() {
         call(&mut engine, result, "isStrongBiometric", "()Z", &[]),
         Value::Int(1)
     );
+
+    // The three-argument Fingerprint constructor leaves the group id at
+    // its field default, identifier setters mutate in place.
+    let plain_name = text(&mut engine, "left thumb");
+    let plain = p49_new(
+        &mut engine,
+        "Landroid/hardware/fingerprint/Fingerprint;",
+        "(Ljava/lang/CharSequence;IJ)V",
+        &[plain_name, Value::Int(5), Value::Long(6)],
+    );
+    assert_eq!(
+        call(&mut engine, plain, "getGroupId", "()I", &[]),
+        Value::Int(0)
+    );
+    let renamed = text(&mut engine, "renamed");
+    call(
+        &mut engine,
+        plain,
+        "setName",
+        "(Ljava/lang/CharSequence;)V",
+        std::slice::from_ref(&renamed),
+    );
+    call(
+        &mut engine,
+        plain,
+        "setDeviceId",
+        "(J)V",
+        &[Value::Long(77)],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            plain,
+            "getName",
+            "()Ljava/lang/CharSequence;",
+            &[]
+        ),
+        "renamed"
+    );
+    assert_eq!(
+        call(&mut engine, plain, "getDeviceId", "()J", &[]),
+        Value::Long(77)
+    );
+    // AOSP's CryptoObject constructors store the wrapper unchecked, so a
+    // null cipher yields null typed getters and opId 0, not an exception.
+    let null_crypto = p49_new(
+        &mut engine,
+        "Landroid/hardware/fingerprint/FingerprintManager$CryptoObject;",
+        "(Ljavax/crypto/Cipher;)V",
+        &[Value::Null],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            null_crypto,
+            "getCipher",
+            "()Ljavax/crypto/Cipher;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(&mut engine, null_crypto, "getOpId", "()J", &[]),
+        Value::Long(0)
+    );
 }
 
 #[test]
