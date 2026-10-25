@@ -9626,6 +9626,43 @@ fn wallpaper_engine_unattached_state_and_defaults_are_guest_visible() {
     call(
         &mut engine,
         wallpaper,
+        "setZoom",
+        "(F)V",
+        &[Value::Float(0.0)],
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "getZoom", "()F", &[]),
+        Value::Float(0.0),
+        "ambient setZoom(0) silently resets the previous zoom"
+    );
+    call(
+        &mut engine,
+        wallpaper,
+        "setZoom",
+        "(F)V",
+        &[Value::Float(0.5)],
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "getZoom", "()F", &[]),
+        Value::Float(0.5)
+    );
+    assert_eq!(
+        call(&mut engine, wallpaper, "shouldZoomOutWallpaper", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            wallpaper,
+            "shouldWaitForEngineShown",
+            "()Z",
+            &[]
+        ),
+        Value::Int(0)
+    );
+    call(
+        &mut engine,
+        wallpaper,
         "onCreate",
         "(Landroid/view/SurfaceHolder;)V",
         std::slice::from_ref(&holder),
