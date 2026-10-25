@@ -229,6 +229,14 @@ pub fn package_manager(vm: &mut Engine) -> Result<Value, VmExit> {
     Ok(Value::Obj(alloc(vm, APM, Vec::new())?))
 }
 
+/// `Context.getApplicationInfo()` — the SHORT route (AOSP: same
+/// ApplicationInfo the PackageManager would hand back for the own package;
+/// LadderActivity and friends call it directly on the Context, without going
+/// through getPackageManager()).
+pub(crate) fn context_app_info(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    app_info(vm)
+}
+
 pub fn instance_intrinsic(
     vm: &mut Engine,
     recv_class: &str,

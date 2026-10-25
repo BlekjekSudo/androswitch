@@ -1575,6 +1575,12 @@ fn do_invoke(
         {
             return Ok(v);
         }
+        // Apêndice E (Google Play Services / Firebase, modo "sem GMS"
+        // honesto): só responde por classes GMS/Firebase/Billing, antes do
+        // host `Landroid` genérico — `None` continua para DEX.
+        if let Some(v) = crate::gms::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
+            return Ok(v);
+        }
         // M3: classes android/* são HOST (framework.rs) — nunca estão no DEX
         if mref.class.starts_with("Landroid/") {
             return match crate::framework::call_host_static(
@@ -1714,6 +1720,14 @@ fn do_invoke(
     // startup, biometria, futures) — `None` mantém o DEX real da lib.
     if let Some(v) =
         crate::androidx::call_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+    {
+        return Ok(v);
+    }
+    // Apêndice E: objetos seguidos pelo shim GMS/Firebase e classes
+    // `Lcom/google/android/gms/`, `Lcom/google/firebase/`,
+    // `Lcom/android/billingclient/` — `None` continua para o host/DEX.
+    if let Some(v) =
+        crate::gms::call_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
     {
         return Ok(v);
     }

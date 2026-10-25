@@ -3449,6 +3449,21 @@ Stage Summary:
 - Commit "fix(vm): resolve Activity.getAssets() with a real AssetManager host" sobre 8e15e67 (main pós-#203; rebase limpo de adb6eaf — #203 só tocou README/ROADMAP/appendix-c-literal, zero conflito), 6 arquivos, +668/−5: android_res.rs (host completo), classpath.rs (hierarquia), tests/android_assets.rs (10 regressões), api-coverage.toml + api-coverage.md (Apêndice C).
 - Patch format-patch (42176 bytes) publicado em paste.rs e entregue ao PR-Agent no tempchat 8873 com sha256/tree/base conferidos por download de verificação — push + PR por conta dele (token do dono).
 - Sem unsafe; sem mudança em Sentinel/CI/baselines; nenhuma API enfraquecida (Lei nº 1 preservada: erros tipados, nunca silêncio). Expectativa: 12/12 APKs do sdk-ladder passam do readRungsAsset() — validação real pendente no runner do APK-Tester (não executada aqui; APKs do ladder não estão neste sandbox).
+
+---
+Task ID: B-3 (tempchat coordenação 8873)
+Agent: B-Agent
+Task: follow-up da cascata do ladder (PR #205): Context.getApplicationInfo() — LadderActivity linha 96 chama a rota CURTA direto no Context (NOT_FOUND era o próximo gap após o getAssets curado em 12/12)
+
+Work Log:
+- Validação real confirmada pelo PR-Agent na página do #205: com o patch getAssets, os 12/12 ladder APKs passam do readRungsAsset e logam I/LADDER/minsdkNN; morrem em LadderActivity->getApplicationInfo() (NOT_FOUND). getFilesDir (jfile.rs:207) e getPackageManager().getPackageInfo (android_pm.rs) já existiam — só faltava a rota curta.
+- android_pm.rs: app_info exposto como pub(crate) context_app_info (o AOSP devolve a MESMA ApplicationInfo do próprio pacote pelas duas rotas).
+- android_res.rs: "getApplicationInfo" adicionado à Context family (lista + match com sig exato ()Landroid/content/pm/ApplicationInfo;) delegando para android_pm; doc do módulo atualizado.
+- +2 regressões em tests/android_assets.rs: context_get_application_info_serves_manifest_facts (classe/packageName/campos int minSdk-target-uid-enabled; rota curta ≡ rota longa PM com minSdkVersion igual; não-Context retorna None) e application_info_serves_every_context_receiver (Activity/Application/Service/ContextWrapper).
+- Gates (base = head do PR #205 f326093): fmt ✅; clippy -D warnings ✅; test --workspace 892/0 (+2) ✅; check --all-features --locked ✅.
+
+Stage Summary:
+- Commit na branch followup/context-get-application-info (empilha no PR #205 — mesmos arquivos); patch incremental publicado para o PR-Agent pushar na branch do PR (2º commit), fechando o follow-up anunciado no corpo do #205.
 Task ID: B-2 (tempchat coordenação 8873)
 Agent: B-Agent
 Task: fix(registry) — 3 gaps do detector documentados pelo APK-Tester (engines 16/22/32): tauri não dispara na build real; Defold emite libdmengine.so mas o registro esperava libdefold.so; twa-pwa sem asset_statements

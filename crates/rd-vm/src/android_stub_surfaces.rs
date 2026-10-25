@@ -23610,6 +23610,9 @@ fn p57_print_builder_instance(
                 return Err(npe("mediaSize"));
             };
             put(vm, recv, "mMediaSize", args[0].clone())?;
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                put(vm, existing, "mMediaSize", args[0].clone())?;
+            }
             Value::Obj(recv)
         }
         (
@@ -23620,6 +23623,9 @@ fn p57_print_builder_instance(
                 return Err(npe("resolution"));
             };
             put(vm, recv, "mResolution", args[0].clone())?;
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                put(vm, existing, "mResolution", args[0].clone())?;
+            }
             Value::Obj(recv)
         }
         (
@@ -23630,6 +23636,9 @@ fn p57_print_builder_instance(
                 return Err(npe("margins"));
             };
             put(vm, recv, "mMinMargins", args[0].clone())?;
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                put(vm, existing, "mMinMargins", args[0].clone())?;
+            }
             Value::Obj(recv)
         }
         ("setColorMode", "(I)Landroid/print/PrintAttributes$Builder;") => {
@@ -23638,6 +23647,9 @@ fn p57_print_builder_instance(
                 return Err(iae(format!("invalid color mode: {mode}")));
             }
             put(vm, recv, "mColorMode", Value::Int(mode))?;
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                put(vm, existing, "mColorMode", Value::Int(mode))?;
+            }
             Value::Obj(recv)
         }
         ("setDuplexMode", "(I)Landroid/print/PrintAttributes$Builder;") => {
@@ -23646,6 +23658,9 @@ fn p57_print_builder_instance(
                 return Err(iae(format!("invalid duplex mode: {mode}")));
             }
             put(vm, recv, "mDuplexMode", Value::Int(mode))?;
+            if let Some(existing) = field_obj(vm, recv, "rd_attributes") {
+                put(vm, existing, "mDuplexMode", Value::Int(mode))?;
+            }
             Value::Obj(recv)
         }
         ("build", "()Landroid/print/PrintAttributes;") => {
@@ -24127,10 +24142,12 @@ fn p57_keygen_instance(
             ("getUid", "()I") => match field_int(vm, recv, "mNamespace") {
                 -1 => Value::Int(-1),
                 102 => Value::Int(1010),
-                ns => {
-                    return Err(iae(format!(
-                        "No UID corresponding to namespace {ns}"
-                    )))
+                _ => {
+                    // AOSP catches KeyProperties' IllegalArgumentException and
+                    // rethrows it as an IllegalStateException here.
+                    return Err(ise(
+                        "getUid called on KeyGenParameterSpec with non legacy keystore namespace.",
+                    ));
                 }
             },
             ("getNamespace", "()I") => Value::Int(field_int(vm, recv, "mNamespace")),
@@ -24457,7 +24474,7 @@ fn p57_keygen_instance(
                 self_value
             } else {
                 return Err(iae(
-                    "maxUsageCount must be either UNRESTRICTED_USAGE_COUNT or a positive value",
+                    "maxUsageCount is not valid",
                 ));
             }
         }
@@ -24838,9 +24855,7 @@ fn p57_key_protection_instance(
                 put(vm, recv, "mMaxUsageCount", Value::Int(count))?;
                 self_value
             } else {
-                return Err(iae(
-                    "maxUsageCount must be either UNRESTRICTED_USAGE_COUNT or a positive value",
-                ));
+                return Err(iae("maxUsageCount is not valid"));
             }
         }
         ("setRollbackResistant", "(Z)Landroid/security/keystore/KeyProtection$Builder;") => {
@@ -48618,8 +48633,15 @@ fn p36f_pdf_document_instance(
             Value::Null
         }
         ("getPages", "()Ljava/util/List;") => {
-            // Snapshot of AOSP's unmodifiable view over mPages.
-            p49_list_value(vm, p36f_pdf_finished_pages(vm, recv))?
+            // AOSP returns Collections.unmodifiableList(mPages); the host
+            // snapshot keeps the UOE-on-mutation contract.
+            let snapshot = p49_list_value(vm, p36f_pdf_finished_pages(vm, recv))?;
+            vm.invoke_static(
+                "Ljava/util/Collections;",
+                "unmodifiableList",
+                "(Ljava/util/List;)Ljava/util/List;",
+                &[snapshot],
+            )?
         }
         ("close", "()V") => {
             p36f_pdf_throw_if_current(vm, recv)?;
@@ -50145,6 +50167,10 @@ fn p36g_freeze_period_instance(
         ("<init>", "(Ljava/time/MonthDay;Ljava/time/MonthDay;)V") => {
             let (sm, sd) = p36g_month_day_parts(vm, &p36a_value(args, 0))?;
             let (em, ed) = p36g_month_day_parts(vm, &p36a_value(args, 1))?;
+            // AOSP derives the day-of-year from MonthDay.atYear(2001);
+            // 2001 is not a leap year, so February 29 resolves to the 28th.
+            let sd = if sm == 2 && sd == 29 { 28 } else { sd };
+            let ed = if em == 2 && ed == 29 { 28 } else { ed };
             put(vm, recv, "mStart", p36a_value(args, 0))?;
             put(vm, recv, "mEnd", p36a_value(args, 1))?;
             put(
@@ -51907,12 +51933,12 @@ fn p36h_proposal_builder(
         "addEncryptionAlgorithm" => {
             let algorithm = iarg(args, 0);
             let key_length = iarg(args, 1);
-            if is_child && !P36H_CHILD_ENCR_IDS.contains(&algorithm) {
-                return Err(iae(format!(
-                    "Encryption algorithm not supported for Child SA: {algorithm}"
-                )));
-            }
+            // AOSP validates the transform (algorithm id + key length)
+            // before applying the Child SA supported-algorithm filter.
             p36h_validate_encryption(algorithm, key_length)?;
+            if is_child && !P36H_CHILD_ENCR_IDS.contains(&algorithm) {
+                return Err(iae(format!("Unsupported encryption algorithm {algorithm}")));
+            }
             let is_aead = p36h_is_aead(algorithm);
             let has_aead = field_int(vm, recv, "rd_has_aead");
             if has_aead != -1 && (has_aead == 1) != is_aead {
