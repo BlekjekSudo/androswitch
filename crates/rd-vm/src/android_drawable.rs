@@ -120,13 +120,14 @@ fn state_matches(spec: &[i32], state: &[i32]) -> bool {
 }
 
 fn csl_default(states: &[Vec<i32>], colors: &[i32]) -> i32 {
-    // AOSP: the colour of the first empty (wildcard) spec, else colors[0]
+    // AOSP onColorsChanged: colors[0], overridden by the LAST empty
+    // (wildcard) spec; an empty list defaults to Color.RED.
     states
         .iter()
-        .position(|s| s.is_empty())
+        .rposition(|s| s.is_empty())
         .and_then(|i| colors.get(i).copied())
         .or_else(|| colors.first().copied())
-        .unwrap_or(0xFF00_0000u32 as i32)
+        .unwrap_or(0xFFFF_0000u32 as i32)
 }
 
 fn color_state_list(
@@ -290,10 +291,22 @@ pub fn instance_intrinsic(
             put(vm, recv, "rd_alpha", Value::Int(255))?;
             put(vm, recv, "rd_visible", Value::Int(1))?;
             if kind.ends_with("ColorDrawable;") {
-                put(vm, recv, "rd_color", Value::Int(int(args, 0)))?;
+                // rd_color mirrors mUseColor, rd_base mBaseColor.
+                let c = Value::Int(int(args, 0));
+                put(vm, recv, "rd_color", c.clone())?;
+                put(vm, recv, "rd_base", c)?;
             }
             if kind.ends_with("RippleDrawable;") {
-                if let Some(c) = obj(0) {
+                if sig.starts_with("(Landroid/content/res/ColorStateList;") {
+                    match obj(0) {
+                        Some(c) => put(vm, recv, "rd_csl", Value::Obj(c))?,
+                        None => {
+                            return Err(crate::android_sysservices::iae(
+                                "RippleDrawable requires a non-null color",
+                            ))
+                        }
+                    }
+                } else if let Some(c) = obj(0) {
                     put(vm, recv, "rd_csl", Value::Obj(c))?;
                 }
                 put(vm, recv, "rd_radius", Value::Int(-1))?;
@@ -377,10 +390,31 @@ pub fn instance_intrinsic(
         }
         ("getLevel", _) => Value::Int(geti(vm, recv, "rd_level", 0)),
         ("setAlpha", _) => {
-            put(vm, recv, "rd_alpha", Value::Int(int(args, 0) & 0xFF))?;
+            if kind.ends_with("ColorDrawable;") {
+                // AOSP modulates mBaseColor's alpha into mUseColor:
+                // alpha += alpha >> 7 (0..256), use = base * a >> 8.
+                // Keep the whole calculation in Java's wrapping i32
+                // arithmetic so out-of-contract values cannot panic.
+                let a = int(args, 0);
+                let a = a.wrapping_add(a >> 7);
+                let base = geti(vm, recv, "rd_base", geti(vm, recv, "rd_color", 0)) as u32;
+                let base_alpha = (base >> 24) as i32;
+                let use_alpha = base_alpha.wrapping_mul(a) >> 8;
+                let use_color = (base & 0x00FF_FFFF) | ((use_alpha as u32) << 24);
+                put(vm, recv, "rd_color", Value::Int(use_color as i32))?;
+            } else {
+                put(vm, recv, "rd_alpha", Value::Int(int(args, 0) & 0xFF))?;
+            }
             Value::Null
         }
-        ("getAlpha", _) => Value::Int(geti(vm, recv, "rd_alpha", 255)),
+        ("getAlpha", _) => {
+            if kind.ends_with("ColorDrawable;") {
+                // The combined (used) color's alpha, not the setter value.
+                Value::Int((geti(vm, recv, "rd_color", 0) as u32 >> 24) as i32)
+            } else {
+                Value::Int(geti(vm, recv, "rd_alpha", 255))
+            }
+        }
         ("setColorFilter" | "setTintList" | "setTintMode" | "setTintBlendMode" | "setTint", _) => {
             put(
                 vm,
@@ -414,7 +448,25 @@ pub fn instance_intrinsic(
         ("getLayoutDirection", _) => Value::Int(0),
         ("getIntrinsicWidth" | "getIntrinsicHeight", _) => Value::Int(-1),
         ("getMinimumWidth" | "getMinimumHeight", _) => Value::Int(0),
-        ("getOpacity", _) => Value::Int(-3), // PixelFormat.TRANSLUCENT
+        ("getOpacity", _) => {
+            if kind.ends_with("ColorDrawable;") {
+                if !matches!(
+                    vm.heap.get_field(recv, "rd_setColorFilter"),
+                    Ok(Value::Null)
+                ) && vm.heap.get_field(recv, "rd_setColorFilter").is_ok()
+                {
+                    Value::Int(-3) // TRANSLUCENT behind a colour filter
+                } else {
+                    match geti(vm, recv, "rd_color", 0) as u32 >> 24 {
+                        255 => Value::Int(-1), // PixelFormat.OPAQUE
+                        0 => Value::Int(-2),   // PixelFormat.TRANSPARENT
+                        _ => Value::Int(-3),
+                    }
+                }
+            } else {
+                Value::Int(-3) // PixelFormat.TRANSLUCENT
+            }
+        }
         ("getPadding", _) => Value::Int(0),
         ("getChangingConfigurations", _) => Value::Int(0),
         ("mutate", _) => Value::Obj(recv),
@@ -423,11 +475,18 @@ pub fn instance_intrinsic(
         // ColorDrawable
         ("getColor", _) => Value::Int(geti(vm, recv, "rd_color", 0)),
         ("setColor", "(I)V") => {
-            put(vm, recv, "rd_color", Value::Int(int(args, 0)))?;
+            let c = Value::Int(int(args, 0));
+            put(vm, recv, "rd_color", c.clone())?;
+            if kind.ends_with("ColorDrawable;") {
+                put(vm, recv, "rd_base", c)?;
+            }
             Value::Null
         }
         // RippleDrawable
         ("setColor", _) => {
+            if kind.ends_with("RippleDrawable;") && obj(0).is_none() {
+                return Err(crate::android_sysservices::iae("color cannot be null"));
+            }
             put(
                 vm,
                 recv,
