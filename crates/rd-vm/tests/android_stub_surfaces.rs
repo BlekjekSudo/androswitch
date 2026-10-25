@@ -21653,3 +21653,489 @@ fn telecom_values_and_no_service_manager_are_guest_visible() {
         ""
     );
 }
+
+#[test]
+fn batch36i_source_audit_edge_semantics_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+
+    // CallAudioState: equals and the copy constructor use the
+    // ROUTE_STREAMING-adjusted supportedRouteMask (AOSP getSupportedRouteMask).
+    let streaming_wide = p49_new(
+        &mut engine,
+        P36I_AUDIO_STATE,
+        "(ZII)V",
+        &[Value::Int(0), Value::Int(16), Value::Int(31)],
+    );
+    let streaming_narrow = p49_new(
+        &mut engine,
+        P36I_AUDIO_STATE,
+        "(ZII)V",
+        &[Value::Int(0), Value::Int(16), Value::Int(16)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            streaming_wide,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(streaming_narrow)]
+        ),
+        Value::Int(1)
+    );
+    let streaming_copy = p49_new(
+        &mut engine,
+        P36I_AUDIO_STATE,
+        "(Landroid/telecom/CallAudioState;)V",
+        &[Value::Obj(streaming_wide)],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            streaming_copy,
+            "getSupportedRouteMask",
+            "()I",
+            &[]
+        ),
+        Value::Int(16)
+    );
+    // The 5-argument @TestApi constructor stores explicit bluetooth state.
+    let no_devices = call_static(
+        &mut engine,
+        "Ljava/util/Collections;",
+        "emptyList",
+        "()Ljava/util/List;",
+        &[],
+    );
+    let five_arg = p49_new(
+        &mut engine,
+        P36I_AUDIO_STATE,
+        "(ZIILandroid/bluetooth/BluetoothDevice;Ljava/util/Collection;)V",
+        &[
+            Value::Int(1),
+            Value::Int(2),
+            Value::Int(3),
+            Value::Null,
+            no_devices,
+        ],
+    );
+    assert_eq!(
+        call(&mut engine, five_arg, "isMuted", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, five_arg, "getSupportedRouteMask", "()I", &[]),
+        Value::Int(3)
+    );
+
+    // VideoProfile.isVideo + ServiceState network-type getters.
+    assert_eq!(
+        call_static(&mut engine, P36I_VIDEO, "isVideo", "(I)Z", &[Value::Int(4)]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call_static(&mut engine, P36I_VIDEO, "isVideo", "(I)Z", &[Value::Int(2)]),
+        Value::Int(1)
+    );
+    let state = p49_new(&mut engine, P36I_SERVICE_STATE, "()V", &[]);
+    assert_eq!(
+        call(&mut engine, state, "getDataNetworkType", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, state, "getRilVoiceRadioTechnology", "()I", &[]),
+        Value::Int(0)
+    );
+
+    // PhoneAccount: capability predicates, enabled mutation, equality, and
+    // the AOSP builder/account list aliasing.
+    let component = p36i_component(&mut engine, "com.example.voip", "com.example.voip.Svc");
+    let user = instance(&mut engine, "Landroid/os/UserHandle;");
+    let id = text(&mut engine, "acc-9");
+    let handle = p49_new(
+        &mut engine,
+        P36I_HANDLE,
+        "(Landroid/content/ComponentName;Ljava/lang/String;Landroid/os/UserHandle;)V",
+        &[Value::Obj(component), id, Value::Obj(user)],
+    );
+    let label = text(&mut engine, "VoIP");
+    let builder = p49_new(
+        &mut engine,
+        P36I_ACCOUNT_BUILDER,
+        "(Landroid/telecom/PhoneAccountHandle;Ljava/lang/CharSequence;)V",
+        &[Value::Obj(handle), label],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setCapabilities",
+        "(I)Landroid/telecom/PhoneAccount$Builder;",
+        &[Value::Int(0x802)],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setIsEnabled",
+        "(Z)Landroid/telecom/PhoneAccount$Builder;",
+        &[Value::Int(1)],
+    );
+    let account = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/telecom/PhoneAccount;",
+        &[],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            account,
+            "hasCapabilities",
+            "(I)Z",
+            &[Value::Int(0x800)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            account,
+            "hasCapabilities",
+            "(I)Z",
+            &[Value::Int(0x1)]
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, account, "isSelfManaged", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, account, "isEnabled", "()Z", &[]),
+        Value::Int(1)
+    );
+    call(
+        &mut engine,
+        account,
+        "setIsEnabled",
+        "(Z)V",
+        &[Value::Int(0)],
+    );
+    assert_eq!(
+        call(&mut engine, account, "isEnabled", "()Z", &[]),
+        Value::Int(0)
+    );
+    // build() aliases the builder's scheme list (AOSP behaviour): adding a
+    // scheme to the builder afterwards becomes visible on the account.
+    let sip = text(&mut engine, "sip");
+    call(
+        &mut engine,
+        builder,
+        "addSupportedUriScheme",
+        "(Ljava/lang/String;)Landroid/telecom/PhoneAccount$Builder;",
+        &[sip],
+    );
+    let sip2 = text(&mut engine, "sip");
+    assert_eq!(
+        call(
+            &mut engine,
+            account,
+            "supportsUriScheme",
+            "(Ljava/lang/String;)Z",
+            &[sip2]
+        ),
+        Value::Int(1)
+    );
+    let rebuilt_builder = object(call(
+        &mut engine,
+        account,
+        "toBuilder",
+        "()Landroid/telecom/PhoneAccount$Builder;",
+        &[],
+    ));
+    let rebuilt = object(call(
+        &mut engine,
+        rebuilt_builder,
+        "build",
+        "()Landroid/telecom/PhoneAccount;",
+        &[],
+    ));
+    assert_eq!(
+        call(
+            &mut engine,
+            account,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(rebuilt)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, account, "hashCode", "()I", &[]),
+        call(&mut engine, rebuilt, "hashCode", "()I", &[])
+    );
+
+    // StatusHints equality + hash sum.
+    let label1 = text(&mut engine, "Ringing");
+    let hints1 = p49_new(
+        &mut engine,
+        P36I_HINTS,
+        "(Ljava/lang/CharSequence;Landroid/graphics/drawable/Icon;Landroid/os/Bundle;)V",
+        &[label1, Value::Null, Value::Null],
+    );
+    let label2 = text(&mut engine, "Ringing");
+    let hints2 = p49_new(
+        &mut engine,
+        P36I_HINTS,
+        "(Ljava/lang/CharSequence;Landroid/graphics/drawable/Icon;Landroid/os/Bundle;)V",
+        &[label2, Value::Null, Value::Null],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            hints1,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(hints2)]
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, hints1, "hashCode", "()I", &[]),
+        call(&mut engine, hints2, "hashCode", "()I", &[])
+    );
+
+    // PhoneNumberUtils BCD codec, including MMI plus placement.
+    let encode = |engine: &mut Engine, number: &str| {
+        let value = text(engine, number);
+        call_static(
+            engine,
+            P36I_PHONE_UTILS,
+            "numberToCalledPartyBCD",
+            "(Ljava/lang/String;)[B",
+            &[value],
+        )
+    };
+    let intl = encode(&mut engine, "+1555010");
+    assert_eq!(
+        byte_array_values(&engine, &intl),
+        vec![0x91u8, 0x51, 0x55, 0x10, 0xF0]
+    );
+    let decode = |engine: &mut Engine, bytes: Value, len: i32| {
+        call_static_text(
+            engine,
+            P36I_PHONE_UTILS,
+            "calledPartyBCDToString",
+            "([BII)Ljava/lang/String;",
+            &[bytes, Value::Int(0), Value::Int(len)],
+        )
+    };
+    assert_eq!(decode(&mut engine, intl.clone(), 5), "+1555010");
+    let local = encode(&mut engine, "555");
+    assert_eq!(byte_array_values(&engine, &local), vec![0x81u8, 0x55, 0xF5]);
+    assert_eq!(decode(&mut engine, local, 3), "555");
+    let mmi = encode(&mut engine, "+*31#123");
+    let mmi_len = byte_array_values(&engine, &mmi).len() as i32;
+    assert_eq!(decode(&mut engine, mmi, mmi_len), "*31#+123");
+    let oddball = encode(&mut engine, "+**21#");
+    let odd_len = byte_array_values(&engine, &oddball).len() as i32;
+    assert_eq!(decode(&mut engine, oddball, odd_len), "**21#+");
+    assert_eq!(decode(&mut engine, intl, 1), "");
+    let fragment_bytes = byte_array(&mut engine, &[0x21]);
+    assert_eq!(
+        call_static_text(
+            &mut engine,
+            P36I_PHONE_UTILS,
+            "calledPartyBCDFragmentToString",
+            "([BII)Ljava/lang/String;",
+            &[fragment_bytes, Value::Int(0), Value::Int(1)]
+        ),
+        "12"
+    );
+    let empty_number = text(&mut engine, "+");
+    assert_eq!(
+        call_static(
+            &mut engine,
+            P36I_PHONE_UTILS,
+            "numberToCalledPartyBCD",
+            "(Ljava/lang/String;)[B",
+            &[empty_number]
+        ),
+        Value::Null
+    );
+    let bad_char = text(&mut engine, "12a");
+    assert_throws(
+        engine.invoke_static(
+            P36I_PHONE_UTILS,
+            "numberToCalledPartyBCD",
+            "(Ljava/lang/String;)[B",
+            &[bad_char],
+        ),
+        "Ljava/lang/RuntimeException;",
+    );
+    // networkPortionToCalledPartyBCD strips separators/post-dial first.
+    let messy = text(&mut engine, "+1 (555) 010,99");
+    let network_bcd = call_static(
+        &mut engine,
+        P36I_PHONE_UTILS,
+        "networkPortionToCalledPartyBCD",
+        "(Ljava/lang/String;)[B",
+        &[messy],
+    );
+    let network_len = byte_array_values(&engine, &network_bcd).len() as i32;
+    assert_eq!(decode(&mut engine, network_bcd, network_len), "+1555010");
+}
+
+#[test]
+fn batch36i_manager_no_service_lists_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let sm = p36i_system_service(&mut engine, "telephony_subscription_service");
+    let ids = call(&mut engine, sm, "getActiveSubscriptionIdList", "()[I", &[]);
+    assert_eq!(array_values(&engine, &ids).len(), 0);
+    let all = call(
+        &mut engine,
+        sm,
+        "getAllSubscriptionInfoList",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, all), Value::Int(0));
+    assert_eq!(
+        call(
+            &mut engine,
+            sm,
+            "getAvailableSubscriptionInfoList",
+            "()Ljava/util/List;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            sm,
+            "getAccessibleSubscriptionInfoList",
+            "()Ljava/util/List;",
+            &[]
+        ),
+        Value::Null
+    );
+
+    let telecom = p36i_system_service(&mut engine, "telecom");
+    let capable = call(
+        &mut engine,
+        telecom,
+        "getCallCapablePhoneAccounts",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, capable), Value::Int(0));
+    let all_accounts = call(
+        &mut engine,
+        telecom,
+        "getAllPhoneAccounts",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36h_size(&mut engine, all_accounts), Value::Int(0));
+    assert_eq!(
+        call(&mut engine, telecom, "getAllPhoneAccountsCount", "()I", &[]),
+        Value::Int(0)
+    );
+    // getPhoneAccountsForPackage is the odd one out in AOSP: null, not empty.
+    assert_eq!(
+        call(
+            &mut engine,
+            telecom,
+            "getPhoneAccountsForPackage",
+            "()Ljava/util/List;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            telecom,
+            "getUserSelectedOutgoingPhoneAccount",
+            "()Landroid/telecom/PhoneAccountHandle;",
+            &[]
+        ),
+        Value::Null
+    );
+    assert_eq!(
+        call(&mut engine, telecom, "getCurrentTtyMode", "()I", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, telecom, "isTtySupported", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_throws(
+        engine.invoke_instance(
+            telecom,
+            "getOwnSelfManagedPhoneAccounts",
+            "()Ljava/util/List;",
+            &[],
+        ),
+        "Ljava/lang/IllegalStateException;",
+    );
+}
+
+#[test]
+fn gateway_info_value_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let pkg = text(&mut engine, "com.example.gateway");
+    let gateway = p36i_uri(&mut engine, "sip:gateway@example.com");
+    let original = p36i_uri(&mut engine, "tel:+1555010");
+    let info = p49_new(
+        &mut engine,
+        "Landroid/telecom/GatewayInfo;",
+        "(Ljava/lang/String;Landroid/net/Uri;Landroid/net/Uri;)V",
+        &[pkg, gateway.clone(), original.clone()],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            info,
+            "getGatewayProviderPackageName",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "com.example.gateway"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            info,
+            "getGatewayAddress",
+            "()Landroid/net/Uri;",
+            &[]
+        ),
+        gateway
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            info,
+            "getOriginalAddress",
+            "()Landroid/net/Uri;",
+            &[]
+        ),
+        original
+    );
+    assert_eq!(
+        call(&mut engine, info, "isEmpty", "()Z", &[]),
+        Value::Int(0)
+    );
+    let empty_pkg = text(&mut engine, "");
+    let empty_info = p49_new(
+        &mut engine,
+        "Landroid/telecom/GatewayInfo;",
+        "(Ljava/lang/String;Landroid/net/Uri;Landroid/net/Uri;)V",
+        &[empty_pkg, gateway, Value::Null],
+    );
+    assert_eq!(
+        call(&mut engine, empty_info, "isEmpty", "()Z", &[]),
+        Value::Int(1)
+    );
+}

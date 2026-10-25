@@ -2174,7 +2174,8 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/telecom/CallAudioState;"
         | "Landroid/telecom/VideoProfile;"
         | "Landroid/telecom/VideoProfile$CameraCapabilities;"
-        | "Landroid/telecom/StatusHints;" => Some(OBJECT),
+        | "Landroid/telecom/StatusHints;"
+        | "Landroid/telecom/GatewayInfo;" => Some(OBJECT),
         _ => None,
     }
 }
@@ -2845,7 +2846,8 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         | "Landroid/telecom/CallAudioState;"
         | "Landroid/telecom/VideoProfile;"
         | "Landroid/telecom/VideoProfile$CameraCapabilities;"
-        | "Landroid/telecom/StatusHints;" => Some(&["Landroid/os/Parcelable;"]),
+        | "Landroid/telecom/StatusHints;"
+        | "Landroid/telecom/GatewayInfo;" => Some(&["Landroid/os/Parcelable;"]),
         _ => None,
     }
 }
