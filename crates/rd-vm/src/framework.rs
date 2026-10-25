@@ -1009,6 +1009,10 @@ pub struct HostState {
     /// work Data, navegação, startup, biometria, futures. Dentro do
     /// HostState para ser GC-root automaticamente via Debug (gc.rs).
     pub androidx: crate::androidx::AndroidxState,
+    /// Estado do Apêndice E (Google Play Services / Firebase, modo "sem
+    /// GMS" honesto): `crates/rd-vm/src/gms.rs`. Enraizado pelo GC via o
+    /// mesmo render Debug que cobre todo o `HostState`.
+    pub gms: crate::gms::GmsState,
 }
 
 /// M8 (31º gap): fragment registrada por um commit de FragmentTransaction.
