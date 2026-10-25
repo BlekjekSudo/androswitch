@@ -87,7 +87,7 @@ pub fn scan(package: &str, dexes: &[rd_dex::Dex]) -> ApiUsage {
             methods
                 .entry(cls)
                 .or_default()
-                .insert(dex.strings.get_or_empty(m.name_idx).to_string());
+                .insert(dex.string(m.name_idx).to_string());
         }
         // referências de campo implicam o tipo (ex.: android.os.Build.VERSION)
         for f in &dex.field_ids {
