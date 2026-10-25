@@ -282,6 +282,16 @@ Sentinel run
 [`39930840914`](https://github.com/nadabgfccvd/RustyDroid/actions/runs/39930840914)
 passed complete with no findings.
 
+**Update 2026-10-25 — deep-audit series.** After Rounds 1–10, two deep-audit
+series re-checked the modeled subset of individual surfaces line by line
+against AOSP and fixed real divergences (e.g. `TileService.onBind`,
+`MtpObjectInfo` int getters, `EuiccManager` ordering, the legacy `NfcAdapter`
+singleton, MBMS `DownloadRequest.Builder.setAppIntent` assignment order):
+[PR #196](https://github.com/nadabgfccvd/RustyDroid/pull/196) (merge `73b5685`)
+and [PR #200](https://github.com/nadabgfccvd/RustyDroid/pull/200) (merge
+`80963fd`, cellbroadcast + mbms). A deep audit confirms the documented subset
+only; it does **not** promote a surface past `partial`.
+
 That publication status does not change the completion bar: every surface
 named below remains at the status recorded in `data/api-coverage.toml`
 until its whole-package blockers are closed.

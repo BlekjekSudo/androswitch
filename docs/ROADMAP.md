@@ -18,7 +18,7 @@
 | M8 | Compat real | app OSS médio navega funcional; v0.9 | ✅ **implementado (2026-10)** |
 | M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ✅ **implementado e revisado (2026-10)** — 5 APKs reais × 3 ABIs com chamadas JNI verificadas; aprovação humana registrada em 2026-10-21 |
 | M10 | Dispositivos virtuais | câmera/GPS/biometria programáveis pelo agente | ⬜ |
-| M11 | Engines | Flutter → RN → Mono → wasm: 1 app de cada em golden flow | ⬜ |
+| M11 | Engines | WASM → RN → Mono → Flutter (ordem do [ADR 013](adr/013-m11-engine-execution-strategy.md)): 1 app de cada em golden flow | ⬜ — ADR 013 aceito (2026-10-25); S1 (`rd-engine-wasm`) é o próximo passo |
 | M12 | Ecossistema GH | docs site, compat-matrix viva, releases; v1.0 | ⬜ |
 
 ## ✅ Apêndice G — registro e detecção completos (2026-10-14)
