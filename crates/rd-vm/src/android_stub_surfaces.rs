@@ -48931,6 +48931,7 @@ const P36G_DPM: &str = "Landroid/app/admin/DevicePolicyManager;";
 const P36G_UPDATE_POLICY: &str = "Landroid/app/admin/SystemUpdatePolicy;";
 const P36G_VALIDATION_FAILED: &str =
     "Landroid/app/admin/SystemUpdatePolicy$ValidationFailedException;";
+const P36G_FREEZE_PERIOD: &str = "Landroid/app/admin/FreezePeriod;";
 
 fn partial36g_host_static(
     vm: &mut Engine,
@@ -49038,6 +49039,7 @@ fn p36g_is_class(class: &str) -> bool {
             | P36G_DPM
             | P36G_UPDATE_POLICY
             | P36G_VALIDATION_FAILED
+            | P36G_FREEZE_PERIOD
     )
 }
 
@@ -49214,6 +49216,7 @@ fn partial36g_instance(
             p36g_credential_option_builder_instance(vm, name, sig, recv, args)
         }
         P36G_PROVIDER_SERVICE => p36g_provider_service_instance(vm, name, sig, recv, args),
+        P36G_FREEZE_PERIOD => p36g_freeze_period_instance(vm, name, sig, recv, args),
         P36G_DPM => p36g_dpm_instance(vm, name, sig, recv, args),
         P36G_UPDATE_POLICY => Ok(Some(match (name, sig) {
             ("<init>", "()V") => {
@@ -49237,7 +49240,55 @@ fn partial36g_instance(
                     Value::Int(-1)
                 }
             }
-            ("getFreezePeriods", "()Ljava/util/List;") => get(vm, recv, "mFreezePeriods"),
+            ("getFreezePeriods", "()Ljava/util/List;") => vm.invoke_static(
+                "Ljava/util/Collections;",
+                "unmodifiableList",
+                "(Ljava/util/List;)Ljava/util/List;",
+                &[get(vm, recv, "mFreezePeriods")],
+            )?,
+            (
+                "setFreezePeriods",
+                "(Ljava/util/List;)Landroid/app/admin/SystemUpdatePolicy;",
+            ) => {
+                let periods = collection_items(vm, args.first());
+                p36g_validate_freeze_periods(vm, &periods)?;
+                let stored = new_collection(vm, "Ljava/util/ArrayList;", periods)?;
+                put(vm, recv, "mFreezePeriods", Value::Obj(stored))?;
+                Value::Obj(recv)
+            }
+            ("validateType", "()V") => {
+                let kind = field_int(vm, recv, "mPolicyType");
+                match kind {
+                    1 | 3 => {}
+                    2 => {
+                        let start = field_int(vm, recv, "mMaintenanceWindowStart");
+                        let end = field_int(vm, recv, "mMaintenanceWindowEnd");
+                        if !(0..1440).contains(&start) || !(0..1440).contains(&end) {
+                            return Err(iae("Invalid maintenance window".to_string()));
+                        }
+                    }
+                    _ => {
+                        return Err(iae("Invalid system update policy type.".to_string()));
+                    }
+                }
+                Value::Null
+            }
+            ("isValid", "()Z") => {
+                let kind_ok = match field_int(vm, recv, "mPolicyType") {
+                    1 | 3 => true,
+                    2 => {
+                        (0..1440).contains(&field_int(vm, recv, "mMaintenanceWindowStart"))
+                            && (0..1440).contains(&field_int(vm, recv, "mMaintenanceWindowEnd"))
+                    }
+                    _ => false,
+                };
+                if !kind_ok {
+                    Value::Int(0)
+                } else {
+                    let periods = collection_items(vm, Some(&get(vm, recv, "mFreezePeriods")));
+                    Value::Int(i32::from(p36g_validate_freeze_periods(vm, &periods).is_ok()))
+                }
+            }
             ("toString", "()Ljava/lang/String;") => {
                 let mut freezes = Vec::new();
                 for item in collection_items(vm, Some(&get(vm, recv, "mFreezePeriods"))) {
@@ -49262,6 +49313,203 @@ fn partial36g_instance(
         })),
         _ => Ok(None),
     }
+}
+
+// --- FreezePeriod / SystemUpdatePolicy freeze validation (AOSP 14) ----------
+
+const P36G_MONTH_START_DOY: [i32; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+const P36G_MONTH_ABBR: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+fn p36g_month_day_parts(vm: &mut Engine, value: &Value) -> Result<(i32, i32), VmExit> {
+    let Value::Obj(r) = value else {
+        return Err(npe("MonthDay"));
+    };
+    let month = match vm.invoke_instance(*r, "getMonthValue", "()I", &[])? {
+        Value::Int(v) => v,
+        _ => 0,
+    };
+    let day = match vm.invoke_instance(*r, "getDayOfMonth", "()I", &[])? {
+        Value::Int(v) => v,
+        _ => 0,
+    };
+    Ok((month, day))
+}
+
+fn p36g_doy_to_month_day(doy: i32) -> (usize, i32) {
+    let mut month = 11usize;
+    while month > 0 && P36G_MONTH_START_DOY[month] >= doy {
+        month -= 1;
+    }
+    (month, doy - P36G_MONTH_START_DOY[month])
+}
+
+fn p36g_freeze_to_string(start_day: i32, end_day: i32) -> String {
+    let (sm, sd) = p36g_doy_to_month_day(start_day);
+    let (em, ed) = p36g_doy_to_month_day(end_day);
+    format!(
+        "{} {:02} - {} {:02}",
+        P36G_MONTH_ABBR[sm], sd, P36G_MONTH_ABBR[em], ed
+    )
+}
+
+fn p36g_validation_exit(vm: &mut Engine, code: i32, message: String) -> VmExit {
+    match alloc_obj(
+        vm,
+        P36G_VALIDATION_FAILED,
+        vec![("mErrorCode".to_string(), Value::Int(code))],
+    ) {
+        Ok(obj) => VmExit::Exception(crate::err::Throwable {
+            class: P36G_VALIDATION_FAILED.to_string(),
+            message: Some(message),
+            obj: Some(obj),
+        }),
+        Err(error) => error,
+    }
+}
+
+fn p36g_freeze_days(vm: &Engine, period: ObjRef) -> (i32, i32) {
+    (
+        field_int(vm, period, "mStartDay"),
+        field_int(vm, period, "mEndDay"),
+    )
+}
+
+/// FreezePeriod.validatePeriods: canonicalize onto a 365-day ring, then
+/// reject duplicates/overlaps, periods over 90 days, and separations below
+/// 60 days (codes 2/3/4 of ValidationFailedException).
+fn p36g_validate_freeze_periods(vm: &mut Engine, periods: &[Value]) -> Result<(), VmExit> {
+    let mut spans: Vec<(i32, i32)> = Vec::with_capacity(periods.len());
+    for p in periods {
+        match p {
+            Value::Obj(r) if class_of(vm, *r) == P36G_FREEZE_PERIOD => {
+                spans.push(p36g_freeze_days(vm, *r));
+            }
+            Value::Obj(_) => {
+                return Err(throw(
+                    "Ljava/lang/ClassCastException;",
+                    "freeze period element".to_string(),
+                ));
+            }
+            _ => return Err(npe("freeze period")),
+        }
+    }
+    // canonicalizePeriods
+    let mut taken = [false; 365];
+    for (start, end) in &spans {
+        let effective_end = if end < start { end + 365 } else { *end };
+        let mut i = *start;
+        while i <= effective_end {
+            taken[((i - 1) % 365) as usize] = true;
+            i += 1;
+        }
+    }
+    let mut canon: Vec<(i32, i32)> = Vec::new();
+    let mut i = 0i32;
+    while i < 365 {
+        if !taken[i as usize] {
+            i += 1;
+            continue;
+        }
+        let start = i + 1;
+        while i < 365 && taken[i as usize] {
+            i += 1;
+        }
+        canon.push((start, i));
+    }
+    if canon.len() > 1 && canon[canon.len() - 1].1 == 365 && canon[0].0 == 1 {
+        let last = canon.len() - 1;
+        let wrapped = (canon[last].0, canon[0].1);
+        canon[last] = wrapped;
+        canon.remove(0);
+    }
+    if canon.len() != spans.len() {
+        return Err(p36g_validation_exit(
+            vm,
+            2,
+            "Found duplicate or overlapping periods".to_string(),
+        ));
+    }
+    for idx in 0..canon.len() {
+        let (start, end) = canon[idx];
+        let length = (if end < start { end + 365 } else { end }) - start + 1;
+        if length > 90 {
+            return Err(p36g_validation_exit(
+                vm,
+                3,
+                format!(
+                    "Freeze period {} is too long: {} days",
+                    p36g_freeze_to_string(start, end),
+                    length
+                ),
+            ));
+        }
+        let (pstart, pend) = if idx > 0 {
+            canon[idx - 1]
+        } else {
+            canon[canon.len() - 1]
+        };
+        if canon.len() > 1 {
+            let separation = if idx == 0 && pend >= pstart {
+                start + (365 - pend) - 1
+            } else {
+                start - pend - 1
+            };
+            if separation < 60 {
+                return Err(p36g_validation_exit(
+                    vm,
+                    4,
+                    format!(
+                        "Freeze periods {} and {} are too close together: {} days apart",
+                        p36g_freeze_to_string(pstart, pend),
+                        p36g_freeze_to_string(start, end),
+                        separation
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn p36g_freeze_period_instance(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(Ljava/time/MonthDay;Ljava/time/MonthDay;)V") => {
+            let (sm, sd) = p36g_month_day_parts(vm, &p36a_value(args, 0))?;
+            let (em, ed) = p36g_month_day_parts(vm, &p36a_value(args, 1))?;
+            put(vm, recv, "mStart", p36a_value(args, 0))?;
+            put(vm, recv, "mEnd", p36a_value(args, 1))?;
+            put(
+                vm,
+                recv,
+                "mStartDay",
+                Value::Int(P36G_MONTH_START_DOY[(sm - 1) as usize] + sd),
+            )?;
+            put(
+                vm,
+                recv,
+                "mEndDay",
+                Value::Int(P36G_MONTH_START_DOY[(em - 1) as usize] + ed),
+            )?;
+            Value::Null
+        }
+        ("getStart", "()Ljava/time/MonthDay;") => get(vm, recv, "mStart"),
+        ("getEnd", "()Ljava/time/MonthDay;") => get(vm, recv, "mEnd"),
+        ("toString", "()Ljava/lang/String;") => {
+            let (start, end) = p36g_freeze_days(vm, recv);
+            jstr(vm, p36g_freeze_to_string(start, end))?
+        }
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
 }
 
 // --- credentials helpers -----------------------------------------------------

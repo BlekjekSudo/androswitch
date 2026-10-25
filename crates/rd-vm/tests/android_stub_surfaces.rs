@@ -22896,3 +22896,162 @@ fn wifi_ipsec_value_identity_audit_is_guest_visible() {
         Value::Int(0)
     );
 }
+
+#[test]
+fn freeze_periods_and_update_policy_validation_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let month_day = |engine: &mut Engine, month: i32, day: i32| {
+        object(call_static(
+            engine,
+            "Ljava/time/MonthDay;",
+            "of",
+            "(II)Ljava/time/MonthDay;",
+            &[Value::Int(month), Value::Int(day)],
+        ))
+    };
+    let feb29 = month_day(&mut engine, 2, 29);
+    assert_eq!(
+        call_text(&mut engine, feb29, "toString", "()Ljava/lang/String;", &[]),
+        "--02-29"
+    );
+    // Feb 29 in a non-leap year adjusts to Feb 28 (MonthDay.atYear).
+    let at_2023 = object(call(
+        &mut engine,
+        feb29,
+        "atYear",
+        "(I)Ljava/time/LocalDate;",
+        &[Value::Int(2023)],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            at_2023,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "2023-02-28"
+    );
+    assert_throws(
+        engine.invoke_static(
+            "Ljava/time/MonthDay;",
+            "of",
+            "(II)Ljava/time/MonthDay;",
+            &[Value::Int(2), Value::Int(30)],
+        ),
+        "Ljava/time/DateTimeException;",
+    );
+
+    let freeze = |engine: &mut Engine, sm: i32, sd: i32, em: i32, ed: i32| {
+        let start = month_day(engine, sm, sd);
+        let end = month_day(engine, em, ed);
+        p49_new(
+            engine,
+            "Landroid/app/admin/FreezePeriod;",
+            "(Ljava/time/MonthDay;Ljava/time/MonthDay;)V",
+            &[Value::Obj(start), Value::Obj(end)],
+        )
+    };
+    let policy = object(call_static(
+        &mut engine,
+        P36G_UPDATE_POLICY,
+        "createWindowedInstallPolicy",
+        "(II)Landroid/app/admin/SystemUpdatePolicy;",
+        &[Value::Int(60), Value::Int(180)],
+    ));
+    let winter = freeze(&mut engine, 12, 20, 1, 10);
+    assert_eq!(
+        call_text(&mut engine, winter, "toString", "()Ljava/lang/String;", &[]),
+        "Dec 20 - Jan 10"
+    );
+    let periods = list_of(&mut engine, &[Value::Obj(winter)]);
+    let chained = call(
+        &mut engine,
+        policy,
+        "setFreezePeriods",
+        "(Ljava/util/List;)Landroid/app/admin/SystemUpdatePolicy;",
+        &[Value::Obj(periods)],
+    );
+    assert_eq!(chained, Value::Obj(policy));
+    assert_eq!(
+        call(&mut engine, policy, "isValid", "()Z", &[]),
+        Value::Int(1)
+    );
+    let stored = call(
+        &mut engine,
+        policy,
+        "getFreezePeriods",
+        "()Ljava/util/List;",
+        &[],
+    );
+    assert_eq!(p36g_list_size(&mut engine, stored), Value::Int(1));
+
+    // Overlapping periods: ValidationFailedException with error code 2.
+    let a = freeze(&mut engine, 1, 1, 1, 20);
+    let b = freeze(&mut engine, 1, 15, 2, 1);
+    let overlapping = list_of(&mut engine, &[Value::Obj(a), Value::Obj(b)]);
+    match engine.invoke_instance(
+        policy,
+        "setFreezePeriods",
+        "(Ljava/util/List;)Landroid/app/admin/SystemUpdatePolicy;",
+        &[Value::Obj(overlapping)],
+    ) {
+        Err(rd_vm::err::VmExit::Exception(thrown)) => {
+            assert_eq!(
+                thrown.class,
+                "Landroid/app/admin/SystemUpdatePolicy$ValidationFailedException;"
+            );
+            let obj = thrown.obj.expect("exception object");
+            assert_eq!(
+                engine
+                    .invoke_instance(obj, "getErrorCode", "()I", &[])
+                    .expect("getErrorCode"),
+                Value::Int(2)
+            );
+        }
+        other => panic!("expected ValidationFailedException, got {other:?}"),
+    }
+
+    // A 100-day period exceeds the 90-day maximum (error code 3).
+    let long = freeze(&mut engine, 1, 1, 4, 10);
+    let too_long = list_of(&mut engine, &[Value::Obj(long)]);
+    match engine.invoke_instance(
+        policy,
+        "setFreezePeriods",
+        "(Ljava/util/List;)Landroid/app/admin/SystemUpdatePolicy;",
+        &[Value::Obj(too_long)],
+    ) {
+        Err(rd_vm::err::VmExit::Exception(thrown)) => {
+            let obj = thrown.obj.expect("exception object");
+            assert_eq!(
+                engine
+                    .invoke_instance(obj, "getErrorCode", "()I", &[])
+                    .expect("getErrorCode"),
+                Value::Int(3)
+            );
+        }
+        other => panic!("expected freezePeriodTooLong, got {other:?}"),
+    }
+
+    // Two short periods less than 60 days apart (error code 4).
+    let x = freeze(&mut engine, 1, 1, 1, 10);
+    let y = freeze(&mut engine, 2, 1, 2, 10);
+    let close = list_of(&mut engine, &[Value::Obj(x), Value::Obj(y)]);
+    match engine.invoke_instance(
+        policy,
+        "setFreezePeriods",
+        "(Ljava/util/List;)Landroid/app/admin/SystemUpdatePolicy;",
+        &[Value::Obj(close)],
+    ) {
+        Err(rd_vm::err::VmExit::Exception(thrown)) => {
+            let obj = thrown.obj.expect("exception object");
+            assert_eq!(
+                engine
+                    .invoke_instance(obj, "getErrorCode", "()I", &[])
+                    .expect("getErrorCode"),
+                Value::Int(4)
+            );
+        }
+        other => panic!("expected freezePeriodTooClose, got {other:?}"),
+    }
+}
