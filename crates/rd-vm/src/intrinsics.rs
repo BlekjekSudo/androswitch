@@ -369,6 +369,9 @@ fn call_static_intrinsic_rooted(
     if let Some(v) = crate::android_motion::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = crate::android_velocity::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     if let Some(v) = crate::android_colorspace::static_intrinsic(vm, class, name, args)? {
         return Ok(Some(v));
     }
@@ -3991,6 +3994,14 @@ fn instance_intrinsic_dispatch(
     if recv_class.starts_with("Landroid/view/MotionEvent") {
         if let Some(v) =
             crate::android_motion::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
+    // VelocityTracker (android_velocity.rs)
+    if recv_class == crate::android_velocity::VT {
+        if let Some(v) =
+            crate::android_velocity::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
         {
             return Ok(Some(v));
         }

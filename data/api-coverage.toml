@@ -228,12 +228,12 @@ domain = "view-ui"
 status = "partial"
 domain_module = "fd-ui"
 module = "rd-vm/view-layout"
-code = ["crates/rd-vm/src/framework.rs", "crates/rd-vm/src/view_layout.rs", "crates/rd-vm/src/view_props.rs", "crates/rd-vm/src/view_attach.rs", "crates/rd-vm/src/window.rs", "crates/rd-vm/src/android_motion.rs"]
+code = ["crates/rd-vm/src/framework.rs", "crates/rd-vm/src/view_layout.rs", "crates/rd-vm/src/view_props.rs", "crates/rd-vm/src/view_attach.rs", "crates/rd-vm/src/window.rs", "crates/rd-vm/src/android_motion.rs", "crates/rd-vm/src/android_velocity.rs"]
 milestone = "M3/M4/M8"
 notes = "View/ViewGroup tree, layout params, touch/click delivery, Window decor/content, ViewTreeObserver and MotionEvent subsets exist. SurfaceFlinger-backed surfaces, full gesture detectors and all window types are not complete."
 evidence = ["docs/compat-matrix.md"]
 gap_id = "gap-android-view-partial"
-key_apis = ["android.view.View.findViewById", "android.view.View.setOnClickListener", "android.view.ViewGroup.addView", "android.view.Window.getDecorView", "android.view.MotionEvent.obtain"]
+key_apis = ["android.view.View.findViewById", "android.view.View.setOnClickListener", "android.view.ViewGroup.addView", "android.view.Window.getDecorView", "android.view.MotionEvent.obtain", "android.view.VelocityTracker.obtain"]
 
 [[surface]]
 id = "android-view-accessibility"

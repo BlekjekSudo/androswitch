@@ -12,7 +12,7 @@ humans:
 | `tap_text` tool | agents | tap by visible label (`"Continuar"`, `"Ajustes"`) instead of coordinates | 25–180 ms (tap + app work) |
 | `observe: true` on `launch/tap/tap_text/swipe/type_text/key/wait/wait_for` | agents | the action result carries the new screen summary → 1 round-trip per step | +45 ms |
 | MCP resources `rustydroid://screen` (JSON), `rustydroid://screen.txt`, `rustydroid://screen.png`, `rustydroid://logs` | MCP clients | `resources/read` + `resources/subscribe` → `notifications/resources/updated` whenever visible content changes | — |
-| `rd mcp --live 0.0.0.0:7878` (or `RD_MCP_LIVE`) | humans | browser page with the RustyDroid-rendered frame, the screen text, tap-target overlay, last tool + latency; long-poll push | PNG encoded only when the version changes |
+| `rd mcp --live 0.0.0.0:7878` (or `RD_MCP_LIVE`) | humans | browser page with the RustyDroid-rendered frame, the screen text, tap-target overlay (checkbox "tap targets"), package/activity, last tool + latency, frame version; long-poll push (`/state.json?since=N`, ≤20 s) | PNG served from `/frame.png` (see the routes below) |
 | `screenshot` | both | PNG, now **cached per frame version** and **deflate-compressed** (adaptive row filters; ~190 KB instead of ~3.1 MB) | ~75 ms fresh · 1.4 ms repeated |
 
 Before round 6, the only way to see a Compose app was `screenshot`
@@ -111,3 +111,18 @@ delegation and bounded rectilinear Region clipping.
   (determinism is a feature for agents).
 - Text inside images rasterized from fonts at runtime is found; text baked
   into PNG assets is not (no OCR).
+
+## Live viewer: routes and page (`rd mcp --live`)
+
+Served by `live_serve_conn` in `crates/rd-agent/src/observe.rs` (`observe.rs:710`; std-only HTTP, one thread per connection, `Connection: close`). The address comes from `rd mcp --live <addr>` or `RD_MCP_LIVE` (`crates/rd-cli/src/main.rs:590`, `crates/rd-agent/src/mcp.rs:3195`). The viewer is started in `serve_stdio_with` (`crates/rd-agent/src/mcp.rs:3201-3212`) and logs `[rd mcp] live viewer: http://<addr>/` to stderr.
+
+| Route | Response | Notes |
+|---|---|---|
+| `/` or `/index.html` | HTML page (`LIVE_HTML`, `observe.rs:765-796`) | Self-contained page: frame canvas, tap-target overlay, screen text, status pills |
+| `/state.json` | JSON state | Long-poll: `?since=N` blocks until the frame version passes `N`, up to 20 s (`observe.rs:720-742`). Without `since` it returns at once |
+| `/frame.png` | `image/png` | `204 No Content` while no frame has been recorded yet (`observe.rs:744-749`) |
+| any other path | `404 Not Found` | Empty body |
+
+The page's header shows the package and activity, the frame version (`frame vN`), and the last tool with its latency (`last: <tool> <ms> ms`, `observe.rs:791`). It shows the screen text and a `draw pass failed` message when the host draw fails. The overlay is a checkbox labelled "tap targets" (`observe.rs:779`).
+
+Successful (200) responses send `Cache-Control: no-store`. All responses close the connection.
