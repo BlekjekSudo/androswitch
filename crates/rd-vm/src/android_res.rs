@@ -31,11 +31,12 @@
 //!
 //! **Context family.** `getResources`, `getTheme`, `obtainStyledAttributes`,
 //! `getMainLooper`, `getBaseContext`, `isRestricted`, `getAttributionTag`,
-//! `getAttributionSource`, `getAssets`,
+//! `getAttributionSource`, `getAssets`, `getApplicationInfo`,
 //! `getText` and `getString(I, Object…)` are answered for any receiver that
 //! is a `Context` subtype. That covers Activity, Application, Service, and
 //! DEX `ContextWrapper`s, whatever class the method ref names. `getResources`
-//! also covers Views.
+//! also covers Views. `getApplicationInfo` delegates to the same host model
+//! `PackageManager` serves for the own package (android_pm.rs).
 //!
 //! **AssetManager (APK-Tester ladder 12/12).** `Context.getAssets()` and
 //! `Resources.getAssets()` return one canonical host `AssetManager` per VM.
@@ -1151,6 +1152,7 @@ pub(crate) fn instance_intrinsic(
             | "getAttributionTag"
             | "getAttributionSource"
             | "getAssets"
+            | "getApplicationInfo"
             | "getText"
             | "getString"
             | "getColor"
@@ -1200,6 +1202,13 @@ pub(crate) fn instance_intrinsic(
         }
         ("getMainLooper", _) => Value::Obj(vm.main_looper_obj()?),
         ("getAssets", _) => Value::Obj(asset_manager(vm)?),
+        // APK-Tester ladder follow-up: the short route the LadderActivity uses
+        // (`ApplicationInfo appInfo = getApplicationInfo()`), same object the
+        // PackageManager serves for the own package (minSdk/targetSdk come from
+        // the attached APK manifest).
+        ("getApplicationInfo", "()Landroid/content/pm/ApplicationInfo;") => {
+            Value::Obj(crate::android_pm::context_app_info(vm)?)
+        }
         // ContextWrapper with no attached base: the platform ContextImpl
         // (not a ContextWrapper, so unwrap loops terminate)
         ("getBaseContext", _) => Value::Obj(crate::intrinsics::context_impl(vm)?),
