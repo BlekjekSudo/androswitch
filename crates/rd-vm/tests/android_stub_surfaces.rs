@@ -23055,3 +23055,73 @@ fn freeze_periods_and_update_policy_validation_are_guest_visible() {
         other => panic!("expected freezePeriodTooClose, got {other:?}"),
     }
 }
+
+#[test]
+fn credential_option_public_constructor_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let kind = text(&mut engine, "android.credentials.TYPE_PASSWORD_CREDENTIAL");
+    let retrieval = p36g_bundle_with(&mut engine, "key", "value");
+    let candidate = p36g_bundle_with(&mut engine, "key", "value");
+    let option = p49_new(
+        &mut engine,
+        "Landroid/credentials/CredentialOption;",
+        "(Ljava/lang/String;Landroid/os/Bundle;Landroid/os/Bundle;Z)V",
+        &[
+            kind,
+            Value::Obj(retrieval),
+            Value::Obj(candidate),
+            Value::Int(1),
+        ],
+    );
+    assert_eq!(
+        call_text(&mut engine, option, "getType", "()Ljava/lang/String;", &[]),
+        "android.credentials.TYPE_PASSWORD_CREDENTIAL"
+    );
+    assert_eq!(
+        call(&mut engine, option, "isSystemProviderRequired", "()Z", &[]),
+        Value::Int(1)
+    );
+    let providers = call(
+        &mut engine,
+        option,
+        "getAllowedProviders",
+        "()Ljava/util/Set;",
+        &[],
+    );
+    assert_eq!(p36g_list_size(&mut engine, providers), Value::Int(0));
+    assert_eq!(
+        call(&mut engine, option, "describeContents", "()I", &[]),
+        Value::Int(0)
+    );
+
+    // Empty type is IAE; null bundles are NPEs (private-ctor validations).
+    let empty = text(&mut engine, "");
+    let unused = p36g_bundle_with(&mut engine, "k", "v");
+    let unused2 = p36g_bundle_with(&mut engine, "k", "v");
+    let target = instance(&mut engine, "Landroid/credentials/CredentialOption;");
+    assert_throws(
+        engine.invoke_instance(
+            target,
+            "<init>",
+            "(Ljava/lang/String;Landroid/os/Bundle;Landroid/os/Bundle;Z)V",
+            &[
+                empty,
+                Value::Obj(unused),
+                Value::Obj(unused2),
+                Value::Int(0),
+            ],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let kind = text(&mut engine, "type");
+    let target = instance(&mut engine, "Landroid/credentials/CredentialOption;");
+    assert_throws(
+        engine.invoke_instance(
+            target,
+            "<init>",
+            "(Ljava/lang/String;Landroid/os/Bundle;Landroid/os/Bundle;Z)V",
+            &[kind, Value::Null, Value::Obj(unused2), Value::Int(0)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+}

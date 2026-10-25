@@ -49199,6 +49199,32 @@ fn partial36g_instance(
             p36g_begin_create_resp_builder_instance(vm, name, sig, recv, args)
         }
         P36G_CREDENTIAL_OPTION => Ok(Some(match (name, sig) {
+            (
+                "<init>",
+                "(Ljava/lang/String;Landroid/os/Bundle;Landroid/os/Bundle;Z)V",
+            ) => {
+                // Public 4-arg ctor delegates to the validating private ctor
+                // with a fresh empty ArraySet.
+                let kind = p36g_check_string_not_empty(
+                    vm,
+                    &p36a_value(args, 0),
+                    "type must not be empty",
+                )?;
+                req_obj(args, 1, "requestData must not be null")?;
+                req_obj(args, 2, "candidateQueryData must not be null")?;
+                let allowed = new_collection(vm, "Landroid/util/ArraySet;", Vec::new())?;
+                put(vm, recv, "mType", kind)?;
+                put(vm, recv, "mCredentialRetrievalData", p36a_value(args, 1))?;
+                put(vm, recv, "mCandidateQueryData", p36a_value(args, 2))?;
+                put(
+                    vm,
+                    recv,
+                    "mIsSystemProviderRequired",
+                    Value::Int(iarg(args, 3)),
+                )?;
+                put(vm, recv, "mAllowedProviders", Value::Obj(allowed))?;
+                Value::Null
+            }
             ("getType", "()Ljava/lang/String;") => get(vm, recv, "mType"),
             ("getCredentialRetrievalData", "()Landroid/os/Bundle;") => {
                 get(vm, recv, "mCredentialRetrievalData")
@@ -49210,6 +49236,7 @@ fn partial36g_instance(
                 Value::Int(i32::from(field_bool(vm, recv, "mIsSystemProviderRequired")))
             }
             ("getAllowedProviders", "()Ljava/util/Set;") => get(vm, recv, "mAllowedProviders"),
+            ("describeContents", "()I") => Value::Int(0),
             _ => return Ok(None),
         })),
         P36G_CREDENTIAL_OPTION_BUILDER => {
@@ -49533,8 +49560,11 @@ fn p36g_collection_not_empty(vm: &Engine, value: &Value, name: &str) -> Result<V
 }
 
 fn p36g_elements_not_null(items: &[Value], name: &str) -> Result<(), VmExit> {
-    if items.iter().any(|item| matches!(item, Value::Null)) {
-        return Err(npe(&format!("{name} element must not be null")));
+    // Preconditions.checkCollectionElementsNotNull: "%s[%d] must not be null".
+    for (index, item) in items.iter().enumerate() {
+        if matches!(item, Value::Null) {
+            return Err(npe(&format!("{name}[{index}] must not be null")));
+        }
     }
     Ok(())
 }
@@ -49655,6 +49685,7 @@ fn p36g_calling_app_info_instance(
         ("getPackageName", "()Ljava/lang/String;") => get(vm, recv, "mPackageName"),
         ("getSigningInfo", "()Landroid/content/pm/SigningInfo;") => get(vm, recv, "mSigningInfo"),
         ("getOrigin", "()Ljava/lang/String;") => get(vm, recv, "mOrigin"),
+        ("describeContents", "()I") => Value::Int(0),
         _ => return Ok(None),
     }))
 }
