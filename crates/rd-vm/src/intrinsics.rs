@@ -8,6 +8,11 @@ use crate::heap::HeapObj;
 use crate::repr;
 use crate::value::Value;
 
+pub use crate::android_display::{
+    dispatch_display_event, EVENT_FLAG_DISPLAY_ADDED, EVENT_FLAG_DISPLAY_CHANGED,
+    EVENT_FLAG_DISPLAY_REMOVED,
+};
+
 const STRING: &str = "Ljava/lang/String;";
 const SB: &str = "Ljava/lang/StringBuilder;";
 const OBJECT: &str = "Ljava/lang/Object;";
@@ -362,6 +367,9 @@ fn call_static_intrinsic_rooted(
         return Ok(Some(v));
     }
     if let Some(v) = crate::android_motion::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
+    if let Some(v) = crate::android_velocity::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
     if let Some(v) = crate::android_colorspace::static_intrinsic(vm, class, name, args)? {
@@ -3990,6 +3998,14 @@ fn instance_intrinsic_dispatch(
             return Ok(Some(v));
         }
     }
+    // VelocityTracker (android_velocity.rs)
+    if recv_class == crate::android_velocity::VT {
+        if let Some(v) =
+            crate::android_velocity::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
+        {
+            return Ok(Some(v));
+        }
+    }
     // java.util.PriorityQueue (jpriorityqueue.rs)
     if let Some(v) =
         crate::jpriorityqueue::instance_intrinsic(vm, recv_class, name, sig, recv, args)?
@@ -4035,13 +4051,18 @@ fn instance_intrinsic_dispatch(
             return Ok(Some(v));
         }
     }
-    // the default Display (android_display.rs)
+    // the default Display, Display.Mode, and DisplayManager (android_display.rs)
     if matches!(name, "getDisplay" | "getDefaultDisplay")
-        || recv_class == crate::android_display::DISPLAY
+        || matches!(
+            recv_class,
+            crate::android_display::DISPLAY
+                | crate::android_display::DISPLAY_MODE
+                | crate::android_display::DISPLAY_MANAGER
+        )
     {
-        if let Some(v) =
-            crate::android_display::instance_intrinsic(vm, recv_class, mref_class, name, sig, args)?
-        {
+        if let Some(v) = crate::android_display::instance_intrinsic(
+            vm, recv_class, mref_class, name, sig, recv, args,
+        )? {
             return Ok(Some(v));
         }
     }
