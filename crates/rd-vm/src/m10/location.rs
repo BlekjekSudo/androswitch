@@ -221,14 +221,14 @@ pub(super) fn instance_call(
     match class {
         LOCATION_MANAGER => match name {
             "isLocationEnabled" => {
-                let on = vm.fw.m10.location.gps_enabled || vm.fw.m10.location.network_enabled;
+                let on = vm.fw.vdev.location.gps_enabled || vm.fw.vdev.location.network_enabled;
                 Ok(Some(Value::Int(i32::from(on))))
             }
             "isProviderEnabled" => {
                 let p = opt_str_arg(vm, args, 0)?.unwrap_or_default();
                 let on = match p.as_str() {
-                    "gps" | "fused" => vm.fw.m10.location.gps_enabled,
-                    "network" => vm.fw.m10.location.network_enabled,
+                    "gps" | "fused" => vm.fw.vdev.location.gps_enabled,
+                    "network" => vm.fw.vdev.location.network_enabled,
                     "passive" => true,
                     _ => false,
                 };
@@ -237,20 +237,20 @@ pub(super) fn instance_call(
             "getAllProviders" | "getProviders" => {
                 let enabled_only = name == "getProviders" && bool_arg(args, 0);
                 let mut provs = Vec::new();
-                if !enabled_only || vm.fw.m10.location.gps_enabled {
+                if !enabled_only || vm.fw.vdev.location.gps_enabled {
                     provs.push(str_val(vm, "gps")?);
                     provs.push(str_val(vm, "fused")?);
                 }
-                if !enabled_only || vm.fw.m10.location.network_enabled {
+                if !enabled_only || vm.fw.vdev.location.network_enabled {
                     provs.push(str_val(vm, "network")?);
                 }
                 provs.push(str_val(vm, "passive")?);
                 Ok(Some(array_list(vm, provs)?))
             }
             "getBestProvider" => {
-                if vm.fw.m10.location.gps_enabled {
+                if vm.fw.vdev.location.gps_enabled {
                     Ok(Some(str_val(vm, "gps")?))
-                } else if vm.fw.m10.location.network_enabled {
+                } else if vm.fw.vdev.location.network_enabled {
                     Ok(Some(str_val(vm, "network")?))
                 } else {
                     Ok(Some(Value::Null))
@@ -260,15 +260,15 @@ pub(super) fn instance_call(
                 check_any_perm(vm, LOCATION_PERMS)?;
                 let prov = opt_str_arg(vm, args, 0)?.unwrap_or_else(|| "gps".into());
                 let enabled = match prov.as_str() {
-                    "gps" | "fused" => vm.fw.m10.location.gps_enabled,
-                    "network" => vm.fw.m10.location.network_enabled,
+                    "gps" | "fused" => vm.fw.vdev.location.gps_enabled,
+                    "network" => vm.fw.vdev.location.network_enabled,
                     "passive" => true,
                     _ => false,
                 };
                 if !enabled {
                     return Ok(Some(Value::Null));
                 }
-                let mut fix = vm.fw.m10.location.current.clone();
+                let mut fix = vm.fw.vdev.location.current.clone();
                 fix.provider = prov;
                 Ok(Some(Value::Obj(build_location_obj(vm, &fix)?)))
             }
@@ -295,13 +295,13 @@ pub(super) fn instance_call(
                 if let Some(l) = listener {
                     let exists = vm
                         .fw
-                        .m10
+                        .vdev
                         .location
                         .listeners
                         .iter()
                         .any(|reg| reg.listener == l && !reg.fused_callback);
                     if !exists {
-                        vm.fw.m10.location.listeners.push(LocationListenerReg {
+                        vm.fw.vdev.location.listeners.push(LocationListenerReg {
                             listener: l,
                             provider,
                             fused_callback: false,
@@ -314,7 +314,7 @@ pub(super) fn instance_call(
             "getCurrentLocation" => {
                 check_any_perm(vm, LOCATION_PERMS)?;
                 let prov = opt_str_arg(vm, args, 0)?.unwrap_or_else(|| "gps".into());
-                let mut fix = vm.fw.m10.location.current.clone();
+                let mut fix = vm.fw.vdev.location.current.clone();
                 fix.provider = prov;
                 let loc = build_location_obj(vm, &fix)?;
                 if let Some(consumer) = args.last().and_then(|v| match v {
@@ -333,7 +333,7 @@ pub(super) fn instance_call(
             }
             "removeUpdates" => {
                 if let Some(l) = obj_arg(args, 0) {
-                    vm.fw.m10.location.listeners.retain(|r| r.listener != l);
+                    vm.fw.vdev.location.listeners.retain(|r| r.listener != l);
                 }
                 Ok(Some(Value::Null))
             }
@@ -528,7 +528,7 @@ pub(super) fn instance_call(
         FUSED_CLIENT => match name {
             "getLastLocation" | "getCurrentLocation" => {
                 check_any_perm(vm, LOCATION_PERMS)?;
-                let mut fix = vm.fw.m10.location.current.clone();
+                let mut fix = vm.fw.vdev.location.current.clone();
                 fix.provider = "fused".into();
                 let loc = build_location_obj(vm, &fix)?;
                 Ok(Some(Value::Obj(completed_task(vm, Value::Obj(loc))?)))
@@ -550,13 +550,13 @@ pub(super) fn instance_call(
                 if let Some(cb_ref) = cb {
                     let exists = vm
                         .fw
-                        .m10
+                        .vdev
                         .location
                         .listeners
                         .iter()
                         .any(|r| r.listener == cb_ref && r.fused_callback);
                     if !exists {
-                        vm.fw.m10.location.listeners.push(LocationListenerReg {
+                        vm.fw.vdev.location.listeners.push(LocationListenerReg {
                             listener: cb_ref,
                             provider: "fused".into(),
                             fused_callback: true,
@@ -569,7 +569,7 @@ pub(super) fn instance_call(
             "removeLocationUpdates" => {
                 if let Some(cb_ref) = obj_arg(args, 0) {
                     vm.fw
-                        .m10
+                        .vdev
                         .location
                         .listeners
                         .retain(|r| r.listener != cb_ref);
@@ -646,9 +646,9 @@ impl Engine {
                 "latitude must be in [-90,90] and longitude in [-180,180]",
             ));
         }
-        let time_ms = self.fw.m10.next_wall_ms();
-        let elapsed_ns = self.fw.m10.next_timestamp_ns();
-        let prev = self.fw.m10.location.current.clone();
+        let time_ms = self.fw.vdev.next_wall_ms();
+        let elapsed_ns = self.fw.vdev.next_timestamp_ns();
+        let prev = self.fw.vdev.location.current.clone();
         let fix = LocationFix {
             provider: "gps".into(),
             latitude,
@@ -660,7 +660,7 @@ impl Engine {
             time_ms,
             elapsed_ns,
         };
-        self.fw.m10.location.current = fix.clone();
+        self.fw.vdev.location.current = fix.clone();
         self.m10_deliver_location_fix(&fix)
     }
 
@@ -682,22 +682,22 @@ impl Engine {
                 accuracy: 5.0,
                 speed,
                 bearing: 0.0,
-                time_ms: self.fw.m10.wall_clock_ms,
-                elapsed_ns: self.fw.m10.monotonic_ns,
+                time_ms: self.fw.vdev.wall_clock_ms,
+                elapsed_ns: self.fw.vdev.monotonic_ns,
             });
         }
-        self.fw.m10.location.route = route;
-        self.fw.m10.location.route_cursor = 0;
+        self.fw.vdev.location.route = route;
+        self.fw.vdev.location.route_cursor = 0;
         self.m10_step_location_route()
     }
 
     /// Advance one waypoint along the configured route and deliver callbacks.
     pub fn m10_step_location_route(&mut self) -> Result<usize, VmExit> {
-        let idx = self.fw.m10.location.route_cursor;
-        let Some(wp) = self.fw.m10.location.route.get(idx).cloned() else {
+        let idx = self.fw.vdev.location.route_cursor;
+        let Some(wp) = self.fw.vdev.location.route.get(idx).cloned() else {
             return Ok(0);
         };
-        self.fw.m10.location.route_cursor = idx + 1;
+        self.fw.vdev.location.route_cursor = idx + 1;
         self.m10_set_location(
             wp.latitude,
             wp.longitude,
@@ -709,11 +709,11 @@ impl Engine {
     }
 
     fn m10_deliver_location_fix(&mut self, fix: &LocationFix) -> Result<usize, VmExit> {
-        let regs = self.fw.m10.location.listeners.clone();
+        let regs = self.fw.vdev.location.listeners.clone();
         if regs.is_empty() {
             return Ok(0);
         }
-        self.fw.m10.location.listeners.retain(|r| !r.single_shot);
+        self.fw.vdev.location.listeners.retain(|r| !r.single_shot);
         self.with_host_roots(|vm| {
             let mut count = 0usize;
             for reg in regs {

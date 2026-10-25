@@ -242,7 +242,7 @@ pub(super) fn static_call(
         (AUDIO_TRACK, "getNativeOutputSampleRate") => Ok(Some(Value::Int(48_000))),
         (MEDIA_PLAYER, "create") => {
             let mp = alloc(vm, MEDIA_PLAYER)?;
-            vm.fw.m10.media_players.insert(
+            vm.fw.vdev.media_players.insert(
                 mp,
                 MediaPlayerEntry {
                     state: MediaPlayerState::Prepared,
@@ -331,7 +331,7 @@ pub(super) fn instance_call(
             "build" => {
                 check_perm(vm, "android.permission.RECORD_AUDIO")?;
                 let r = alloc(vm, AUDIO_RECORD)?;
-                vm.fw.m10.audio_records.insert(
+                vm.fw.vdev.audio_records.insert(
                     r,
                     AudioRecordState {
                         sample_rate: 44_100,
@@ -354,7 +354,7 @@ pub(super) fn instance_call(
             | "setPerformanceMode" => Ok(Some(Value::Obj(recv))),
             "build" => {
                 let r = alloc(vm, AUDIO_TRACK)?;
-                vm.fw.m10.audio_tracks.insert(
+                vm.fw.vdev.audio_tracks.insert(
                     r,
                     AudioTrackState {
                         sample_rate: 48_000,
@@ -373,7 +373,7 @@ pub(super) fn instance_call(
             "getActiveSessions" => {
                 let ctrls: Vec<Value> = vm
                     .fw
-                    .m10
+                    .vdev
                     .media_sessions
                     .iter()
                     .filter(|(_, s)| s.active)
@@ -413,7 +413,7 @@ pub(super) fn instance_call(
                 let st = match get_field(vm, recv, "rd_session") {
                     Some(Value::Obj(s)) => vm
                         .fw
-                        .m10
+                        .vdev
                         .media_sessions
                         .get(&s)
                         .and_then(|e| e.playback_state)
@@ -427,7 +427,7 @@ pub(super) fn instance_call(
                 let md = match get_field(vm, recv, "rd_session") {
                     Some(Value::Obj(s)) => vm
                         .fw
-                        .m10
+                        .vdev
                         .media_sessions
                         .get(&s)
                         .and_then(|e| e.metadata)
@@ -443,7 +443,12 @@ pub(super) fn instance_call(
             let Some(Value::Obj(sess)) = get_field(vm, recv, "rd_session") else {
                 return Ok(Some(Value::Null));
             };
-            let cb = vm.fw.m10.media_sessions.get(&sess).and_then(|s| s.callback);
+            let cb = vm
+                .fw
+                .vdev
+                .media_sessions
+                .get(&sess)
+                .and_then(|s| s.callback);
             match name {
                 "play" | "pause" | "stop" | "skipToNext" | "skipToPrevious" => {
                     let cb_name = match name {
@@ -577,7 +582,7 @@ pub(super) fn instance_call(
                     return Ok(Some(Value::Null));
                 }
                 let proj = alloc(vm, PROJECTION)?;
-                vm.fw.m10.media_projections.insert(
+                vm.fw.vdev.media_projections.insert(
                     proj,
                     MediaProjectionEntry {
                         callbacks: Vec::new(),
@@ -591,9 +596,10 @@ pub(super) fn instance_call(
         },
         PROJECTION => match name {
             "registerCallback" => {
-                if let (Some(cb), Some(entry)) =
-                    (obj_arg(args, 0), vm.fw.m10.media_projections.get_mut(&recv))
-                {
+                if let (Some(cb), Some(entry)) = (
+                    obj_arg(args, 0),
+                    vm.fw.vdev.media_projections.get_mut(&recv),
+                ) {
                     if !entry.callbacks.contains(&cb) {
                         entry.callbacks.push(cb);
                     }
@@ -601,9 +607,10 @@ pub(super) fn instance_call(
                 Ok(Some(Value::Null))
             }
             "unregisterCallback" => {
-                if let (Some(cb), Some(entry)) =
-                    (obj_arg(args, 0), vm.fw.m10.media_projections.get_mut(&recv))
-                {
+                if let (Some(cb), Some(entry)) = (
+                    obj_arg(args, 0),
+                    vm.fw.vdev.media_projections.get_mut(&recv),
+                ) {
                     entry.callbacks.retain(|x| *x != cb);
                 }
                 Ok(Some(Value::Null))
@@ -611,7 +618,7 @@ pub(super) fn instance_call(
             "createVirtualDisplay" => {
                 let stopped = vm
                     .fw
-                    .m10
+                    .vdev
                     .media_projections
                     .get(&recv)
                     .map(|p| p.stopped)
@@ -635,7 +642,7 @@ pub(super) fn instance_call(
                         ("rd_dpi".into(), Value::Int(dpi)),
                     ],
                 )?;
-                if let Some(entry) = vm.fw.m10.media_projections.get_mut(&recv) {
+                if let Some(entry) = vm.fw.vdev.media_projections.get_mut(&recv) {
                     entry.displays.push(vd);
                 }
                 if let Some(surf) = surface {
@@ -653,7 +660,7 @@ pub(super) fn instance_call(
                 Ok(Some(Value::Obj(vd)))
             }
             "stop" => {
-                let cbs = if let Some(entry) = vm.fw.m10.media_projections.get_mut(&recv) {
+                let cbs = if let Some(entry) = vm.fw.vdev.media_projections.get_mut(&recv) {
                     if entry.stopped {
                         Vec::new()
                     } else {
@@ -689,7 +696,7 @@ fn audio_manager_call(
             let s = int_arg(args, 0);
             let cur = vm
                 .fw
-                .m10
+                .vdev
                 .audio
                 .stream_volumes
                 .get(&s)
@@ -701,7 +708,7 @@ fn audio_manager_call(
             let s = int_arg(args, 0);
             let max = vm
                 .fw
-                .m10
+                .vdev
                 .audio
                 .stream_volumes
                 .get(&s)
@@ -715,48 +722,52 @@ fn audio_manager_call(
             let idx = int_arg(args, 1);
             let max = vm
                 .fw
-                .m10
+                .vdev
                 .audio
                 .stream_volumes
                 .get(&s)
                 .map(|(_, m)| *m)
                 .unwrap_or(15);
             vm.fw
-                .m10
+                .vdev
                 .audio
                 .stream_volumes
                 .insert(s, (idx.clamp(0, max), max));
             Ok(Some(Value::Null))
         }
         "isVolumeFixed" => Ok(Some(Value::Int(0))),
-        "getRingerMode" => Ok(Some(Value::Int(vm.fw.m10.audio.ringer_mode))),
+        "getRingerMode" => Ok(Some(Value::Int(vm.fw.vdev.audio.ringer_mode))),
         "setRingerMode" => {
-            vm.fw.m10.audio.ringer_mode = int_arg(args, 0).clamp(0, 2);
+            vm.fw.vdev.audio.ringer_mode = int_arg(args, 0).clamp(0, 2);
             Ok(Some(Value::Null))
         }
-        "getMode" => Ok(Some(Value::Int(vm.fw.m10.audio.mode))),
+        "getMode" => Ok(Some(Value::Int(vm.fw.vdev.audio.mode))),
         "setMode" => {
-            vm.fw.m10.audio.mode = int_arg(args, 0);
+            vm.fw.vdev.audio.mode = int_arg(args, 0);
             Ok(Some(Value::Null))
         }
-        "isSpeakerphoneOn" => Ok(Some(Value::Int(i32::from(vm.fw.m10.audio.speakerphone_on)))),
+        "isSpeakerphoneOn" => Ok(Some(Value::Int(i32::from(
+            vm.fw.vdev.audio.speakerphone_on,
+        )))),
         "setSpeakerphoneOn" => {
-            vm.fw.m10.audio.speakerphone_on = bool_arg(args, 0);
+            vm.fw.vdev.audio.speakerphone_on = bool_arg(args, 0);
             Ok(Some(Value::Null))
         }
-        "isMicrophoneMute" => Ok(Some(Value::Int(i32::from(vm.fw.m10.audio.microphone_mute)))),
+        "isMicrophoneMute" => Ok(Some(Value::Int(i32::from(
+            vm.fw.vdev.audio.microphone_mute,
+        )))),
         "setMicrophoneMute" => {
-            vm.fw.m10.audio.microphone_mute = bool_arg(args, 0);
+            vm.fw.vdev.audio.microphone_mute = bool_arg(args, 0);
             Ok(Some(Value::Null))
         }
         "isMusicActive" => {
             let playing = vm
                 .fw
-                .m10
+                .vdev
                 .media_players
                 .values()
                 .any(|p| p.state == MediaPlayerState::Started)
-                || vm.fw.m10.audio_tracks.values().any(|t| t.play_state == 3);
+                || vm.fw.vdev.audio_tracks.values().any(|t| t.play_state == 3);
             Ok(Some(Value::Int(i32::from(playing))))
         }
         "requestAudioFocus" => {
@@ -776,7 +787,7 @@ fn audio_manager_call(
                 3 => -3, // AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK
                 _ => -1, // AUDIOFOCUS_LOSS
             };
-            if let Some(prev) = vm.fw.m10.audio.focus_stack.last().cloned() {
+            if let Some(prev) = vm.fw.vdev.audio.focus_stack.last().cloned() {
                 if prev.listener != listener {
                     if let Some(prev_l) = prev.listener {
                         let _ = call_dex(
@@ -790,11 +801,11 @@ fn audio_manager_call(
                 }
             }
             vm.fw
-                .m10
+                .vdev
                 .audio
                 .focus_stack
                 .retain(|e| e.listener != listener);
-            vm.fw.m10.audio.focus_stack.push(AudioFocusEntry {
+            vm.fw.vdev.audio.focus_stack.push(AudioFocusEntry {
                 listener,
                 stream_type: stream,
                 duration_hint: gain,
@@ -811,7 +822,7 @@ fn audio_manager_call(
                 obj_arg(args, 0)
             };
             vm.fw
-                .m10
+                .vdev
                 .audio
                 .focus_stack
                 .retain(|e| e.listener != listener);
@@ -831,7 +842,7 @@ fn audio_record_call(
         "<init>" => {
             check_perm(vm, "android.permission.RECORD_AUDIO")?;
             let sr = int_arg(args, 1).max(8_000);
-            vm.fw.m10.audio_records.insert(
+            vm.fw.vdev.audio_records.insert(
                 recv,
                 AudioRecordState {
                     sample_rate: sr,
@@ -843,12 +854,12 @@ fn audio_record_call(
             Ok(Some(Value::Null))
         }
         "getState" => Ok(Some(Value::Int(i32::from(
-            vm.fw.m10.audio_records.contains_key(&recv),
+            vm.fw.vdev.audio_records.contains_key(&recv),
         )))),
         "getRecordingState" => {
             let st = vm
                 .fw
-                .m10
+                .vdev
                 .audio_records
                 .get(&recv)
                 .map(|r| if r.recording { 3 } else { 1 })
@@ -857,33 +868,33 @@ fn audio_record_call(
         }
         "getSampleRate" => Ok(Some(Value::Int(
             vm.fw
-                .m10
+                .vdev
                 .audio_records
                 .get(&recv)
                 .map(|r| r.sample_rate)
                 .unwrap_or(44_100),
         ))),
         "startRecording" => {
-            let Some(st) = vm.fw.m10.audio_records.get_mut(&recv) else {
+            let Some(st) = vm.fw.vdev.audio_records.get_mut(&recv) else {
                 return Err(illegal_state("AudioRecord not initialized"));
             };
             st.recording = true;
             Ok(Some(Value::Null))
         }
         "stop" => {
-            if let Some(st) = vm.fw.m10.audio_records.get_mut(&recv) {
+            if let Some(st) = vm.fw.vdev.audio_records.get_mut(&recv) {
                 st.recording = false;
             }
             Ok(Some(Value::Null))
         }
         "release" => {
-            vm.fw.m10.audio_records.remove(&recv);
+            vm.fw.vdev.audio_records.remove(&recv);
             Ok(Some(Value::Null))
         }
         "read" => {
             let recording = vm
                 .fw
-                .m10
+                .vdev
                 .audio_records
                 .get(&recv)
                 .map(|r| r.recording)
@@ -898,10 +909,10 @@ fn audio_record_call(
             if cls == "Ljava/nio/ByteBuffer;" {
                 let req_bytes = int_arg(args, 1).max(0) as usize;
                 let mut chunk = vec![0u8; req_bytes];
-                let avail = vm.fw.m10.audio.pcm_input_queue.len().min(req_bytes);
+                let avail = vm.fw.vdev.audio.pcm_input_queue.len().min(req_bytes);
                 if avail > 0 {
-                    chunk[..avail].copy_from_slice(&vm.fw.m10.audio.pcm_input_queue[..avail]);
-                    vm.fw.m10.audio.pcm_input_queue.drain(..avail);
+                    chunk[..avail].copy_from_slice(&vm.fw.vdev.audio.pcm_input_queue[..avail]);
+                    vm.fw.vdev.audio.pcm_input_queue.drain(..avail);
                 }
                 if let Some(Value::Obj(arr)) = get_field(vm, dst, "rd_buf") {
                     let cap = array_len(vm, arr).unwrap_or(0);
@@ -912,7 +923,7 @@ fn audio_record_call(
                     }
                     put_field(vm, dst, "rd_pos", Value::Int(0))?;
                     put_field(vm, dst, "rd_limit", Value::Int(n as i32))?;
-                    if let Some(st) = vm.fw.m10.audio_records.get_mut(&recv) {
+                    if let Some(st) = vm.fw.vdev.audio_records.get_mut(&recv) {
                         st.bytes_read += n as u64;
                     }
                     return Ok(Some(Value::Int(n as i32)));
@@ -928,32 +939,32 @@ fn audio_record_call(
             if cls == "[S" {
                 let bytes_needed = count * 2;
                 let mut raw = vec![0u8; bytes_needed];
-                let avail = vm.fw.m10.audio.pcm_input_queue.len().min(bytes_needed);
+                let avail = vm.fw.vdev.audio.pcm_input_queue.len().min(bytes_needed);
                 if avail > 0 {
-                    raw[..avail].copy_from_slice(&vm.fw.m10.audio.pcm_input_queue[..avail]);
-                    vm.fw.m10.audio.pcm_input_queue.drain(..avail);
+                    raw[..avail].copy_from_slice(&vm.fw.vdev.audio.pcm_input_queue[..avail]);
+                    vm.fw.vdev.audio.pcm_input_queue.drain(..avail);
                 }
                 let elems = vm.heap.array_elems_mut(dst)?;
                 for i in 0..count {
                     let sample = i16::from_le_bytes([raw[i * 2], raw[i * 2 + 1]]);
                     elems[off + i] = Value::Int(i32::from(sample));
                 }
-                if let Some(st) = vm.fw.m10.audio_records.get_mut(&recv) {
+                if let Some(st) = vm.fw.vdev.audio_records.get_mut(&recv) {
                     st.bytes_read += bytes_needed as u64;
                 }
                 Ok(Some(Value::Int(count as i32)))
             } else {
                 let mut raw = vec![0u8; count];
-                let avail = vm.fw.m10.audio.pcm_input_queue.len().min(count);
+                let avail = vm.fw.vdev.audio.pcm_input_queue.len().min(count);
                 if avail > 0 {
-                    raw[..avail].copy_from_slice(&vm.fw.m10.audio.pcm_input_queue[..avail]);
-                    vm.fw.m10.audio.pcm_input_queue.drain(..avail);
+                    raw[..avail].copy_from_slice(&vm.fw.vdev.audio.pcm_input_queue[..avail]);
+                    vm.fw.vdev.audio.pcm_input_queue.drain(..avail);
                 }
                 let elems = vm.heap.array_elems_mut(dst)?;
                 for i in 0..count {
                     elems[off + i] = Value::Int(i32::from(raw[i] as i8));
                 }
-                if let Some(st) = vm.fw.m10.audio_records.get_mut(&recv) {
+                if let Some(st) = vm.fw.vdev.audio_records.get_mut(&recv) {
                     st.bytes_read += count as u64;
                 }
                 Ok(Some(Value::Int(count as i32)))
@@ -972,7 +983,7 @@ fn audio_track_call(
     match name {
         "<init>" => {
             let sr = int_arg(args, 1).max(8_000);
-            vm.fw.m10.audio_tracks.insert(
+            vm.fw.vdev.audio_tracks.insert(
                 recv,
                 AudioTrackState {
                     sample_rate: sr,
@@ -984,30 +995,30 @@ fn audio_track_call(
             Ok(Some(Value::Null))
         }
         "getState" => Ok(Some(Value::Int(i32::from(
-            vm.fw.m10.audio_tracks.contains_key(&recv),
+            vm.fw.vdev.audio_tracks.contains_key(&recv),
         )))),
         "getPlayState" => Ok(Some(Value::Int(
             vm.fw
-                .m10
+                .vdev
                 .audio_tracks
                 .get(&recv)
                 .map(|t| t.play_state)
                 .unwrap_or(1),
         ))),
         "play" => {
-            if let Some(t) = vm.fw.m10.audio_tracks.get_mut(&recv) {
+            if let Some(t) = vm.fw.vdev.audio_tracks.get_mut(&recv) {
                 t.play_state = 3;
             }
             Ok(Some(Value::Null))
         }
         "pause" => {
-            if let Some(t) = vm.fw.m10.audio_tracks.get_mut(&recv) {
+            if let Some(t) = vm.fw.vdev.audio_tracks.get_mut(&recv) {
                 t.play_state = 2;
             }
             Ok(Some(Value::Null))
         }
         "stop" | "flush" => {
-            if let Some(t) = vm.fw.m10.audio_tracks.get_mut(&recv) {
+            if let Some(t) = vm.fw.vdev.audio_tracks.get_mut(&recv) {
                 if name == "stop" {
                     t.play_state = 1;
                 }
@@ -1015,7 +1026,7 @@ fn audio_track_call(
             Ok(Some(Value::Null))
         }
         "release" => {
-            vm.fw.m10.audio_tracks.remove(&recv);
+            vm.fw.vdev.audio_tracks.remove(&recv);
             Ok(Some(Value::Null))
         }
         "write" => {
@@ -1033,7 +1044,7 @@ fn audio_track_call(
                     preview.extend_from_slice(&bytes[pos..end.min(pos + 64)]);
                     put_field(vm, src, "rd_pos", Value::Int(end as i32))?;
                 }
-                if let Some(t) = vm.fw.m10.audio_tracks.get_mut(&recv) {
+                if let Some(t) = vm.fw.vdev.audio_tracks.get_mut(&recv) {
                     t.bytes_written += n as u64;
                     t.last_samples_preview = preview;
                 }
@@ -1045,11 +1056,11 @@ fn audio_track_call(
             if cls == "[B" {
                 let bytes = read_byte_array(vm, src)?;
                 let end = (off + count).min(bytes.len());
-                if let Some(t) = vm.fw.m10.audio_tracks.get_mut(&recv) {
+                if let Some(t) = vm.fw.vdev.audio_tracks.get_mut(&recv) {
                     t.bytes_written += (end.saturating_sub(off)) as u64;
                     t.last_samples_preview = bytes[off..end.min(off + 64)].to_vec();
                 }
-            } else if let Some(t) = vm.fw.m10.audio_tracks.get_mut(&recv) {
+            } else if let Some(t) = vm.fw.vdev.audio_tracks.get_mut(&recv) {
                 t.bytes_written += bytes_written as u64;
             }
             Ok(Some(Value::Int(count as i32)))
@@ -1067,14 +1078,14 @@ fn media_player_call(
     match name {
         "<init>" => {
             vm.fw
-                .m10
+                .vdev
                 .media_players
                 .insert(recv, MediaPlayerEntry::default());
             Ok(Some(Value::Null))
         }
         "setDataSource" => {
             let ds = opt_str_arg(vm, args, 0)?.unwrap_or_else(|| "uri://datasource".into());
-            let entry = vm.fw.m10.media_players.entry(recv).or_default();
+            let entry = vm.fw.vdev.media_players.entry(recv).or_default();
             if entry.state != MediaPlayerState::Idle {
                 return Err(illegal_state(
                     "MediaPlayer.setDataSource requires Idle state",
@@ -1086,7 +1097,7 @@ fn media_player_call(
         }
         "prepare" | "prepareAsync" => {
             let cb = {
-                let entry = vm.fw.m10.media_players.entry(recv).or_default();
+                let entry = vm.fw.vdev.media_players.entry(recv).or_default();
                 if !matches!(
                     entry.state,
                     MediaPlayerState::Initialized | MediaPlayerState::Stopped
@@ -1110,7 +1121,7 @@ fn media_player_call(
             Ok(Some(Value::Null))
         }
         "start" => {
-            let entry = vm.fw.m10.media_players.entry(recv).or_default();
+            let entry = vm.fw.vdev.media_players.entry(recv).or_default();
             if !matches!(
                 entry.state,
                 MediaPlayerState::Prepared
@@ -1124,7 +1135,7 @@ fn media_player_call(
             Ok(Some(Value::Null))
         }
         "pause" => {
-            let entry = vm.fw.m10.media_players.entry(recv).or_default();
+            let entry = vm.fw.vdev.media_players.entry(recv).or_default();
             if !matches!(
                 entry.state,
                 MediaPlayerState::Started
@@ -1137,7 +1148,7 @@ fn media_player_call(
             Ok(Some(Value::Null))
         }
         "stop" => {
-            let entry = vm.fw.m10.media_players.entry(recv).or_default();
+            let entry = vm.fw.vdev.media_players.entry(recv).or_default();
             if matches!(entry.state, MediaPlayerState::Idle | MediaPlayerState::End) {
                 return Err(illegal_state("MediaPlayer.stop in invalid state"));
             }
@@ -1147,7 +1158,7 @@ fn media_player_call(
         "seekTo" => {
             let pos = int_arg(args, 0).max(0);
             let cb = {
-                let entry = vm.fw.m10.media_players.entry(recv).or_default();
+                let entry = vm.fw.vdev.media_players.entry(recv).or_default();
                 if matches!(
                     entry.state,
                     MediaPlayerState::Idle
@@ -1172,7 +1183,7 @@ fn media_player_call(
             Ok(Some(Value::Null))
         }
         "reset" => {
-            if let Some(entry) = vm.fw.m10.media_players.get_mut(&recv) {
+            if let Some(entry) = vm.fw.vdev.media_players.get_mut(&recv) {
                 entry.state = MediaPlayerState::Idle;
                 entry.position_ms = 0;
                 entry.data_source.clear();
@@ -1180,16 +1191,16 @@ fn media_player_call(
             Ok(Some(Value::Null))
         }
         "release" => {
-            if let Some(entry) = vm.fw.m10.media_players.get_mut(&recv) {
+            if let Some(entry) = vm.fw.vdev.media_players.get_mut(&recv) {
                 entry.state = MediaPlayerState::End;
             }
-            vm.fw.m10.media_players.remove(&recv);
+            vm.fw.vdev.media_players.remove(&recv);
             Ok(Some(Value::Null))
         }
         "isPlaying" => {
             let on = vm
                 .fw
-                .m10
+                .vdev
                 .media_players
                 .get(&recv)
                 .map(|e| e.state == MediaPlayerState::Started)
@@ -1198,7 +1209,7 @@ fn media_player_call(
         }
         "getCurrentPosition" => Ok(Some(Value::Int(
             vm.fw
-                .m10
+                .vdev
                 .media_players
                 .get(&recv)
                 .map(|e| e.position_ms)
@@ -1206,27 +1217,27 @@ fn media_player_call(
         ))),
         "getDuration" => Ok(Some(Value::Int(
             vm.fw
-                .m10
+                .vdev
                 .media_players
                 .get(&recv)
                 .map(|e| e.duration_ms)
                 .unwrap_or(0),
         ))),
         "setLooping" => {
-            let entry = vm.fw.m10.media_players.entry(recv).or_default();
+            let entry = vm.fw.vdev.media_players.entry(recv).or_default();
             entry.looping = bool_arg(args, 0);
             Ok(Some(Value::Null))
         }
         "isLooping" => Ok(Some(Value::Int(i32::from(
             vm.fw
-                .m10
+                .vdev
                 .media_players
                 .get(&recv)
                 .map(|e| e.looping)
                 .unwrap_or(false),
         )))),
         "setVolume" => {
-            let entry = vm.fw.m10.media_players.entry(recv).or_default();
+            let entry = vm.fw.vdev.media_players.entry(recv).or_default();
             entry.left_vol = float_arg(args, 0);
             entry.right_vol = float_arg(args, 1);
             Ok(Some(Value::Null))
@@ -1235,12 +1246,17 @@ fn media_player_call(
             Ok(Some(Value::Null))
         }
         "setOnPreparedListener" => {
-            vm.fw.m10.media_players.entry(recv).or_default().on_prepared = obj_arg(args, 0);
+            vm.fw
+                .vdev
+                .media_players
+                .entry(recv)
+                .or_default()
+                .on_prepared = obj_arg(args, 0);
             Ok(Some(Value::Null))
         }
         "setOnCompletionListener" => {
             vm.fw
-                .m10
+                .vdev
                 .media_players
                 .entry(recv)
                 .or_default()
@@ -1249,7 +1265,7 @@ fn media_player_call(
         }
         "setOnSeekCompleteListener" => {
             vm.fw
-                .m10
+                .vdev
                 .media_players
                 .entry(recv)
                 .or_default()
@@ -1257,7 +1273,7 @@ fn media_player_call(
             Ok(Some(Value::Null))
         }
         "setOnErrorListener" => {
-            vm.fw.m10.media_players.entry(recv).or_default().on_error = obj_arg(args, 0);
+            vm.fw.vdev.media_players.entry(recv).or_default().on_error = obj_arg(args, 0);
             Ok(Some(Value::Null))
         }
         _ => Ok(None),
@@ -1273,7 +1289,7 @@ fn media_session_call(
     match name {
         "<init>" => {
             let tag = opt_str_arg(vm, args, 1)?.unwrap_or_else(|| "default".into());
-            vm.fw.m10.media_sessions.insert(
+            vm.fw.vdev.media_sessions.insert(
                 recv,
                 MediaSessionEntry {
                     tag,
@@ -1290,21 +1306,21 @@ fn media_session_call(
             Ok(Some(Value::Null))
         }
         "setActive" => {
-            if let Some(s) = vm.fw.m10.media_sessions.get_mut(&recv) {
+            if let Some(s) = vm.fw.vdev.media_sessions.get_mut(&recv) {
                 s.active = bool_arg(args, 0);
             }
             Ok(Some(Value::Null))
         }
         "isActive" => Ok(Some(Value::Int(i32::from(
             vm.fw
-                .m10
+                .vdev
                 .media_sessions
                 .get(&recv)
                 .map(|s| s.active)
                 .unwrap_or(false),
         )))),
         "setCallback" => {
-            if let Some(s) = vm.fw.m10.media_sessions.get_mut(&recv) {
+            if let Some(s) = vm.fw.vdev.media_sessions.get_mut(&recv) {
                 s.callback = obj_arg(args, 0);
             }
             Ok(Some(Value::Null))
@@ -1319,7 +1335,7 @@ fn media_session_call(
                     )
                 })
                 .unwrap_or((0, 0));
-            if let Some(s) = vm.fw.m10.media_sessions.get_mut(&recv) {
+            if let Some(s) = vm.fw.vdev.media_sessions.get_mut(&recv) {
                 s.playback_state = st_obj;
                 s.state_code = code;
                 s.position_ms = pos;
@@ -1336,7 +1352,7 @@ fn media_session_call(
                 super::get_str_field(vm, r, "rd_md_METADATA_KEY_ARTIST")
                     .or_else(|| super::get_str_field(vm, r, "rd_md_android.media.metadata.ARTIST"))
             });
-            if let Some(s) = vm.fw.m10.media_sessions.get_mut(&recv) {
+            if let Some(s) = vm.fw.vdev.media_sessions.get_mut(&recv) {
                 s.metadata = md_obj;
                 s.title = title;
                 s.artist = artist;
@@ -1361,7 +1377,7 @@ fn media_session_call(
         }
         "setFlags" | "setSessionActivity" | "setMediaButtonReceiver" => Ok(Some(Value::Null)),
         "release" => {
-            vm.fw.m10.media_sessions.remove(&recv);
+            vm.fw.vdev.media_sessions.remove(&recv);
             Ok(Some(Value::Null))
         }
         _ => Ok(None),
@@ -1372,7 +1388,7 @@ impl Engine {
     /// Enqueue virtual PCM input bytes for `AudioRecord.read(...)`.
     pub fn m10_push_audio_input(&mut self, pcm_bytes: &[u8]) {
         self.fw
-            .m10
+            .vdev
             .audio
             .pcm_input_queue
             .extend_from_slice(pcm_bytes);
@@ -1381,7 +1397,7 @@ impl Engine {
     /// Advance/complete any started `MediaPlayer`s and fire `OnCompletionListener`.
     pub fn m10_complete_media_players(&mut self) -> Result<usize, VmExit> {
         let mut callbacks = Vec::new();
-        for (mp, entry) in &mut self.fw.m10.media_players {
+        for (mp, entry) in &mut self.fw.vdev.media_players {
             if entry.state == MediaPlayerState::Started {
                 if entry.looping {
                     entry.position_ms = 0;
@@ -1428,7 +1444,7 @@ impl Engine {
         }
         let cbs: Vec<ObjRef> = self
             .fw
-            .m10
+            .vdev
             .media_sessions
             .values()
             .filter(|s| s.active)

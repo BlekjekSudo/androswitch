@@ -164,10 +164,10 @@ pub(crate) fn enqueue_frame_to_surface(
     format: i32,
     bytes: &[u8],
 ) -> Result<bool, VmExit> {
-    let Some(reader_ref) = vm.fw.m10.surface_to_reader.get(&surface).copied() else {
+    let Some(reader_ref) = vm.fw.vdev.surface_to_reader.get(&surface).copied() else {
         return Ok(false);
     };
-    let Some(reader_meta) = vm.fw.m10.image_readers.get(&reader_ref).cloned() else {
+    let Some(reader_meta) = vm.fw.vdev.image_readers.get(&reader_ref).cloned() else {
         return Ok(false);
     };
     if reader_meta.closed {
@@ -184,7 +184,7 @@ pub(crate) fn enqueue_frame_to_surface(
     } else {
         reader_meta.format
     };
-    let ts = vm.fw.m10.next_timestamp_ns();
+    let ts = vm.fw.vdev.next_timestamp_ns();
 
     let bb = new_byte_buffer_from_bytes(vm, bytes)?;
     let pixel_stride = if fmt == 1 { 4 } else { 1 };
@@ -212,7 +212,7 @@ pub(crate) fn enqueue_frame_to_surface(
         ],
     )?;
 
-    let listener = if let Some(st) = vm.fw.m10.image_readers.get_mut(&reader_ref) {
+    let listener = if let Some(st) = vm.fw.vdev.image_readers.get_mut(&reader_ref) {
         let max_q = (st.max_images.max(1)) as usize;
         if st.queue.len() >= max_q {
             st.queue.remove(0);
@@ -325,8 +325,8 @@ pub(super) fn static_call(
             }
             let surface = alloc(vm, SURFACE)?;
             let reader = alloc(vm, IMAGE_READER)?;
-            vm.fw.m10.surface_to_reader.insert(surface, reader);
-            vm.fw.m10.image_readers.insert(
+            vm.fw.vdev.surface_to_reader.insert(surface, reader);
+            vm.fw.vdev.image_readers.insert(
                 reader,
                 ImageReaderState {
                     width: w,
@@ -409,7 +409,7 @@ pub(super) fn instance_call(
         }
         CAMERA_MANAGER => match name {
             "getCameraIdList" => {
-                let ids: Vec<String> = vm.fw.m10.cameras.keys().cloned().collect();
+                let ids: Vec<String> = vm.fw.vdev.cameras.keys().cloned().collect();
                 let mut vals = Vec::with_capacity(ids.len());
                 for id in ids {
                     vals.push(str_val(vm, id)?);
@@ -418,7 +418,7 @@ pub(super) fn instance_call(
             }
             "getCameraCharacteristics" => {
                 let id = req_str_arg(vm, args, 0)?;
-                if !vm.fw.m10.cameras.contains_key(&id) {
+                if !vm.fw.vdev.cameras.contains_key(&id) {
                     return Err(illegal(format!("unknown camera id: {id}")));
                 }
                 let id_v = str_val(vm, id)?;
@@ -428,7 +428,7 @@ pub(super) fn instance_call(
             "setTorchMode" => {
                 let id = req_str_arg(vm, args, 0)?;
                 let on = bool_arg(args, 1);
-                let Some(cam) = vm.fw.m10.cameras.get_mut(&id) else {
+                let Some(cam) = vm.fw.vdev.cameras.get_mut(&id) else {
                     return Err(illegal(format!("unknown camera id: {id}")));
                 };
                 if !cam.flash_available {
@@ -440,7 +440,7 @@ pub(super) fn instance_call(
             "openCamera" => {
                 check_perm(vm, "android.permission.CAMERA")?;
                 let id = req_str_arg(vm, args, 0)?;
-                if !vm.fw.m10.cameras.contains_key(&id) {
+                if !vm.fw.vdev.cameras.contains_key(&id) {
                     return Err(illegal(format!("unknown camera id: {id}")));
                 }
                 // (String, StateCallback, Handler) or (String, Executor, StateCallback)
@@ -479,9 +479,9 @@ pub(super) fn instance_call(
                         ("rd_closed".into(), Value::Int(0)),
                     ],
                 )?;
-                vm.fw.m10.camera_devices.insert(dev, id);
+                vm.fw.vdev.camera_devices.insert(dev, id);
                 if let Some(cb_ref) = cb {
-                    vm.fw.m10.camera_callbacks.insert(dev, cb_ref);
+                    vm.fw.vdev.camera_callbacks.insert(dev, cb_ref);
                     let _ = call_dex(
                         vm,
                         cb_ref,
@@ -501,7 +501,7 @@ pub(super) fn instance_call(
         CAMERA_CHARS => match name {
             "get" => {
                 let id = get_str_field(vm, recv, "rd_cam_id").unwrap_or_else(|| "0".into());
-                let Some(cam) = vm.fw.m10.cameras.get(&id).cloned() else {
+                let Some(cam) = vm.fw.vdev.cameras.get(&id).cloned() else {
                     return Ok(Some(Value::Null));
                 };
                 let key_name = obj_arg(args, 0)
@@ -651,7 +651,7 @@ pub(super) fn instance_call(
                     }
                 }
                 let session = alloc(vm, CAPTURE_SESSION)?;
-                vm.fw.m10.camera_sessions.insert(
+                vm.fw.vdev.camera_sessions.insert(
                     session,
                     CameraSessionState {
                         device: recv,
@@ -675,19 +675,19 @@ pub(super) fn instance_call(
             }
             "close" => {
                 put_field(vm, recv, "rd_closed", Value::Int(1))?;
-                vm.fw.m10.camera_devices.remove(&recv);
+                vm.fw.vdev.camera_devices.remove(&recv);
                 let closed_sessions: Vec<ObjRef> = vm
                     .fw
-                    .m10
+                    .vdev
                     .camera_sessions
                     .iter()
                     .filter(|(_, s)| s.device == recv)
                     .map(|(k, _)| *k)
                     .collect();
                 for s in closed_sessions {
-                    vm.fw.m10.camera_sessions.remove(&s);
+                    vm.fw.vdev.camera_sessions.remove(&s);
                 }
-                if let Some(cb) = vm.fw.m10.camera_callbacks.remove(&recv) {
+                if let Some(cb) = vm.fw.vdev.camera_callbacks.remove(&recv) {
                     let _ = call_dex(
                         vm,
                         cb,
@@ -791,7 +791,7 @@ pub(super) fn instance_call(
             "getDevice" => {
                 let dev = vm
                     .fw
-                    .m10
+                    .vdev
                     .camera_sessions
                     .get(&recv)
                     .map(|s| Value::Obj(s.device))
@@ -807,7 +807,7 @@ pub(super) fn instance_call(
                     return Err(illegal("CaptureRequest is null"));
                 };
                 let (cam_id, seq, default_surfaces) = {
-                    let Some(sess) = vm.fw.m10.camera_sessions.get_mut(&recv) else {
+                    let Some(sess) = vm.fw.vdev.camera_sessions.get_mut(&recv) else {
                         return Err(illegal_state("CameraCaptureSession is closed"));
                     };
                     if sess.closed {
@@ -836,10 +836,10 @@ pub(super) fn instance_call(
                 if targets.is_empty() {
                     targets = default_surfaces;
                 }
-                let injected = vm.fw.m10.injected_camera_frames.get(&cam_id).cloned();
+                let injected = vm.fw.vdev.injected_camera_frames.get(&cam_id).cloned();
                 let cam_dims = vm
                     .fw
-                    .m10
+                    .vdev
                     .cameras
                     .get(&cam_id)
                     .map(|c| (c.width, c.height))
@@ -848,10 +848,10 @@ pub(super) fn instance_call(
                 for surf in targets {
                     let reader_fmt = vm
                         .fw
-                        .m10
+                        .vdev
                         .surface_to_reader
                         .get(&surf)
-                        .and_then(|r| vm.fw.m10.image_readers.get(r))
+                        .and_then(|r| vm.fw.vdev.image_readers.get(r))
                         .map(|ir| (ir.width, ir.height, ir.format));
                     let (w, h, fmt, data) = if let Some(spec) = &injected {
                         (spec.width, spec.height, spec.format, spec.bytes.clone())
@@ -890,13 +890,13 @@ pub(super) fn instance_call(
                 Ok(Some(Value::Int(seq)))
             }
             "stopRepeating" | "abortCaptures" => {
-                if let Some(sess) = vm.fw.m10.camera_sessions.get_mut(&recv) {
+                if let Some(sess) = vm.fw.vdev.camera_sessions.get_mut(&recv) {
                     sess.repeating = false;
                 }
                 Ok(Some(Value::Null))
             }
             "close" => {
-                vm.fw.m10.camera_sessions.remove(&recv);
+                vm.fw.vdev.camera_sessions.remove(&recv);
                 Ok(Some(Value::Null))
             }
             _ => Ok(None),
@@ -912,7 +912,7 @@ pub(super) fn instance_call(
         IMAGE_READER => match name {
             "getWidth" => Ok(Some(Value::Int(
                 vm.fw
-                    .m10
+                    .vdev
                     .image_readers
                     .get(&recv)
                     .map(|r| r.width)
@@ -920,7 +920,7 @@ pub(super) fn instance_call(
             ))),
             "getHeight" => Ok(Some(Value::Int(
                 vm.fw
-                    .m10
+                    .vdev
                     .image_readers
                     .get(&recv)
                     .map(|r| r.height)
@@ -928,7 +928,7 @@ pub(super) fn instance_call(
             ))),
             "getImageFormat" => Ok(Some(Value::Int(
                 vm.fw
-                    .m10
+                    .vdev
                     .image_readers
                     .get(&recv)
                     .map(|r| r.format)
@@ -936,7 +936,7 @@ pub(super) fn instance_call(
             ))),
             "getMaxImages" => Ok(Some(Value::Int(
                 vm.fw
-                    .m10
+                    .vdev
                     .image_readers
                     .get(&recv)
                     .map(|r| r.max_images)
@@ -944,7 +944,7 @@ pub(super) fn instance_call(
             ))),
             "getSurface" => Ok(Some(
                 vm.fw
-                    .m10
+                    .vdev
                     .image_readers
                     .get(&recv)
                     .map(|r| Value::Obj(r.surface))
@@ -952,13 +952,13 @@ pub(super) fn instance_call(
             )),
             "setOnImageAvailableListener" => {
                 let l = obj_arg(args, 0);
-                if let Some(st) = vm.fw.m10.image_readers.get_mut(&recv) {
+                if let Some(st) = vm.fw.vdev.image_readers.get_mut(&recv) {
                     st.listener = l;
                 }
                 Ok(Some(Value::Null))
             }
             "acquireLatestImage" => {
-                let img = if let Some(st) = vm.fw.m10.image_readers.get_mut(&recv) {
+                let img = if let Some(st) = vm.fw.vdev.image_readers.get_mut(&recv) {
                     let last = st.queue.pop();
                     st.queue.clear();
                     last
@@ -968,7 +968,7 @@ pub(super) fn instance_call(
                 Ok(Some(img.map(Value::Obj).unwrap_or(Value::Null)))
             }
             "acquireNextImage" => {
-                let img = if let Some(st) = vm.fw.m10.image_readers.get_mut(&recv) {
+                let img = if let Some(st) = vm.fw.vdev.image_readers.get_mut(&recv) {
                     if st.queue.is_empty() {
                         None
                     } else {
@@ -980,8 +980,8 @@ pub(super) fn instance_call(
                 Ok(Some(img.map(Value::Obj).unwrap_or(Value::Null)))
             }
             "close" => {
-                if let Some(st) = vm.fw.m10.image_readers.remove(&recv) {
-                    vm.fw.m10.surface_to_reader.remove(&st.surface);
+                if let Some(st) = vm.fw.vdev.image_readers.remove(&recv) {
+                    vm.fw.vdev.surface_to_reader.remove(&st.surface);
                 }
                 Ok(Some(Value::Null))
             }
@@ -1224,7 +1224,7 @@ impl Engine {
         format: i32,
         bytes: Vec<u8>,
     ) -> Result<usize, VmExit> {
-        if !self.fw.m10.cameras.contains_key(camera_id) {
+        if !self.fw.vdev.cameras.contains_key(camera_id) {
             return Err(illegal(format!("unknown camera id: {camera_id}")));
         }
         if width <= 0 || height <= 0 || bytes.is_empty() {
@@ -1232,7 +1232,7 @@ impl Engine {
                 "camera frame width/height and bytes must be non-empty",
             ));
         }
-        self.fw.m10.injected_camera_frames.insert(
+        self.fw.vdev.injected_camera_frames.insert(
             camera_id.to_string(),
             CameraFrameSpec {
                 width,
@@ -1243,7 +1243,7 @@ impl Engine {
         );
         let active_surfaces: Vec<ObjRef> = self
             .fw
-            .m10
+            .vdev
             .camera_sessions
             .values()
             .filter(|s| !s.closed && s.repeating && s.camera_id == camera_id)

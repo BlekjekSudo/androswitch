@@ -222,7 +222,7 @@ pub(super) fn instance_call(
         },
         FW_BM_MANAGER | AX_BM_MANAGER => match name {
             "canAuthenticate" => Ok(Some(Value::Int(
-                vm.fw.m10.biometrics.can_authenticate_code(),
+                vm.fw.vdev.biometrics.can_authenticate_code(),
             ))),
             _ => Ok(None),
         },
@@ -291,7 +291,7 @@ pub(super) fn instance_call(
                 Ok(Some(Value::Null))
             }
             "cancelAuthentication" => {
-                if let Some(p) = vm.fw.m10.biometrics.active_prompt.take() {
+                if let Some(p) = vm.fw.vdev.biometrics.active_prompt.take() {
                     let _ = deliver_prompt_outcome(
                         vm,
                         &p,
@@ -307,10 +307,10 @@ pub(super) fn instance_call(
         },
         FP_MANAGER => match name {
             "isHardwareDetected" => Ok(Some(Value::Int(i32::from(
-                vm.fw.m10.biometrics.hardware_present,
+                vm.fw.vdev.biometrics.hardware_present,
             )))),
             "hasEnrolledFingerprints" => Ok(Some(Value::Int(i32::from(
-                vm.fw.m10.biometrics.hardware_present && vm.fw.m10.biometrics.enrolled,
+                vm.fw.vdev.biometrics.hardware_present && vm.fw.vdev.biometrics.enrolled,
             )))),
             "authenticate" => {
                 // (CryptoObject, CancellationSignal, int flags, AuthenticationCallback, Handler)
@@ -333,8 +333,8 @@ fn start_biometric_prompt(
     callback: ObjRef,
     crypto: Option<ObjRef>,
 ) -> Result<(), VmExit> {
-    vm.fw.m10.biometrics.auth_attempts += 1;
-    if !vm.fw.m10.biometrics.hardware_present {
+    vm.fw.vdev.biometrics.auth_attempts += 1;
+    if !vm.fw.vdev.biometrics.hardware_present {
         let prompt = ActiveBiometricPrompt {
             kind,
             callback,
@@ -350,7 +350,7 @@ fn start_biometric_prompt(
         )?;
         return Ok(());
     }
-    if !vm.fw.m10.biometrics.enrolled {
+    if !vm.fw.vdev.biometrics.enrolled {
         let prompt = ActiveBiometricPrompt {
             kind,
             callback,
@@ -371,10 +371,10 @@ fn start_biometric_prompt(
         callback,
         crypto,
     };
-    let auto = vm.fw.m10.biometrics.auto_outcome.clone();
+    let auto = vm.fw.vdev.biometrics.auto_outcome.clone();
     match auto {
         BiometricOutcome::Pending => {
-            vm.fw.m10.biometrics.active_prompt = Some(prompt);
+            vm.fw.vdev.biometrics.active_prompt = Some(prompt);
         }
         other => {
             let _ = deliver_prompt_outcome(vm, &prompt, &other)?;
@@ -392,12 +392,12 @@ impl Engine {
         persist_auto: bool,
     ) -> Result<bool, VmExit> {
         if persist_auto {
-            self.fw.m10.biometrics.auto_outcome = outcome.clone();
+            self.fw.vdev.biometrics.auto_outcome = outcome.clone();
         }
         let active = match &outcome {
-            BiometricOutcome::Failed => self.fw.m10.biometrics.active_prompt.clone(),
+            BiometricOutcome::Failed => self.fw.vdev.biometrics.active_prompt.clone(),
             BiometricOutcome::Pending => None,
-            _ => self.fw.m10.biometrics.active_prompt.take(),
+            _ => self.fw.vdev.biometrics.active_prompt.take(),
         };
         let Some(prompt) = active else {
             return Ok(false);
@@ -406,7 +406,7 @@ impl Engine {
     }
 
     pub fn m10_set_biometric_hardware(&mut self, present: bool, enrolled: bool) {
-        self.fw.m10.biometrics.hardware_present = present;
-        self.fw.m10.biometrics.enrolled = enrolled;
+        self.fw.vdev.biometrics.hardware_present = present;
+        self.fw.vdev.biometrics.enrolled = enrolled;
     }
 }

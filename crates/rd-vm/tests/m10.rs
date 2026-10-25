@@ -653,7 +653,7 @@ fn camera2_session_imagereader_and_bytebuffer_pipeline() {
         &[cam0, Value::Obj(dev_cb), Value::Null],
     );
     assert_eq!(count(&e, CAM_DEV_CB, "onOpened"), 1);
-    let dev = *e.fw.m10.camera_devices.keys().next().expect("open device");
+    let dev = *e.fw.vdev.camera_devices.keys().next().expect("open device");
 
     // Build CaptureRequest targeting surface + createCaptureSession -> onConfigured
     let Value::Obj(req_builder) = icall(
@@ -702,7 +702,7 @@ fn camera2_session_imagereader_and_bytebuffer_pipeline() {
         &[Value::Obj(surf_list), Value::Obj(sess_cb), Value::Null],
     );
     assert_eq!(count(&e, CAM_SESS_CB, "onConfigured"), 1);
-    let sess = *e.fw.m10.camera_sessions.keys().next().expect("session");
+    let sess = *e.fw.vdev.camera_sessions.keys().next().expect("session");
 
     let cap_cb = dex_obj(&mut e, CAM_CAP_CB);
     icall(
@@ -822,7 +822,7 @@ fn biometrics_framework_and_androidx_callbacks() {
         prompt,
         &[Value::Null, Value::Null, Value::Obj(fw_cb)],
     );
-    assert!(e.fw.m10.biometrics.active_prompt.is_some());
+    assert!(e.fw.vdev.biometrics.active_prompt.is_some());
     // Failed attempt keeps prompt open; success consumes prompt
     assert!(e
         .m10_trigger_biometric(BiometricOutcome::Failed, false)
@@ -832,7 +832,7 @@ fn biometrics_framework_and_androidx_callbacks() {
         .m10_trigger_biometric(BiometricOutcome::Success, false)
         .expect("succeed"));
     assert_eq!(count(&e, BIO_FW_CB, "onAuthenticationSucceeded"), 1);
-    assert!(e.fw.m10.biometrics.active_prompt.is_none());
+    assert!(e.fw.vdev.biometrics.active_prompt.is_none());
 
     // AndroidX BiometricPrompt + lockout error
     let ax_prompt = host_obj(&mut e, "Landroidx/biometric/BiometricPrompt;");
@@ -993,7 +993,7 @@ fn audio_focus_pcm_mediaplayer_mediasession_and_projection() {
         ),
         Value::Int(4)
     );
-    assert_eq!(e.fw.m10.audio_tracks[&trk].bytes_written, 4);
+    assert_eq!(e.fw.vdev.audio_tracks[&trk].bytes_written, 4);
 
     // MediaPlayer state machine + callbacks
     let mp = host_obj(&mut e, "Landroid/media/MediaPlayer;");
@@ -1234,7 +1234,7 @@ fn connectivity_telephony_sms_ble_and_nfc_end_to_end() {
         sms_mgr,
         &[dest, Value::Null, body, Value::Null, Value::Null],
     );
-    assert_eq!(e.fw.m10.telephony.sent_sms.len(), 1);
+    assert_eq!(e.fw.vdev.telephony.sent_sms.len(), 1);
 
     let bcast = dex_obj(&mut e, BCAST_CB);
     e.fw.m8.receivers.push(bcast);
@@ -1435,8 +1435,8 @@ fn sysconfig_battery_wakelock_darkmode_locale_orientation_and_clipboard() {
     e.m10_set_font_scale(1.3).expect("font_scale");
     e.m10_set_orientation("landscape").expect("landscape");
     assert_eq!(count(&e, MAIN, "onConfigurationChanged"), 4);
-    assert_eq!(e.fw.m10.sysconfig.width_px, 1440);
-    assert_eq!(e.fw.m10.sysconfig.height_px, 720);
+    assert_eq!(e.fw.vdev.sysconfig.width_px, 1440);
+    assert_eq!(e.fw.vdev.sysconfig.height_px, 720);
 
     // Clipboard shared between guest ClipData and agent m10_get_clipboard/m10_set_clipboard
     let clip_key = s(&mut e, "clipboard");

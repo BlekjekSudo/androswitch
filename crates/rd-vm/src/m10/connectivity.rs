@@ -156,7 +156,7 @@ fn build_scan_result(vm: &mut Engine, adv: &BleAdv) -> Result<ObjRef, VmExit> {
             ("rd_name".into(), name),
         ],
     )?;
-    let ts = vm.fw.m10.next_timestamp_ns();
+    let ts = vm.fw.vdev.next_timestamp_ns();
     alloc_with(
         vm,
         BLE_SCAN_RESULT,
@@ -353,28 +353,29 @@ pub(super) fn instance_call(
             Ok(None)
         }
         TELEPHONY_MANAGER => match name {
-            "getSimState" => Ok(Some(Value::Int(vm.fw.m10.telephony.sim_state))),
-            "getNetworkOperatorName" | "getSimOperatorName" => {
-                Ok(Some(str_val(vm, vm.fw.m10.telephony.carrier_name.clone())?))
-            }
+            "getSimState" => Ok(Some(Value::Int(vm.fw.vdev.telephony.sim_state))),
+            "getNetworkOperatorName" | "getSimOperatorName" => Ok(Some(str_val(
+                vm,
+                vm.fw.vdev.telephony.carrier_name.clone(),
+            )?)),
             "getNetworkOperator" | "getSimOperator" => Ok(Some(str_val(
                 vm,
-                vm.fw.m10.telephony.operator_mcc_mnc.clone(),
+                vm.fw.vdev.telephony.operator_mcc_mnc.clone(),
             )?)),
             "getNetworkCountryIso" | "getSimCountryIso" => {
-                Ok(Some(str_val(vm, vm.fw.m10.telephony.country_iso.clone())?))
+                Ok(Some(str_val(vm, vm.fw.vdev.telephony.country_iso.clone())?))
             }
-            "getPhoneType" => Ok(Some(Value::Int(vm.fw.m10.telephony.phone_type))),
-            "getCallState" => Ok(Some(Value::Int(vm.fw.m10.telephony.call_state))),
+            "getPhoneType" => Ok(Some(Value::Int(vm.fw.vdev.telephony.phone_type))),
+            "getCallState" => Ok(Some(Value::Int(vm.fw.vdev.telephony.call_state))),
             "getNetworkType" | "getDataNetworkType" => {
                 if name == "getDataNetworkType" {
                     check_perm(vm, "android.permission.READ_PHONE_STATE")?;
                 }
-                Ok(Some(Value::Int(vm.fw.m10.telephony.network_type)))
+                Ok(Some(Value::Int(vm.fw.vdev.telephony.network_type)))
             }
-            "isNetworkRoaming" => Ok(Some(Value::Int(i32::from(vm.fw.m10.telephony.roaming)))),
+            "isNetworkRoaming" => Ok(Some(Value::Int(i32::from(vm.fw.vdev.telephony.roaming)))),
             "isDataEnabled" => Ok(Some(Value::Int(i32::from(
-                vm.fw.m10.telephony.data_enabled,
+                vm.fw.vdev.telephony.data_enabled,
             )))),
             "getLine1Number" => {
                 check_any_perm(
@@ -385,10 +386,13 @@ pub(super) fn instance_call(
                         "android.permission.READ_PHONE_NUMBERS",
                     ],
                 )?;
-                Ok(Some(str_val(vm, vm.fw.m10.telephony.phone_number.clone())?))
+                Ok(Some(str_val(
+                    vm,
+                    vm.fw.vdev.telephony.phone_number.clone(),
+                )?))
             }
             "hasIccCard" => Ok(Some(Value::Int(i32::from(
-                vm.fw.m10.telephony.sim_state == 5,
+                vm.fw.vdev.telephony.sim_state == 5,
             )))),
             _ => Ok(None),
         },
@@ -401,11 +405,12 @@ pub(super) fn instance_call(
                 if dest.is_empty() || text.is_empty() {
                     return Err(illegal("destinationAddress and text must not be empty"));
                 }
-                vm.fw.m10.telephony.sent_sms.push(OutboundSms {
+                vm.fw.vdev.telephony.sent_sms.push(OutboundSms {
                     destination: dest,
                     sc_address: sc,
                     text,
                 });
+                #[cfg(feature = "advanced-components")]
                 if let Some(sent_pi) = obj_arg(args, 3) {
                     if vm.fw.m9.pending.contains_key(&sent_pi) {
                         vm.m9_send_pending(sent_pi)?;
@@ -430,7 +435,7 @@ pub(super) fn instance_call(
         },
         CONNECTIVITY_MANAGER => match name {
             "getActiveNetwork" => {
-                if !vm.fw.m10.network.online || vm.fw.m10.network.airplane_mode {
+                if !vm.fw.vdev.network.online || vm.fw.vdev.network.airplane_mode {
                     return Ok(Some(Value::Null));
                 }
                 let net = alloc_with(vm, NETWORK, vec![("rd_net_id".into(), Value::Int(100))])?;
@@ -438,19 +443,19 @@ pub(super) fn instance_call(
             }
             "getNetworkCapabilities" => {
                 if obj_arg(args, 0).is_none()
-                    || !vm.fw.m10.network.online
-                    || vm.fw.m10.network.airplane_mode
+                    || !vm.fw.vdev.network.online
+                    || vm.fw.vdev.network.airplane_mode
                 {
                     return Ok(Some(Value::Null));
                 }
-                let net = vm.fw.m10.network.clone();
+                let net = vm.fw.vdev.network.clone();
                 Ok(Some(Value::Obj(build_network_caps(vm, &net)?)))
             }
             "getActiveNetworkInfo" => {
-                if !vm.fw.m10.network.online || vm.fw.m10.network.airplane_mode {
+                if !vm.fw.vdev.network.online || vm.fw.vdev.network.airplane_mode {
                     return Ok(Some(Value::Null));
                 }
-                let t = if vm.fw.m10.network.transport == "cellular" {
+                let t = if vm.fw.vdev.network.transport == "cellular" {
                     0
                 } else {
                     1
@@ -465,17 +470,17 @@ pub(super) fn instance_call(
                 )?;
                 Ok(Some(Value::Obj(info)))
             }
-            "isActiveNetworkMetered" => Ok(Some(Value::Int(i32::from(vm.fw.m10.network.metered)))),
+            "isActiveNetworkMetered" => Ok(Some(Value::Int(i32::from(vm.fw.vdev.network.metered)))),
             "registerDefaultNetworkCallback" | "registerNetworkCallback" => {
                 let cb = args.last().and_then(|v| match v {
                     Value::Obj(r) => Some(*r),
                     _ => None,
                 });
                 if let Some(cb_ref) = cb {
-                    if !vm.fw.m10.network_callbacks.contains(&cb_ref) {
-                        vm.fw.m10.network_callbacks.push(cb_ref);
+                    if !vm.fw.vdev.network_callbacks.contains(&cb_ref) {
+                        vm.fw.vdev.network_callbacks.push(cb_ref);
                     }
-                    if vm.fw.m10.network.online && !vm.fw.m10.network.airplane_mode {
+                    if vm.fw.vdev.network.online && !vm.fw.vdev.network.airplane_mode {
                         let net =
                             alloc_with(vm, NETWORK, vec![("rd_net_id".into(), Value::Int(100))])?;
                         let _ = call_dex(
@@ -491,7 +496,7 @@ pub(super) fn instance_call(
             }
             "unregisterNetworkCallback" => {
                 if let Some(cb_ref) = obj_arg(args, 0) {
-                    vm.fw.m10.network_callbacks.retain(|c| *c != cb_ref);
+                    vm.fw.vdev.network_callbacks.retain(|c| *c != cb_ref);
                 }
                 Ok(Some(Value::Null))
             }
@@ -525,7 +530,7 @@ pub(super) fn instance_call(
         },
         WIFI_MANAGER => match name {
             "isWifiEnabled" => Ok(Some(Value::Int(i32::from(
-                !vm.fw.m10.network.airplane_mode && vm.fw.m10.network.transport == "wifi",
+                !vm.fw.vdev.network.airplane_mode && vm.fw.vdev.network.transport == "wifi",
             )))),
             _ => Ok(None),
         },
@@ -535,23 +540,23 @@ pub(super) fn instance_call(
         },
         BT_ADAPTER => match name {
             "isEnabled" => Ok(Some(Value::Int(i32::from(
-                vm.fw.m10.bluetooth_enabled && !vm.fw.m10.network.airplane_mode,
+                vm.fw.vdev.bluetooth_enabled && !vm.fw.vdev.network.airplane_mode,
             )))),
             "getState" => Ok(Some(Value::Int(
-                if vm.fw.m10.bluetooth_enabled && !vm.fw.m10.network.airplane_mode {
+                if vm.fw.vdev.bluetooth_enabled && !vm.fw.vdev.network.airplane_mode {
                     12
                 } else {
                     10
                 },
             ))),
-            "getName" => Ok(Some(str_val(vm, vm.fw.m10.bluetooth_name.clone())?)),
+            "getName" => Ok(Some(str_val(vm, vm.fw.vdev.bluetooth_name.clone())?)),
             "setName" => {
                 if let Some(n) = opt_str_arg(vm, args, 0)? {
-                    vm.fw.m10.bluetooth_name = n;
+                    vm.fw.vdev.bluetooth_name = n;
                 }
                 Ok(Some(Value::Int(1)))
             }
-            "getAddress" => Ok(Some(str_val(vm, vm.fw.m10.bluetooth_address.clone())?)),
+            "getAddress" => Ok(Some(str_val(vm, vm.fw.vdev.bluetooth_address.clone())?)),
             "getBondedDevices" => {
                 let set = alloc(vm, "Ljava/util/HashSet;")?;
                 vm.fw
@@ -571,7 +576,7 @@ pub(super) fn instance_call(
                 Ok(Some(Value::Obj(d)))
             }
             "getBluetoothLeScanner" => {
-                if !vm.fw.m10.bluetooth_enabled || vm.fw.m10.network.airplane_mode {
+                if !vm.fw.vdev.bluetooth_enabled || vm.fw.vdev.network.airplane_mode {
                     return Ok(Some(Value::Null));
                 }
                 Ok(Some(Value::Obj(system_service_singleton(vm, BLE_SCANNER)?)))
@@ -599,10 +604,10 @@ pub(super) fn instance_call(
                 }) else {
                     return Err(illegal("ScanCallback is null"));
                 };
-                if !vm.fw.m10.ble_scan_callbacks.contains(&cb) {
-                    vm.fw.m10.ble_scan_callbacks.push(cb);
+                if !vm.fw.vdev.ble_scan_callbacks.contains(&cb) {
+                    vm.fw.vdev.ble_scan_callbacks.push(cb);
                 }
-                let advs = vm.fw.m10.ble_advertisements.clone();
+                let advs = vm.fw.vdev.ble_advertisements.clone();
                 for adv in &advs {
                     let sr = build_scan_result(vm, adv)?;
                     let _ = call_dex(
@@ -617,7 +622,7 @@ pub(super) fn instance_call(
             }
             "stopScan" => {
                 if let Some(cb) = obj_arg(args, 0) {
-                    vm.fw.m10.ble_scan_callbacks.retain(|x| *x != cb);
+                    vm.fw.vdev.ble_scan_callbacks.retain(|x| *x != cb);
                 }
                 Ok(Some(Value::Null))
             }
@@ -656,13 +661,13 @@ pub(super) fn instance_call(
             _ => Ok(None),
         },
         NFC_ADAPTER => match name {
-            "isEnabled" => Ok(Some(Value::Int(i32::from(vm.fw.m10.nfc_enabled)))),
+            "isEnabled" => Ok(Some(Value::Int(i32::from(vm.fw.vdev.nfc_enabled)))),
             "enableReaderMode" => {
-                vm.fw.m10.nfc_reader_callback = obj_arg(args, 1);
+                vm.fw.vdev.nfc_reader_callback = obj_arg(args, 1);
                 Ok(Some(Value::Null))
             }
             "disableReaderMode" => {
-                vm.fw.m10.nfc_reader_callback = None;
+                vm.fw.vdev.nfc_reader_callback = None;
                 Ok(Some(Value::Null))
             }
             "enableForegroundDispatch" | "disableForegroundDispatch" => Ok(Some(Value::Null)),
@@ -761,16 +766,16 @@ impl Engine {
         metered: bool,
         airplane_mode: bool,
     ) -> Result<usize, VmExit> {
-        self.fw.m10.network.online = online && !airplane_mode;
-        self.fw.m10.network.transport = transport.to_string();
-        self.fw.m10.network.metered = metered;
-        self.fw.m10.network.airplane_mode = airplane_mode;
-        let cbs = self.fw.m10.network_callbacks.clone();
+        self.fw.vdev.network.online = online && !airplane_mode;
+        self.fw.vdev.network.transport = transport.to_string();
+        self.fw.vdev.network.metered = metered;
+        self.fw.vdev.network.airplane_mode = airplane_mode;
+        let cbs = self.fw.vdev.network_callbacks.clone();
         if cbs.is_empty() {
             return Ok(0);
         }
-        let is_up = self.fw.m10.network.online;
-        let net_snap = self.fw.m10.network.clone();
+        let is_up = self.fw.vdev.network.online;
+        let net_snap = self.fw.vdev.network.clone();
         self.with_host_roots(|vm| {
             let mut fired = 0usize;
             for cb in cbs {
@@ -813,7 +818,7 @@ impl Engine {
 
     /// Inject an inbound SMS and broadcast `android.provider.Telephony.SMS_RECEIVED`.
     pub fn m10_receive_sms(&mut self, sender: &str, text: &str) -> Result<usize, VmExit> {
-        self.fw.m10.telephony.received_sms.push(InboundSms {
+        self.fw.vdev.telephony.received_sms.push(InboundSms {
             sender: sender.to_string(),
             text: text.to_string(),
         });
@@ -871,8 +876,8 @@ impl Engine {
             rssi,
             payload,
         };
-        self.fw.m10.ble_advertisements.push(adv.clone());
-        let cbs = self.fw.m10.ble_scan_callbacks.clone();
+        self.fw.vdev.ble_advertisements.push(adv.clone());
+        let cbs = self.fw.vdev.ble_scan_callbacks.clone();
         if cbs.is_empty() {
             return Ok(0);
         }
@@ -904,12 +909,12 @@ impl Engine {
         text: Option<String>,
         uri: Option<String>,
     ) -> Result<usize, VmExit> {
-        self.fw.m10.nfc_last_tag = Some(NfcTagSpec {
+        self.fw.vdev.nfc_last_tag = Some(NfcTagSpec {
             id: tag_id.clone(),
             text: text.clone(),
             uri: uri.clone(),
         });
-        let reader_cb = self.fw.m10.nfc_reader_callback;
+        let reader_cb = self.fw.vdev.nfc_reader_callback;
         let cur_act = self.fw.current_activity;
         let receivers = self.fw.m8.receivers.clone();
         self.with_host_roots(|vm| {

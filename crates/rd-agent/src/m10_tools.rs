@@ -144,7 +144,7 @@ impl AgentSession {
             return serde_json::Value::Null;
         };
         let clip = e.m10_get_clipboard().ok().flatten();
-        let st = &e.fw.m10;
+        let st = &e.fw.vdev;
         let sensors_summary: serde_json::Map<String, serde_json::Value> = st
             .sensors
             .iter()
@@ -349,27 +349,27 @@ impl AgentSession {
                     .and_then(|v| v.as_i64())
                     .and_then(|v| i32::try_from(v).ok())
                 {
-                    e.fw.m10.telephony.sim_state = sim;
+                    e.fw.vdev.telephony.sim_state = sim;
                 }
                 if let Some(carrier) = args.get("carrier_name").and_then(|v| v.as_str()) {
-                    e.fw.m10.telephony.carrier_name = carrier.to_string();
+                    e.fw.vdev.telephony.carrier_name = carrier.to_string();
                 }
                 if let Some(nt) = args
                     .get("network_type")
                     .and_then(|v| v.as_i64())
                     .and_then(|v| i32::try_from(v).ok())
                 {
-                    e.fw.m10.telephony.network_type = nt;
+                    e.fw.vdev.telephony.network_type = nt;
                 }
                 if let Some(cs) = args
                     .get("call_state")
                     .and_then(|v| v.as_i64())
                     .and_then(|v| i32::try_from(v).ok())
                 {
-                    e.fw.m10.telephony.call_state = cs;
+                    e.fw.vdev.telephony.call_state = cs;
                 }
                 if let Some(roam) = args.get("roaming").and_then(|v| v.as_bool()) {
-                    e.fw.m10.telephony.roaming = roam;
+                    e.fw.vdev.telephony.roaming = roam;
                 }
             }
             "sms_receive" => {

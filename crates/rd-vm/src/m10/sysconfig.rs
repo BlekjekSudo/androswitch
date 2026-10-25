@@ -120,7 +120,7 @@ impl Default for SystemConfigState {
 }
 
 pub(crate) fn build_battery_intent(vm: &mut Engine) -> Result<ObjRef, VmExit> {
-    let bat = vm.fw.m10.battery.clone();
+    let bat = vm.fw.vdev.battery.clone();
     let intent = alloc(vm, INTENT_CLS)?;
     vm.attach_host_state(INTENT_CLS, intent)?;
     vm.fw.m8.intents.entry(intent).or_default().action = Some(ACTION_BATTERY_CHANGED.into());
@@ -232,7 +232,7 @@ fn ensure_resources_singletons(vm: &mut Engine) -> Result<(ObjRef, ObjRef), VmEx
 
 fn apply_sysconfig_to_vm(vm: &mut Engine, notify_activity: bool) -> Result<(), VmExit> {
     let (cfg, dm) = ensure_resources_singletons(vm)?;
-    let st = vm.fw.m10.sysconfig.clone();
+    let st = vm.fw.vdev.sysconfig.clone();
 
     let (lang, country) = parse_locale_tag(&st.locale_tag);
     let l_val = str_val(vm, lang.to_lowercase())?;
@@ -482,7 +482,7 @@ pub(super) fn instance_call(
         BATTERY_MANAGER => match name {
             "getIntProperty" => {
                 let prop = int_arg(args, 0);
-                let bat = &vm.fw.m10.battery;
+                let bat = &vm.fw.vdev.battery;
                 let v = match prop {
                     1 => bat.level * 30_000, // uAh charge counter
                     2 | 3 => {
@@ -501,15 +501,15 @@ pub(super) fn instance_call(
             "getLongProperty" => {
                 let prop = int_arg(args, 0);
                 let v = if prop == 4 {
-                    i64::from(vm.fw.m10.battery.level)
+                    i64::from(vm.fw.vdev.battery.level)
                 } else {
                     0
                 };
                 Ok(Some(Value::Long(v)))
             }
-            "isCharging" => Ok(Some(Value::Int(i32::from(vm.fw.m10.battery.charging)))),
-            "computeChargeTimeRemaining" => Ok(Some(Value::Long(if vm.fw.m10.battery.charging {
-                i64::from(100 - vm.fw.m10.battery.level) * 60_000
+            "isCharging" => Ok(Some(Value::Int(i32::from(vm.fw.vdev.battery.charging)))),
+            "computeChargeTimeRemaining" => Ok(Some(Value::Long(if vm.fw.vdev.battery.charging {
+                i64::from(100 - vm.fw.vdev.battery.level) * 60_000
             } else {
                 -1
             }))),
@@ -517,18 +517,20 @@ pub(super) fn instance_call(
         },
         POWER_MANAGER => match name {
             "isInteractive" | "isScreenOn" => {
-                Ok(Some(Value::Int(i32::from(vm.fw.m10.power.interactive))))
+                Ok(Some(Value::Int(i32::from(vm.fw.vdev.power.interactive))))
             }
-            "isPowerSaveMode" => Ok(Some(Value::Int(i32::from(vm.fw.m10.power.power_save_mode)))),
+            "isPowerSaveMode" => Ok(Some(Value::Int(i32::from(
+                vm.fw.vdev.power.power_save_mode,
+            )))),
             "isDeviceIdleMode" => Ok(Some(Value::Int(0))),
             "isIgnoringBatteryOptimizations" => Ok(Some(Value::Int(i32::from(
-                vm.fw.m10.power.ignoring_battery_optimizations,
+                vm.fw.vdev.power.ignoring_battery_optimizations,
             )))),
             "newWakeLock" => {
                 let flags = int_arg(args, 0);
                 let tag = req_str_arg(vm, args, 1)?;
                 let wl = alloc(vm, WAKE_LOCK)?;
-                vm.fw.m10.wake_locks.insert(
+                vm.fw.vdev.wake_locks.insert(
                     wl,
                     WakeLockEntry {
                         tag,
@@ -544,7 +546,7 @@ pub(super) fn instance_call(
         },
         WAKE_LOCK => match name {
             "acquire" => {
-                if let Some(wl) = vm.fw.m10.wake_locks.get_mut(&recv) {
+                if let Some(wl) = vm.fw.vdev.wake_locks.get_mut(&recv) {
                     if wl.ref_counted {
                         wl.count += 1;
                     } else {
@@ -555,7 +557,7 @@ pub(super) fn instance_call(
                 Ok(Some(Value::Null))
             }
             "release" => {
-                if let Some(wl) = vm.fw.m10.wake_locks.get_mut(&recv) {
+                if let Some(wl) = vm.fw.vdev.wake_locks.get_mut(&recv) {
                     if wl.ref_counted {
                         if wl.count == 0 {
                             return Err(super::error(
@@ -574,14 +576,14 @@ pub(super) fn instance_call(
             }
             "isHeld" => Ok(Some(Value::Int(i32::from(
                 vm.fw
-                    .m10
+                    .vdev
                     .wake_locks
                     .get(&recv)
                     .map(|w| w.held)
                     .unwrap_or(false),
             )))),
             "setReferenceCounted" => {
-                if let Some(wl) = vm.fw.m10.wake_locks.get_mut(&recv) {
+                if let Some(wl) = vm.fw.vdev.wake_locks.get_mut(&recv) {
                     wl.ref_counted = bool_arg(args, 0);
                 }
                 Ok(Some(Value::Null))
@@ -589,14 +591,14 @@ pub(super) fn instance_call(
             _ => Ok(None),
         },
         UI_MODE_MANAGER => match name {
-            "getNightMode" => Ok(Some(Value::Int(if vm.fw.m10.sysconfig.dark_mode {
+            "getNightMode" => Ok(Some(Value::Int(if vm.fw.vdev.sysconfig.dark_mode {
                 2
             } else {
                 1
             }))),
             "setNightMode" | "setApplicationNightMode" => {
                 let mode = int_arg(args, 0);
-                vm.fw.m10.sysconfig.dark_mode = mode == 2;
+                vm.fw.vdev.sysconfig.dark_mode = mode == 2;
                 apply_sysconfig_to_vm(vm, true)?;
                 Ok(Some(Value::Null))
             }
@@ -621,7 +623,7 @@ pub(super) fn instance_call(
                                 let l = get_str_field(vm, *loc, "rd_lang")
                                     .unwrap_or_else(|| "en".into());
                                 let c = get_str_field(vm, *loc, "rd_country").unwrap_or_default();
-                                vm.fw.m10.sysconfig.locale_tag =
+                                vm.fw.vdev.sysconfig.locale_tag =
                                     if c.is_empty() { l } else { format!("{l}-{c}") };
                                 apply_sysconfig_to_vm(vm, true)?;
                             }
@@ -635,22 +637,22 @@ pub(super) fn instance_call(
         CLIPBOARD_MANAGER => match name {
             "addPrimaryClipChangedListener" => {
                 if let Some(l) = obj_arg(args, 0) {
-                    if !vm.fw.m10.sysconfig.clipboard_listeners.contains(&l) {
-                        vm.fw.m10.sysconfig.clipboard_listeners.push(l);
+                    if !vm.fw.vdev.sysconfig.clipboard_listeners.contains(&l) {
+                        vm.fw.vdev.sysconfig.clipboard_listeners.push(l);
                     }
                 }
                 Ok(Some(Value::Null))
             }
             "removePrimaryClipChangedListener" => {
                 if let Some(l) = obj_arg(args, 0) {
-                    vm.fw.m10.sysconfig.clipboard_listeners.retain(|x| *x != l);
+                    vm.fw.vdev.sysconfig.clipboard_listeners.retain(|x| *x != l);
                 }
                 Ok(Some(Value::Null))
             }
             "setPrimaryClip" => {
                 let v = args.first().cloned().unwrap_or(Value::Null);
                 put_field(vm, recv, "rd_primary_clip", v)?;
-                let listeners = vm.fw.m10.sysconfig.clipboard_listeners.clone();
+                let listeners = vm.fw.vdev.sysconfig.clipboard_listeners.clone();
                 for l in listeners {
                     let _ = call_dex(vm, l, "onPrimaryClipChanged", "()V", Vec::new())?;
                 }
@@ -784,14 +786,14 @@ impl Engine {
         if !(0..=100).contains(&level) {
             return Err(illegal("battery level must be in 0..=100"));
         }
-        self.fw.m10.battery.level = level;
-        self.fw.m10.battery.charging = charging;
-        self.fw.m10.battery.plugged = plugged.unwrap_or(if charging { 2 } else { 0 });
+        self.fw.vdev.battery.level = level;
+        self.fw.vdev.battery.charging = charging;
+        self.fw.vdev.battery.plugged = plugged.unwrap_or(if charging { 2 } else { 0 });
         if let Some(t) = temperature_tenths_c {
-            self.fw.m10.battery.temperature_tenths_c = t;
+            self.fw.vdev.battery.temperature_tenths_c = t;
         }
         if let Some(ps) = power_save_mode {
-            self.fw.m10.power.power_save_mode = ps;
+            self.fw.vdev.power.power_save_mode = ps;
         }
         let receivers = self.fw.m8.receivers.clone();
         if receivers.is_empty() {
@@ -823,7 +825,7 @@ impl Engine {
     }
 
     pub fn m10_set_dark_mode(&mut self, enabled: bool) -> Result<(), VmExit> {
-        self.fw.m10.sysconfig.dark_mode = enabled;
+        self.fw.vdev.sysconfig.dark_mode = enabled;
         self.with_host_roots(|vm| apply_sysconfig_to_vm(vm, true))
     }
 
@@ -831,7 +833,7 @@ impl Engine {
         if language_tag.trim().is_empty() {
             return Err(illegal("locale tag must not be empty"));
         }
-        self.fw.m10.sysconfig.locale_tag = language_tag.trim().to_string();
+        self.fw.vdev.sysconfig.locale_tag = language_tag.trim().to_string();
         self.with_host_roots(|vm| apply_sysconfig_to_vm(vm, true))
     }
 
@@ -839,7 +841,7 @@ impl Engine {
         if !(0.5..=3.0).contains(&scale) {
             return Err(illegal("font_scale must be in 0.5..=3.0"));
         }
-        self.fw.m10.sysconfig.font_scale = scale;
+        self.fw.vdev.sysconfig.font_scale = scale;
         self.with_host_roots(|vm| apply_sysconfig_to_vm(vm, true))
     }
 
@@ -850,17 +852,17 @@ impl Engine {
             _ => return Err(illegal("orientation must be 'portrait' or 'landscape'")),
         };
         let (min_d, max_d) = {
-            let a = self.fw.m10.sysconfig.width_px;
-            let b = self.fw.m10.sysconfig.height_px;
+            let a = self.fw.vdev.sysconfig.width_px;
+            let b = self.fw.vdev.sysconfig.height_px;
             (a.min(b), a.max(b))
         };
-        self.fw.m10.sysconfig.orientation = code;
+        self.fw.vdev.sysconfig.orientation = code;
         if code == 1 {
-            self.fw.m10.sysconfig.width_px = min_d;
-            self.fw.m10.sysconfig.height_px = max_d;
+            self.fw.vdev.sysconfig.width_px = min_d;
+            self.fw.vdev.sysconfig.height_px = max_d;
         } else {
-            self.fw.m10.sysconfig.width_px = max_d;
-            self.fw.m10.sysconfig.height_px = min_d;
+            self.fw.vdev.sysconfig.width_px = max_d;
+            self.fw.vdev.sysconfig.height_px = min_d;
         }
         self.with_host_roots(|vm| apply_sysconfig_to_vm(vm, true))
     }
@@ -872,7 +874,7 @@ impl Engine {
             let mgr = system_service_singleton(vm, CLIPBOARD_MANAGER)?;
             let clip = build_plain_clip_data(vm, &lbl, &txt)?;
             put_field(vm, mgr, "rd_primary_clip", Value::Obj(clip))?;
-            let listeners = vm.fw.m10.sysconfig.clipboard_listeners.clone();
+            let listeners = vm.fw.vdev.sysconfig.clipboard_listeners.clone();
             for l in listeners {
                 let _ = call_dex(vm, l, "onPrimaryClipChanged", "()V", Vec::new())?;
             }

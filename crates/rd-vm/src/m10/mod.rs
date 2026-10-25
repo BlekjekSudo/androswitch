@@ -215,7 +215,9 @@ impl std::fmt::Debug for State {
         // integers; emit only genuine `ObjRef` roots so scalar config values
         // (sensor types, screen dimensions, battery level) never pin heap slots.
         let roots = self.collect_gc_roots();
-        f.debug_struct("M10State").field("roots", &roots).finish()
+        f.debug_struct("VirtualDeviceState")
+            .field("roots", &roots)
+            .finish()
     }
 }
 
@@ -223,7 +225,7 @@ impl Engine {
     /// Enables M10 virtual peripherals (`ADR 011`) ahead of Appendix C's
     /// absent-hardware / no-service default profile in `intrinsics.rs`.
     pub fn m10_enable_virtual_devices(&mut self) {
-        self.fw.m10.virtual_hardware_enabled = true;
+        self.fw.vdev.virtual_hardware_enabled = true;
     }
 }
 

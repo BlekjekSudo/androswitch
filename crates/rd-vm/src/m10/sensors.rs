@@ -305,7 +305,7 @@ pub(super) fn instance_call(
         SENSOR_MANAGER => match name {
             "getDefaultSensor" => {
                 let stype = int_arg(args, 0);
-                if vm.fw.m10.sensors.contains_key(&stype) {
+                if vm.fw.vdev.sensors.contains_key(&stype) {
                     Ok(Some(Value::Obj(alloc_sensor_obj(vm, stype)?)))
                 } else {
                     Ok(Some(Value::Null))
@@ -314,8 +314,8 @@ pub(super) fn instance_call(
             "getSensorList" => {
                 let stype = int_arg(args, 0);
                 let types: Vec<i32> = if stype == -1 {
-                    vm.fw.m10.sensors.keys().copied().collect()
-                } else if vm.fw.m10.sensors.contains_key(&stype) {
+                    vm.fw.vdev.sensors.keys().copied().collect()
+                } else if vm.fw.vdev.sensors.contains_key(&stype) {
                     vec![stype]
                 } else {
                     Vec::new()
@@ -334,7 +334,7 @@ pub(super) fn instance_call(
                     return Ok(Some(Value::Int(0)));
                 };
                 let sensor_type = get_int_field(vm, sensor_obj, "rd_sensor_type", 0);
-                if !vm.fw.m10.sensors.contains_key(&sensor_type) {
+                if !vm.fw.vdev.sensors.contains_key(&sensor_type) {
                     return Ok(Some(Value::Int(0)));
                 }
                 let rate = int_arg(args, 2);
@@ -348,12 +348,12 @@ pub(super) fn instance_call(
                 };
                 let already = vm
                     .fw
-                    .m10
+                    .vdev
                     .sensor_listeners
                     .iter()
                     .any(|r| r.listener == listener && r.sensor_type == sensor_type);
                 if !already {
-                    vm.fw.m10.sensor_listeners.push(SensorListenerReg {
+                    vm.fw.vdev.sensor_listeners.push(SensorListenerReg {
                         listener,
                         sensor_type,
                         rate_us,
@@ -368,12 +368,12 @@ pub(super) fn instance_call(
                 if let Some(sensor_obj) = obj_arg(args, 1) {
                     let stype = get_int_field(vm, sensor_obj, "rd_sensor_type", -1);
                     vm.fw
-                        .m10
+                        .vdev
                         .sensor_listeners
                         .retain(|r| !(r.listener == listener && r.sensor_type == stype));
                 } else {
                     vm.fw
-                        .m10
+                        .vdev
                         .sensor_listeners
                         .retain(|r| r.listener != listener);
                 }
@@ -383,7 +383,7 @@ pub(super) fn instance_call(
         },
         SENSOR => {
             let stype = get_int_field(vm, recv, "rd_sensor_type", 1);
-            let Some(spec) = vm.fw.m10.sensors.get(&stype).cloned() else {
+            let Some(spec) = vm.fw.vdev.sensors.get(&stype).cloned() else {
                 return Ok(None);
             };
             match name {
@@ -421,7 +421,7 @@ impl Engine {
             return Err(illegal("sensor values must not be empty"));
         }
         let acc = accuracy.unwrap_or(3).clamp(0, 3);
-        let prev_acc = match self.fw.m10.sensors.get_mut(&sensor_type) {
+        let prev_acc = match self.fw.vdev.sensors.get_mut(&sensor_type) {
             Some(s) => {
                 let prev = s.accuracy;
                 s.values = values.clone();
@@ -430,10 +430,10 @@ impl Engine {
             }
             None => return Err(illegal(format!("unsupported sensor type {sensor_type}"))),
         };
-        let ts = self.fw.m10.next_timestamp_ns();
+        let ts = self.fw.vdev.next_timestamp_ns();
         let listeners: Vec<ObjRef> = self
             .fw
-            .m10
+            .vdev
             .sensor_listeners
             .iter()
             .filter(|r| r.sensor_type == sensor_type)

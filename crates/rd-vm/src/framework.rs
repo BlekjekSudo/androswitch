@@ -1003,7 +1003,7 @@ pub struct HostState {
     #[cfg(feature = "advanced-components")]
     pub m9: crate::m9::State,
     #[cfg(feature = "virtual-devices")]
-    pub m10: crate::m10::State,
+    pub vdev: crate::m10::State,
     /// Apêndice D: estado dos shims host AndroidX (`androidx.rs`) —
     /// lifecycle, livedata, viewmodel, collections, datastore (valores),
     /// work Data, navegação, startup, biometria, futures. Dentro do

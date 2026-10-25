@@ -394,7 +394,7 @@ fn call_static_intrinsic_rooted(
         return Ok(Some(v));
     }
     #[cfg(feature = "virtual-devices")]
-    if vm.fw.m10.virtual_hardware_enabled {
+    if vm.fw.vdev.virtual_hardware_enabled {
         if let Some(v) = crate::m10::call_static(vm, class, name, sig, args)? {
             return Ok(Some(v));
         }
@@ -1144,7 +1144,7 @@ fn platform_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<V
                         Some(v) => Some(v),
                         None => {
                             #[cfg(feature = "virtual-devices")]
-                            let m10_val = if vm.fw.m10.virtual_hardware_enabled {
+                            let m10_val = if vm.fw.vdev.virtual_hardware_enabled {
                                 crate::m10::host_static(vm, owner, field)?
                             } else {
                                 None
@@ -4144,7 +4144,7 @@ fn instance_intrinsic_dispatch(
         return Ok(Some(v));
     }
     #[cfg(feature = "virtual-devices")]
-    if vm.fw.m10.virtual_hardware_enabled {
+    if vm.fw.vdev.virtual_hardware_enabled {
         if let Some(v) = crate::m10::call_instance(vm, recv_class, name, sig, recv, args)? {
             return Ok(Some(v));
         }
