@@ -13,9 +13,9 @@
     "startup_budget_emulated_ms_max": 1500.0
   },
   "release_binary": {
-    "max_bytes_without_ab_review": 14680064,
-    "reference_bytes": 11722168,
-    "reference_note": "Observed local release binary during ADR 009 work; A/B ratio remains the primary gate."
+    "max_bytes_without_ab_review": 18874368,
+    "reference_bytes": 17143432,
+    "reference_note": "Re-recorded 2026-10-25 from the Sentinel all-features release build of main@71cc791 (measured on docs-only PR #212: 17143432 bytes). Previous reference 11722168 (ADR 009 work, 2026-10-22). Growth came from merged feature PRs (Appendix C surfaces, M10 virtual devices, engine registry), each within the per-PR A/B ratio gate; the ceiling keeps ~10% headroom. A/B ratio remains the primary gate."
   },
   "corpus": [
     {

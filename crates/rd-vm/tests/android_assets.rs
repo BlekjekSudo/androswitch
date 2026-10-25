@@ -512,3 +512,131 @@ fn asset_manager_close_is_noop_and_ctor_allows_bare_new() {
 const RUNGS_PATH_ENTRY: &str = "assets/ladder/rungs.json";
 const TOP_ENTRY: &str = "assets/zz.txt";
 const TOP_NAME: &str = "zz.txt";
+
+#[test]
+fn context_get_application_info_serves_manifest_facts() {
+    // Follow-up da cascata do ladder: LadderActivity chama
+    // `getApplicationInfo()` DIRETO no Context (sem passar pelo PackageManager)
+    // para ler minSdkVersion/targetSdkVersion declarados no manifest.
+    let mut vm = apk_vm(vec![(TOP_ENTRY, b"zz".to_vec())]);
+    let a = activity(&mut vm);
+    let info = match call_instance_intrinsic(
+        &mut vm,
+        ACTIVITY,
+        "getApplicationInfo",
+        "()Landroid/content/pm/ApplicationInfo;",
+        a,
+        &[],
+    )
+    .expect("intrínseco de getApplicationInfo executa")
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getApplicationInfo: {other:?}"),
+    };
+    assert_eq!(
+        vm.heap.class_of(info).expect("classe"),
+        "Landroid/content/pm/ApplicationInfo;"
+    );
+    // fatos do manifest do fixture sintético (build_apk: min 26 / target 36…
+    // o apkfix default é min=1/target=1; o teste usa os valores reais do APK)
+    let pkg = vm.heap.get_field(info, "packageName").expect("packageName");
+    match pkg {
+        Value::Obj(r) => assert_eq!(vm.heap.as_str(r).expect("str"), "com.test.assets"),
+        other => panic!("packageName: {other:?}"),
+    }
+    // campos int usados pelo ladder (iget direto no host object)
+    for field in ["minSdkVersion", "targetSdkVersion", "uid", "enabled"] {
+        let v = vm.heap.get_field(info, field).expect(field);
+        assert!(matches!(v, Value::Int(_)), "{field}: {v:?}");
+    }
+    // rota LONGA segue igual (PackageManager.getApplicationInfo do próprio
+    // pacote) — os mesmos fatos, via caminho diferente
+    let pm = match call_instance_intrinsic(
+        &mut vm,
+        ACTIVITY,
+        "getPackageManager",
+        "()Landroid/content/pm/PackageManager;",
+        a,
+        &[],
+    )
+    .expect("getPackageManager executa")
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("getPackageManager: {other:?}"),
+    };
+    let pkg_name = string_arg(&mut vm, "com.test.assets");
+    let long = match call_instance_intrinsic(
+        &mut vm,
+        "Landroid/app/ApplicationPackageManager;",
+        "getApplicationInfo",
+        "(Ljava/lang/String;)Landroid/content/pm/ApplicationInfo;",
+        pm,
+        &[pkg_name],
+    )
+    .expect("PM.getApplicationInfo executa")
+    {
+        Some(Value::Obj(r)) => r,
+        other => panic!("PM.getApplicationInfo: {other:?}"),
+    };
+    let min_short = vm
+        .heap
+        .get_field(info, "minSdkVersion")
+        .unwrap()
+        .as_int()
+        .unwrap();
+    let min_long = vm
+        .heap
+        .get_field(long, "minSdkVersion")
+        .unwrap()
+        .as_int()
+        .unwrap();
+    assert_eq!(min_short, min_long, "rota curta ≡ rota longa (AOSP)");
+
+    // não-Context continua sem fingir suporte
+    let marker = vm
+        .heap
+        .alloc_instance("LMarker;".to_string(), Vec::new())
+        .expect("marker aloca");
+    assert!(
+        call_instance_intrinsic(
+            &mut vm,
+            "LMarker;",
+            "getApplicationInfo",
+            "()Landroid/content/pm/ApplicationInfo;",
+            marker,
+            &[]
+        )
+        .expect("intrínseco executa")
+        .is_none(),
+        "getApplicationInfo em não-Context deve retornar None"
+    );
+}
+
+#[test]
+fn application_info_serves_every_context_receiver() {
+    let mut vm = apk_vm(vec![(TOP_ENTRY, b"zz".to_vec())]);
+    for class in [
+        "Landroid/app/Activity;",
+        "Landroid/app/Application;",
+        "Landroid/app/Service;",
+        "Landroid/content/ContextWrapper;",
+    ] {
+        let recv = vm
+            .heap
+            .alloc_instance(class.to_string(), Vec::new())
+            .expect("receiver aloca");
+        match call_instance_intrinsic(
+            &mut vm,
+            class,
+            "getApplicationInfo",
+            "()Landroid/content/pm/ApplicationInfo;",
+            recv,
+            &[],
+        )
+        .expect("intrínseco executa")
+        {
+            Some(Value::Obj(_)) => {}
+            other => panic!("{class}: getApplicationInfo devia responder, veio {other:?}"),
+        }
+    }
+}

@@ -72,3 +72,12 @@ Progresso passo a passo em `PROGRESS-appendix-de.md` (raiz do repo).
 Os PRs #191/#192 (Apêndice C, outro agente) não são tocados por este
 trabalho; arquivos compartilhados recebem, no máximo, edições aditivas
 mínimas documentadas no PR.
+
+- **S6 (2026-10-25, branch `appendix-e-gms-runtime-20261025`)**: o
+  runtime do Apêndice E vive em `crates/rd-vm/src/gms.rs` (host-first,
+  estado em `HostState.gms`, dispatch aditivo em `interp.rs` ao lado do
+  Apêndice D) com 21 testes em `crates/rd-vm/tests/gms.rs`. 20 dos 21
+  serviços sobem de `not_implemented` para `partial` (subconjuntos
+  testados descritos em `data/gms.toml`); ML Kit permanece
+  `not_implemented` e sem dispatch — o teste
+  `unknown_gms_surface_returns_none` fixa essa fronteira.

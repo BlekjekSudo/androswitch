@@ -188,9 +188,9 @@ module = "rd-vm/framework"
 code = ["crates/rd-vm/src/framework.rs", "crates/rd-vm/src/content.rs", "crates/rd-vm/src/bundle.rs", "crates/rd-vm/src/m8.rs", "crates/rd-vm/src/prefs.rs"]
 milestone = "M3/M8+Literal-R3"
 notes = "Context, Intent/component/extras, broadcasts, services and ContentResolver observers have host subsets. SharedPreferences now uses canonical per-name objects backed by app-private shared_prefs/<name>.xml VFS files with typed String/int/long/float/boolean/StringSet values, listeners, remove/clear and cross-Engine persistence. Full provider IPC, multi-process preference reloading, mode enforcement and every Context service are not complete."
-evidence = ["crates/rd-vm/tests/m8.rs", "crates/rd-vm/src/prefs.rs", "docs/compat-matrix.md"]
+evidence = ["crates/rd-vm/tests/m8.rs", "crates/rd-vm/tests/android_assets.rs", "crates/rd-vm/src/prefs.rs", "docs/compat-matrix.md"]
 gap_id = "gap-android-content-partial"
-key_apis = ["android.content.Context.getSystemService", "android.content.Context.startActivity", "android.content.Context.getAssets", "android.content.Intent.putExtra", "android.content.SharedPreferences.edit", "android.content.ContentResolver.notifyChange"]
+key_apis = ["android.content.Context.getSystemService", "android.content.Context.startActivity", "android.content.Context.getAssets", "android.content.Context.getApplicationInfo", "android.content.Intent.putExtra", "android.content.SharedPreferences.edit", "android.content.ContentResolver.notifyChange"]
 
 [[surface]]
 id = "android-content-pm"
