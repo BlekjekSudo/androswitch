@@ -478,14 +478,18 @@ Normalização dos atalhos históricos da spec no registro: conceitos que não s
 
 ## Apêndice D — AndroidX/Jetpack (shims por módulo)
 
-| Categoria | Bibliotecas (implementação nativa ou shim) |
-|---|---|
-| Foundation | appcompat, core-ktx, activity, annotation, multidex, startup |
-| Architecture | lifecycle (viewmodel/livedata/savedstate), room (via ST-02), paging 3, work (SYS-04), navigation (UI-04), datastore (ST-01), collection, palette |
-| UI | compose (UI-05), recyclerview, viewpager2, constraintlayout, coordinatorlayout, drawerlayout, swiperefreshlayout, cardview, fragment, browser(custom tabs→web), emojiji?→emoji2 |
-| Behavior | media3/ExoPlayer (MEDIA-01/02), cameraX (MEDIA-03), biometric (MEDIA-05), security-crypto (ST-04), credential-manager, privacy: photo-picker |
-| DI/async | hilt/dagger (reflection-free init), kotlinx-coroutines/flow (mapeadas em threads nativas), rxjava bridge |
-| 3rd-party comuns | okhttp/retrofit/moshi/gson (NET-01), coil/glide/picasso (UI-02 decode), firebase core/messaging/crashlytics→mocks locais (SYS-08) |
+A fonte executável deste apêndice é [`data/jetpack.toml`](data/jetpack.toml), validada por `rd-framework::fd_jetpack` e consumida por `rd jetpack`, pelo MCP e pelos relatórios gerados. A tabela abaixo é **gerada** por `cargo xtask jetpack-spec`; o relatório completo sai em [`docs/jetpack.md`](docs/jetpack.md) (`cargo xtask jetpack-report`); contexto e ledger em [`docs/appendix-d-e.md`](docs/appendix-d-e.md). Cada módulo declara estratégia — `dex-passthrough` (o DEX da biblioteca executa na VM), `host-shim` (host intercepta métodos listados; resto cai no DEX) ou `host-native` — e status conservador: `supported` é só o subconjunto documentado, nunca a biblioteca inteira. Room segue via ST-02, work via SYS-04, navigation via UI-04, datastore via ST-01, media3/ExoPlayer via MEDIA-01/02, cameraX via MEDIA-03, biometric via MEDIA-05, security-crypto via ST-04, okhttp/retrofit/moshi/gson via NET-01 e coil/glide/picasso via UI-02; hilt/dagger é reflection-free init e kotlinx-coroutines/flow mapeia em threads. Firebase não é registrado aqui: vive no Apêndice E (prefixo tem um único dono). Toda mudança de shim AndroidX deve atualizar `data/jetpack.toml` no mesmo PR e regenerar spec/relatórios.
+
+<!-- BEGIN JETPACK -->
+| Categoria | Bibliotecas (implementação nativa ou shim) | Status das bibliotecas | Módulos |
+|---|---|---|---|
+| Foundation | appcompat, core-ktx, activity, annotation, multidex, startup | partial 3 · not_implemented 3 | `none`, `rd-vm/androidx`, `rd-vm/m9` |
+| Architecture | lifecycle-runtime, lifecycle-livedata, lifecycle-viewmodel, lifecycle-savedstate, room, paging 3, work, navigation, datastore, collection, palette | partial 9 · not_implemented 2 | `none`, `rd-vm/androidx`, `rd-vm/m8` |
+| UI | compose, recyclerview, viewpager2, constraintlayout, coordinatorlayout, drawerlayout, swiperefreshlayout, cardview, fragment, browser (custom tabs), emoji2, material (extra além da tabela da spec) | partial 3 · stub 2 · not_implemented 7 | `none`, `rd-vm/androidx`, `rd-vm/inflate`, `rd-vm/m8` |
+| Behavior | media3/ExoPlayer, cameraX, biometric, security-crypto, credential-manager, photo-picker (privacy) | partial 1 · not_implemented 5 | `none`, `rd-vm/androidx` |
+| DI/async | hilt/dagger, kotlinx-coroutines/flow, rxjava bridge | not_implemented 3 | `none` |
+| 3rd-party comuns | okhttp, retrofit, moshi, gson, coil, glide, picasso, guava ListenableFuture (extra — base de work/camera) | partial 2 · not_implemented 6 | `none`, `rd-vm/androidx`, `rd-vm/m8` |
+<!-- END JETPACK -->
 
 ## Apêndice E — Google Play Services / Firebase (modo "sem GMS" honesto)
 
@@ -495,6 +499,16 @@ Normalização dos atalhos históricos da spec no registro: conceitos que não s
 - Ads → eventos estruturados sem rede · Fit/Health → dados fake programáveis
 - Cast/Nearby → NET-08 · SafetyNet/Integrity → resposta determinística fake
 - Firebase: Analytics (eventos capturados), Messaging (SYS-08), Crashlytics (crashes reais capturados!), Firestore/RTDB → NET-03 record/replay
+
+A fonte executável deste apêndice é [`data/gms.toml`](data/gms.toml), validada por `rd-framework::fd_gms` e consumida por `rd gms`, pelo MCP e pelos relatórios gerados. O modo honesto é **validado, não só documentado**: `mode = "no-gms-honest"` e `network = "none"` em todo serviço — não há processo GMS, conta Google nem backend real; status mede o shim local para o subconjunto documentado, jamais paridade com os servidores do Google. A tabela abaixo é **gerada** por `cargo xtask gms-spec`; o relatório completo (incl. o contrato programável de cada serviço) sai em [`docs/gms.md`](docs/gms.md) (`cargo xtask gms-report`); contexto e ledger em [`docs/appendix-d-e.md`](docs/appendix-d-e.md). Toda mudança de shim GMS/Firebase deve atualizar `data/gms.toml` no mesmo PR e regenerar spec/relatórios.
+
+<!-- BEGIN GMS -->
+| Categoria | Serviços (shim sem GMS) | Status dos serviços | Módulos |
+|---|---|---|---|
+| GMS core | GoogleApiAvailability / common, Tasks API | not_implemented 2 | `none` |
+| Play Services | Location (fused), Maps, Billing, Auth (Google Sign-In), Ads, Fit/Health, Cast, Nearby, SafetyNet / Play Integrity | not_implemented 9 | `none` |
+| Firebase | Firebase core (FirebaseApp), Firebase Analytics, Firebase Auth, Firebase Messaging (FCM), Firebase Crashlytics, Cloud Firestore, Realtime Database, Firebase Remote Config (extra além da spec), Firebase Storage (extra além da spec), ML Kit (extra além da spec) | not_implemented 10 | `none` |
+<!-- END GMS -->
 
 ## Apêndice F — Componentes & Manifest (modelo completo — CORE-12)
 

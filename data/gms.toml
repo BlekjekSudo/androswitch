@@ -1,0 +1,394 @@
+# RustyDroid — data/gms.toml
+# Apêndice E da spec: Google Play Services / Firebase (modo "sem GMS" honesto).
+#
+# Fonte executável consumida por rd-framework::fd_gms, `rd gms`,
+# classificação MCP e `cargo xtask gms-report|gms-spec`.
+#
+# MODO HONESTO (validado): mode = "no-gms-honest" e network = "none" em
+# TODOS os serviços. Não há processo GMS, conta Google nem backend real.
+# As APIs existem como shims host com respostas estruturadas,
+# determinísticas e programáveis pelo agente; eventos são capturados
+# localmente, nunca enviados. `supported`/`partial` medem o SHIM, jamais
+# paridade com os servidores do Google.
+#
+# Status: mesma semântica conservadora dos Apêndices C/D.
+schema_version = 1
+source = "RustyDroid.md Appendix E"
+api_floor = 26
+api_ceiling = 36
+mode = "no-gms-honest"
+
+[[category]]
+id = "gms-core"
+name = "GMS core"
+summary = "Disponibilidade, erros e a Tasks API da qual todos os serviços dependem."
+
+[[category]]
+id = "gms-services"
+name = "Play Services"
+summary = "Location, Maps, Billing, Auth, Ads, Fit/Health, Cast/Nearby e Integridade — mocks offline programáveis."
+
+[[category]]
+id = "firebase"
+name = "Firebase"
+summary = "Core, Analytics, Auth, Messaging, Crashlytics e bancos locais (Firestore/RTDB) sem backend."
+
+# ===================== GMS core =====================
+[[service]]
+id = "gms-common"
+name = "GoogleApiAvailability / common"
+category = "gms-core"
+coordinates = "com.google.android.gms:play-services-base"
+prefixes = ["com.google.android.gms.common"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Código de disponibilidade devolvido (SUCCESS/SERVICE_MISSING/...), textos de erro."
+notes = "GoogleApiAvailability/GoogleApiClient/ConnectionResult sem shim: apps que checam disponibilidade no startup não recebem resposta host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-common"
+key_apis = ["com.google.android.gms.common.GoogleApiAvailability.isGooglePlayServicesAvailable", "com.google.android.gms.common.ConnectionResult"]
+
+[[service]]
+id = "gms-tasks"
+name = "Tasks API"
+category = "gms-core"
+coordinates = "com.google.android.gms:play-services-tasks"
+prefixes = ["com.google.android.gms.tasks"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Resultados/exceções de Tasks de todos os serviços E nascem aqui; listeners disparam deterministicamente."
+notes = "Task/TaskCompletionSource/Tasks sem modelo host — é a fundação de Location/Auth/Firestore/FCM e precisa existir antes deles."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-tasks"
+key_apis = ["com.google.android.gms.tasks.Task.addOnSuccessListener", "com.google.android.gms.tasks.Tasks.forResult"]
+
+# ===================== Play Services =====================
+[[service]]
+id = "gms-location"
+name = "Location (fused)"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-location"
+prefixes = ["com.google.android.gms.location"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Fix GPS (lat/lng/accuracy/tempo) devolvido por getLastLocation/getCurrentLocation; callbacks registrados (MEDIA-05)."
+notes = "FusedLocationProviderClient sem shim; nenhum fix virtual é entregue."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-location"
+key_apis = ["com.google.android.gms.location.FusedLocationProviderClient.getLastLocation", "com.google.android.gms.location.LocationServices.getFusedLocationProviderClient"]
+
+[[service]]
+id = "gms-maps"
+name = "Maps"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-maps"
+prefixes = ["com.google.android.gms.maps"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Câmera e marcadores registrados num modelo consultável; sem tiles de rede (UI-07 offline)."
+notes = "GoogleMap/SupportMapFragment sem shim; getMapAsync nunca chama o callback via host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-maps"
+key_apis = ["com.google.android.gms.maps.SupportMapFragment.getMapAsync", "com.google.android.gms.maps.GoogleMap.addMarker"]
+
+[[service]]
+id = "gms-billing"
+name = "Billing"
+category = "gms-services"
+coordinates = "com.android.billingclient:billing"
+prefixes = ["com.android.billingclient"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Catálogo (produtos/preços), resultado do fluxo de compra, purchases possuídas, erros BillingResponseCode."
+notes = "BillingClient sem mock: o fluxo de compras completo (conexão, query, launch, acknowledge/consume) não é testável."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-billing"
+key_apis = ["com.android.billingclient.api.BillingClient.startConnection", "com.android.billingclient.api.BillingClient.launchBillingFlow"]
+
+[[service]]
+id = "gms-auth"
+name = "Auth (Google Sign-In)"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-auth"
+prefixes = ["com.google.android.gms.auth"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Conta fake (id/email/nome/token) ou ausência de conta; provedores fake."
+notes = "GoogleSignIn sem shim; getLastSignedInAccount/signInIntent não respondem via host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-auth"
+key_apis = ["com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount", "com.google.android.gms.auth.api.signin.GoogleSignIn.getClient"]
+
+[[service]]
+id = "gms-ads"
+name = "Ads"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-ads"
+prefixes = ["com.google.android.gms.ads"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Sucesso/falha de load por formato; eventos estruturados capturados, sem rede nem criativos."
+notes = "MobileAds/AdView/Interstitial sem shim; nenhum evento de anúncio é registrado."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-ads"
+key_apis = ["com.google.android.gms.ads.MobileAds.initialize", "com.google.android.gms.ads.AdView.loadAd"]
+
+[[service]]
+id = "gms-fit-health"
+name = "Fit/Health"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-fitness"
+prefixes = ["com.google.android.gms.fitness"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Datasets fake (passos, frequência, sessões) devolvidos às leituras; gravações capturadas."
+notes = "Google Fit sem shim. Health Connect é API de plataforma/androidx.health — fora deste serviço (ver Apêndice C)."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-fit-health"
+key_apis = ["com.google.android.gms.fitness.Fitness.getHistoryClient"]
+
+[[service]]
+id = "gms-cast"
+name = "Cast"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-cast"
+prefixes = ["com.google.android.gms.cast"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Dispositivos/sessões fake opcionais (NET-08); default: nenhum dispositivo descoberto."
+notes = "CastContext/MediaRouter GMS sem shim; descoberta não retorna rotas host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-cast"
+key_apis = ["com.google.android.gms.cast.framework.CastContext.getSharedInstance"]
+
+[[service]]
+id = "gms-nearby"
+name = "Nearby"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-nearby"
+prefixes = ["com.google.android.gms.nearby"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Endpoints fake programáveis (NET-08); default: descoberta vazia, advertising registrado."
+notes = "Nearby Connections/Messages sem shim; startDiscovery/startAdvertising não respondem via host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-nearby"
+key_apis = ["com.google.android.gms.nearby.Nearby.getConnectionsClient"]
+
+[[service]]
+id = "gms-integrity"
+name = "SafetyNet / Play Integrity"
+category = "gms-services"
+coordinates = "com.google.android.play:integrity"
+prefixes = ["com.google.android.gms.safetynet", "com.google.android.play.core.integrity"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Token/veredito determinístico fake, rotulado como shim; nonce registrado. NUNCA atesta um dispositivo real."
+notes = "SafetyNetClient/IntegrityManager sem shim; apps com gate de integridade não recebem token (nem fake) via host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-gms-integrity"
+key_apis = ["com.google.android.gms.safetynet.SafetyNetClient.attest", "com.google.android.play.core.integrity.IntegrityManager.requestIntegrityToken"]
+
+# ===================== Firebase =====================
+[[service]]
+id = "firebase-core"
+name = "Firebase core (FirebaseApp)"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-common"
+prefixes = ["com.google.firebase"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "FirebaseOptions fake (project/app id, api key) do app default; initializeApp registrado."
+notes = "FirebaseApp.initializeApp/getInstance sem shim; serviços Firebase nem chegam a inicializar sem o DEX + google-services."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-firebase-core"
+key_apis = ["com.google.firebase.FirebaseApp.initializeApp", "com.google.firebase.FirebaseApp.getInstance"]
+
+[[service]]
+id = "firebase-analytics"
+name = "Firebase Analytics"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-analytics"
+prefixes = ["com.google.firebase.analytics"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Nada a programar: eventos/user properties/user id são CAPTURADOS e consultáveis pelo agente."
+notes = "FirebaseAnalytics.logEvent sem captura host; eventos se perdem (ou quebram) sem GMS."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-firebase-analytics"
+key_apis = ["com.google.firebase.analytics.FirebaseAnalytics.logEvent", "com.google.firebase.analytics.FirebaseAnalytics.setUserProperty"]
+
+[[service]]
+id = "firebase-auth"
+name = "Firebase Auth"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-auth"
+prefixes = ["com.google.firebase.auth"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Usuário fake (uid/email), sucesso/falha de sign-in por método, sessão atual."
+notes = "FirebaseAuth sem provedores fake; signIn*/createUser* retornam Tasks que o host não completa."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-firebase-auth"
+key_apis = ["com.google.firebase.auth.FirebaseAuth.signInAnonymously", "com.google.firebase.auth.FirebaseAuth.getCurrentUser"]
+
+[[service]]
+id = "firebase-messaging"
+name = "Firebase Messaging (FCM)"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-messaging"
+prefixes = ["com.google.firebase.messaging"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Token FCM fake; tópicos inscritos; injeção de RemoteMessage pelo agente (SYS-08)."
+notes = "FirebaseMessaging.getToken/subscribe sem shim; mensagens push não podem ser injetadas no app."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-firebase-messaging"
+key_apis = ["com.google.firebase.messaging.FirebaseMessaging.getToken", "com.google.firebase.messaging.RemoteMessage"]
+
+[[service]]
+id = "firebase-crashlytics"
+name = "Firebase Crashlytics"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-crashlytics"
+prefixes = ["com.google.firebase.crashlytics"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Captura: recordException/log/custom keys + crashes REAIS (exceções não tratadas da VM), nunca upload."
+notes = "FirebaseCrashlytics sem captura host; nem exceções registradas nem crashes da sessão são coletados."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-firebase-crashlytics"
+key_apis = ["com.google.firebase.crashlytics.FirebaseCrashlytics.recordException", "com.google.firebase.crashlytics.FirebaseCrashlytics.log"]
+
+[[service]]
+id = "firebase-firestore"
+name = "Cloud Firestore"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-firestore"
+prefixes = ["com.google.firebase.firestore"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Store local record/replay (NET-03): documentos semeados pelo agente; listeners disparam nas escritas locais."
+notes = "FirebaseFirestore sem store local; collection/document get/set não respondem via host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-firebase-firestore"
+key_apis = ["com.google.firebase.firestore.FirebaseFirestore.collection", "com.google.firebase.firestore.DocumentReference.set"]
+
+[[service]]
+id = "firebase-rtdb"
+name = "Realtime Database"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-database"
+prefixes = ["com.google.firebase.database"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "Árvore local record/replay (NET-03): valores semeados; ValueEventListeners disparam nas escritas locais."
+notes = "FirebaseDatabase sem store local; getReference/setValue não respondem via host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-firebase-rtdb"
+key_apis = ["com.google.firebase.database.FirebaseDatabase.getReference", "com.google.firebase.database.DatabaseReference.setValue"]
+
+[[service]]
+id = "firebase-remoteconfig"
+name = "Firebase Remote Config (extra além da spec)"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-config"
+prefixes = ["com.google.firebase.remoteconfig"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "(Futuro) mapa chave→valor programável; fetch completa sem rede."
+notes = "Extra além das balas do Apêndice E (apps reais o usam em todo startup): registrado para classificação honesta, sem shim."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-firebase-remoteconfig"
+key_apis = ["com.google.firebase.remoteconfig.FirebaseRemoteConfig.fetchAndActivate"]
+
+[[service]]
+id = "firebase-storage"
+name = "Firebase Storage (extra além da spec)"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-storage"
+prefixes = ["com.google.firebase.storage"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "(Futuro) blobs locais por path; URLs de download fake determinísticas."
+notes = "Extra além das balas do Apêndice E: registrado para classificação, sem shim."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-firebase-storage"
+key_apis = ["com.google.firebase.storage.FirebaseStorage.getReference"]
+
+[[service]]
+id = "mlkit"
+name = "ML Kit (extra além da spec)"
+category = "firebase"
+coordinates = "com.google.mlkit:*:*"
+prefixes = ["com.google.mlkit"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "(Futuro) resultados fake de OCR/barcode programáveis sobre imagens de entrada."
+notes = "Extra: ML Kit (OCR/barcode) aparece em apps reais; sem shim, Tasks de reconhecimento nunca completam via host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-mlkit"
+key_apis = ["com.google.mlkit.vision.text.TextRecognition", "com.google.mlkit.vision.barcode.BarcodeScanning"]

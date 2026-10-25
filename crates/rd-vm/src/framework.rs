@@ -1004,6 +1004,11 @@ pub struct HostState {
     pub m9: crate::m9::State,
     #[cfg(feature = "virtual-devices")]
     pub m10: crate::m10::State,
+    /// Apêndice D: estado dos shims host AndroidX (`androidx.rs`) —
+    /// lifecycle, livedata, viewmodel, collections, datastore (valores),
+    /// work Data, navegação, startup, biometria, futures. Dentro do
+    /// HostState para ser GC-root automaticamente via Debug (gc.rs).
+    pub androidx: crate::androidx::AndroidxState,
 }
 
 /// M8 (31º gap): fragment registrada por um commit de FragmentTransaction.

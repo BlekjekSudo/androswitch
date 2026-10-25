@@ -1568,6 +1568,13 @@ fn do_invoke(
         {
             return Ok(v);
         }
+        // Apêndice D: shims host AndroidX (FileProvider, AppInitializer,
+        // DataStore keys, MultiDex.install…) — `None` mantém o DEX real.
+        if let Some(v) =
+            crate::androidx::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
+        {
+            return Ok(v);
+        }
         // M3: classes android/* são HOST (framework.rs) — nunca estão no DEX
         if mref.class.starts_with("Landroid/") {
             return match crate::framework::call_host_static(
@@ -1698,6 +1705,15 @@ fn do_invoke(
     // `None` cai para o DEX real da biblioteca (androidx/okhttp no APK).
     if let Some(v) =
         crate::m8::call_m8_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+    {
+        return Ok(v);
+    }
+
+    // Apêndice D: shims host AndroidX por módulo (lifecycle, livedata,
+    // viewmodel, collection, datastore valores, work Data, navigation,
+    // startup, biometria, futures) — `None` mantém o DEX real da lib.
+    if let Some(v) =
+        crate::androidx::call_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
     {
         return Ok(v);
     }
