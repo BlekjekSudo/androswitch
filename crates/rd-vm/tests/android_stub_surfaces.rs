@@ -22570,6 +22570,47 @@ fn service_state_and_cell_broadcast_id_range_values_are_guest_visible() {
         ),
         "Ljava/lang/IllegalArgumentException;",
     );
+    // Boundary: a single-id range at the top of the 16-bit id space is
+    // valid, and equality is exact-class/field based only.
+    let single = p49_new(
+        &mut engine,
+        P36I_CB_RANGE,
+        "(IIIZ)V",
+        &[
+            Value::Int(65535),
+            Value::Int(65535),
+            Value::Int(2),
+            Value::Int(0),
+        ],
+    );
+    assert_eq!(
+        call(&mut engine, single, "getType", "()I", &[]),
+        Value::Int(2)
+    );
+    assert_eq!(
+        call_text(&mut engine, single, "toString", "()Ljava/lang/String;", &[]),
+        "CellBroadcastIdRange[65535, 65535, 2, false]"
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            range,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Null],
+        ),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            range,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(single)],
+        ),
+        Value::Int(0)
+    );
 }
 
 #[test]
@@ -22722,6 +22763,127 @@ fn mbms_download_request_and_file_info_are_guest_visible() {
             &[Value::Obj(other_info)]
         ),
         Value::Int(0)
+    );
+    // FileInfo stores its fields unchecked; two all-null instances are
+    // equal through Objects.equals semantics.
+    let null_info = p49_new(
+        &mut engine,
+        P36I_FILE_INFO,
+        "(Landroid/net/Uri;Ljava/lang/String;)V",
+        &[Value::Null, Value::Null],
+    );
+    let null_info2 = p49_new(
+        &mut engine,
+        P36I_FILE_INFO,
+        "(Landroid/net/Uri;Ljava/lang/String;)V",
+        &[Value::Null, Value::Null],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            null_info,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(null_info2)]
+        ),
+        Value::Int(1)
+    );
+
+    // The app intent round-trips through Intent.toUri/parseUri.
+    let done_action = text(&mut engine, "com.example.DOWNLOAD_DONE");
+    let done_intent = p49_new(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "(Ljava/lang/String;)V",
+        &[done_action],
+    );
+    let intent_builder = p49_new(
+        &mut engine,
+        P36I_DOWNLOAD_BUILDER,
+        "(Landroid/net/Uri;Landroid/net/Uri;)V",
+        &[source.clone(), dest.clone()],
+    );
+    call(
+        &mut engine,
+        intent_builder,
+        "setAppIntent",
+        "(Landroid/content/Intent;)Landroid/telephony/mbms/DownloadRequest$Builder;",
+        &[Value::Obj(done_intent)],
+    );
+    let with_intent = object(call(
+        &mut engine,
+        intent_builder,
+        "build",
+        "()Landroid/telephony/mbms/DownloadRequest;",
+        &[],
+    ));
+    let restored = object(call(
+        &mut engine,
+        with_intent,
+        "getIntentForApp",
+        "()Landroid/content/Intent;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            restored,
+            "getAction",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "com.example.DOWNLOAD_DONE"
+    );
+
+    // AOSP assigns the serialized intent before validating its length, so
+    // the oversized value remains in the builder when setAppIntent throws
+    // and is carried into the next build().
+    let long_action = "a".repeat(50_001);
+    let long_action_value = text(&mut engine, &long_action);
+    let big_intent = p49_new(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "(Ljava/lang/String;)V",
+        &[long_action_value],
+    );
+    let oversized_builder = p49_new(
+        &mut engine,
+        P36I_DOWNLOAD_BUILDER,
+        "(Landroid/net/Uri;Landroid/net/Uri;)V",
+        &[source, dest],
+    );
+    assert_throws(
+        engine.invoke_instance(
+            oversized_builder,
+            "setAppIntent",
+            "(Landroid/content/Intent;)Landroid/telephony/mbms/DownloadRequest$Builder;",
+            &[Value::Obj(big_intent)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let retained = object(call(
+        &mut engine,
+        oversized_builder,
+        "build",
+        "()Landroid/telephony/mbms/DownloadRequest;",
+        &[],
+    ));
+    let retained_intent = object(call(
+        &mut engine,
+        retained,
+        "getIntentForApp",
+        "()Landroid/content/Intent;",
+        &[],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            retained_intent,
+            "getAction",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        long_action
     );
 }
 
