@@ -32702,6 +32702,15 @@ fn p41_tile_service_instance(
             }
             return Ok(None);
         }
+        ("startActivityAndCollapse", "(Landroid/content/Intent;)V") => {
+            // START_ACTIVITY_NEEDS_PENDING_INTENT is enabled for apps
+            // targeting Android 14 (our reference platform).
+            return Err(throw(
+                "Ljava/lang/UnsupportedOperationException;",
+                "startActivityAndCollapse: Starting activity from TileService using an Intent \
+                 is not allowed.",
+            ));
+        }
         ("onBind", "(Landroid/content/Intent;)Landroid/os/IBinder;") => {
             let Some(intent) = oarg(args, 0) else {
                 return Err(npe(""));
