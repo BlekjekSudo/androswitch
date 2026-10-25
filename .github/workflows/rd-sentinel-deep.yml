@@ -126,6 +126,17 @@ jobs:
           cargo install cargo-audit@0.22.2 --locked
           cargo install cargo-deny@0.20.2 --locked
           cargo install cargo-machete@0.9.2 --locked
+      # issue #193: the core/determinism components run
+      # `cargo test --workspace --all-features`, which enables the rd-ndk
+      # native tests. Those tests need the golden/native three-ABI
+      # fixtures (built from source, never committed) and the Unicorn
+      # worker — this job had neither, so the nightly failed 3 tests 5/5.
+      - name: Install native fixture prerequisites and build fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+          python -m pip install unicorn==2.1.4
+          bash golden/native/build.sh
       - name: Fetch pinned Primftpd corpus for determinism probes
         continue-on-error: true
         run: |

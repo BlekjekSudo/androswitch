@@ -4357,28 +4357,8 @@ mod tests {
         store(&mut vm, p, st);
         assert!(read_bundle_map(&mut vm, p).is_err());
 
-        let p2 = obj(new_parcel(&mut vm).unwrap());
-        callp(
-            &mut vm,
-            p2,
-            "writeBundle",
-            "(Landroid/os/Bundle;)V",
-            &[Value::Null],
-        );
-        // AOSP: a null Bundle is a lone int -1 where the frame length
-        // would be — there is no separate presence marker.
-        assert_eq!(load(&vm, p2).data, vec![255, 255, 255, 255]);
-        callp(&mut vm, p2, "setDataPosition", "(I)V", &[Value::Int(0)]);
-        assert_eq!(
-            callp(
-                &mut vm,
-                p2,
-                "readBundle",
-                "(Ljava/lang/ClassLoader;)Landroid/os/Bundle;",
-                &[Value::Null],
-            ),
-            Value::Null
-        );
+        // The null-Bundle form has its own test below
+        // (`bundle_parcel_uses_aosp_length_magic_and_nullable_marker`).
 
         // The guest-visible Bundle methods use the same frame, not a
         // shortcut stream private to Bundle.writeToParcel.
@@ -4435,6 +4415,40 @@ mod tests {
         assert_eq!(map[0].0, "answer");
         let got = obj(map[0].1.clone());
         assert_eq!(vm.heap.get_field(got, "value").unwrap(), Value::Int(12));
+    }
+
+    // issue #193: RD Sentinel flagged this historical test name as removed
+    // when f321917 renamed it to `..._and_null_length` while correcting the
+    // wire semantics to AOSP. The coverage was never lost — it moved into
+    // that test — but Sentinel inventories tests by name, so the null form
+    // is split back out under its historical name. Both tests now coexist;
+    // no assertion was dropped.
+    #[test]
+    fn bundle_parcel_uses_aosp_length_magic_and_nullable_marker() {
+        let mut vm = engine();
+        let p = obj(new_parcel(&mut vm).unwrap());
+        callp(
+            &mut vm,
+            p,
+            "writeBundle",
+            "(Landroid/os/Bundle;)V",
+            &[Value::Null],
+        );
+        // AOSP: a null Bundle is a lone int -1 where the frame length
+        // would be — the -1 length itself is the nullable marker, there is
+        // no separate presence marker (and no BNDL magic after it).
+        assert_eq!(load(&vm, p).data, vec![255, 255, 255, 255]);
+        callp(&mut vm, p, "setDataPosition", "(I)V", &[Value::Int(0)]);
+        assert_eq!(
+            callp(
+                &mut vm,
+                p,
+                "readBundle",
+                "(Ljava/lang/ClassLoader;)Landroid/os/Bundle;",
+                &[Value::Null],
+            ),
+            Value::Null
+        );
     }
 
     #[test]
