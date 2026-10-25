@@ -67,13 +67,35 @@ fn upscale(u: i128, k: i64) -> Result<i128, VmExit> {
     mul(u, pow10(k)?)
 }
 
+fn npe(msg: &str) -> VmExit {
+    VmExit::Exception(Throwable::new("Ljava/lang/NullPointerException;", msg))
+}
+
+fn nfe(msg: impl Into<String>) -> VmExit {
+    VmExit::Exception(Throwable::new("Ljava/lang/NumberFormatException;", msg))
+}
+
+fn iae(msg: impl Into<String>) -> VmExit {
+    VmExit::Exception(Throwable::new("Ljava/lang/IllegalArgumentException;", msg))
+}
+
+fn non_null_str(vm: &Engine, v: Option<&Value>, label: &str) -> Result<String, VmExit> {
+    let Some(val @ Value::Obj(r)) = v else {
+        return Err(npe(label));
+    };
+    if *r == 0 {
+        return Err(npe(label));
+    }
+    crate::intrinsics::string_arg(vm, val)
+}
+
 /// `n / d` rounded with a JDK RoundingMode name.
 fn div_round(n: i128, d: i128, mode: &str) -> Result<i128, VmExit> {
     if d == 0 {
         return Err(arith("Division by zero"));
     }
-    let q = n / d;
-    let r = n % d;
+    let q = n.checked_div(d).ok_or_else(overflow)?;
+    let r = n.checked_rem(d).ok_or_else(overflow)?;
     if r == 0 {
         return Ok(q);
     }
@@ -92,7 +114,11 @@ fn div_round(n: i128, d: i128, mode: &str) -> Result<i128, VmExit> {
         // HALF_EVEN (also the default)
         _ => cmp == Greater || (cmp == Equal && q % 2 != 0),
     };
-    Ok(if inc { q + sign } else { q })
+    if inc {
+        q.checked_add(sign).ok_or_else(overflow)
+    } else {
+        Ok(q)
+    }
 }
 
 /// Rescale `(u, s)` to `new_s`, rounding when digits are dropped.
@@ -128,22 +154,44 @@ fn digits(u: i128) -> i32 {
     d
 }
 
-fn strip(mut u: i128, mut s: i32) -> (i128, i32) {
+fn strip_checked(mut u: i128, mut s: i32) -> Result<(i128, i32), VmExit> {
     if u == 0 {
-        return (0, 0);
+        return Ok((0, 0));
     }
     while u % 10 == 0 {
+        let next_s = s.checked_sub(1).ok_or_else(overflow)?;
         u /= 10;
-        s -= 1;
+        s = next_s;
     }
-    (u, s)
+    Ok((u, s))
+}
+
+#[cfg(test)]
+fn strip(u: i128, s: i32) -> (i128, i32) {
+    strip_checked(u, s).unwrap_or((u, s))
+}
+
+fn plain_char_len(u: i128, s: i32) -> u64 {
+    let d_len = digits(u) as u64;
+    let body = if s <= 0 {
+        d_len.saturating_add((-(s as i64)) as u64)
+    } else {
+        let su = s as u64;
+        if d_len <= su {
+            su.saturating_add(2)
+        } else {
+            d_len.saturating_add(1)
+        }
+    };
+    body.saturating_add(u64::from(u < 0))
 }
 
 pub(crate) fn plain_string(u: i128, s: i32) -> String {
     let neg = u < 0;
     let mut d = u.unsigned_abs().to_string();
     if s <= 0 {
-        d.push_str(&"0".repeat((-s) as usize));
+        let zeros = usize::try_from(-(s as i64)).unwrap_or(0);
+        d.push_str(&"0".repeat(zeros));
     } else {
         let s = s as usize;
         if d.len() <= s {
@@ -156,6 +204,24 @@ pub(crate) fn plain_string(u: i128, s: i32) -> String {
     } else {
         d
     }
+}
+
+fn plain_string_checked(vm: &Engine, u: i128, s: i32) -> Result<String, VmExit> {
+    let len = plain_char_len(u, s);
+    let requested_u64 = len.saturating_mul(2).saturating_add(32);
+    let requested = usize::try_from(requested_u64).unwrap_or(usize::MAX);
+    if vm
+        .heap
+        .used()
+        .checked_add(requested)
+        .map_or(true, |n| n > vm.heap.budget())
+    {
+        return Err(crate::err::oom_throwable(crate::heap::OomError {
+            requested,
+            budget: vm.heap.budget(),
+        }));
+    }
+    Ok(plain_string(u, s))
 }
 
 fn sci_string(u: i128, s: i32) -> String {
@@ -174,6 +240,32 @@ fn sci_string(u: i128, s: i32) -> String {
         format!("E+{adjusted}")
     } else {
         format!("E{adjusted}")
+    };
+    format!("{}{m}{e}", if neg { "-" } else { "" })
+}
+
+fn eng_string(u: i128, s: i32) -> String {
+    let adjusted = -(s as i64) + (digits(u) as i64 - 1);
+    if s >= 0 && adjusted >= -6 {
+        return plain_string(u, s);
+    }
+    if u == 0 {
+        return sci_string(0, s);
+    }
+    let neg = u < 0;
+    let d = u.unsigned_abs().to_string();
+    let r = adjusted.rem_euclid(3) as usize;
+    let int_digits = 1 + r;
+    let eng_exp = adjusted - (r as i64);
+    let m = if d.len() <= int_digits {
+        format!("{d}{}", "0".repeat(int_digits - d.len()))
+    } else {
+        format!("{}.{}", &d[..int_digits], &d[int_digits..])
+    };
+    let e = if eng_exp >= 0 {
+        format!("E+{eng_exp}")
+    } else {
+        format!("E{eng_exp}")
     };
     format!("{}{m}{e}", if neg { "-" } else { "" })
 }
@@ -200,18 +292,27 @@ fn parse(text: &str) -> Option<(i128, i32)> {
         return None;
     }
     let all = format!("{ip}{fp}");
-    let u: i128 = all.trim_start_matches('0').parse().unwrap_or(0);
-    let u = if all.trim_start_matches('0').is_empty() {
+    let trimmed = all.trim_start_matches('0');
+    let u: i128 = if trimmed.is_empty() {
         0
     } else {
-        u
+        let mag: u128 = trimmed.parse().ok()?;
+        if neg {
+            if mag == (i128::MAX as u128) + 1 {
+                i128::MIN
+            } else if mag <= i128::MAX as u128 {
+                -(mag as i128)
+            } else {
+                return None;
+            }
+        } else if mag <= i128::MAX as u128 {
+            mag as i128
+        } else {
+            return None;
+        }
     };
-    // i128 parse failure on huge inputs → None (NumberFormatException)
-    if !all.trim_start_matches('0').is_empty() && u == 0 {
-        return None;
-    }
     let scale = i32::try_from(fp.len() as i64 - exp).ok()?;
-    Some((if neg { -u } else { u }, scale))
+    Some((u, scale))
 }
 
 fn new_num(vm: &mut Engine, class: &str, u: i128, s: i32) -> Result<Value, VmExit> {
@@ -237,7 +338,7 @@ fn num_of(vm: &Engine, v: Option<&Value>) -> Result<(i128, i32), VmExit> {
 
 fn mode_of(vm: &mut Engine, v: Option<&Value>) -> Result<String, VmExit> {
     match v {
-        Some(Value::Obj(r)) => {
+        Some(Value::Obj(r)) if *r != 0 => {
             if let Ok(Value::Obj(n)) = vm.heap.get_field(*r, "name") {
                 if let Ok(s) = vm.heap.as_str(n) {
                     return Ok(s.to_string());
@@ -246,8 +347,13 @@ fn mode_of(vm: &mut Engine, v: Option<&Value>) -> Result<String, VmExit> {
             crate::intrinsics::object_to_string(vm, *r)
         }
         // legacy int constants (BigDecimal.ROUND_*)
-        Some(Value::Int(i)) => Ok(MODES.get(*i as usize).unwrap_or(&"HALF_EVEN").to_string()),
-        _ => Ok("HALF_EVEN".to_string()),
+        Some(Value::Int(i)) => {
+            let Some(m) = usize::try_from(*i).ok().and_then(|idx| MODES.get(idx)) else {
+                return Err(iae("Invalid rounding mode"));
+            };
+            Ok((*m).to_string())
+        }
+        _ => Err(npe("RoundingMode == null")),
     }
 }
 
@@ -327,17 +433,18 @@ pub fn static_intrinsic(
         }
         (BI, "valueOf", "(J)Ljava/math/BigInteger;") => new_num(vm, BI, long(0) as i128, 0)?,
         (RM, "valueOf", "(Ljava/lang/String;)Ljava/math/RoundingMode;") => {
-            let n = match args.first() {
-                Some(v @ Value::Obj(_)) => crate::intrinsics::string_arg(vm, v)?,
-                _ => String::new(),
-            };
+            let n = non_null_str(vm, args.first(), "Name is null")?;
             if !MODES.contains(&n.as_str()) {
-                return Err(VmExit::Exception(Throwable::new(
-                    "Ljava/lang/IllegalArgumentException;",
-                    format!("No enum constant java.math.RoundingMode.{n}"),
-                )));
+                return Err(iae(format!("No enum constant java.math.RoundingMode.{n}")));
             }
             rounding_mode(vm, &n)?
+        }
+        (RM, "valueOf", "(I)Ljava/math/RoundingMode;") => {
+            let ord = args.first().and_then(|v| v.as_int().ok()).unwrap_or(-1);
+            let Some(m) = usize::try_from(ord).ok().and_then(|idx| MODES.get(idx)) else {
+                return Err(iae("Invalid rounding mode"));
+            };
+            rounding_mode(vm, m)?
         }
         _ => return Ok(None),
     }))
@@ -356,23 +463,24 @@ pub fn instance_intrinsic(
         let class = mref_class;
         let (u, s) = match sig {
             "(Ljava/lang/String;)V" | "(Ljava/lang/String;I)V" => {
-                let t = match args.first() {
-                    Some(v @ Value::Obj(_)) => crate::intrinsics::string_arg(vm, v)?,
-                    _ => String::new(),
-                };
+                let t = non_null_str(vm, args.first(), "val == null")?;
                 let parsed = if sig == "(Ljava/lang/String;I)V" {
                     // BigInteger(String, radix)
-                    let radix = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(10) as u32;
-                    i128::from_str_radix(t.trim(), radix).ok().map(|u| (u, 0))
+                    let radix_raw = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(10);
+                    if !(2..=36).contains(&radix_raw) {
+                        return Err(nfe("Radix out of range"));
+                    }
+                    i128::from_str_radix(t.trim(), radix_raw as u32)
+                        .ok()
+                        .map(|u| (u, 0))
                 } else if class == BI {
                     t.trim().parse::<i128>().ok().map(|u| (u, 0))
                 } else {
                     parse(&t)
                 };
                 parsed.ok_or_else(|| {
-                    VmExit::Exception(Throwable::new(
-                        "Ljava/lang/NumberFormatException;",
-                        format!("Character array is missing \"exponent\" mark 'e' or 'E'. ({t})"),
+                    nfe(format!(
+                        "Character array is missing \"exponent\" mark 'e' or 'E'. ({t})"
                     ))
                 })?
             }
@@ -397,14 +505,13 @@ pub fn instance_intrinsic(
                 // exact binary value of the double
                 let d = args.first().and_then(|v| v.as_double().ok()).unwrap_or(0.0);
                 if !d.is_finite() {
-                    return Err(VmExit::Exception(Throwable::new(
-                        "Ljava/lang/NumberFormatException;",
-                        "Infinite or NaN",
-                    )));
+                    return Err(nfe("Infinite or NaN"));
                 }
                 let txt = format!("{d:.40}");
-                let (u, s) = parse(&txt).unwrap_or((0, 0));
-                strip(u, s)
+                let (u, s) = parse(&txt)
+                    .or_else(|| parse(&crate::numerics::java_double_to_string(d, false)))
+                    .unwrap_or((0, 0));
+                strip_checked(u, s)?
             }
             _ => return Ok(None),
         };
@@ -417,16 +524,17 @@ pub fn instance_intrinsic(
     let class = vm.heap.class_of(recv)?.to_string();
     let is_bi = class == BI;
     let int_arg = |i: usize| args.get(i).and_then(|v| v.as_int().ok()).unwrap_or(0);
-    let whole = |u: i128, s: i32| -> i128 {
+    let whole_checked = |u: i128, s: i32| -> Result<i128, VmExit> {
         if s <= 0 {
-            upscale(u, -(s as i64)).unwrap_or(0)
+            upscale(u, -(s as i64))
         } else {
-            match 10i128.checked_pow(s as u32) {
+            Ok(match 10i128.checked_pow(s as u32) {
                 Some(p) => u / p,
                 None => 0,
-            }
+            })
         }
     };
+    let whole = |u: i128, s: i32| -> i128 { whole_checked(u, s).unwrap_or(0) };
     let v = match (name, sig) {
         ("add", _) | ("subtract", _) | ("multiply", _) | ("max", _) | ("min", _)
             if args.len() == 1 =>
@@ -464,7 +572,7 @@ pub fn instance_intrinsic(
                 }));
             }
             if is_bi {
-                new_num(vm, BI, u / o.0, 0)?
+                new_num(vm, BI, u.checked_div(o.0).ok_or_else(overflow)?, 0)?
             } else if args.len() >= 2 {
                 // divide(d, scale, mode) | divide(d, mode)
                 let (scale, mode) = if args.len() == 3 {
@@ -481,18 +589,22 @@ pub fn instance_intrinsic(
                 new_num(vm, BD, div_round(n, d, &mode)?, scale)?
             } else {
                 // exact quotient, preferred scale this.scale - divisor.scale
-                let pref = s - o.1;
+                let pref_i64 = s as i64 - o.1 as i64;
                 let mut found = None;
-                for extra in 0..=40i32 {
-                    let sc = pref.max(0) + extra;
+                for extra in 0..=40i64 {
+                    let sc_i64 = pref_i64.max(0) + extra;
+                    let Ok(sc) = i32::try_from(sc_i64) else {
+                        break;
+                    };
                     let e = sc as i64 - s as i64 + o.1 as i64;
                     let (n, d) = if e >= 0 {
                         (upscale(u, e)?, o.0)
                     } else {
                         (u, upscale(o.0, -e)?)
                     };
-                    if n % d == 0 {
-                        found = Some((n / d, sc));
+                    if n.checked_rem(d) == Some(0) {
+                        let q = n.checked_div(d).ok_or_else(overflow)?;
+                        found = Some((q, sc));
                         break;
                     }
                 }
@@ -501,12 +613,12 @@ pub fn instance_intrinsic(
                         "Non-terminating decimal expansion; no exact representable decimal result.",
                     ));
                 };
-                while sc > pref && q % 10 == 0 && q != 0 {
+                while (sc as i64) > pref_i64 && q % 10 == 0 && q != 0 {
                     q /= 10;
                     sc -= 1;
                 }
                 if q == 0 {
-                    sc = pref;
+                    sc = i32::try_from(pref_i64).map_err(|_| overflow())?;
                 }
                 new_num(vm, BD, q, sc)?
             }
@@ -516,16 +628,19 @@ pub fn instance_intrinsic(
             if o.0 == 0 {
                 return Err(arith("Division by zero"));
             }
+            if is_bi && name == "mod" && o.0 < 0 {
+                return Err(arith("BigInteger: modulus not positive"));
+            }
             let (a, b, sc) = align((u, s), o)?;
             let r = if name == "mod" {
-                a.rem_euclid(b)
+                a.checked_rem_euclid(b).ok_or_else(overflow)?
             } else {
-                a % b
+                a.checked_rem(b).ok_or_else(overflow)?
             };
             new_num(vm, &class, r, sc)?
         }
-        ("negate", _) => new_num(vm, &class, -u, s)?,
-        ("abs", _) => new_num(vm, &class, u.abs(), s)?,
+        ("negate", _) => new_num(vm, &class, u.checked_neg().ok_or_else(overflow)?, s)?,
+        ("abs", _) => new_num(vm, &class, u.checked_abs().ok_or_else(overflow)?, s)?,
         ("pow", "(I)Ljava/math/BigDecimal;") | ("pow", "(I)Ljava/math/BigInteger;") => {
             let n = int_arg(0);
             if n < 0 {
@@ -547,17 +662,21 @@ pub fn instance_intrinsic(
         }
         ("round", _) => {
             // round(MathContext): precision from the context's field, HALF_UP
-            let prec = match args.first() {
-                Some(Value::Obj(mc)) => match vm.heap.get_field(*mc, "precision") {
-                    Ok(Value::Int(p)) => p,
-                    _ => 0,
-                },
+            let Some(Value::Obj(mc)) = args.first() else {
+                return Err(npe("mc == null"));
+            };
+            if *mc == 0 {
+                return Err(npe("mc == null"));
+            }
+            let prec = match vm.heap.get_field(*mc, "precision") {
+                Ok(Value::Int(p)) => p,
                 _ => 0,
             };
             if prec <= 0 || digits(u) <= prec {
                 new_num(vm, BD, u, s)?
             } else {
-                let ns = s - (digits(u) - prec);
+                let drop = digits(u) as i64 - prec as i64;
+                let ns = i32::try_from(s as i64 - drop).map_err(|_| overflow())?;
                 new_num(vm, BD, rescale(u, s, ns, "HALF_UP")?, ns)?
             }
         }
@@ -575,7 +694,7 @@ pub fn instance_intrinsic(
             }
         }
         ("stripTrailingZeros", _) => {
-            let (ru, rs) = strip(u, s);
+            let (ru, rs) = strip_checked(u, s)?;
             new_num(vm, BD, ru, rs)?
         }
         ("signum", "()I") => Value::Int(u.signum() as i32),
@@ -583,7 +702,7 @@ pub fn instance_intrinsic(
         ("precision", "()I") => Value::Int(digits(u)),
         ("unscaledValue", _) => new_num(vm, BI, u, 0)?,
         ("toBigInteger", _) | ("toBigIntegerExact", _) => {
-            let w = whole(u, s);
+            let w = whole_checked(u, s)?;
             if name == "toBigIntegerExact" && upscale(w, s.max(0) as i64)? != u {
                 return Err(arith("Rounding necessary"));
             }
@@ -616,7 +735,12 @@ pub fn instance_intrinsic(
             Value::Obj(crate::intrinsics::alloc_string(vm, t)?)
         }
         ("toString", "(I)Ljava/lang/String;") if is_bi => {
-            let radix = int_arg(0).clamp(2, 36) as u32;
+            let raw = int_arg(0);
+            let radix = if (2..=36).contains(&raw) {
+                raw as u32
+            } else {
+                10
+            };
             let mut n = u.unsigned_abs();
             let mut out = Vec::new();
             loop {
@@ -632,17 +756,21 @@ pub fn instance_intrinsic(
             let t: String = out.into_iter().rev().collect();
             Value::Obj(crate::intrinsics::alloc_string(vm, t)?)
         }
-        ("toPlainString", _) | ("toEngineeringString", _) => {
-            Value::Obj(crate::intrinsics::alloc_string(vm, plain_string(u, s))?)
+        ("toPlainString", _) => {
+            let t = plain_string_checked(vm, u, s)?;
+            Value::Obj(crate::intrinsics::alloc_string(vm, t)?)
         }
-        ("doubleValue", "()D") => Value::Double(plain_string(u, s).parse::<f64>().unwrap_or(0.0)),
-        ("floatValue", "()F") => Value::Float(plain_string(u, s).parse::<f32>().unwrap_or(0.0)),
+        ("toEngineeringString", _) => {
+            Value::Obj(crate::intrinsics::alloc_string(vm, eng_string(u, s))?)
+        }
+        ("doubleValue", "()D") => Value::Double(sci_string(u, s).parse::<f64>().unwrap_or(0.0)),
+        ("floatValue", "()F") => Value::Float(sci_string(u, s).parse::<f32>().unwrap_or(0.0)),
         ("longValue", "()J") => Value::Long(whole(u, s) as i64),
         ("intValue", "()I") => Value::Int(whole(u, s) as i32),
         ("shortValue", "()S") => Value::Int(whole(u, s) as i16 as i32),
         ("byteValue", "()B") => Value::Int(whole(u, s) as i8 as i32),
         ("longValueExact", "()J") | ("intValueExact", "()I") => {
-            let w = whole(u, s);
+            let w = whole_checked(u, s)?;
             if upscale(w, s.max(0) as i64)? != u {
                 return Err(arith("Rounding necessary"));
             }

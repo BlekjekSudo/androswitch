@@ -31,6 +31,58 @@ use crate::value::Value;
 use rd_apk::arsc::ResolvedValue;
 use rd_apk::axml::{AttrValue, ComplexUnit, XmlAttribute, XmlElement};
 
+/// Anti-overflow coordinate ceiling inside scrollable containers (#263):
+/// permits multi-screen scrollable content (e.g. 1000dp = 2000px inside
+/// `ScrollView` / `HorizontalScrollView` / `RecyclerView`) while still blocking
+/// `i32::MAX`-scale coordinate wrap in layout and hit-testing.
+const MAX_LAYOUT_DIM_PX: i32 = 65_536;
+
+#[derive(Clone, Copy)]
+struct AxisCaps {
+    w: i32,
+    h: i32,
+}
+
+impl AxisCaps {
+    const VIEWPORT: Self = Self {
+        w: framework::WINDOW_W,
+        h: framework::WINDOW_H,
+    };
+}
+
+fn caps_for_desc(vm: &Engine, desc: &str, mut caps: AxisCaps) -> AxisCaps {
+    let v_scroll = [
+        "Landroid/widget/ScrollView;",
+        "Landroidx/core/widget/NestedScrollView;",
+        "Landroidx/recyclerview/widget/RecyclerView;",
+        "Landroid/widget/AbsListView;",
+        "Landroidx/viewpager2/widget/ViewPager2;",
+        "Landroidx/coordinatorlayout/widget/CoordinatorLayout;",
+    ];
+    let h_scroll = [
+        "Landroid/widget/HorizontalScrollView;",
+        "Landroidx/recyclerview/widget/RecyclerView;",
+        "Landroidx/viewpager/widget/ViewPager;",
+        "Landroidx/viewpager2/widget/ViewPager2;",
+        "Lcom/google/android/material/tabs/TabLayout;",
+    ];
+    if v_scroll.iter().any(|t| vm.cp.is_subtype(desc, t)) {
+        caps.h = caps.h.max(MAX_LAYOUT_DIM_PX);
+    }
+    if h_scroll.iter().any(|t| vm.cp.is_subtype(desc, t)) {
+        caps.w = caps.w.max(MAX_LAYOUT_DIM_PX);
+    }
+    caps
+}
+
+fn caps_for_parent_obj(vm: &Engine, parent: ObjRef) -> AxisCaps {
+    let mut caps = AxisCaps::VIEWPORT;
+    if let Ok(cls) = vm.heap.class_of(parent) {
+        caps = caps_for_desc(vm, cls, caps);
+    }
+    caps
+}
+
 /// Infla `layout_resid` (R.layout.x) do APK injetado e devolve a raiz da
 /// árvore de views host. Quem anexa na window é o chamador (dispatch de
 /// `Activity.setContentView(I)` → `framework::set_content_view`). O contexto
@@ -39,7 +91,7 @@ pub fn inflate_resource(vm: &mut Engine, layout_resid: u32) -> Result<ObjRef, Vm
     let context = vm.fw.current_activity;
     let doc = load_layout_document(vm, layout_resid)?;
     let mut count = 0usize;
-    inflate_element_depth(vm, &doc.root, 0, &mut count, context)
+    inflate_element_depth(vm, &doc.root, 0, &mut count, context, AxisCaps::VIEWPORT)
 }
 
 /// Equivalente host de `LayoutInflater.inflate(resource, root, attachToRoot)`.
@@ -63,6 +115,7 @@ pub(crate) fn inflate_resource_into_with_context(
     context: Option<ObjRef>,
 ) -> Result<ObjRef, VmExit> {
     let doc = load_layout_document(vm, layout_resid)?;
+    let initial_caps = root.map_or(AxisCaps::VIEWPORT, |p| caps_for_parent_obj(vm, p));
     let mut count = 0usize;
     if doc.root.name == "merge" {
         let Some(root) = root.filter(|_| attach_to_root) else {
@@ -71,13 +124,21 @@ pub(crate) fn inflate_resource_into_with_context(
             ));
         };
         count += 1;
-        inflate_children(vm, root, &doc.root.children, 1, &mut count, context)?;
+        inflate_children(
+            vm,
+            root,
+            &doc.root.children,
+            1,
+            &mut count,
+            context,
+            initial_caps,
+        )?;
         return Ok(root);
     }
 
-    let view = inflate_element_depth(vm, &doc.root, 0, &mut count, context)?;
+    let view = inflate_element_depth(vm, &doc.root, 0, &mut count, context, initial_caps)?;
     if let Some(parent) = root {
-        assign_layout_params(vm, parent, view, &[&doc.root])?;
+        assign_layout_params(vm, parent, view, &[&doc.root], initial_caps)?;
     }
     if let Some(root) = root.filter(|_| attach_to_root) {
         framework::attach_child(vm, root, view)?;
@@ -148,18 +209,19 @@ fn layout_margin(
     vm: &Engine,
     elements: &[&XmlElement],
     name: &str,
+    cap: i32,
     default: i32,
 ) -> Result<i32, VmExit> {
     let Some(attr) = layout_param_attr(elements, name) else {
         return Ok(default);
     };
     match &attr.value {
-        AttrValue::Int(value) if value.unsigned_abs() <= framework::WINDOW_H as u32 => Ok(*value),
+        AttrValue::Int(value) if value.unsigned_abs() <= cap as u32 => Ok(*value),
         AttrValue::Int(value) => Err(inflate_error(format!(
             "android:{name}={value}px excede o limite de margem"
         ))),
-        AttrValue::Reference(resid) => ref_dimension_px(vm, name, *resid, framework::WINDOW_H),
-        _ => Ok(dimension_px(attr, framework::WINDOW_H, name)?.unwrap_or(default)),
+        AttrValue::Reference(resid) => ref_dimension_px(vm, name, *resid, cap),
+        _ => Ok(dimension_px(attr, cap, name)?.unwrap_or(default)),
     }
 }
 
@@ -235,10 +297,11 @@ fn assign_layout_params(
     parent: ObjRef,
     child: ObjRef,
     elements: &[&XmlElement],
+    caps: AxisCaps,
 ) -> Result<(), VmExit> {
     let params_class = layout_params_class(vm, parent)?;
-    let width = layout_param_size(vm, elements, "layout_width", framework::WINDOW_W, -2)?;
-    let height = layout_param_size(vm, elements, "layout_height", framework::WINDOW_H, -2)?;
+    let width = layout_param_size(vm, elements, "layout_width", caps.w, -2)?;
+    let height = layout_param_size(vm, elements, "layout_height", caps.h, -2)?;
     let params = vm
         .heap
         .alloc_instance(params_class.clone(), Vec::new())
@@ -276,15 +339,16 @@ fn assign_layout_params(
         )?;
     }
 
-    let all = layout_margin(vm, elements, "layout_margin", 0)?;
-    let horizontal = layout_margin(vm, elements, "layout_marginHorizontal", all)?;
-    let vertical = layout_margin(vm, elements, "layout_marginVertical", all)?;
-    let left = layout_margin(vm, elements, "layout_marginLeft", horizontal)?;
-    let right = layout_margin(vm, elements, "layout_marginRight", horizontal)?;
-    let top = layout_margin(vm, elements, "layout_marginTop", vertical)?;
-    let bottom = layout_margin(vm, elements, "layout_marginBottom", vertical)?;
-    let left = layout_margin(vm, elements, "layout_marginStart", left)?;
-    let right = layout_margin(vm, elements, "layout_marginEnd", right)?;
+    let margin_cap = caps.w.max(caps.h);
+    let all = layout_margin(vm, elements, "layout_margin", margin_cap, 0)?;
+    let horizontal = layout_margin(vm, elements, "layout_marginHorizontal", caps.w, all)?;
+    let vertical = layout_margin(vm, elements, "layout_marginVertical", caps.h, all)?;
+    let left = layout_margin(vm, elements, "layout_marginLeft", caps.w, horizontal)?;
+    let right = layout_margin(vm, elements, "layout_marginRight", caps.w, horizontal)?;
+    let top = layout_margin(vm, elements, "layout_marginTop", caps.h, vertical)?;
+    let bottom = layout_margin(vm, elements, "layout_marginBottom", caps.h, vertical)?;
+    let left = layout_margin(vm, elements, "layout_marginStart", caps.w, left)?;
+    let right = layout_margin(vm, elements, "layout_marginEnd", caps.w, right)?;
     for (field, value) in [
         ("leftMargin", left),
         ("topMargin", top),
@@ -441,6 +505,7 @@ fn inflate_element_depth(
     depth: usize,
     count: &mut usize,
     context: Option<ObjRef>,
+    caps: AxisCaps,
 ) -> Result<ObjRef, VmExit> {
     if depth > MAX_INFLATE_DEPTH {
         return Err(inflate_error(format!(
@@ -474,11 +539,12 @@ fn inflate_element_depth(
         })?;
     vm.attach_host_state(&desc, r)?;
     construct_inflated_view(vm, &desc, r, context)?;
-    apply_attrs(vm, r, el)?;
+    apply_attrs(vm, r, el, caps)?;
+    let child_caps = caps_for_desc(vm, &desc, caps);
     // issue #45: attach SEM re-layout — o setContentView leita a raiz
     // UMA vez (O(N)); re-layout por filho era O(N²). `<include>` é expandido
     // aqui porque pode carregar outro layout ou um root `<merge>`.
-    inflate_children(vm, r, &el.children, depth + 1, count, context)?;
+    inflate_children(vm, r, &el.children, depth + 1, count, context, child_caps)?;
     Ok(r)
 }
 
@@ -538,6 +604,7 @@ fn inflate_children(
     depth: usize,
     count: &mut usize,
     context: Option<ObjRef>,
+    caps: AxisCaps,
 ) -> Result<(), VmExit> {
     for child in children {
         if child.name == "include" {
@@ -565,18 +632,20 @@ fn inflate_children(
                     depth + 1,
                     count,
                     context,
+                    caps,
                 )?;
             } else {
-                let view = inflate_element_depth(vm, &included.root, depth + 1, count, context)?;
+                let view =
+                    inflate_element_depth(vm, &included.root, depth + 1, count, context, caps)?;
                 // Os atributos android:* do include sobrescrevem atributos
                 // correspondentes da view raiz incluída (notavelmente id).
-                apply_attrs(vm, view, child)?;
-                assign_layout_params(vm, parent, view, &[child, &included.root])?;
+                apply_attrs(vm, view, child, caps)?;
+                assign_layout_params(vm, parent, view, &[child, &included.root], caps)?;
                 framework::attach_child(vm, parent, view)?;
             }
         } else {
-            let view = inflate_element_depth(vm, child, depth, count, context)?;
-            assign_layout_params(vm, parent, view, &[child])?;
+            let view = inflate_element_depth(vm, child, depth, count, context, caps)?;
+            assign_layout_params(vm, parent, view, &[child], caps)?;
             framework::attach_child(vm, parent, view)?;
         }
     }
@@ -601,6 +670,8 @@ fn view_desc_of(name: &str) -> Result<String, VmExit> {
         "RadioButton" => "Landroid/widget/RadioButton;",
         "RadioGroup" => "Landroid/widget/RadioGroup;",
         "ScrollView" => "Landroid/widget/ScrollView;",
+        "HorizontalScrollView" => "Landroid/widget/HorizontalScrollView;",
+        "ListView" => "Landroid/widget/ListView;",
         other if other.contains('.') => {
             // FQCN — a checagem is_subtype(VIEW) no caller filtra o que o
             // framework host não implementa (ex.: ImageView/WebView)
@@ -616,7 +687,7 @@ fn view_desc_of(name: &str) -> Result<String, VmExit> {
 }
 
 /// Aplica os atributos android:* de um elemento à view host recém-inflada.
-fn apply_attrs(vm: &mut Engine, r: ObjRef, el: &XmlElement) -> Result<(), VmExit> {
+fn apply_attrs(vm: &mut Engine, r: ObjRef, el: &XmlElement, caps: AxisCaps) -> Result<(), VmExit> {
     for a in &el.attrs {
         if !a.is_android() {
             continue; // app:/tools:/custom — fora do escopo M3
@@ -703,13 +774,10 @@ fn apply_attrs(vm: &mut Engine, r: ObjRef, el: &XmlElement) -> Result<(), VmExit
                 // issue #61: @dimen/x por referência RESOLVE no arsc (deferral
                 // da #46 quebrou — bounds errados sem pista não volta).
                 let px = match &a.value {
-                    AttrValue::Reference(res) => Some(ref_dimension_px(
-                        vm,
-                        "layout_height",
-                        *res,
-                        framework::WINDOW_H,
-                    )?),
-                    _ => dimension_px(a, framework::WINDOW_H, "altura")?,
+                    AttrValue::Reference(res) => {
+                        Some(ref_dimension_px(vm, "layout_height", *res, caps.h)?)
+                    }
+                    _ => dimension_px(a, caps.h, "altura")?,
                 };
                 if let Some(px) = px {
                     if let Some(framework::HostObj::View { h, .. }) = vm.fw.objects.get_mut(&r) {
@@ -718,17 +786,14 @@ fn apply_attrs(vm: &mut Engine, r: ObjRef, el: &XmlElement) -> Result<(), VmExit
                 }
             }
             "layout_width" => {
-                // issue #59/#61: largura explícita → w_explicit (vence o slot
-                // distribuído no layout); validada contra WINDOW_W (largura).
+                // issue #59/#61/#263: largura explícita → w_explicit (vence o slot
+                // distribuído no layout); validada contra caps.w.
                 // match_parent/wrap_content/negativo → None (slot do pai).
                 let px = match &a.value {
-                    AttrValue::Reference(res) => Some(ref_dimension_px(
-                        vm,
-                        "layout_width",
-                        *res,
-                        framework::WINDOW_W,
-                    )?),
-                    _ => dimension_px(a, framework::WINDOW_W, "largura")?,
+                    AttrValue::Reference(res) => {
+                        Some(ref_dimension_px(vm, "layout_width", *res, caps.w)?)
+                    }
+                    _ => dimension_px(a, caps.w, "largura")?,
                 };
                 if let Some(px) = px {
                     if let Some(framework::HostObj::View { w_explicit, .. }) =
@@ -784,21 +849,21 @@ fn dimension_px(a: &XmlAttribute, cap: i32, eixo: &str) -> Result<Option<i32>, V
                 ComplexUnit::Px => 1.0,
                 _ => framework::DENSITY, // dip/sp/pt/in/mm → escala do viewport
             };
-            Some((*v * scale).round())
+            Some(((*v as f64) * (scale as f64)).round())
         }
-        AttrValue::Int(i) if *i >= 0 => Some(*i as f32), // px puro
+        AttrValue::Int(i) if *i >= 0 => Some(*i as f64), // px puro
         _ => None,
     };
     match px {
         None => Ok(None),
-        Some(f) if f >= 0.0 && f <= cap as f32 => Ok(Some(f as i32)),
+        Some(f) if f >= 0.0 && f <= cap as f64 => Ok(Some(f as i32)),
         Some(f) => Err(inflate_error(format!(
             "dimensão de layout {f}px excede o viewport de {cap}px no eixo {eixo} (hostil ou bug do app)"
         ))),
     }
 }
 
-/// issue #61: `@dimen/x` por referência → px, validado contra o teto do eixo.
+/// issue #61 / #263: `@dimen/x` por referência → px, validado contra o teto do eixo.
 /// Segue cadeias de Reference (alias) até 8 saltos. NÃO resolve (ou resolve
 /// para tipo errado) → INFLATE tipado — nunca default silencioso.
 fn ref_dimension_px(vm: &Engine, attr: &str, resid: u32, cap: i32) -> Result<i32, VmExit> {
@@ -821,15 +886,20 @@ fn ref_dimension_px(vm: &Engine, attr: &str, resid: u32, cap: i32) -> Result<i32
                     ComplexUnit::Px => 1.0,
                     _ => framework::DENSITY, // dip/sp/pt/in/mm → escala do viewport
                 };
-                let f = (value * scale).round();
-                if f < 0.0 || f > cap as f32 {
+                let f = ((value as f64) * (scale as f64)).round();
+                if f < 0.0 || f > cap as f64 {
                     return Err(inflate_error(format!(
                         "android:{attr}=@0x{resid:08x}: dimensão {f}px excede o viewport de {cap}px no eixo (hostil ou bug do app)"
                     )));
                 }
                 return Ok(f as i32);
             }
-            ResolvedValue::Integer(i) if i >= 0 => return Ok(i), // px puro
+            ResolvedValue::Integer(i) if i >= 0 && i <= cap => return Ok(i), // px puro
+            ResolvedValue::Integer(i) if i > cap => {
+                return Err(inflate_error(format!(
+                    "android:{attr}=@0x{resid:08x}: dimensão {i}px excede o viewport de {cap}px no eixo (hostil ou bug do app)"
+                )));
+            }
             other => {
                 return Err(inflate_error(format!(
                     "android:{attr}=@0x{resid:08x}: resolve para {other:?} — esperado dimensão (@dimen)"
