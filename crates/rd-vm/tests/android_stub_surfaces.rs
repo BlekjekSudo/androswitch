@@ -22192,3 +22192,188 @@ fn phone_account_handle_two_arg_ctor_and_tm_service_state_are_guest_visible() {
         Value::Null
     );
 }
+
+#[test]
+fn mbms_download_request_app_intent_round_trip_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let source = p36i_uri(&mut engine, "http://example.com/movie.mp4");
+    let dest = p36i_uri(&mut engine, "file:///data/local/movie.mp4");
+    let builder = p49_new(
+        &mut engine,
+        P36I_DOWNLOAD_BUILDER,
+        "(Landroid/net/Uri;Landroid/net/Uri;)V",
+        &[source, dest],
+    );
+    // Fresh request: no app intent recorded yet. AOSP getIntentForApp calls
+    // Intent.parseUri(null, 0), which throws NullPointerException (only
+    // URISyntaxException is caught), so the NPE propagates.
+    let plain = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/telephony/mbms/DownloadRequest;",
+        &[],
+    ));
+    assert_throws(
+        engine.invoke_instance(plain, "getIntentForApp", "()Landroid/content/Intent;", &[]),
+        "Ljava/lang/NullPointerException;",
+    );
+
+    let action = text(&mut engine, "com.example.DOWNLOAD_DONE");
+    let intent = p49_new(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "(Ljava/lang/String;)V",
+        &[action],
+    );
+    call(
+        &mut engine,
+        builder,
+        "setAppIntent",
+        "(Landroid/content/Intent;)Landroid/telephony/mbms/DownloadRequest$Builder;",
+        &[Value::Obj(intent)],
+    );
+    let request = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/telephony/mbms/DownloadRequest;",
+        &[],
+    ));
+    let round_tripped = call(
+        &mut engine,
+        request,
+        "getIntentForApp",
+        "()Landroid/content/Intent;",
+        &[],
+    );
+    let recovered = object(round_tripped);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            recovered,
+            "getAction",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "com.example.DOWNLOAD_DONE"
+    );
+}
+
+#[test]
+fn intent_to_uri_and_parse_uri_round_trip_is_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let action = text(&mut engine, "com.example.PLAY");
+    let intent = p49_new(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "(Ljava/lang/String;)V",
+        &[action],
+    );
+    let uri = call_text(
+        &mut engine,
+        intent,
+        "toUri",
+        "(I)Ljava/lang/String;",
+        &[Value::Int(0)],
+    );
+    assert_eq!(uri, "#Intent;action=com.example.PLAY;end");
+
+    // Extras + launch flags survive the round trip; immutable grant flags
+    // are masked out by parseUri unless URI_ALLOW_UNSAFE is passed.
+    let key = text(&mut engine, "track");
+    call(
+        &mut engine,
+        intent,
+        "putExtra",
+        "(Ljava/lang/String;I)Landroid/content/Intent;",
+        &[key, Value::Int(42)],
+    );
+    call(
+        &mut engine,
+        intent,
+        "addFlags",
+        "(I)Landroid/content/Intent;",
+        &[Value::Int(0x101)],
+    );
+    let uri_text = call_text(
+        &mut engine,
+        intent,
+        "toUri",
+        "(I)Ljava/lang/String;",
+        &[Value::Int(0)],
+    );
+    let uri_value = text(&mut engine, &uri_text);
+    assert!(text_of(&engine, &uri_value).contains("launchFlags=0x101"));
+    assert!(text_of(&engine, &uri_value).contains("i.track=42"));
+    let parsed = object(call_static(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "parseUri",
+        "(Ljava/lang/String;I)Landroid/content/Intent;",
+        &[uri_value, Value::Int(0)],
+    ));
+    assert_eq!(
+        call_text(
+            &mut engine,
+            parsed,
+            "getAction",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "com.example.PLAY"
+    );
+    assert_eq!(
+        call(&mut engine, parsed, "getFlags", "()I", &[]),
+        Value::Int(0x100) // FLAG_GRANT_READ_URI_PERMISSION (0x1) masked out
+    );
+    let key2 = text(&mut engine, "track");
+    assert_eq!(
+        call(
+            &mut engine,
+            parsed,
+            "getIntExtra",
+            "(Ljava/lang/String;I)I",
+            &[key2, Value::Int(-1)]
+        ),
+        Value::Int(42)
+    );
+
+    // A bare URI parses to ACTION_VIEW with that data.
+    let bare = text(&mut engine, "https://example.com/watch");
+    let view = object(call_static(
+        &mut engine,
+        "Landroid/content/Intent;",
+        "parseUri",
+        "(Ljava/lang/String;I)Landroid/content/Intent;",
+        &[bare, Value::Int(0)],
+    ));
+    assert_eq!(
+        call_text(&mut engine, view, "getAction", "()Ljava/lang/String;", &[]),
+        "android.intent.action.VIEW"
+    );
+    let data = call(&mut engine, view, "getData", "()Landroid/net/Uri;", &[]);
+    let data_obj = object(data);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            data_obj,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "https://example.com/watch"
+    );
+
+    // Unknown EXTRA types are URISyntaxException, not a silent default.
+    let malformed = text(&mut engine, "#Intent;X.key=1;end");
+    assert_throws(
+        engine.invoke_static(
+            "Landroid/content/Intent;",
+            "parseUri",
+            "(Ljava/lang/String;I)Landroid/content/Intent;",
+            &[malformed, Value::Int(0)],
+        ),
+        "Ljava/net/URISyntaxException;",
+    );
+}
