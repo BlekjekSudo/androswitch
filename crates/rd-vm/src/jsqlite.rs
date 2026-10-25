@@ -951,12 +951,15 @@ fn db_intrinsic(
                     match out {
                         Some(c) => c,
                         None => {
-                            let res = run(
-                                vm,
-                                db,
-                                &vm.fw.m8.sqlx.programs[&q].1.clone(),
-                                &vm.fw.m8.sqlx.programs[&q].2.clone(),
-                            )?;
+                            let Some((_, p_sql, p_binds)) = vm.fw.m8.sqlx.programs.get(&q).cloned()
+                            else {
+                                return Err(Throwable::new(
+                                    "Ljava/lang/IllegalStateException;",
+                                    "attempt to re-open an already-closed object".to_string(),
+                                )
+                                .into());
+                            };
+                            let res = run(vm, db, &p_sql, &p_binds)?;
                             new_cursor_obj(vm, res)?
                         }
                     }
@@ -1178,6 +1181,97 @@ fn db_intrinsic(
     }))
 }
 
+/// Counts SQLite bind parameters (`?`, `?NNN`, `:name`, `@name`, `$name`)
+/// outside string/identifier quotes and SQL comments, mirroring
+/// `sqlite3_bind_parameter_count` (capped at SQLite's `32_766` variable limit).
+fn count_sql_bind_params(sql: &str) -> usize {
+    const MAX_SQLITE_VARS: usize = 32_766;
+    let b = sql.as_bytes();
+    let mut i = 0usize;
+    let mut next_idx = 0usize;
+    let mut max_idx = 0usize;
+    let mut named: Vec<String> = Vec::new();
+    while i < b.len() {
+        match b[i] {
+            b'\'' | b'"' | b'`' => {
+                let q = b[i];
+                i += 1;
+                while i < b.len() {
+                    if b[i] == q {
+                        i += 1;
+                        if i < b.len() && b[i] == q {
+                            i += 1;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        i += 1;
+                    }
+                }
+            }
+            b'[' => {
+                i += 1;
+                while i < b.len() && b[i] != b']' {
+                    i += 1;
+                }
+                if i < b.len() {
+                    i += 1;
+                }
+            }
+            b'-' if i + 1 < b.len() && b[i + 1] == b'-' => {
+                i += 2;
+                while i < b.len() && b[i] != b'\n' {
+                    i += 1;
+                }
+            }
+            b'/' if i + 1 < b.len() && b[i + 1] == b'*' => {
+                i += 2;
+                while i + 1 < b.len() && !(b[i] == b'*' && b[i + 1] == b'/') {
+                    i += 1;
+                }
+                i = (i + 2).min(b.len());
+            }
+            b'?' => {
+                i += 1;
+                let start = i;
+                while i < b.len() && b[i].is_ascii_digit() {
+                    i += 1;
+                }
+                if i > start {
+                    let n = sql[start..i].parse::<usize>().unwrap_or(0);
+                    if (1..=MAX_SQLITE_VARS).contains(&n) {
+                        next_idx = n;
+                        max_idx = max_idx.max(n);
+                    }
+                } else {
+                    next_idx = next_idx.saturating_add(1).min(MAX_SQLITE_VARS);
+                    max_idx = max_idx.max(next_idx);
+                }
+            }
+            b':' | b'@' | b'$'
+                if i + 1 < b.len() && (b[i + 1].is_ascii_alphabetic() || b[i + 1] == b'_') =>
+            {
+                let start = i;
+                i += 1;
+                while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_' || b[i] == b'$')
+                {
+                    i += 1;
+                }
+                let tok = &sql[start..i];
+                if !named.iter().any(|x| x == tok) {
+                    named.push(tok.to_string());
+                    next_idx = next_idx.saturating_add(1).min(MAX_SQLITE_VARS);
+                    max_idx = max_idx.max(next_idx);
+                }
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+    max_idx.min(MAX_SQLITE_VARS)
+}
+
 fn program_intrinsic(
     vm: &mut Engine,
     name: &str,
@@ -1185,13 +1279,28 @@ fn program_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    let idx = args
-        .first()
-        .and_then(|v| v.as_int().ok())
-        .unwrap_or(0)
-        .max(1) as usize
-        - 1;
-    let bind = |vm: &mut Engine, v: Sv| {
+    let Some((db, sql, binds)) = vm.fw.m8.sqlx.programs.get(&recv).cloned() else {
+        return Err(Throwable::new(
+            "Ljava/lang/IllegalStateException;",
+            "attempt to re-open an already-closed object".to_string(),
+        )
+        .into());
+    };
+    let num_params = count_sql_bind_params(&sql).max(binds.len()).min(32_766);
+    let raw_index = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0);
+    let check_bind_idx = |raw: i32| -> Result<usize, VmExit> {
+        if raw < 1 || (raw as usize) > num_params {
+            return Err(Throwable::new(
+                "Ljava/lang/IllegalArgumentException;",
+                format!(
+                    "Cannot bind argument at index {raw} because the index is out of range.  The statement has {num_params} parameters."
+                ),
+            )
+            .into());
+        }
+        Ok((raw as usize) - 1)
+    };
+    let bind = |vm: &mut Engine, idx: usize, v: Sv| {
         if let Some(p) = vm.fw.m8.sqlx.programs.get_mut(&recv) {
             if p.2.len() <= idx {
                 p.2.resize(idx + 1, Sv::Null);
@@ -1199,31 +1308,34 @@ fn program_intrinsic(
             p.2[idx] = v;
         }
     };
-    let (db, sql, binds) = vm.fw.m8.sqlx.programs[&recv].clone();
     Ok(Some(match name {
         "bindNull" => {
-            bind(vm, Sv::Null);
+            let idx = check_bind_idx(raw_index)?;
+            bind(vm, idx, Sv::Null);
             Value::Null
         }
         "bindLong" => {
+            let idx = check_bind_idx(raw_index)?;
             let v = match args.get(1) {
                 Some(Value::Long(l)) => *l,
                 Some(Value::Int(i)) => *i as i64,
                 _ => 0,
             };
-            bind(vm, Sv::Int(v));
+            bind(vm, idx, Sv::Int(v));
             Value::Null
         }
         "bindDouble" => {
+            let idx = check_bind_idx(raw_index)?;
             let v = match args.get(1) {
                 Some(Value::Double(d)) => *d,
                 Some(Value::Float(f)) => *f as f64,
                 _ => 0.0,
             };
-            bind(vm, Sv::Real(v));
+            bind(vm, idx, Sv::Real(v));
             Value::Null
         }
         "bindString" | "bindBlob" => {
+            let idx = check_bind_idx(raw_index)?;
             match args.get(1) {
                 None | Some(Value::Null) => {
                     return Err(Throwable::new(
@@ -1234,7 +1346,7 @@ fn program_intrinsic(
                 }
                 Some(v) => {
                     let sv = java_to_sv(vm, v);
-                    bind(vm, sv);
+                    bind(vm, idx, sv);
                 }
             }
             Value::Null

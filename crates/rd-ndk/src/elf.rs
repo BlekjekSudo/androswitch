@@ -192,7 +192,9 @@ impl Elf {
                         .map(|x| x <= size)
                         .unwrap_or(false)
                 {
-                    return Ok(off + address - va);
+                    return off
+                        .checked_add(address - va)
+                        .ok_or_else(|| bad("file offset overflow"));
                 }
             }
             Err(bad(format!(
@@ -312,7 +314,10 @@ impl Elf {
         }
         // Standard DT_RELR: address entries followed by bitmap words.
         if get(35) != 0 {
-            if get(37) != word as u64 || get(35) % (word as u64) != 0 {
+            if get(37) != word as u64
+                || get(35) % (word as u64) != 0
+                || get(35) / (word as u64) > MAX_ENTRIES as u64
+            {
                 return Err(bad("invalid RELR table"));
             }
             let off = vaoff(get(36), get(35))?;
@@ -333,16 +338,25 @@ impl Elf {
                 } else {
                     for bit in 1..word * 8 {
                         if entry & (1u64 << bit) != 0 {
+                            let delta = ((bit - 1) as u64)
+                                .checked_mul(word as u64)
+                                .ok_or_else(|| bad("RELR overflow"))?;
+                            let rel_off = address
+                                .checked_add(delta)
+                                .ok_or_else(|| bad("RELR overflow"))?;
                             relocations.push(Relocation {
-                                offset: address + (bit - 1) as u64 * word as u64,
+                                offset: rel_off,
                                 kind: relative_kind(abi),
                                 symbol: 0,
                                 addend: None,
                             });
                         }
                     }
+                    let step = ((word * 8 - 1) as u64)
+                        .checked_mul(word as u64)
+                        .ok_or_else(|| bad("RELR overflow"))?;
                     address = address
-                        .checked_add((word * 8 - 1) as u64 * word as u64)
+                        .checked_add(step)
                         .ok_or_else(|| bad("RELR overflow"))?;
                 }
                 if relocations.len() > MAX_ENTRIES {
@@ -350,9 +364,18 @@ impl Elf {
                 }
             }
         }
-        let mut count = relocations.iter().map(|r| r.symbol + 1).max().unwrap_or(0);
+        let mut count = 0usize;
+        for r in &relocations {
+            let need = r
+                .symbol
+                .checked_add(1)
+                .ok_or_else(|| bad("symbol index overflow"))?;
+            count = count.max(need);
+        }
         if get(4) != 0 {
-            count = count.max(num(d, vaoff(get(4), 8)? + 4, 4)? as usize);
+            let nchain = usize::try_from(num(d, vaoff(get(4), 8)? + 4, 4)?)
+                .map_err(|_| bad("symbol count exceeds budget"))?;
+            count = count.max(nchain);
         }
         if get(0x6ffffef5) != 0 {
             let h = vaoff(get(0x6ffffef5), 16)?;
@@ -362,18 +385,30 @@ impl Elf {
             if nb > MAX_ENTRIES as u64 || bloom > MAX_ENTRIES as u64 {
                 return Err(bad("GNU hash too large"));
             }
-            let buckets = h + 16 + bloom * word as u64;
+            let buckets = h
+                .checked_add(16)
+                .and_then(|v| v.checked_add(bloom * word as u64))
+                .ok_or_else(|| bad("GNU hash overflow"))?;
             let mut last = first;
             for i in 0..nb {
-                last = last.max(num(d, buckets + i * 4, 4)?);
+                let idx = buckets
+                    .checked_add(i * 4)
+                    .ok_or_else(|| bad("GNU hash overflow"))?;
+                last = last.max(num(d, idx, 4)?);
             }
             if last >= first && last != 0 {
-                let chains = buckets + nb * 4;
+                let chains = buckets
+                    .checked_add(nb * 4)
+                    .ok_or_else(|| bad("GNU hash overflow"))?;
                 loop {
                     if last >= MAX_ENTRIES as u64 {
                         return Err(bad("GNU hash chain too long"));
                     }
-                    let v = num(d, chains + (last - first) * 4, 4)?;
+                    let chain_off = (last - first)
+                        .checked_mul(4)
+                        .and_then(|v| chains.checked_add(v))
+                        .ok_or_else(|| bad("GNU hash overflow"))?;
+                    let v = num(d, chain_off, 4)?;
                     last += 1;
                     if v & 1 != 0 {
                         break;
@@ -399,52 +434,97 @@ impl Elf {
                     if ent == 0 || size % ent != 0 {
                         return Err(bad("invalid dynsym section"));
                     }
-                    count = count.max((size / ent) as usize);
+                    let sec_count = usize::try_from(size / ent)
+                        .map_err(|_| bad("symbol count exceeds budget"))?;
+                    count = count.max(sec_count);
                 }
             }
         }
         if count > MAX_ENTRIES {
             return Err(bad("symbol count exceeds budget"));
         }
+        let memory_size = (end + 4095) & !4095;
+        let in_load_range = |addr: u64, len: u64| -> bool {
+            let Some(limit) = addr.checked_add(len) else {
+                return false;
+            };
+            segments.iter().any(|s| {
+                addr >= s.address
+                    && s.address
+                        .checked_add(s.memory_size)
+                        .map(|seg_end| limit <= seg_end)
+                        .unwrap_or(false)
+            })
+        };
         let mut symbols = Vec::new();
         if count > 0 {
             let entry = if wide { 24 } else { 16 };
             if get(11) != entry {
                 return Err(bad("invalid DT_SYMENT"));
             }
-            let off = vaoff(get(6), count as u64 * entry)?;
+            let sym_bytes = (count as u64)
+                .checked_mul(entry)
+                .ok_or_else(|| bad("symbol count exceeds budget"))?;
+            let off = vaoff(get(6), sym_bytes)?;
             for i in 0..count {
                 let p = off + i as u64 * entry;
                 let name = cstr(strings, num(d, p, 4)?)?;
                 let info = num(d, p + if wide { 4 } else { 12 }, 1)?;
-                let defined = num(d, p + if wide { 6 } else { 14 }, 2)? != 0;
+                let shndx = num(d, p + if wide { 6 } else { 14 }, 2)?;
+                let defined = shndx != 0;
+                let value = num(d, p + if wide { 8 } else { 4 }, word)?;
+                let size = num(d, p + if wide { 16 } else { 8 }, word)?;
+                let kind = (info & 15) as u8;
+                if defined {
+                    let sym_addr = if abi == Abi::Arm && matches!(kind, 0 | 2) {
+                        value & !1
+                    } else {
+                        value
+                    };
+                    let ok = in_load_range(sym_addr, 0)
+                        || (kind == 6 && sym_addr <= memory_size)
+                        || (shndx == 0xfff1 && value == 0 && size == 0);
+                    if !ok {
+                        return Err(bad("defined symbol outside PT_LOAD segments"));
+                    }
+                }
                 symbols.push(Symbol {
                     name,
-                    value: num(d, p + if wide { 8 } else { 4 }, word)?,
-                    size: num(d, p + if wide { 16 } else { 8 }, word)?,
+                    value,
+                    size,
                     defined,
                     weak: info >> 4 == 2,
-                    kind: (info & 15) as u8,
+                    kind,
                 });
             }
         }
         for r in &relocations {
-            let valid = segments.iter().any(|s| {
-                r.offset >= s.address
-                    && r.offset
-                        .checked_add(word as u64)
-                        .map(|e| e <= s.address + s.memory_size)
-                        .unwrap_or(false)
-            });
+            let valid = in_load_range(r.offset, word as u64);
             if !valid || r.symbol >= symbols.len() && r.symbol != 0 {
                 return Err(bad("relocation target/symbol outside image"));
             }
         }
+        let init = if get(12) == 0 {
+            None
+        } else {
+            let v = get(12);
+            let addr = if abi == Abi::Arm { v & !1 } else { v };
+            if !in_load_range(addr, 1) {
+                return Err(bad("DT_INIT outside PT_LOAD"));
+            }
+            Some(v)
+        };
         let init_array = if get(25) != 0 {
-            if get(27) % (word as u64) != 0 || get(27) > MAX_IMAGE {
+            let arr_va = get(25);
+            let arr_sz = get(27);
+            if arr_sz % (word as u64) != 0
+                || arr_sz > MAX_IMAGE
+                || arr_sz / (word as u64) > MAX_ENTRIES as u64
+                || !in_load_range(arr_va, arr_sz)
+            {
                 return Err(bad("invalid init_array"));
             }
-            Some((get(25), (get(27) / word as u64) as usize))
+            Some((arr_va, (arr_sz / word as u64) as usize))
         } else {
             None
         };
@@ -454,9 +534,9 @@ impl Elf {
             symbols,
             relocations,
             needed,
-            init: if get(12) == 0 { None } else { Some(get(12)) },
+            init,
             init_array,
-            memory_size: (end + 4095) & !4095,
+            memory_size,
         })
     }
     pub fn symbol(&self, name: &str) -> Option<u64> {
