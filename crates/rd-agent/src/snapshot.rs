@@ -176,6 +176,16 @@ fn store_snapshot(
 }
 
 impl AgentSession {
+    /// Issue #259: um pacote só pode servir/gravar snapshot enquanto o
+    /// estado da sessão para ele é o de um install pristine.
+    fn snapshot_pristine(&self, package: &str) -> bool {
+        !self.snapshot_dirty.contains(package)
+    }
+
+    fn mark_snapshot_dirty(&mut self, package: &str) {
+        self.snapshot_dirty.insert(package.to_string());
+    }
+
     /// ADR 009 fast install: paged open (tail+CD), fingerprint, manifest
     /// only. Returns `Ok(Some(result))` on a verified snapshot hit,
     /// `Ok(None)` to fall through to the authoritative whole-file path
@@ -262,6 +272,12 @@ impl AgentSession {
         snap_key: Option<&str>,
         source: Option<&Path>,
     ) -> Option<PendingSnapshot> {
+        // Issue #259: grants/estado persistido mudam o primeiro frame
+        // e o fingerprint não os enxerga — fora do pristine, o launch
+        // real é o único caminho honesto.
+        if !self.snapshot_pristine(package) {
+            return None;
+        }
         let t0 = std::time::Instant::now();
         let key = match snap_key {
             Some(k) => k.to_string(),
@@ -327,6 +343,11 @@ impl AgentSession {
     /// launch result can disclose them (`snapshot_error`); they never
     /// fail the launch itself.
     fn capture_snapshot(&mut self, package: &str, activity: &str) -> Result<(), RdError> {
+        // Issue #259: nunca gravar no cache global um frame produzido
+        // fora do estado pristine (envenenaria sessões futuras).
+        if !self.snapshot_pristine(package) {
+            return Ok(());
+        }
         let t0 = std::time::Instant::now();
         let (source_path, manifest_bytes) = {
             let app = self.find_installed(package).ok_or_else(|| {
@@ -378,6 +399,9 @@ impl AgentSession {
             .take()
             .ok_or_else(|| agent_error("NOT_RUNNING", "no snapshot to materialize", None))?;
         let r = self.cold_launch(&pending.package, &pending.activity, None)?;
+        // Issue #259: o engine real rodou — o app pode ter persistido
+        // estado; launches futuros desta sessão não servem snapshot.
+        self.mark_snapshot_dirty(&pending.package);
         phase("snapshot_materialize", t0);
         r.map(|_| ()).map_err(vm_exit_to_rd)
     }
