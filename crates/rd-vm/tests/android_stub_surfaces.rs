@@ -6217,6 +6217,45 @@ fn usage_empty_history_events_and_stats_merge_are_guest_visible() {
         call(&mut engine, iterable, "hasNextEvent", "()Z", &[]),
         Value::Int(0)
     );
+
+    // Deep audit: getNextEvent rejects a null output event with IAE, and
+    // resetToStart rewinds the cursor so the sequence can be read again.
+    assert_throws(
+        engine.invoke_instance(
+            iterable,
+            "getNextEvent",
+            "(Landroid/app/usage/UsageEvents$Event;)Z",
+            &[Value::Null],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    call(&mut engine, iterable, "resetToStart", "()V", &[]);
+    assert_eq!(
+        call(&mut engine, iterable, "hasNextEvent", "()Z", &[]),
+        Value::Int(1)
+    );
+    let second_pass = instance(&mut engine, "Landroid/app/usage/UsageEvents$Event;");
+    call(&mut engine, second_pass, "<init>", "()V", &[]);
+    assert_eq!(
+        call(
+            &mut engine,
+            iterable,
+            "getNextEvent",
+            "(Landroid/app/usage/UsageEvents$Event;)Z",
+            &[Value::Obj(second_pass)],
+        ),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            second_pass,
+            "getPackageName",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "com.example"
+    );
 }
 
 #[test]
@@ -6450,6 +6489,36 @@ fn print_values_rotation_and_no_service_manager_are_guest_visible() {
             &[Value::Int(8)],
         ),
         "Ljava/lang/IllegalArgumentException;",
+    );
+
+    // Deep audit: the Builder' mAttributes is the object build() returns,
+    // so setter calls after build() mutate the already-returned instance,
+    // and repeated build() calls return the same instance.
+    let built = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/print/PrintAttributes;",
+        &[],
+    ));
+    let built_again = object(call(
+        &mut engine,
+        builder,
+        "build",
+        "()Landroid/print/PrintAttributes;",
+        &[],
+    ));
+    assert_eq!(built, built_again);
+    call(
+        &mut engine,
+        builder,
+        "setColorMode",
+        "(I)Landroid/print/PrintAttributes$Builder;",
+        &[Value::Int(1)],
+    );
+    assert_eq!(
+        call(&mut engine, built, "getColorMode", "()I", &[]),
+        Value::Int(1)
     );
 }
 
@@ -6757,6 +6826,49 @@ fn keystore_specs_protection_and_key_info_preserve_explicit_values() {
             &[Value::Int(-1)],
         ),
         Value::Int(-1)
+    );
+
+    // Deep audit: KeyGenParameterSpec.getUid wraps KeyProperties'
+    // IllegalArgumentException for non-legacy namespaces into an
+    // IllegalStateException (the static conversion itself throws IAE).
+    assert_throws(
+        engine.invoke_static(
+            "Landroid/security/keystore/KeyProperties;",
+            "namespaceToLegacyUid",
+            "(I)I",
+            &[Value::Int(103)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let namespaced_builder = instance(
+        &mut engine,
+        "Landroid/security/keystore/KeyGenParameterSpec$Builder;",
+    );
+    let namespaced_alias = text(&mut engine, "namespaced-key");
+    call(
+        &mut engine,
+        namespaced_builder,
+        "<init>",
+        "(Ljava/lang/String;I)V",
+        &[namespaced_alias, Value::Int(3)],
+    );
+    call(
+        &mut engine,
+        namespaced_builder,
+        "setNamespace",
+        "(I)Landroid/security/keystore/KeyGenParameterSpec$Builder;",
+        &[Value::Int(103)],
+    );
+    let namespaced_spec = object(call(
+        &mut engine,
+        namespaced_builder,
+        "build",
+        "()Landroid/security/keystore/KeyGenParameterSpec;",
+        &[],
+    ));
+    assert_throws(
+        engine.invoke_instance(namespaced_spec, "getUid", "()I", &[]),
+        "Ljava/lang/IllegalStateException;",
     );
 }
 
@@ -18469,6 +18581,47 @@ fn bluetooth_le_scan_settings_and_filters_are_guest_visible() {
     assert!(engine
         .cp
         .is_subtype(P36D_SCAN_FILTER, "Landroid/os/Parcelable;"));
+
+    // Deep audit: setManufacturerData validates the *existing* stored
+    // data/mask pair, not the pair being set — so a mismatched pair is
+    // accepted on the first call and only rejected by the second call
+    // (whatever it tries to store). Builder state after the throw keeps
+    // the first pair.
+    let trap_builder = p49_new(
+        &mut engine,
+        "Landroid/bluetooth/le/ScanFilter$Builder;",
+        "()V",
+        &[],
+    );
+    let short_data = byte_array(&mut engine, &[1, 2, 3]);
+    let long_mask = byte_array(&mut engine, &[1, 2, 3, 4, 5]);
+    call(
+        &mut engine,
+        trap_builder,
+        "setManufacturerData",
+        "(I[B[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+        &[Value::Int(7), short_data.clone(), long_mask],
+    );
+    let fine_data = byte_array(&mut engine, &[9]);
+    let fine_mask = byte_array(&mut engine, &[9]);
+    assert_throws(
+        engine.invoke_instance(
+            trap_builder,
+            "setManufacturerData",
+            "(I[B[B)Landroid/bluetooth/le/ScanFilter$Builder;",
+            &[Value::Int(7), fine_data, fine_mask],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let trapped = object(call(
+        &mut engine,
+        trap_builder,
+        "build",
+        "()Landroid/bluetooth/le/ScanFilter;",
+        &[],
+    ));
+    let stored = call(&mut engine, trapped, "getManufacturerData", "()[B", &[]);
+    assert_eq!(byte_array_values(&engine, &stored), vec![1u8, 2, 3]);
 }
 
 #[test]
@@ -19523,6 +19676,36 @@ fn media_browser_disconnected_state_and_media_items_are_guest_visible() {
         call(&mut engine, item, "isPlayable", "()Z", &[]),
         Value::Int(1)
     );
+    // Deep audit: FLAG_BROWSABLE is 1<<0 and FLAG_PLAYABLE is 1<<1 —
+    // pin each bit independently (a flags=3 fixture cannot detect a swap).
+    let browsable_only = p49_new(
+        &mut engine,
+        P36E_MEDIA_ITEM,
+        "(Landroid/media/MediaDescription;I)V",
+        &[Value::Obj(description), Value::Int(1)],
+    );
+    assert_eq!(
+        call(&mut engine, browsable_only, "isBrowsable", "()Z", &[]),
+        Value::Int(1)
+    );
+    assert_eq!(
+        call(&mut engine, browsable_only, "isPlayable", "()Z", &[]),
+        Value::Int(0)
+    );
+    let playable_only = p49_new(
+        &mut engine,
+        P36E_MEDIA_ITEM,
+        "(Landroid/media/MediaDescription;I)V",
+        &[Value::Obj(description), Value::Int(2)],
+    );
+    assert_eq!(
+        call(&mut engine, playable_only, "isBrowsable", "()Z", &[]),
+        Value::Int(0)
+    );
+    assert_eq!(
+        call(&mut engine, playable_only, "isPlayable", "()Z", &[]),
+        Value::Int(1)
+    );
     assert_eq!(
         call_text(&mut engine, item, "getMediaId", "()Ljava/lang/String;", &[]),
         "song-1"
@@ -19625,6 +19808,26 @@ fn media_projection_without_a_token_or_service_is_guest_visible() {
             &[Value::Obj(callback), Value::Obj(handler)],
         ),
         "Ljava/lang/NullPointerException;",
+    );
+    // Deep audit: addCallback stores the delegate before the failing
+    // service call, so removing that callback reaches the service (and the
+    // same NPE) — but the local removal happens first, making a second
+    // removal an unknown-callback no-op.
+    assert_throws(
+        engine.invoke_instance(
+            manager,
+            "removeCallback",
+            "(Landroid/media/projection/MediaProjectionManager$Callback;)V",
+            &[Value::Obj(callback)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    call(
+        &mut engine,
+        manager,
+        "removeCallback",
+        "(Landroid/media/projection/MediaProjectionManager$Callback;)V",
+        &[Value::Obj(callback)],
     );
     let built_manager = p49_new(
         &mut engine,
@@ -19773,6 +19976,51 @@ fn audiofx_descriptors_and_no_effect_engine_are_guest_visible() {
     );
     call(&mut engine, effect, "release", "()V", &[]);
     assert_eq!(field(&engine, effect, "mState"), Value::Int(0));
+
+    // Deep audit: the string Descriptor constructor parses through
+    // UUID.fromString, so a malformed UUID is an IllegalArgumentException;
+    // equals dereferences the fields directly, so two default Descriptors
+    // (all-null fields) throw NPE; and a null type probe is simply false
+    // when no effects are installed.
+    let descriptor_class = "Landroid/media/audiofx/AudioEffect$Descriptor;";
+    let descriptor_sig =
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V";
+    let bad_uuid = text(&mut engine, "not-a-uuid");
+    let mode = text(&mut engine, "Insert");
+    let name = text(&mut engine, "Fx");
+    let implementor = text(&mut engine, "Rusty");
+    let good_uuid = text(&mut engine, "123e4567-e89b-12d3-a456-426614174000");
+    let malformed = instance(&mut engine, descriptor_class);
+    assert_throws(
+        engine.invoke_instance(
+            malformed,
+            "<init>",
+            descriptor_sig,
+            &[bad_uuid, good_uuid, mode, name, implementor],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    let empty_one = p49_new(&mut engine, descriptor_class, "()V", &[]);
+    let empty_two = p49_new(&mut engine, descriptor_class, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            empty_one,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(empty_two)],
+        ),
+        "Ljava/lang/NullPointerException;",
+    );
+    assert_eq!(
+        call_static(
+            &mut engine,
+            "Landroid/media/audiofx/AudioEffect;",
+            "isEffectTypeAvailable",
+            "(Ljava/util/UUID;)Z",
+            &[Value::Null],
+        ),
+        Value::Int(0)
+    );
 }
 
 // ---- Appendix C Batch 36-F: graphics.pdf / renderscript ----
@@ -20079,6 +20327,25 @@ fn pdf_document_lifecycle_and_page_info_are_guest_visible() {
         &[],
     ));
     assert_eq!(call(&mut engine, pages, "size", "()I", &[]), Value::Int(2));
+
+    // Deep audit: getPages exposes Collections.unmodifiableList(mPages),
+    // so mutating the returned list is rejected.
+    let first_page_info = object(call(
+        &mut engine,
+        pages,
+        "get",
+        "(I)Ljava/lang/Object;",
+        &[Value::Int(0)],
+    ));
+    assert_throws(
+        engine.invoke_instance(
+            pages,
+            "add",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(first_page_info)],
+        ),
+        "Ljava/lang/UnsupportedOperationException;",
+    );
 }
 
 #[test]
@@ -21356,6 +21623,38 @@ fn credentials_entries_responses_and_service_binding_are_guest_visible() {
         ),
         P36G_NPE,
     );
+
+    // Deep audit: the (String, Slice) CredentialEntry constructor uses
+    // Objects.requireNonNull for the type (empty accepted, null NPE),
+    // unlike the other constructors' checkStringNotEmpty (IAE).
+    let entry_class = "Landroid/service/credentials/CredentialEntry;";
+    let empty_type = text(&mut engine, "");
+    let empty_typed = p49_new(
+        &mut engine,
+        entry_class,
+        "(Ljava/lang/String;Landroid/app/slice/Slice;)V",
+        &[empty_type, Value::Obj(slice)],
+    );
+    assert_eq!(
+        call_text(
+            &mut engine,
+            empty_typed,
+            "getType",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        ""
+    );
+    let null_typed = instance(&mut engine, entry_class);
+    assert_throws(
+        engine.invoke_instance(
+            null_typed,
+            "<init>",
+            "(Ljava/lang/String;Landroid/app/slice/Slice;)V",
+            &[Value::Null, Value::Obj(slice)],
+        ),
+        P36G_NPE,
+    );
 }
 
 #[test]
@@ -22482,6 +22781,29 @@ fn ike_sa_proposal_builders_validate_like_aosp() {
             &[Value::Int(31)]
         ),
         "DH_GROUP_CURVE_25519"
+    );
+
+    // Deep audit: the Child builder rejects IKE-valid ciphers that the
+    // IPsec stack does not support (3DES), while wholly unknown algorithm
+    // ids fail transform validation; both surface as IAE at add time.
+    let child_rejecting = p49_new(&mut engine, P36H_CHILD_BUILDER, "()V", &[]);
+    assert_throws(
+        engine.invoke_instance(
+            child_rejecting,
+            "addEncryptionAlgorithm",
+            "(II)Landroid/net/ipsec/ike/ChildSaProposal$Builder;",
+            &[Value::Int(3), Value::Int(0)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
+    );
+    assert_throws(
+        engine.invoke_instance(
+            child_rejecting,
+            "addEncryptionAlgorithm",
+            "(II)Landroid/net/ipsec/ike/ChildSaProposal$Builder;",
+            &[Value::Int(999), Value::Int(0)],
+        ),
+        "Ljava/lang/IllegalArgumentException;",
     );
 }
 
@@ -24243,6 +24565,45 @@ fn telecom_values_and_no_service_manager_are_guest_visible() {
         ),
         ""
     );
+
+    // Deep audit: PhoneAccountHandle.checkParameters only logs — null
+    // component, id and user handle are all stored without rejection,
+    // and equality/hash tolerate the null fields.
+    let null_handle_a = p49_new(
+        &mut engine,
+        P36I_HANDLE,
+        "(Landroid/content/ComponentName;Ljava/lang/String;Landroid/os/UserHandle;)V",
+        &[Value::Null, Value::Null, Value::Null],
+    );
+    let null_handle_b = p49_new(
+        &mut engine,
+        P36I_HANDLE,
+        "(Landroid/content/ComponentName;Ljava/lang/String;Landroid/os/UserHandle;)V",
+        &[Value::Null, Value::Null, Value::Null],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            null_handle_a,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(null_handle_b)]
+        ),
+        Value::Int(1)
+    );
+    let hash_a = call(&mut engine, null_handle_a, "hashCode", "()I", &[]);
+    let hash_b = call(&mut engine, null_handle_b, "hashCode", "()I", &[]);
+    assert_eq!(hash_a, hash_b);
+    assert_eq!(
+        call(
+            &mut engine,
+            null_handle_a,
+            "getId",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        Value::Null
+    );
 }
 
 #[test]
@@ -25645,6 +26006,21 @@ fn freeze_periods_and_update_policy_validation_are_guest_visible() {
         }
         other => panic!("expected freezePeriodTooClose, got {other:?}"),
     }
+
+    // Deep audit: AOSP derives the freeze day-of-year from
+    // MonthDay.atYear(2001); 2001 is not a leap year, so a period
+    // starting February 29 is dated from the 28th.
+    let leap_start = freeze(&mut engine, 2, 29, 3, 5);
+    assert_eq!(
+        call_text(
+            &mut engine,
+            leap_start,
+            "toString",
+            "()Ljava/lang/String;",
+            &[]
+        ),
+        "Feb 28 - Mar 05"
+    );
 }
 
 #[test]
@@ -25824,6 +26200,35 @@ fn renderscript_matrix4f_multiply_and_rotate_audit_is_guest_visible() {
     };
     assert!((xy - 1.0).abs() < 1e-6, "get(0,1) = {xy}");
     assert!((yx + 1.0).abs() < 1e-6, "get(1,0) = {yx}");
+
+    // Deep audit: AOSP loadRotate "normalizes" only an already-unit
+    // axis (`if (!(len != 1))`), so a non-unit axis is used verbatim.
+    // Rotating 90 degrees about (0, 0, 2) therefore yields
+    // m[4] = xy*nc - z*s = -2 instead of the proper rotation's -1.
+    let nonunit = p49_new(&mut engine, "Landroid/renderscript/Matrix4f;", "()V", &[]);
+    call(
+        &mut engine,
+        nonunit,
+        "loadRotate",
+        "(FFFF)V",
+        &[
+            Value::Float(90.0),
+            Value::Float(0.0),
+            Value::Float(0.0),
+            Value::Float(2.0),
+        ],
+    );
+    let scaled = match call(
+        &mut engine,
+        nonunit,
+        "get",
+        "(II)F",
+        &[Value::Int(1), Value::Int(0)],
+    ) {
+        Value::Float(v) => v,
+        other => panic!("{other:?}"),
+    };
+    assert!((scaled + 2.0).abs() < 1e-6, "get(1,0) = {scaled}");
 }
 
 #[test]

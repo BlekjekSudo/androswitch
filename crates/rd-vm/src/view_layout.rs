@@ -1883,13 +1883,75 @@ pub(crate) fn host_dispatch_touch(vm: &mut Engine, v: ObjRef, ev: ObjRef) -> Res
             return Ok(true);
         }
     }
-    Ok(truthy(crate::jcollections::guest_call(
-        vm,
-        v,
-        "onTouchEvent",
-        TOUCH_SIG,
-        &[Value::Obj(ev)],
-    )?))
+    // AOSP View.onTouchEvent: a DEX override runs first; when none resolves
+    // the framework default applies — a clickable view consumes the gesture
+    // (PFLAG_PRESSED), performs the click on UP and returns true; a
+    // non-clickable view returns false. Without this default the DOWN falls
+    // through to the next view under the point: a full-screen sibling (e.g.
+    // a ViewPager behind a TabLayout) steals the tap and the target view's
+    // `performClick` (TabView → tab.select → setCurrentItem) never runs.
+    if let Some(r) =
+        crate::jcollections::guest_call(vm, v, "onTouchEvent", TOUCH_SIG, &[Value::Obj(ev)])?
+    {
+        return Ok(truthy(Some(r)));
+    }
+    view_on_touch_event_default(vm, v, ev)
+}
+
+/// AOSP `View.onTouchEvent` default (the framework implementation reached
+/// when no DEX override resolves): CLICKABLE views consume DOWN/UP/CANCEL
+/// and run `performClick` on UP over an active press; others return false.
+/// The pressed flag lives in the same view-prop store as the touch listener
+/// (`rd_pressed`), keeping `HostObj::View` unchanged.
+pub(crate) fn view_on_touch_event_default(
+    vm: &mut Engine,
+    v: ObjRef,
+    ev: ObjRef,
+) -> Result<bool, VmExit> {
+    let clickable = matches!(
+        vm.fw.get(v),
+        Some(HostObj::View {
+            clickable: true,
+            ..
+        })
+    );
+    if !clickable {
+        return Ok(false);
+    }
+    let action = match vm.heap.get_field(ev, "rd_action") {
+        Ok(Value::Int(a)) => a,
+        _ => crate::android_motion::ACTION_DOWN,
+    };
+    match action {
+        crate::android_motion::ACTION_DOWN => {
+            set_prop(vm, v, "rd_pressed", 1);
+            Ok(true)
+        }
+        crate::android_motion::ACTION_UP => {
+            let pressed = prop(vm, v, "rd_pressed").unwrap_or(0);
+            set_prop(vm, v, "rd_pressed", 0);
+            if pressed != 0 {
+                // AOSP performClickInternal: the DEX `performClick` override
+                // runs first (Material TabView.select and friends); when none
+                // exists the host listener dispatch plays View.performClick
+                // (setOnClickListener / android:onClick).
+                match crate::jcollections::guest_call(vm, v, "performClick", "()Z", &[])? {
+                    Some(_) => {}
+                    None => {
+                        vm.dispatch_click(v)?;
+                    }
+                }
+            }
+            Ok(true)
+        }
+        // ACTION_CANCEL (3): an interrupted gesture releases the press.
+        3 => {
+            set_prop(vm, v, "rd_pressed", 0);
+            Ok(true)
+        }
+        // MOVE and other actions stay consumed while the press is active.
+        _ => Ok(true),
+    }
 }
 
 /// `View.post*`: enqueue `r` on the main looper after `delay_ms`.
