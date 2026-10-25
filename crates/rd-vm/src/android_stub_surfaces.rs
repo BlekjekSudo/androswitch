@@ -51981,6 +51981,10 @@ fn p36i_telephony_manager(
         | ("getNetworkOperatorName", "()Ljava/lang/String;")
         | ("getNetworkOperatorName", "(I)Ljava/lang/String;") => empty(vm)?,
         ("isNetworkRoaming", "()Z") | ("isNetworkRoaming", "(I)Z") => bool_value(false),
+        // No ITelephony binder: getServiceStateForSubscriber returns null.
+        ("getServiceState", "()Landroid/telephony/ServiceState;")
+        | ("getServiceState", "(I)Landroid/telephony/ServiceState;")
+        | ("getServiceStateForSubscriber", "(I)Landroid/telephony/ServiceState;") => Value::Null,
         _ => return Ok(None),
     };
     Ok(Some(v))
@@ -53676,6 +53680,9 @@ fn partial36i_static(
     if let Some(v) = partial36i_telephony_static(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
+    if let Some(v) = p36i_user_handle_static(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     partial36i_telecom_static(vm, class, name, sig, args)
 }
 
@@ -53706,6 +53713,7 @@ fn partial36i_instance(
         P36I_CAMERA_CAPS => p36i_camera_caps(vm, name, sig, recv, args),
         P36I_STATUS_HINTS => p36i_status_hints(vm, name, sig, recv, args),
         P36I_GATEWAY_INFO => p36i_gateway_info(vm, name, sig, recv, args),
+        "Landroid/os/UserHandle;" => p36i_user_handle(vm, name, sig, recv, args),
         _ => Ok(None),
     }
 }
@@ -53941,6 +53949,82 @@ fn p36i_gateway_info(
             bool_value(pkg_empty || matches!(get(vm, recv, "mGatewayAddress"), Value::Null))
         }
         ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+// android.os.UserHandle + Process.myUserHandle (supporting surface for
+// PhoneAccountHandle; android.os was already partial without a host model
+// for these). The VM runs apps as user 0 (Process.myUid() = 10000).
+fn p36i_new_user_handle(vm: &mut Engine, user_id: i32) -> Result<Value, VmExit> {
+    let r = alloc_obj(vm, "Landroid/os/UserHandle;", Vec::new())?;
+    put(vm, r, "mHandle", Value::Int(user_id))?;
+    Ok(Value::Obj(r))
+}
+
+fn p36i_my_user_id(vm: &mut Engine) -> i32 {
+    match vm.invoke_static("Landroid/os/Process;", "myUid", "()I", &[]) {
+        Ok(Value::Int(uid)) => uid / 100000,
+        _ => 0,
+    }
+}
+
+fn p36i_user_handle(
+    vm: &mut Engine,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (name, sig) {
+        ("<init>", "(I)V") => {
+            put(vm, recv, "mHandle", Value::Int(iarg(args, 0)))?;
+            Value::Null
+        }
+        ("getIdentifier", "()I") => Value::Int(field_int(vm, recv, "mHandle")),
+        ("isSystem", "()Z") => bool_value(field_int(vm, recv, "mHandle") == 0),
+        ("toString", "()Ljava/lang/String;") => jstr(
+            vm,
+            format!("UserHandle{{{}}}", field_int(vm, recv, "mHandle")),
+        )?,
+        ("equals", "(Ljava/lang/Object;)Z") => {
+            let eq = match oarg(args, 0) {
+                Some(o) if class_of(vm, o) == "Landroid/os/UserHandle;" => {
+                    field_int(vm, recv, "mHandle") == field_int(vm, o, "mHandle")
+                }
+                _ => false,
+            };
+            bool_value(eq)
+        }
+        ("hashCode", "()I") => Value::Int(field_int(vm, recv, "mHandle")),
+        ("describeContents", "()I") => Value::Int(0),
+        _ => return Ok(None),
+    };
+    Ok(Some(v))
+}
+
+fn p36i_user_handle_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let v = match (class, name, sig) {
+        ("Landroid/os/UserHandle;", "of", "(I)Landroid/os/UserHandle;") => {
+            p36i_new_user_handle(vm, iarg(args, 0))?
+        }
+        // MU_ENABLED profiles: user id is uid / PER_USER_RANGE.
+        ("Landroid/os/UserHandle;", "getUserId", "(I)I") => Value::Int(iarg(args, 0) / 100000),
+        ("Landroid/os/UserHandle;", "getUserHandleForUid", "(I)Landroid/os/UserHandle;") => {
+            p36i_new_user_handle(vm, iarg(args, 0) / 100000)?
+        }
+        ("Landroid/os/UserHandle;", "myUserId", "()I") => Value::Int(p36i_my_user_id(vm)),
+        ("Landroid/os/Process;", "myUserHandle", "()Landroid/os/UserHandle;") => {
+            let user_id = p36i_my_user_id(vm);
+            p36i_new_user_handle(vm, user_id)?
+        }
         _ => return Ok(None),
     };
     Ok(Some(v))

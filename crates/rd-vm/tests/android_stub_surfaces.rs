@@ -22139,3 +22139,56 @@ fn gateway_info_value_is_guest_visible() {
         Value::Int(1)
     );
 }
+
+#[test]
+fn phone_account_handle_two_arg_ctor_and_tm_service_state_are_guest_visible() {
+    let mut engine = engine_of(&DexBuilder::new());
+    let component = p36i_component(&mut engine, "com.example.dialer", "com.example.dialer.Svc");
+    let id = text(&mut engine, "acc-2");
+    let handle = p49_new(
+        &mut engine,
+        P36I_HANDLE,
+        "(Landroid/content/ComponentName;Ljava/lang/String;)V",
+        &[Value::Obj(component), id],
+    );
+    let user = call(
+        &mut engine,
+        handle,
+        "getUserHandle",
+        "()Landroid/os/UserHandle;",
+        &[],
+    );
+    assert!(
+        matches!(user, Value::Obj(_)),
+        "owner user handle must be present"
+    );
+    let id_b = text(&mut engine, "acc-2");
+    let handle_b = p49_new(
+        &mut engine,
+        P36I_HANDLE,
+        "(Landroid/content/ComponentName;Ljava/lang/String;)V",
+        &[Value::Obj(component), id_b],
+    );
+    assert_eq!(
+        call(
+            &mut engine,
+            handle,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            &[Value::Obj(handle_b)]
+        ),
+        Value::Int(1)
+    );
+
+    let tm = p36i_system_service(&mut engine, "telephony");
+    assert_eq!(
+        call(
+            &mut engine,
+            tm,
+            "getServiceState",
+            "()Landroid/telephony/ServiceState;",
+            &[]
+        ),
+        Value::Null
+    );
+}
