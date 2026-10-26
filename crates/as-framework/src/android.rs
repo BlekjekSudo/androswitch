@@ -54,6 +54,21 @@ fn text(vm: &Engine, v: &Value) -> Result<String> {
 fn string(vm: &mut Engine, s: impl Into<String>) -> Result<Value> {
     Ok(Value::Obj(vm.heap.alloc_string(s.into())?))
 }
+fn numerics_metadata(
+    class: &str,
+    name: &str,
+    sig: &str,
+) -> Option<rd_vm::framework_host::HostMethodKind> {
+    #[cfg(feature = "std")]
+    {
+        rd_vm::numerics::method_metadata(class, name, sig)
+    }
+    #[cfg(not(feature = "std"))]
+    {
+        let _ = (class, name, sig);
+        None
+    }
+}
 // Dalvik registers contain untyped bits. Host services receive the types in
 // the actual method descriptor, including zero-as-null and float constants.
 fn typed_args(sig: &str, args: &[Value]) -> Result<Vec<Value>> {
@@ -1518,6 +1533,7 @@ impl FrameworkHost for Android {
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
         rd_vm::boxes::method_metadata(class, name, sig)
+            .or_else(|| numerics_metadata(class, name, sig))
             .or_else(|| rd_vm::java_file::method_metadata(class, name, sig))
             .or_else(|| rd_vm::atomic_file::method_metadata(class, name, sig))
             .or_else(|| rd_vm::java_stream::method_metadata(class, name, sig))

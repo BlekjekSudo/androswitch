@@ -213,8 +213,8 @@ pub mod m9;
 #[cfg(feature = "native")]
 #[cfg(feature = "desktop-runtime")]
 pub mod native;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-pub(crate) mod numerics;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+pub mod numerics;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod parcel;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]

@@ -54,7 +54,6 @@ const REFLECT_FIELD: &str = "Ljava/lang/reflect/Field;";
 const UNSAFE_CLASS: &str = "Lsun/misc/Unsafe;";
 const TIME_UNIT: &str = "Ljava/util/concurrent/TimeUnit;";
 use crate::framework::{CLASS, THREAD};
-const MATH: &str = "Ljava/lang/Math;";
 /// M8 (compat real): coleções java.util host — segundo gap de launch do
 /// org.primftpd (`WeakHashMap.<init>`). WeakHashMap ≡ HashMap (sem GC na
 /// arena, entradas nunca são limpas — limitação documentada); LinkedList
@@ -139,36 +138,6 @@ const LONG: &str = "Ljava/lang/Long;";
 const PRINTSTREAM: &str = "Ljava/io/PrintStream;";
 const NFE: &str = "Ljava/lang/NumberFormatException;";
 const ARITH: &str = "Ljava/lang/ArithmeticException;";
-
-/// Semântica FLOOR do Java (issue #48): `div_euclid`/`rem_euclid` do Rust são
-/// SEMÂNTICA EUCLIDIANA — `floorDiv(4,−3)` Java = −2, `div_euclid` dá −1.
-/// floorDiv = truncado com ajuste quando o resto é não-zero e tem sinal
-/// oposto ao divisor; floorMod = a − floorDiv·b (com wrapping nos cantos
-/// MIN/−1, que a JVM também sofre por contrato).
-fn java_floor_div_i32(a: i32, b: i32) -> i32 {
-    let q = a.wrapping_div(b);
-    let r = a.wrapping_rem(b);
-    if r != 0 && ((r < 0) != (b < 0)) {
-        q.wrapping_sub(1)
-    } else {
-        q
-    }
-}
-fn java_floor_mod_i32(a: i32, b: i32) -> i32 {
-    a.wrapping_sub(java_floor_div_i32(a, b).wrapping_mul(b))
-}
-fn java_floor_div_i64(a: i64, b: i64) -> i64 {
-    let q = a.wrapping_div(b);
-    let r = a.wrapping_rem(b);
-    if r != 0 && ((r < 0) != (b < 0)) {
-        q.wrapping_sub(1)
-    } else {
-        q
-    }
-}
-fn java_floor_mod_i64(a: i64, b: i64) -> i64 {
-    a.wrapping_sub(java_floor_div_i64(a, b).wrapping_mul(b))
-}
 
 /// Escreve no stdout/stderr do host. PrintStream Java NUNCA lança IOException
 /// (spec de java.io.PrintStream) — engolir falha de E/S é a semântica correta.
@@ -528,95 +497,6 @@ fn call_static_intrinsic_rooted(
         }
         ("Ljava/lang/Runtime;", "getRuntime", "()Ljava/lang/Runtime;") => {
             Ok(Some(Value::Obj(vm.runtime_obj()?)))
-        }
-        (MATH, "abs", "(I)I") => Ok(Some(Value::Int(args[0].as_int()?.wrapping_abs()))),
-        (MATH, "abs", "(J)J") => Ok(Some(Value::Long(args[0].as_long()?.wrapping_abs()))),
-        (MATH, "abs", "(F)F") => Ok(Some(Value::Float(args[0].as_float()?.abs()))),
-        (MATH, "abs", "(D)D") => Ok(Some(Value::Double(args[0].as_double()?.abs()))),
-        (MATH, "min", "(II)I") => Ok(Some(Value::Int(args[0].as_int()?.min(args[1].as_int()?)))),
-        (MATH, "max", "(II)I") => Ok(Some(Value::Int(args[0].as_int()?.max(args[1].as_int()?)))),
-        (MATH, "min", "(JJ)J") => Ok(Some(Value::Long(
-            args[0].as_long()?.min(args[1].as_long()?),
-        ))),
-        (MATH, "max", "(JJ)J") => Ok(Some(Value::Long(
-            args[0].as_long()?.max(args[1].as_long()?),
-        ))),
-        (MATH, "min", "(FF)F") => Ok(Some(Value::Float(java_min_f32(
-            args[0].as_float()?,
-            args[1].as_float()?,
-        )))),
-        (MATH, "max", "(FF)F") => Ok(Some(Value::Float(java_max_f32(
-            args[0].as_float()?,
-            args[1].as_float()?,
-        )))),
-        (MATH, "min", "(DD)D") => Ok(Some(Value::Double(java_min_f64(
-            args[0].as_double()?,
-            args[1].as_double()?,
-        )))),
-        (MATH, "max", "(DD)D") => Ok(Some(Value::Double(java_max_f64(
-            args[0].as_double()?,
-            args[1].as_double()?,
-        )))),
-        (MATH, "sqrt", "(D)D") => Ok(Some(Value::Double(args[0].as_double()?.sqrt()))),
-        (MATH, "pow", "(DD)D") => Ok(Some(Value::Double(java_pow(
-            args[0].as_double()?,
-            args[1].as_double()?,
-        )))),
-        (MATH, "floor", "(D)D") => Ok(Some(Value::Double(args[0].as_double()?.floor()))),
-        (MATH, "ceil", "(D)D") => Ok(Some(Value::Double(args[0].as_double()?.ceil()))),
-        // issue #27: rotina emitida por d8 em código real
-        (MATH, "round", "(F)I") => {
-            let v = args[0].as_float()?;
-            Ok(Some(Value::Int(java_round_f32(v))))
-        }
-        (MATH, "round", "(D)J") => {
-            let v = args[0].as_double()?;
-            Ok(Some(Value::Long(java_round_f64(v))))
-        }
-        (MATH, "floorDiv", "(II)I") => {
-            let a = args[0].as_int()?;
-            let b = args[1].as_int()?;
-            if b == 0 {
-                return Err(VmExit::Exception(Throwable::new(ARITH, "divide by zero")));
-            }
-            // issue #48: floor real do Java (não euclidiano)
-            Ok(Some(Value::Int(java_floor_div_i32(a, b))))
-        }
-        (MATH, "floorMod", "(II)I") => {
-            let a = args[0].as_int()?;
-            let b = args[1].as_int()?;
-            if b == 0 {
-                return Err(VmExit::Exception(Throwable::new(ARITH, "divide by zero")));
-            }
-            Ok(Some(Value::Int(java_floor_mod_i32(a, b))))
-        }
-        (MATH, "floorDiv", "(JJ)J") => {
-            let a = args[0].as_long()?;
-            let b = args[1].as_long()?;
-            if b == 0 {
-                return Err(VmExit::Exception(Throwable::new(ARITH, "divide by zero")));
-            }
-            Ok(Some(Value::Long(java_floor_div_i64(a, b))))
-        }
-        (MATH, "floorMod", "(JJ)J") => {
-            let a = args[0].as_long()?;
-            let b = args[1].as_long()?;
-            if b == 0 {
-                return Err(VmExit::Exception(Throwable::new(ARITH, "divide by zero")));
-            }
-            Ok(Some(Value::Long(java_floor_mod_i64(a, b))))
-        }
-        (MATH, "signum", "(D)D") => {
-            let v = args[0].as_double()?;
-            Ok(Some(Value::Double(if v.is_nan() {
-                f64::NAN
-            } else if v == 0.0 {
-                v
-            } else if v > 0.0 {
-                1.0
-            } else {
-                -1.0
-            })))
         }
         (INTEGER, "parseInt", "(Ljava/lang/String;)I") => {
             // issue #37: parseInt(null) → NumberFormatException("null") na JVM
@@ -5446,83 +5326,6 @@ fn parse_long(s: &str) -> Result<i64, String> {
             .ok_or_else(|| format!("For input string: \"{s}\""))?;
     }
     Ok(acc)
-}
-
-/// min/max/pow do Java: NaN em qualquer arg → NaN (diferente do Rust, que
-/// ignora NaN em min/max); ±0.0 decide por sinal (issue #37 — Rust deixa
-/// não-especificado, Java retorna -0.0 no min e +0.0 no max).
-fn java_min_f32(a: f32, b: f32) -> f32 {
-    if a.is_nan() || b.is_nan() {
-        f32::NAN
-    } else if a == 0.0 && b == 0.0 {
-        if a.is_sign_negative() {
-            a
-        } else {
-            b
-        } // -0.0 vence no min
-    } else {
-        a.min(b)
-    }
-}
-fn java_max_f32(a: f32, b: f32) -> f32 {
-    if a.is_nan() || b.is_nan() {
-        f32::NAN
-    } else if a == 0.0 && b == 0.0 {
-        if a.is_sign_positive() {
-            a
-        } else {
-            b
-        } // +0.0 vence no max
-    } else {
-        a.max(b)
-    }
-}
-fn java_min_f64(a: f64, b: f64) -> f64 {
-    if a.is_nan() || b.is_nan() {
-        f64::NAN
-    } else if a == 0.0 && b == 0.0 {
-        if a.is_sign_negative() {
-            a
-        } else {
-            b
-        }
-    } else {
-        a.min(b)
-    }
-}
-fn java_max_f64(a: f64, b: f64) -> f64 {
-    if a.is_nan() || b.is_nan() {
-        f64::NAN
-    } else if a == 0.0 && b == 0.0 {
-        if a.is_sign_positive() {
-            a
-        } else {
-            b
-        }
-    } else {
-        a.max(b)
-    }
-}
-
-/// Math.round: floor(x + 0.5) com saturação nos limites do tipo (semântica
-/// Java — o `as` do Rust já satura, mas NaN → 0 e meio-ponto para cima).
-fn java_round_f32(v: f32) -> i32 {
-    if v.is_nan() {
-        0
-    } else {
-        (v + 0.5).floor() as i32
-    }
-}
-fn java_round_f64(v: f64) -> i64 {
-    if v.is_nan() {
-        0
-    } else {
-        (v + 0.5).floor() as i64
-    }
-}
-fn java_pow(a: f64, b: f64) -> f64 {
-    // Java Math.pow casos especiais mínimos cobertos por pow do Rust
-    a.powf(b)
 }
 
 /// Native loading is never silently ignored, including in minimal builds.

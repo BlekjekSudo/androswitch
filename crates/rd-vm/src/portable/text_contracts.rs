@@ -1,7 +1,8 @@
 //! Shared Java text/numeric/array contracts, independent of APK identity.
 use crate::{err, intrinsics, Engine, ObjRef, Throwable, Value, VmExit};
+#[cfg(not(feature = "std"))]
+use alloc::format;
 use alloc::{
-    format,
     string::{String, ToString},
     vec::Vec,
 };
@@ -36,78 +37,83 @@ pub(super) fn call_static(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>> {
-    let number = match (class, name, sig) {
-        ("Ljava/lang/Double;", "toString", "(D)Ljava/lang/String;") => {
-            Some(crate::repr::java_double(args[0].as_double()?))
-        }
-        ("Ljava/lang/Float;", "toString", "(F)Ljava/lang/String;") => {
-            Some(crate::repr::java_float(args[0].as_float()?))
-        }
-        ("Ljava/lang/Integer;", "toHexString", "(I)Ljava/lang/String;") => {
-            Some(format!("{:x}", args[0].as_int()? as u32))
-        }
-        ("Ljava/lang/Long;", "toHexString", "(J)Ljava/lang/String;") => {
-            Some(format!("{:x}", args[0].as_long()? as u64))
-        }
-        _ => None,
-    };
-    if let Some(value) = number {
-        return out(vm, value);
-    }
-    if matches!(class, "Ljava/lang/Math;" | "Ljava/lang/StrictMath;") && name == "abs" {
-        return Ok(Some(match sig {
-            "(I)I" => Value::Int(args[0].as_int()?.wrapping_abs()),
-            "(J)J" => Value::Long(args[0].as_long()?.wrapping_abs()),
-            "(F)F" => Value::Float(args[0].as_float()?.abs()),
-            "(D)D" => Value::Double(args[0].as_double()?.abs()),
-            _ => return Ok(None),
-        }));
-    }
-    if matches!(class, "Ljava/lang/Math;" | "Ljava/lang/StrictMath;")
-        && matches!(name, "min" | "max")
+    // The shipping std VM uses the complete inherited numerics family.
+    // Retain the earlier small core-only fallback for the isolated parser VM.
+    #[cfg(not(feature = "std"))]
     {
-        // Rust's floating min/max suppress a single NaN; Java propagates it.
-        // Equal signed zero also has an ordering in Java (negative < positive).
-        let minimum = name == "min";
-        macro_rules! floating {
-            ($a:expr, $b:expr, $kind:ident) => {{
-                let (a, b) = ($a, $b);
-                Value::$kind(if a.is_nan() {
-                    a
-                } else if b.is_nan() {
-                    b
-                } else if a == 0.0 && b == 0.0 {
-                    if minimum {
-                        if a.is_sign_negative() || b.is_sign_negative() {
-                            -0.0
+        let number = match (class, name, sig) {
+            ("Ljava/lang/Double;", "toString", "(D)Ljava/lang/String;") => {
+                Some(crate::repr::java_double(args[0].as_double()?))
+            }
+            ("Ljava/lang/Float;", "toString", "(F)Ljava/lang/String;") => {
+                Some(crate::repr::java_float(args[0].as_float()?))
+            }
+            ("Ljava/lang/Integer;", "toHexString", "(I)Ljava/lang/String;") => {
+                Some(format!("{:x}", args[0].as_int()? as u32))
+            }
+            ("Ljava/lang/Long;", "toHexString", "(J)Ljava/lang/String;") => {
+                Some(format!("{:x}", args[0].as_long()? as u64))
+            }
+            _ => None,
+        };
+        if let Some(value) = number {
+            return out(vm, value);
+        }
+        if matches!(class, "Ljava/lang/Math;" | "Ljava/lang/StrictMath;") && name == "abs" {
+            return Ok(Some(match sig {
+                "(I)I" => Value::Int(args[0].as_int()?.wrapping_abs()),
+                "(J)J" => Value::Long(args[0].as_long()?.wrapping_abs()),
+                "(F)F" => Value::Float(args[0].as_float()?.abs()),
+                "(D)D" => Value::Double(args[0].as_double()?.abs()),
+                _ => return Ok(None),
+            }));
+        }
+        if matches!(class, "Ljava/lang/Math;" | "Ljava/lang/StrictMath;")
+            && matches!(name, "min" | "max")
+        {
+            // Rust's floating min/max suppress a single NaN; Java propagates it.
+            // Equal signed zero also has an ordering in Java (negative < positive).
+            let minimum = name == "min";
+            macro_rules! floating {
+                ($a:expr, $b:expr, $kind:ident) => {{
+                    let (a, b) = ($a, $b);
+                    Value::$kind(if a.is_nan() {
+                        a
+                    } else if b.is_nan() {
+                        b
+                    } else if a == 0.0 && b == 0.0 {
+                        if minimum {
+                            if a.is_sign_negative() || b.is_sign_negative() {
+                                -0.0
+                            } else {
+                                0.0
+                            }
+                        } else if a.is_sign_negative() && b.is_sign_negative() {
+                            a
                         } else {
                             0.0
                         }
-                    } else if a.is_sign_negative() && b.is_sign_negative() {
+                    } else if (minimum && a < b) || (!minimum && a > b) {
                         a
                     } else {
-                        0.0
-                    }
-                } else if (minimum && a < b) || (!minimum && a > b) {
-                    a
-                } else {
-                    b
-                })
-            }};
+                        b
+                    })
+                }};
+            }
+            return Ok(Some(match sig {
+                "(II)I" => {
+                    let (a, b) = (args[0].as_int()?, args[1].as_int()?);
+                    Value::Int(if minimum { a.min(b) } else { a.max(b) })
+                }
+                "(JJ)J" => {
+                    let (a, b) = (args[0].as_long()?, args[1].as_long()?);
+                    Value::Long(if minimum { a.min(b) } else { a.max(b) })
+                }
+                "(FF)F" => floating!(args[0].as_float()?, args[1].as_float()?, Float),
+                "(DD)D" => floating!(args[0].as_double()?, args[1].as_double()?, Double),
+                _ => return Ok(None),
+            }));
         }
-        return Ok(Some(match sig {
-            "(II)I" => {
-                let (a, b) = (args[0].as_int()?, args[1].as_int()?);
-                Value::Int(if minimum { a.min(b) } else { a.max(b) })
-            }
-            "(JJ)J" => {
-                let (a, b) = (args[0].as_long()?, args[1].as_long()?);
-                Value::Long(if minimum { a.min(b) } else { a.max(b) })
-            }
-            "(FF)F" => floating!(args[0].as_float()?, args[1].as_float()?, Float),
-            "(DD)D" => floating!(args[0].as_double()?, args[1].as_double()?, Double),
-            _ => return Ok(None),
-        }));
     }
     if (class, name, sig)
         == (

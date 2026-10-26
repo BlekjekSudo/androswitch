@@ -96,6 +96,50 @@ fn app() -> (App, Rc<Identity>) {
     (app, native)
 }
 #[test]
+fn inherited_numeric_jni_lookup_uses_exact_static_descriptors() {
+    let (mut app, _) = app();
+    for (class, name, sig) in [
+        ("Ljava/lang/Character;", "toChars", "(I[CI)I"),
+        ("Ljava/lang/Character;", "isJavaIdentifierPart", "(I)Z"),
+        ("Ljava/lang/Math;", "floorDiv", "(JJ)J"),
+        ("Ljava/lang/StrictMath;", "rint", "(D)D"),
+        ("Ljava/lang/Float;", "max", "(FF)F"),
+        (
+            "Ljava/lang/Integer;",
+            "valueOf",
+            "(Ljava/lang/String;I)Ljava/lang/Integer;",
+        ),
+        ("Ljava/lang/Long;", "toString", "(JI)Ljava/lang/String;"),
+    ] {
+        assert_eq!(
+            method_owner(&mut app.vm, class, name, sig, true).unwrap(),
+            class
+        );
+        assert!(method_owner(&mut app.vm, class, name, sig, false).is_err());
+    }
+    for (class, name, sig) in [
+        ("Ljava/lang/Character;", "getType", "(I)Z"),
+        ("Ljava/lang/Character;", "isDigit", "(J)Z"),
+        ("Ljava/lang/Math;", "floorDiv", "(JJ)I"),
+        ("Ljava/lang/StrictMath;", "unknown", "(D)D"),
+        ("Ljava/lang/Float;", "max", "(DD)D"),
+    ] {
+        assert!(method_owner(&mut app.vm, class, name, sig, true).is_err());
+    }
+    assert_eq!(
+        app.vm
+            .invoke_static(
+                "Ljava/lang/Math;",
+                "floorDiv",
+                "(JJ)J",
+                &[Value::Long(4), Value::Long(-3)]
+            )
+            .unwrap(),
+        Value::Long(-2)
+    );
+}
+
+#[test]
 fn shared_io_jni_metadata_resolves_only_exact_methods_and_constructor_declarations() {
     let (mut app, _) = app();
     for (class, name, sig) in [
