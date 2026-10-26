@@ -95,7 +95,8 @@ try {
     foreach($entry in $beforeBuild.GetEnumerator()){
         if(-not(Test-Path -LiteralPath $entry.Key -PathType Leaf) -or (Get-FileHash -LiteralPath $entry.Key).Hash.ToLowerInvariant() -cne $entry.Value){throw "Product input changed during build: $($entry.Key)"}
     }
-    @{source_commit=$sourceCommit;files=@($sourceFiles|Sort-Object -Unique|Where-Object {Test-Path -LiteralPath $_ -PathType Leaf}|ForEach-Object {@{path=$_;sha256=(Get-FileHash -LiteralPath $_).Hash.ToLowerInvariant()}})}|ConvertTo-Json -Depth 5|Set-Content "$root/target/evidence/product-source.json" -Encoding utf8NoBOM
+    $sourceJson=@{source_commit=$sourceCommit;source_hash_convention='actual working-tree input bytes; Git text blobs normalize CRLF to LF';files=@($sourceFiles|Sort-Object -Unique|Where-Object {Test-Path -LiteralPath $_ -PathType Leaf}|ForEach-Object {@{path=$_;sha256=(Get-FileHash -LiteralPath $_).Hash.ToLowerInvariant()}})}|ConvertTo-Json -Depth 5
+    [IO.File]::WriteAllText("$root/target/evidence/product-source.json",$sourceJson.Replace("`r`n","`n")+"`n",[Text.UTF8Encoding]::new($false))
     $mesaInputs=if($MesaSdk){@($sdkRust)+@(Get-ChildItem "$MesaSdk/lib" -File -Filter '*.a')}else{@()}
     if($MesaSdk){Copy-Item -LiteralPath "$mesaLink/link-adaptation.json" -Destination "$root/target/evidence/product-mesa-link.json"}
     $sdkInputs=if($LinkBackend -eq 'Windows'){@('libnx/lib/libnx.a','libnx/include/switch/kernel/thread.h','libnx/switch.specs','devkitA64/aarch64-none-elf/include/pthread.h','devkitA64/aarch64-none-elf/lib/pic/libsysbase.a','devkitA64/aarch64-none-elf/lib/pic/libc.a','devkitA64/aarch64-none-elf/lib/pic/libm.a')|ForEach-Object {@{path=$_;sha256=(Get-FileHash -LiteralPath "$WindowsDevkitPro/$_").Hash.ToLowerInvariant()}}}else{@()}
