@@ -1,0 +1,40 @@
+{
+  "session_id": "f787dd4b5111439a80410a17b1b88b60",
+  "commands": [
+    {
+      "kind": "frame"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "ms": 3000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "kind": "frames",
+      "count": 60
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,2925 @@
+{
+  "schema_version": 1,
+  "status": "scoped_collection_factory_integration",
+  "implementation_commit": "3e37e6d0b48a8ffa289cfb5b89edd2fe9ffb993f",
+  "upstream_revision": "3761815dc6a2a1427e9fc66b66e8471b78d1b170",
+  "all_upstream_apis_1_to_1_on_horizon": false,
+  "scope": {
+    "device_factory_overloads": 9,
+    "static_fields": 3,
+    "original_factory_lines_reused": 137,
+    "backend": "existing active collection store; no fallback to disconnected HostState",
+    "complete_collections_family": false
+  },
+  "host": {
+    "reference": {
+      "log": "D:/Dev/Switch/AndroSwitch/local-artifacts/horizon-std/collections-upstream-bounded-tests.log",
+      "log_sha256": "ff6627e48f421b3a7a6510d13c2f043822b46b80358296559ee6cc93c7139ead",
+      "command": "cargo test -p as-vm --features upstream-parity-tests --lib --tests --locked --no-fail-fast -- --test-threads=1",
+      "suites": [
+        {
+          "target": "rd_vm",
+          "source": "unittests ../rd-vm/src/lib.rs",
+          "status": "passed",
+          "passed": 155,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_accessibility_virtual",
+          "source": "../rd-vm/tests/accessibility_virtual.rs",
+          "status": "passed",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_activity_history",
+          "source": "../rd-vm/tests/activity_history.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_alloc_budget_311",
+          "source": "../rd-vm/tests/alloc_budget_311.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_array_containers",
+          "source": "../rd-vm/tests/android_array_containers.rs",
+          "status": "passed",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_assets",
+          "source": "../rd-vm/tests/android_assets.rs",
+          "status": "passed",
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_atomic_file",
+          "source": "../rd-vm/tests/android_atomic_file.rs",
+          "status": "passed",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_base64_streams",
+          "source": "../rd-vm/tests/android_base64_streams.rs",
+          "status": "passed",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_bitset",
+          "source": "../rd-vm/tests/android_bitset.rs",
+          "status": "passed",
+          "passed": 15,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_display",
+          "source": "../rd-vm/tests/android_display.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_inherited_dispatch",
+          "source": "../rd-vm/tests/android_inherited_dispatch.rs",
+          "status": "passed",
+          "passed": 55,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_json",
+          "source": "../rd-vm/tests/android_json.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_json_274",
+          "source": "../rd-vm/tests/android_json_274.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_stub_surfaces",
+          "source": "../rd-vm/tests/android_stub_surfaces.rs",
+          "status": "passed",
+          "passed": 109,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_sysservices_batch1",
+          "source": "../rd-vm/tests/android_sysservices_batch1.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_sysservices_batch6",
+          "source": "../rd-vm/tests/android_sysservices_batch6.rs",
+          "status": "passed",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_touch",
+          "source": "../rd-vm/tests/android_touch.rs",
+          "status": "passed",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_uri_267",
+          "source": "../rd-vm/tests/android_uri_267.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_android_util_lru",
+          "source": "../rd-vm/tests/android_util_lru.rs",
+          "status": "passed",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_androidx",
+          "source": "../rd-vm/tests/androidx.rs",
+          "status": "passed",
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_androidx_hierarchy",
+          "source": "../rd-vm/tests/androidx_hierarchy.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_app",
+          "source": "../rd-vm/tests/app.rs",
+          "status": "passed",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_app_xml",
+          "source": "../rd-vm/tests/app_xml.rs",
+          "status": "passed",
+          "passed": 25,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_arrays_303",
+          "source": "../rd-vm/tests/arrays_303.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_bigdecimal_272",
+          "source": "../rd-vm/tests/bigdecimal_272.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_camera_305",
+          "source": "../rd-vm/tests/camera_305.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_collections_gc",
+          "source": "../rd-vm/tests/collections_gc.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_file_300",
+          "source": "../rd-vm/tests/file_300.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_gc",
+          "source": "../rd-vm/tests/gc.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_gc_generations",
+          "source": "../rd-vm/tests/gc_generations.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_gms",
+          "source": "../rd-vm/tests/gms.rs",
+          "status": "passed",
+          "passed": 33,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_graphics_301",
+          "source": "../rd-vm/tests/graphics_301.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_inflate_263",
+          "source": "../rd-vm/tests/inflate_263.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_io_chars_266",
+          "source": "../rd-vm/tests/io_chars_266.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_jit",
+          "source": "../rd-vm/tests/jit.rs",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_jtext_format_295",
+          "source": "../rd-vm/tests/jtext_format_295.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_m10",
+          "source": "../rd-vm/tests/m10.rs",
+          "status": "passed",
+          "passed": 9,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_m8",
+          "source": "../rd-vm/tests/m8.rs",
+          "status": "passed",
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_m9",
+          "source": "../rd-vm/tests/m9.rs",
+          "status": "passed",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_narrow_arrays_250",
+          "source": "../rd-vm/tests/narrow_arrays_250.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_native",
+          "source": "../rd-vm/tests/native.rs",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_numerics_319",
+          "source": "../rd-vm/tests/numerics_319.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_parcel_261",
+          "source": "../rd-vm/tests/parcel_261.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_parcel_binder",
+          "source": "../rd-vm/tests/parcel_binder.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_regex_262",
+          "source": "../rd-vm/tests/regex_262.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_regex_lookaround",
+          "source": "../rd-vm/tests/regex_lookaround.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_sqlite_prefs_257",
+          "source": "../rd-vm/tests/sqlite_prefs_257.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_string_270",
+          "source": "../rd-vm/tests/string_270.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_view_hierarchy_316",
+          "source": "../rd-vm/tests/view_hierarchy_316.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_vm_exec",
+          "source": "../rd-vm/tests/vm_exec.rs",
+          "status": "passed",
+          "passed": 103,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_xml_269",
+          "source": "../rd-vm/tests/xml_269.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "cargo_errors": [],
+      "test_run_completed_successfully": true,
+      "totals": {
+        "passed": 706,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "zero_case_targets": [
+        "upstream_jit",
+        "upstream_native"
+      ],
+      "incomplete_targets": []
+    },
+    "product": {
+      "log": "D:/Dev/Switch/AndroSwitch/local-artifacts/horizon-std/collections-product-bounded-tests.log",
+      "log_sha256": "1043fdec845ac791e683c67bbdf3e2b970a9d919eb5e01f0a231eedd833cd856",
+      "command": "cargo test -p rd-vm -p as-framework -p as-switch-smoke --features as-framework/host,as-switch-smoke/host-cli,as-switch-smoke/portable-tests --locked --no-fail-fast -- --test-threads=1 --include-ignored",
+      "suites": [
+        {
+          "target": "as_framework",
+          "source": "unittests src/lib.rs",
+          "status": "passed",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "as_conformance",
+          "source": "unittests src/bin/as-conformance.rs",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "as_corpus",
+          "source": "unittests src/bin/as-corpus.rs",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "as_ui_probe",
+          "source": "unittests src/bin/as-ui-probe.rs",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "application_lifecycle",
+          "source": "tests/application_lifecycle.rs",
+          "status": "passed",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "bitmap",
+          "source": "tests/bitmap.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "bundle",
+          "source": "tests/bundle.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "class_forname",
+          "source": "tests/class_forname.rs",
+          "status": "passed",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "collection_factories",
+          "source": "tests/collection_factories.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "communication",
+          "source": "tests/communication.rs",
+          "status": "passed",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "conformance_contracts",
+          "source": "tests/conformance_contracts.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "copy_on_write",
+          "source": "tests/copy_on_write.rs",
+          "status": "passed",
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "executors",
+          "source": "tests/executors.rs",
+          "status": "passed",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "glsurface",
+          "source": "tests/glsurface.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "inherited_dispatch",
+          "source": "tests/inherited_dispatch.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "input_connection",
+          "source": "tests/input_connection.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "lifecycle",
+          "source": "tests/lifecycle.rs",
+          "status": "passed",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "m8_contracts",
+          "source": "tests/m8_contracts.rs",
+          "status": "passed",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "package_info",
+          "source": "tests/package_info.rs",
+          "status": "passed",
+          "passed": 15,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "reflection_fields",
+          "source": "tests/reflection_fields.rs",
+          "status": "passed",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "resource_names",
+          "source": "tests/resource_names.rs",
+          "status": "passed",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "runtime_resources",
+          "source": "tests/runtime_resources.rs",
+          "status": "passed",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "text_utils",
+          "source": "tests/text_utils.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "thread_local",
+          "source": "tests/thread_local.rs",
+          "status": "passed",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "time_unit",
+          "source": "tests/time_unit.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "timer",
+          "source": "tests/timer.rs",
+          "status": "passed",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "uncaught",
+          "source": "tests/uncaught.rs",
+          "status": "passed",
+          "passed": 9,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "as_switch_smoke",
+          "source": "unittests src/lib.rs",
+          "status": "passed",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "as_probe",
+          "source": "unittests src/bin/as-probe.rs",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "jni_constructor",
+          "source": "tests/jni_constructor.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "jni_method_metadata",
+          "source": "tests/jni_method_metadata.rs",
+          "status": "passed",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "jni_objects",
+          "source": "tests/jni_objects.rs",
+          "status": "passed",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "portable_atomic",
+          "source": "tests/portable_atomic.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "portable_class_names",
+          "source": "tests/portable_class_names.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "portable_core",
+          "source": "tests/portable_core.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "portable_encoding",
+          "source": "tests/portable_encoding.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "portable_enum",
+          "source": "tests/portable_enum.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "portable_execution",
+          "source": "tests/portable_execution.rs",
+          "status": "passed",
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "portable_format",
+          "source": "tests/portable_format.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "portable_monitor",
+          "source": "tests/portable_monitor.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "portable_throwable",
+          "source": "tests/portable_throwable.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "shared_android_log",
+          "source": "tests/shared_android_log.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "shared_boxes",
+          "source": "tests/shared_boxes.rs",
+          "status": "passed",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_bitset",
+          "source": "../rd-vm/tests/android_bitset.rs",
+          "status": "passed",
+          "passed": 15,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "upstream_narrow_arrays",
+          "source": "../rd-vm/tests/narrow_arrays_250.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "rd_vm",
+          "source": "unittests src/lib.rs",
+          "status": "passed",
+          "passed": 149,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "accessibility_virtual",
+          "source": "tests/accessibility_virtual.rs",
+          "status": "passed",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "activity_history",
+          "source": "tests/activity_history.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "alloc_budget_311",
+          "source": "tests/alloc_budget_311.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_array_containers",
+          "source": "tests/android_array_containers.rs",
+          "status": "passed",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_assets",
+          "source": "tests/android_assets.rs",
+          "status": "passed",
+          "passed": 12,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_atomic_file",
+          "source": "tests/android_atomic_file.rs",
+          "status": "passed",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_base64_streams",
+          "source": "tests/android_base64_streams.rs",
+          "status": "passed",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_bitset",
+          "source": "tests/android_bitset.rs",
+          "status": "passed",
+          "passed": 15,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_display",
+          "source": "tests/android_display.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_inherited_dispatch",
+          "source": "tests/android_inherited_dispatch.rs",
+          "status": "passed",
+          "passed": 55,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_json",
+          "source": "tests/android_json.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_json_274",
+          "source": "tests/android_json_274.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_stub_surfaces",
+          "source": "tests/android_stub_surfaces.rs",
+          "status": "passed",
+          "passed": 109,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_sysservices_batch1",
+          "source": "tests/android_sysservices_batch1.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_sysservices_batch6",
+          "source": "tests/android_sysservices_batch6.rs",
+          "status": "passed",
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_touch",
+          "source": "tests/android_touch.rs",
+          "status": "passed",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_uri_267",
+          "source": "tests/android_uri_267.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "android_util_lru",
+          "source": "tests/android_util_lru.rs",
+          "status": "passed",
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "androidx",
+          "source": "tests/androidx.rs",
+          "status": "passed",
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "androidx_hierarchy",
+          "source": "tests/androidx_hierarchy.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "app",
+          "source": "tests/app.rs",
+          "status": "passed",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "app_xml",
+          "source": "tests/app_xml.rs",
+          "status": "passed",
+          "passed": 25,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "arrays_303",
+          "source": "tests/arrays_303.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "bigdecimal_272",
+          "source": "tests/bigdecimal_272.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "camera_305",
+          "source": "tests/camera_305.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "collections_gc",
+          "source": "tests/collections_gc.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "file_300",
+          "source": "tests/file_300.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "gc",
+          "source": "tests/gc.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "gc_generations",
+          "source": "tests/gc_generations.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "gms",
+          "source": "tests/gms.rs",
+          "status": "passed",
+          "passed": 33,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "graphics_301",
+          "source": "tests/graphics_301.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "inflate_263",
+          "source": "tests/inflate_263.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "io_chars_266",
+          "source": "tests/io_chars_266.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "jit",
+          "source": "tests/jit.rs",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "jtext_format_295",
+          "source": "tests/jtext_format_295.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "m10",
+          "source": "tests/m10.rs",
+          "status": "passed",
+          "passed": 9,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "m8",
+          "source": "tests/m8.rs",
+          "status": "passed",
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "m9",
+          "source": "tests/m9.rs",
+          "status": "passed",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "narrow_arrays_250",
+          "source": "tests/narrow_arrays_250.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "native",
+          "source": "tests/native.rs",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "numerics_319",
+          "source": "tests/numerics_319.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "parcel_261",
+          "source": "tests/parcel_261.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "parcel_binder",
+          "source": "tests/parcel_binder.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "regex_262",
+          "source": "tests/regex_262.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "regex_lookaround",
+          "source": "tests/regex_lookaround.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "shared_android_log",
+          "source": "tests/shared_android_log.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "shared_boxes",
+          "source": "tests/shared_boxes.rs",
+          "status": "passed",
+          "passed": 6,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "sqlite_prefs_257",
+          "source": "tests/sqlite_prefs_257.rs",
+          "status": "passed",
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "string_270",
+          "source": "tests/string_270.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "view_hierarchy_316",
+          "source": "tests/view_hierarchy_316.rs",
+          "status": "passed",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "vm_exec",
+          "source": "tests/vm_exec.rs",
+          "status": "passed",
+          "passed": 103,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "xml_269",
+          "source": "tests/xml_269.rs",
+          "status": "passed",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "doc_as_framework",
+          "source": "doctests",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "doc_as_switch_smoke",
+          "source": "doctests",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "target": "doc_rd_vm",
+          "source": "doctests",
+          "status": "zero_cases_unverified",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "cargo_errors": [],
+      "test_run_completed_successfully": true,
+      "totals": {
+        "passed": 988,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      "zero_case_targets": [
+        "as_conformance",
+        "as_corpus",
+        "as_ui_probe",
+        "as_probe",
+        "jit",
+        "native",
+        "doc_as_framework",
+        "doc_as_switch_smoke",
+        "doc_rd_vm"
+      ],
+      "incomplete_targets": []
+    },
+    "original_route_errors": [],
+    "environment": {
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0"
+    },
+    "jvm_observations": {
+      "emptyList.size": "0",
+      "emptySet.size": "0",
+      "emptyMap.size": "0",
+      "singletonList.null": "true",
+      "singleton.null": "true",
+      "singletonList.rejectsAdd": "true",
+      "emptyList.rejectsAdd": "true",
+      "emptySet.rejectsAdd": "true",
+      "emptyMap.rejectsPut": "true",
+      "EMPTY_LIST.identity": "true",
+      "unmodifiableList.sizeAfterSourceClear": "0",
+      "emptySortedSet.isSortedSet": "true",
+      "emptySortedMap.isSortedMap": "true",
+      "unmodifiableMap.null": "NullPointerException"
+    }
+  },
+  "limitations": [
+    "Inherited unmodifiable wrappers are snapshots; JVM live-view behavior differs.",
+    "Sorted factories remain reference-only because their inherited return markers are plain Set/Map.",
+    "Synchronized no-op wrappers are not exposed as real Horizon synchronization.",
+    "singletonMap, other Collections utilities, remaining constructors/bulk operations/iterators and full framework state remain integration work.",
+    "Zero-case native/JIT targets remain unverified; test totals are executions, not API coverage percentages.",
+    "Initial default-debug full-reference compilation exhausted compiler memory; preserved as failure.",
+    "Initial metadata-only host check failed on a core metadata stub; preserved separately from execution results."
+  ],
+  "current_hardware_candidate": {
+    "changed": false,
+    "nro_sha256": "a3a34bab32cf31e182fb72efe524bad1e06b5a69107853e9a0aba893aaef2bf8"
+  },
+  "horizon": {
+    "status": "nro_built",
+    "build": {
+      "rustc_verbose": "rustc 1.100.0-nightly (787af2b8c 2026-08-25)\r\nbinary: rustc\r\ncommit-hash: 787af2b8c80638c51a4fc8e44f84e6891f243ec7\r\ncommit-date: 2026-08-25\r\nhost: x86_64-pc-windows-gnu\r\nrelease: 1.100.0-nightly\r\nLLVM version: 23.1.0",
+      "profile": "release panic=abort",
+      "mesa_sdk": "D:/Dev/Switch/AndroSwitch/local-artifacts/dependencies/mesa-switch-0ff52079/sdk/opt/devkitpro/portlibs/switch",
+      "cargo_version": "cargo 1.100.0-nightly (e8cb624d5 2026-08-22)",
+      "std_overlay": {
+        "compiler_commit": "787af2b8c80638c51a4fc8e44f84e6891f243ec7",
+        "original_sysroot": "C:\\Users\\Administrator\\.rustup\\toolchains\\nightly-x86_64-pc-windows-gnu",
+        "overlay_sysroot": "C:\\Users\\Administrator\\.cache\\androswitch\\horizon-std-toolchain-787af2b",
+        "original_library_tree_sha256": "ced5aec7ddb3f4b4ad91e0d56872bc7a498f07b395df8d9867ce4993347439e8",
+        "original_library_file_count": 3631,
+        "files": [
+          {
+            "path": "std/src/sys/fs/unix.rs",
+            "original_sha256": "a25c02ec631e41bc634d2eef5ffcc76689955b531f77a3159e492e9a006c8305",
+            "adapted_sha256": "7bbe67712b2c9296d196fc4a7ab7aa975a4b1de98de532f49b6d2e977e48fc32"
+          },
+          {
+            "path": "std/src/sys/thread/unix.rs",
+            "original_sha256": "93784ff17f94154d57299d568afb42bf77adce9d4f4a15efeed55716f601c2d0",
+            "adapted_sha256": "30ed4928e0ed27a6b3faa355c5c8a5ffe70a5106ddd25e24726ade787bacca5b"
+          }
+        ]
+      },
+      "windows_devkitpro": "C:/devkitPro",
+      "source_manifest_sha256": "465a6ebaaa49bacd80d04c753b87e99969ed42e0e83552ebcb728a7a655db2af",
+      "link_backend": "Windows",
+      "rust_library_profile": "std",
+      "c_compiler_version": "15.2.0",
+      "sqlite_source_lock_sha256": "cce2cc3f0b3e6354568cc3da7d6067980ef88788f451349711975d7cb7f85e95",
+      "status": "built",
+      "source_commit": "3e37e6d0b48a8ffa289cfb5b89edd2fe9ffb993f",
+      "executed": false,
+      "schema_version": 2,
+      "mesa_rust_libraries": "D:\\Dev\\Switch\\AndroSwitch/local-artifacts/dependencies/mesa-switch-0ff52079/rust-std/rust-std-nightly-aarch64-unknown-linux-gnu/rust-std-aarch64-unknown-linux-gnu/lib/rustlib/aarch64-unknown-linux-gnu/lib",
+      "target_directory": "C:\\Users\\Administrator\\.cache\\androswitch\\37b5fa1d-switch-target",
+      "mesa_static_inputs": [
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libaddr2line-f88b4a5ad99efdaa.rlib",
+          "sha256": "e356f00102241f4a68f21f8188fbdeab770fbf8fd874ca715eca728dc331e0e9"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libadler2-4d8a3a02880e0536.rlib",
+          "sha256": "a12e4602c87598fa46ffdda9d3b4f6a13c99f6957b13f8716edd1a1c7129d606"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\liballoc-9866fea3d1eb6a82.rlib",
+          "sha256": "be14d6b37f598ec0bc76c8ef9cc86e2f3b19d2b5f90ebc39e8c7cfbf5e2a86f8"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libcfg_if-356797859cb38376.rlib",
+          "sha256": "9b3ca4a6428b3b43e782e1d0e0880538991f5ee4537124be04532a1872c3b2dd"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libcompiler_builtins-5d97cb3e2cb35b44.rlib",
+          "sha256": "a2d22ab07b4d80d3fea3e65bff9229a90dff8419cadff6a8665c277387bef1a5"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libcore-e288075ad1e23491.rlib",
+          "sha256": "ded61c6d3a23f325309ac913c6ddb4de3acb0228f1a52492c9ca6e3b164309d3"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libgetopts-707af06578ad0f27.rlib",
+          "sha256": "2ca275d91dd8634273b37aff0e32f483d4b56e4ba871d59a28857877ed1d088f"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libgimli-10fd6397cdf8b576.rlib",
+          "sha256": "72efedf6d8c276221ddce73cf75f18eafea2ca419e9129ae5702d35d7e218947"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libhashbrown-213446fa5a0e2a4b.rlib",
+          "sha256": "8ed264ce13c1b84033ca968aade9e0836afb89a7c40a4d1ea0bafa5a66d4cdb1"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\liblibc-5ed7db560aff3b66.rlib",
+          "sha256": "da36be842911f24ceae19e75d1e939432fb1d6b95a8c511d1fbbb70bb2cb0a6c"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libmemchr-48865b00bb1f788d.rlib",
+          "sha256": "b65278cc6cc75c1fbc872b53113957f70c15822c0f29408c9e81533745ff8ebb"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libminiz_oxide-49d3eabad0af1e17.rlib",
+          "sha256": "7969b52a609a69f3d8042e5cf6a12ab597811fed8afe235d7ccbefbc7b9fcf4e"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libobject-9bb980a13aa1cc8f.rlib",
+          "sha256": "c85224d00fdd8a3e5753b148975ee9219e420872935626219eef75313deb211d"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libpanic_unwind-798824c9340428bc.rlib",
+          "sha256": "3f1802524b83b4a7b1a61a5425d463bca509a256d40e4cdcb3d8f0b250d434d4"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libproc_macro-bf9f397371e7c499.rlib",
+          "sha256": "24a7d67dfce46b8e1cf3885fd1dbcc94cda26be4a0f163a03ab54148be028664"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libprofiler_builtins-0422ff386be25f1e.rlib",
+          "sha256": "8ff011c85ac6e968f0bf2834afc0e569ed0285c63d9dbd8f5e8b468b1755165d"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_demangle-d8cf2e243f7f024b.rlib",
+          "sha256": "5be0e335187ab3793ea1539caa1aaaf37d5bb0b397d6b5bd3f7b607d583a80db"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_literal_escaper-34e4438e8fc96a33.rlib",
+          "sha256": "520b3d07fe687313478d302db92ee0461c7e2e67a3db7776249ed792f6e803b0"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_std_workspace_alloc-b31ee33f41285142.rlib",
+          "sha256": "b336aea56d84bf7acd8c816eedaeb28c668798d681179bf6e09f0a626a4f2581"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_std_workspace_core-ddc0bfd59b2289e1.rlib",
+          "sha256": "f49b9a16b2d678ab1a8de69156110822cc15932a511c148d2c3d04910bba53b4"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_std_workspace_std-d699f95255bdce1b.rlib",
+          "sha256": "6942a43c1f25b30d478b8bbf4d407872782bbbad7f66ffc4ac02ae0547a631e4"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libstd_detect-de8ad90142ad622c.rlib",
+          "sha256": "46c8def928a2ee3d7322809712a82f0ec8dc872338817143941d9971ab23047b"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libstd-fbcb7b14d0766431.rlib",
+          "sha256": "3374b9af6a5db51d75f4f89259bc62aa53925a0361413c41eea029a1c482d89d"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libsysroot-f9c715cd0292aef6.rlib",
+          "sha256": "25896e38c04def8fd3496321a41851620dc52af164ed3281029c6dcb155db697"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libtest-16eb038793a58b76.rlib",
+          "sha256": "bd97a22ead8dc52738350f713f491a03ee46e7d9b54dd08b52e6655ffba282f5"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libunwind-ad223e35a99bed2b.rlib",
+          "sha256": "2cf55bf5d41745d2ad409a8bc0135ee10902479ef3ef5740516452f15d098c8d"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libblake3.a",
+          "sha256": "0c2cb7ab53fcbdd738a8262fa8f41f0142b0aa67542d3565409073ba9c776b61"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libcompiler_c_helpers.a",
+          "sha256": "34cf4390440cfdd210b36d1bc0caf40eead340956a2220af0a158215ef881a2e"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libcompiler.a",
+          "sha256": "d0caa17d06eb4388a5070519984070e67085ca315c82b1a88fd71edff390edf9"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libEGL.a",
+          "sha256": "1f25fe42ab32f0b498a23ae1e6a9daf9614f80381a4863011e640ab0b8676ffe"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libGL.a",
+          "sha256": "a38e125f14411bd39514372dc9e808cfa256eadd58ef3b52d59f1a8f85a7239d"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libglapi.a",
+          "sha256": "fc614d85d48430f43f7905bc73ab198304258b34896a6da3e19d6925a756aa2d"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libGLESv1_CM.a",
+          "sha256": "ef751dd308a70b162d65636d710f02854cf5d739dc95eac08bb04186e39d7cb7"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libGLESv2.a",
+          "sha256": "9124a703066a8178d67c86993b8c87576a6a0f2c8f5334f8c7593e7b15bb0375"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\liblibnil_format_table.a",
+          "sha256": "60033b93b2d5383ebcf21bb7c6682458a3244c12a628bdd583da3e58ce307454"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libmesa_util_c11.a",
+          "sha256": "f25264964c7afda6610a0e91a3fe92abc168c34e03628308a01b7ec8d196d3b5"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libmesa_util_simd.a",
+          "sha256": "9e88355006a320213908d310ab7d15b6cb919999a4d79ade8d4b636a1dd84bc8"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libmesa_util.a",
+          "sha256": "a078decd7ac8807fd731919e7d4dc0f773ba9b6cadd718b992404d476d688ab4"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnak_rs.a",
+          "sha256": "733f450fd61032a3e659b50d50a1d37bfabb351d7aa17954e47d342fc2b038e9"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnak.a",
+          "sha256": "5c8f7624d9b4d793cbae6c3916ed456cf5cd8d8155062624012acd3b410ffeeb"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnil.a",
+          "sha256": "e808ff58d862340eb3b8baf55ad44f7c34c26fff637e1fb98f3c5cf228dbb9f8"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnir.a",
+          "sha256": "cc90b12cb66e9e4e71aea13163e8cf2117fa0748fcff75fc13b776164971de7f"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnouveau_horizon.a",
+          "sha256": "5335d11d756845266310eab3caf20536168b72ab3b42d8b46bb13c0ccd59e335"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnouveau_mme.a",
+          "sha256": "198f3cdda632bc220a4d98464be2fe0e205c17eac7d19bc91b2847dd59805c33"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnouveau_ws.a",
+          "sha256": "5121f8ed35afee3f31981cc968ae86bbde81fdd5a9b7e7405a9dd2f4275daaaa"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnvidia_headers_c.a",
+          "sha256": "98e8e9518749ba73d4881c7f5117ab2c9acfd4ed5376396b7d1c79b9c23f4099"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnvk.a",
+          "sha256": "4198573b67e7e8d749f0f65b56c67f3f1a60253694dd7a6b65ebc5dd05d5764e"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libvtn.a",
+          "sha256": "1eb80da16e4630194d4c11eaf89da465b3fe48027060b1b4ae9613033a37a723"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libvulkan_util.a",
+          "sha256": "38d955869b0ac9d2bded10e6c74fe24528bcd82241084f46c3d4e8f76efc8a6e"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libvulkan.a",
+          "sha256": "36bb9ab68578897157b11bfeabe6c6b0b0895d5fb3c31a9b6f31982d85131351"
+        },
+        {
+          "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libxmlconfig.a",
+          "sha256": "3e1ebc594d7b4626006a48857e47580ef1086154f9ad7f06244f741f30912b51"
+        }
+      ],
+      "execution_backend": "embedded-horizon",
+      "target": "aarch64-androswitch-newlib",
+      "nro_sha256": "00355a6eca7dccd49ee06be54a4199397ca1dffa8deb6705b56c018f1c4fdffd",
+      "rust_toolchain": "nightly",
+      "nro_bytes": 28618808
+    },
+    "execution_not_implied": true
+  },
+  "emulator": {
+    "attempts": [
+      {
+        "emulator_version": "1.3.3+e2143d4",
+        "inputs": [
+          {
+            "install_snapshot_step": 3,
+            "bytes": 13099584,
+            "index": 0,
+            "source": "D:\\Download\\mekorama-1-7-2.apk",
+            "staged_name": "0000-external.apk",
+            "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01"
+          }
+        ],
+        "visual_review": "required",
+        "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f787dd4b5111439a80410a17b1b88b60",
+        "pid": 263212,
+        "launches": [
+          {
+            "source": "D:\\Download\\mekorama-1-7-2.apk",
+            "attempt": 0,
+            "bytes": 13099584,
+            "index": 0,
+            "expected_session_id": "f787dd4b5111439a80410a17b1b88b60-1",
+            "staged_name": "0000-external.apk",
+            "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+            "install_snapshot_step": 3
+          }
+        ],
+        "startup_wait_ms": 3000,
+        "latest_media_stop": [
+          {
+            "operation": "glsurface_wait_begin",
+            "result": 1,
+            "detail": 1179676,
+            "tick": 332082107
+          },
+          {
+            "operation": "egl_unbind_result",
+            "result": 1,
+            "detail": 1,
+            "tick": 332763605
+          },
+          {
+            "operation": "egl_destroy_context_result",
+            "result": 1,
+            "detail": 8669090880,
+            "tick": 334685112
+          },
+          {
+            "operation": "egl_destroy_surface_result",
+            "result": 1,
+            "detail": 8602843232,
+            "tick": 334871160
+          },
+          {
+            "operation": "egl_terminate_begin",
+            "result": 0,
+            "detail": 8602744208,
+            "tick": 334930095
+          },
+          {
+            "operation": "egl_terminate_end",
+            "result": 1,
+            "detail": 8602744208,
+            "tick": 335998174
+          },
+          {
+            "operation": "egl_close_result",
+            "result": 0,
+            "detail": 8602744208,
+            "tick": 336039050
+          },
+          {
+            "operation": "glsurface_wait_end",
+            "result": 0,
+            "detail": 0,
+            "tick": 336830302
+          },
+          {
+            "operation": "glsurface_thread_wait_end",
+            "result": 0,
+            "detail": 0,
+            "tick": 336853428
+          },
+          {
+            "operation": "glsurface_thread_close_end",
+            "result": 0,
+            "detail": 0,
+            "tick": 336918147
+          },
+          {
+            "operation": "glsurface_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 336934293
+          },
+          {
+            "operation": "opensl_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 336953153
+          },
+          {
+            "operation": "glsurface_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 337693167
+          },
+          {
+            "operation": "opensl_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 337707248
+          },
+          {
+            "operation": "cpu_capture_publish_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 374038341
+          }
+        ],
+        "commands": 5,
+        "backend": "ryujinx",
+        "root_stop_wait_attempts": 1,
+        "custom_session_events": false,
+        "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f787dd4b5111439a80410a17b1b88b60\\androswitch.nro",
+        "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+        "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+        "execution_attempted": true,
+        "status": "blocked_runtime",
+        "sd_original_restore": "restored",
+        "emulator_frontend": "headless_sdl2",
+        "observed_sessions": [
+          {
+            "completed_case_verified": false,
+            "session_id": "f787dd4b5111439a80410a17b1b88b60-1",
+            "package": "com.martinmagni.mekorama",
+            "revision": 1,
+            "runtime_status": "failed",
+            "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f787dd4b5111439a80410a17b1b88b60\\sessions\\f787dd4b5111439a80410a17b1b88b60-1\\session-report.json",
+            "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+            "error": "HORIZON_WORKER_ERROR [rd-vm]: HORIZON_WORKER_ERROR [start]: worker 4611686018427387905: platform result -140 [pc 0x2: Insn { opcode: 114, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 27514, regs: [0, 2, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V"
+          }
+        ],
+        "capture_ownership_contract": "Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.",
+        "latest_teardown": [
+          {
+            "phase": "stop_requested",
+            "tick": 322235575
+          },
+          {
+            "phase": "native_activity_stop",
+            "tick": 322514319
+          },
+          {
+            "phase": "java_activity_stop",
+            "tick": 322571591
+          },
+          {
+            "phase": "worker_admission_closed",
+            "tick": 325618339
+          },
+          {
+            "phase": "background_worker_quiesce",
+            "tick": 325695292
+          },
+          {
+            "phase": "media_thread_quiesce",
+            "tick": 327411137
+          },
+          {
+            "phase": "glsurface_join",
+            "tick": 327496876
+          },
+          {
+            "phase": "egl_wait_gpu",
+            "tick": 332457073
+          },
+          {
+            "phase": "egl_unbind",
+            "tick": 332712693
+          },
+          {
+            "phase": "egl_destroy_context",
+            "tick": 332788364
+          },
+          {
+            "phase": "egl_destroy_surface",
+            "tick": 334717274
+          },
+          {
+            "phase": "egl_terminate",
+            "tick": 334914422
+          },
+          {
+            "phase": "egl_terminated",
+            "tick": 336018948
+          },
+          {
+            "phase": "guest_thread_quiesce",
+            "tick": 336966600
+          },
+          {
+            "phase": "native_destructors",
+            "tick": 337415425
+          },
+          {
+            "phase": "media_reset",
+            "tick": 337754313
+          },
+          {
+            "phase": "media_released",
+            "tick": 337782222
+          },
+          {
+            "phase": "activity_dispose",
+            "tick": 337796131
+          },
+          {
+            "phase": "runtime_drop",
+            "tick": 337992111
+          },
+          {
+            "phase": "native_mapping_release",
+            "tick": 340036920
+          },
+          {
+            "phase": "native_resource_reset",
+            "tick": 340619873
+          },
+          {
+            "phase": "native_reset_guest_threads",
+            "tick": 340641722
+          },
+          {
+            "phase": "native_reset_cxx",
+            "tick": 340660233
+          },
+          {
+            "phase": "native_reset_keys",
+            "tick": 340683859
+          },
+          {
+            "phase": "native_reset_sync",
+            "tick": 340705163
+          },
+          {
+            "phase": "native_reset_locale",
+            "tick": 340726377
+          },
+          {
+            "phase": "native_reset_admitted",
+            "tick": 340745594
+          },
+          {
+            "phase": "native_mapping_release",
+            "tick": 340770343
+          },
+          {
+            "phase": "native_reset_anonymous_memory",
+            "tick": 341048682
+          },
+          {
+            "phase": "native_tls_reset",
+            "tick": 341096348
+          },
+          {
+            "phase": "native_resources_released",
+            "tick": 341115780
+          },
+          {
+            "phase": "display_geometry_reset",
+            "tick": 341153750
+          },
+          {
+            "phase": "runtime_closed",
+            "tick": 341209741
+          },
+          {
+            "phase": "launcher_refresh",
+            "tick": 341274455
+          },
+          {
+            "phase": "launcher_framebuffer_open",
+            "tick": 343815384
+          },
+          {
+            "phase": "launcher_ready",
+            "tick": 344523509
+          },
+          {
+            "phase": "launcher_stable",
+            "tick": 348492328
+          }
+        ],
+        "host_storage_preflight": {
+          "available_bytes": 16951361536,
+          "volume": "C:\\",
+          "scope": "Host staging estimate, separate from guest/Horizon memory admission",
+          "required_bytes": 617888056
+        },
+        "native_trace_requested": false,
+        "schema_version": 1,
+        "completed_sessions": 1,
+        "physical_device": "not_run",
+        "latest_memory_admission": {
+          "allocator_available_after_load": 1579040752,
+          "allocator_available_before_load": 1597407520,
+          "estimated_parser_bytes": 54122782,
+          "package": "com.martinmagni.mekorama",
+          "parser_budget_bytes": 268435456,
+          "raw_dex_bytes": 14703020,
+          "revision": 1,
+          "schema_version": 1,
+          "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+          "session_id": "f787dd4b5111439a80410a17b1b88b60-1",
+          "status": "vm_ready"
+        },
+        "root_stop_wait_ms": 457,
+        "session_id": "f787dd4b5111439a80410a17b1b88b60",
+        "cases": [
+          {
+            "first_screen": "not_visually_verified",
+            "status": "blocked_or_unreported",
+            "error": "HORIZON_WORKER_ERROR [rd-vm]: HORIZON_WORKER_ERROR [start]: worker 4611686018427387905: platform result -140 [pc 0x2: Insn { opcode: 114, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 27514, regs: [0, 2, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V",
+            "captures": [],
+            "presented_frames": null,
+            "returned_to_launcher": true,
+            "teardown_phases": [
+              "stop_requested",
+              "native_activity_stop",
+              "java_activity_stop",
+              "worker_admission_closed",
+              "background_worker_quiesce",
+              "media_thread_quiesce",
+              "glsurface_join",
+              "egl_wait_gpu",
+              "egl_unbind",
+              "egl_destroy_context",
+              "egl_destroy_surface",
+              "egl_terminate",
+              "egl_terminated",
+              "guest_thread_quiesce",
+              "native_destructors",
+              "media_reset",
+              "media_released",
+              "activity_dispose",
+              "runtime_drop",
+              "native_mapping_release",
+              "native_resource_reset",
+              "native_reset_guest_threads",
+              "native_reset_cxx",
+              "native_reset_keys",
+              "native_reset_sync",
+              "native_reset_locale",
+              "native_reset_admitted",
+              "native_mapping_release",
+              "native_reset_anonymous_memory",
+              "native_tls_reset",
+              "native_resources_released",
+              "display_geometry_reset",
+              "runtime_closed",
+              "launcher_refresh"
+            ],
+            "installed_identity_matches": true,
+            "runtime_status": "failed",
+            "input": {
+              "source": "D:\\Download\\mekorama-1-7-2.apk",
+              "attempt": 0,
+              "bytes": 13099584,
+              "index": 0,
+              "expected_session_id": "f787dd4b5111439a80410a17b1b88b60-1",
+              "staged_name": "0000-external.apk",
+              "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+              "install_snapshot_step": 3
+            },
+            "snapshots": []
+          }
+        ],
+        "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+        "userdata_seed": [],
+        "root_handle_pinned": true,
+        "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-hle-fixed-20261025\\Ryujinx.exe",
+        "nro_sha256": "00355a6eca7dccd49ee06be54a4199397ca1dffa8deb6705b56c018f1c4fdffd",
+        "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-f787dd4b5111439a80410a17b1b88b60",
+        "latest_session_report": {
+          "error": "HORIZON_WORKER_ERROR [rd-vm]: HORIZON_WORKER_ERROR [start]: worker 4611686018427387905: platform result -140 [pc 0x2: Insn { opcode: 114, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 27514, regs: [0, 2, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V",
+          "identity_status": "known",
+          "package": "com.martinmagni.mekorama",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "f787dd4b5111439a80410a17b1b88b60-1",
+          "status": "failed"
+        }
+      },
+      {
+        "native_trace_requested": false,
+        "userdata_seed": [],
+        "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-hle-fixed-20261025\\Ryujinx.exe",
+        "status": "blocked_runtime",
+        "emulator_frontend": "headless_sdl2",
+        "latest_session_report": {
+          "error": "NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+          "identity_status": "known",
+          "package": "com.martinmagni.mekorama",
+          "revision": 1,
+          "schema_version": 1,
+          "session_id": "1504e963ce754df2a243ee06e0b51db3-1",
+          "status": "failed"
+        },
+        "latest_memory_admission": {
+          "allocator_available_after_load": 1579039920,
+          "allocator_available_before_load": 1597406688,
+          "estimated_parser_bytes": 54122782,
+          "package": "com.martinmagni.mekorama",
+          "parser_budget_bytes": 268435456,
+          "raw_dex_bytes": 14703020,
+          "revision": 1,
+          "schema_version": 1,
+          "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+          "session_id": "1504e963ce754df2a243ee06e0b51db3-1",
+          "status": "vm_ready"
+        },
+        "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-1504e963ce754df2a243ee06e0b51db3",
+        "latest_media_stop": [
+          {
+            "operation": "egl_unbind_result",
+            "result": 1,
+            "detail": 1,
+            "tick": 373760378
+          },
+          {
+            "operation": "egl_destroy_context_result",
+            "result": 1,
+            "detail": 8602594176,
+            "tick": 375955328
+          },
+          {
+            "operation": "egl_destroy_surface_result",
+            "result": 1,
+            "detail": 8626587968,
+            "tick": 376567257
+          },
+          {
+            "operation": "egl_terminate_begin",
+            "result": 0,
+            "detail": 8602919152,
+            "tick": 376628448
+          },
+          {
+            "operation": "worker_wait_end",
+            "result": 0,
+            "detail": 0,
+            "tick": 378627054
+          },
+          {
+            "operation": "egl_terminate_end",
+            "result": 1,
+            "detail": 8602919152,
+            "tick": 378734808
+          },
+          {
+            "operation": "glsurface_wait_begin",
+            "result": 1,
+            "detail": 1179676,
+            "tick": 378999782
+          },
+          {
+            "operation": "egl_close_result",
+            "result": 0,
+            "detail": 8602919152,
+            "tick": 379045680
+          },
+          {
+            "operation": "glsurface_wait_end",
+            "result": 0,
+            "detail": 0,
+            "tick": 379114840
+          },
+          {
+            "operation": "glsurface_thread_wait_end",
+            "result": 0,
+            "detail": 0,
+            "tick": 379141814
+          },
+          {
+            "operation": "glsurface_thread_close_end",
+            "result": 0,
+            "detail": 0,
+            "tick": 379166363
+          },
+          {
+            "operation": "glsurface_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 379185000
+          },
+          {
+            "operation": "opensl_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 379267438
+          },
+          {
+            "operation": "glsurface_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 379820691
+          },
+          {
+            "operation": "opensl_quiesce_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 379840442
+          },
+          {
+            "operation": "cpu_capture_publish_result",
+            "result": 0,
+            "detail": 0,
+            "tick": 419548694
+          }
+        ],
+        "startup_wait_ms": 10000,
+        "pid": 162452,
+        "backend": "ryujinx",
+        "cases": [
+          {
+            "input": {
+              "bytes": 13099584,
+              "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+              "source": "D:\\Download\\mekorama-1-7-2.apk",
+              "index": 0,
+              "attempt": 0,
+              "staged_name": "0000-external.apk",
+              "install_snapshot_step": 3,
+              "expected_session_id": "1504e963ce754df2a243ee06e0b51db3-1"
+            },
+            "first_screen": "not_visually_verified",
+            "teardown_phases": [
+              "stop_requested",
+              "egl_destroy_surface",
+              "native_activity_stop",
+              "java_activity_stop",
+              "egl_terminate",
+              "worker_admission_closed",
+              "background_worker_quiesce",
+              "media_thread_quiesce",
+              "glsurface_join",
+              "egl_terminated",
+              "guest_thread_quiesce",
+              "native_destructors",
+              "media_reset",
+              "media_released",
+              "activity_dispose",
+              "runtime_drop",
+              "native_mapping_release",
+              "native_resource_reset",
+              "native_reset_guest_threads",
+              "native_reset_cxx",
+              "native_reset_keys",
+              "native_reset_sync",
+              "native_reset_locale",
+              "native_reset_admitted",
+              "native_mapping_release",
+              "native_reset_anonymous_memory",
+              "native_tls_reset",
+              "native_resources_released",
+              "display_geometry_reset",
+              "runtime_closed",
+              "launcher_refresh"
+            ],
+            "error": "NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+            "presented_frames": null,
+            "installed_identity_matches": true,
+            "status": "blocked_or_unreported",
+            "runtime_status": "failed",
+            "captures": [],
+            "snapshots": [],
+            "returned_to_launcher": true
+          }
+        ],
+        "commands": 5,
+        "root_stop_wait_attempts": 1,
+        "host_storage_preflight": {
+          "scope": "Host staging estimate, separate from guest/Horizon memory admission",
+          "volume": "C:\\",
+          "required_bytes": 617888056,
+          "available_bytes": 16862224384
+        },
+        "completed_sessions": 1,
+        "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+        "root_handle_pinned": true,
+        "physical_device": "not_run",
+        "launches": [
+          {
+            "bytes": 13099584,
+            "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+            "source": "D:\\Download\\mekorama-1-7-2.apk",
+            "index": 0,
+            "attempt": 0,
+            "staged_name": "0000-external.apk",
+            "install_snapshot_step": 3,
+            "expected_session_id": "1504e963ce754df2a243ee06e0b51db3-1"
+          }
+        ],
+        "latest_teardown": [
+          {
+            "phase": "stop_requested",
+            "tick": 375971456
+          },
+          {
+            "phase": "egl_destroy_surface",
+            "tick": 376240978
+          },
+          {
+            "phase": "native_activity_stop",
+            "tick": 376419200
+          },
+          {
+            "phase": "java_activity_stop",
+            "tick": 376459269
+          },
+          {
+            "phase": "egl_terminate",
+            "tick": 376604999
+          },
+          {
+            "phase": "worker_admission_closed",
+            "tick": 377466312
+          },
+          {
+            "phase": "background_worker_quiesce",
+            "tick": 377522227
+          },
+          {
+            "phase": "media_thread_quiesce",
+            "tick": 378733261
+          },
+          {
+            "phase": "glsurface_join",
+            "tick": 378879934
+          },
+          {
+            "phase": "egl_terminated",
+            "tick": 379001151
+          },
+          {
+            "phase": "guest_thread_quiesce",
+            "tick": 379292257
+          },
+          {
+            "phase": "native_destructors",
+            "tick": 379369326
+          },
+          {
+            "phase": "media_reset",
+            "tick": 379887047
+          },
+          {
+            "phase": "media_released",
+            "tick": 379927785
+          },
+          {
+            "phase": "activity_dispose",
+            "tick": 379949792
+          },
+          {
+            "phase": "runtime_drop",
+            "tick": 380070176
+          },
+          {
+            "phase": "native_mapping_release",
+            "tick": 382280058
+          },
+          {
+            "phase": "native_resource_reset",
+            "tick": 382760987
+          },
+          {
+            "phase": "native_reset_guest_threads",
+            "tick": 382778928
+          },
+          {
+            "phase": "native_reset_cxx",
+            "tick": 382796144
+          },
+          {
+            "phase": "native_reset_keys",
+            "tick": 382817888
+          },
+          {
+            "phase": "native_reset_sync",
+            "tick": 382838979
+          },
+          {
+            "phase": "native_reset_locale",
+            "tick": 382862551
+          },
+          {
+            "phase": "native_reset_admitted",
+            "tick": 382888076
+          },
+          {
+            "phase": "native_mapping_release",
+            "tick": 382909994
+          },
+          {
+            "phase": "native_reset_anonymous_memory",
+            "tick": 383235889
+          },
+          {
+            "phase": "native_tls_reset",
+            "tick": 383284621
+          },
+          {
+            "phase": "native_resources_released",
+            "tick": 383303328
+          },
+          {
+            "phase": "display_geometry_reset",
+            "tick": 383335044
+          },
+          {
+            "phase": "runtime_closed",
+            "tick": 383362392
+          },
+          {
+            "phase": "launcher_refresh",
+            "tick": 383424833
+          },
+          {
+            "phase": "launcher_framebuffer_open",
+            "tick": 385880353
+          },
+          {
+            "phase": "launcher_ready",
+            "tick": 386620191
+          },
+          {
+            "phase": "launcher_stable",
+            "tick": 390707610
+          }
+        ],
+        "execution_attempted": true,
+        "session_id": "1504e963ce754df2a243ee06e0b51db3",
+        "root_stop_wait_ms": 490,
+        "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\1504e963ce754df2a243ee06e0b51db3\\androswitch.nro",
+        "observed_sessions": [
+          {
+            "package": "com.martinmagni.mekorama",
+            "session_id": "1504e963ce754df2a243ee06e0b51db3-1",
+            "runtime_status": "failed",
+            "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+            "completed_case_verified": false,
+            "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\1504e963ce754df2a243ee06e0b51db3\\sessions\\1504e963ce754df2a243ee06e0b51db3-1\\session-report.json",
+            "error": "NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+            "revision": 1
+          }
+        ],
+        "inputs": [
+          {
+            "index": 0,
+            "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+            "source": "D:\\Download\\mekorama-1-7-2.apk",
+            "install_snapshot_step": 3,
+            "bytes": 13099584,
+            "staged_name": "0000-external.apk"
+          }
+        ],
+        "visual_review": "required",
+        "nro_sha256": "00355a6eca7dccd49ee06be54a4199397ca1dffa8deb6705b56c018f1c4fdffd",
+        "schema_version": 1,
+        "custom_session_events": true,
+        "capture_ownership_contract": "Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.",
+        "emulator_version": "1.3.3+e2143d4",
+        "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+        "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+        "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-1504e963ce754df2a243ee06e0b51db3",
+        "sd_original_restore": "restored"
+      }
+    ],
+    "application_first_screen": "not_confirmed_by_this_report",
+    "interpretation": "A recorded attempt or transport pass is not application compatibility"
+  },
+  "physical_device": "not_run_for_this_source_checkpoint",
+  "evidence": [
+    {
+      "path": "reports/collection-state-20261026/collections-upstream-bounded-tests.log",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-upstream-bounded-tests.log",
+      "raw_sha256": "ff6627e48f421b3a7a6510d13c2f043822b46b80358296559ee6cc93c7139ead",
+      "sha256": "21e3c4a0413c21c0320bbe12773bbdb99c81853ff4c7fd8a3679426ff27f4551"
+    },
+    {
+      "path": "reports/collection-state-20261026/collections-product-bounded-tests.log",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-product-bounded-tests.log",
+      "raw_sha256": "1043fdec845ac791e683c67bbdf3e2b970a9d919eb5e01f0a231eedd833cd856",
+      "sha256": "cb9cbcf6cbbd0909fc589ce5f253f0ca014775feea90e8a3a238f1db09757d9e"
+    },
+    {
+      "path": "reports/collection-state-20261026/collections-workspace-bounded-clippy.log",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-workspace-bounded-clippy.log",
+      "raw_sha256": "51e75beeab2c5473dc17cfd7523f4e1b10148884598d33284511ca824f5d1f5c",
+      "sha256": "007d4e88d8ed0ca9e5be49d8ec29402144bba2bf77702d7ad22a1a7629c7ce5a"
+    },
+    {
+      "path": "reports/collection-state-20261026/collections-upstream-bounded-clippy.log",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-upstream-bounded-clippy.log",
+      "raw_sha256": "6907b98d45068ab9ab0a9f3a544fa2d406846d8caadc2b5899e04ab805f12414",
+      "sha256": "2322054170397da16e3301ce65808ac1048cb2f3464a370e6355d4e2c76ba68b"
+    },
+    {
+      "path": "reports/collection-state-20261026/collections-upstream-source-audit.json",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-upstream-source-audit.json",
+      "raw_sha256": "549272de19d9e885c121f802de509a7a16823a29db9d71bd78c8759e1b18d48a",
+      "sha256": "4723d2a37fce6d3c39b7628b2594a336966ad421a4f2baa9d5dde37b7e0455eb"
+    },
+    {
+      "path": "reports/collection-state-20261026/collections-upstream-source-audit.log",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-upstream-source-audit.log",
+      "raw_sha256": "4c8475078ced9b8c5365e35310e1958991773ca8948f3842013b9eb0101d3f12",
+      "sha256": "5300fb15410a650cdd3945811d37dbcaafa824e1c1e3842347c7a4e930b3d4af"
+    },
+    {
+      "path": "reports/collection-state-20261026/collections-upstream-tests.log",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-upstream-tests.log",
+      "raw_sha256": "7b4114be42ab5048fc9d01703b359e4e08a5720d5c6b32799bcc65ec22b2449e",
+      "sha256": "409f11fd0730c7714972b5a693e9e9f081f40cd25a15a8c059d92d60086fc6c8"
+    },
+    {
+      "path": "reports/collection-state-20261026/collections-bridge-check.log",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-bridge-check.log",
+      "raw_sha256": "89b396d91ab7be7d35a0e51a62844a86d6c501d6524a53bf5d500355512479b1",
+      "sha256": "968796c13147c34ea342e202aa0c11917c5658c0a27847e8f6fb4ed9cd475810"
+    },
+    {
+      "path": "reports/collection-state-20261026/collections-python-final.log",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-python-final.log",
+      "raw_sha256": "fdb1c3def98e03e6390e8170dd9d0cf2171144e28698ab547325bb4e9f8d8b5c",
+      "sha256": "79ca1fb877846e71980d4c8189440ff035ead9984e7b576c819555c94524cffa"
+    },
+    {
+      "path": "reports/collection-state-20261026/collections-format.log",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-format.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "reports/collection-state-20261026/jvm/CollectionsFactoryOracle.java",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-oracle\\CollectionsFactoryOracle.java",
+      "raw_sha256": "766015501e6d4b3ecc9a2d8056a7afedb4e4fb2fb7f4451b030ff2b604eb2404",
+      "sha256": "3321083b630750055009069834ca5c09d916d77b286c99a91a43e9aace376dba"
+    },
+    {
+      "path": "reports/collection-state-20261026/jvm/results.txt",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-oracle\\results.txt",
+      "raw_sha256": "57d86852a901e765afac48586df4f53da1158eca92576300c2c417f23a204e3e",
+      "sha256": "d09690e4034f9cec4bc1749433dc2ae36b7fd8e617c52fa4b583f2ab93325a70"
+    },
+    {
+      "path": "reports/collection-state-20261026/jvm/java-version.txt",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-oracle\\java-version.txt",
+      "raw_sha256": "f8ace56d47b5580974ae9fdf67189bb9cda08670b15dc168e2151b0301f47260",
+      "sha256": "6b012d60b3d6782218699adddd420bb8559855d9ba1b2ef9898222efb2b59994"
+    },
+    {
+      "path": "reports/collection-state-20261026/jvm/compile.log",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\collections-oracle\\compile.log",
+      "raw_sha256": "33ba12f541c0c1a3892eb5494868d88abe152e43f8a001523d5ac6793a1bbf2d",
+      "sha256": "312e9bd919c699a2f8409f70240177012720c94095f0f4374d44152defc50f7e"
+    },
+    {
+      "path": "reports/collection-state-20261026/target-build.json",
+      "source": "local-artifacts\\m9\\collection-state-3e37e6d\\product-build.json",
+      "raw_sha256": "d907215f96df9b4373faaf82ed1d44149ef5ad8afd6b9711b0154480cf6d41a2",
+      "sha256": "d7981234989a9875309d599122c2e0bf8b55a21781ab8a142a791bdbe81d60a1"
+    },
+    {
+      "path": "reports/collection-state-20261026/product-source.json",
+      "source": "local-artifacts\\m9\\collection-state-3e37e6d\\product-source.json",
+      "raw_sha256": "465a6ebaaa49bacd80d04c753b87e99969ed42e0e83552ebcb728a7a655db2af",
+      "sha256": "465a6ebaaa49bacd80d04c753b87e99969ed42e0e83552ebcb728a7a655db2af"
+    },
+    {
+      "path": "reports/collection-state-20261026/product-std-platform.json",
+      "source": "local-artifacts\\m9\\collection-state-3e37e6d\\product-std-platform.json",
+      "raw_sha256": "7c12ffbf39234ae7d269a5a08b890eb3ac79e95b7a96a01a34a6dccb6763b2ea",
+      "sha256": "5d96de5379f808fe49d8cabd84b1393cd418ca01efbf9bc108816d8c7446d389"
+    },
+    {
+      "path": "reports/collection-state-20261026/product-mesa-link.json",
+      "source": "local-artifacts\\m9\\collection-state-3e37e6d\\product-mesa-link.json",
+      "raw_sha256": "838539c2bffb67d9b7f7d7781ee8645f323bb1b344d64ab72c00c6fbb25add1a",
+      "sha256": "41c7f75a1d0081f617dada75ff43208c342cd86146c314f53cf7aa37fc0782b9"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/verification.json",
+      "source": "local-artifacts\\m9\\external-runs\\f787dd4b5111439a80410a17b1b88b60\\verification.json",
+      "raw_sha256": "1670827bde47eacff9a68cff3d8641f6644822c88d2389be562e22b7b3a640b0",
+      "sha256": "4eb5caed729b217470159bc7fe7c4cbb320db71fc0553ccf88e508222f6e57e9"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/emulator.json",
+      "source": "local-artifacts\\m9\\external-runs\\f787dd4b5111439a80410a17b1b88b60\\emulator.json",
+      "raw_sha256": "eb8b4edd4d8eb80479a51bcf69dc468711cb41e91c9a8635e2c8b145fbe5c986",
+      "sha256": "b8daa0e05ff88110398a32327790db4b9037ab65ff2cc1e2c4f65f7c32f69a63"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/launcher-test.json",
+      "source": "local-artifacts\\m9\\external-runs\\f787dd4b5111439a80410a17b1b88b60\\launcher-test.json",
+      "raw_sha256": "75248e195d212d75f10aa9ac0d78577717aea9d060b58b3c6e0ea843f28c974d",
+      "sha256": "102c273c22628d394e9a662f49acc0a63b441c22a75cd4d5a0d746f690d4ab6d"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/ryujinx.stdout.log",
+      "source": "local-artifacts\\m9\\external-runs\\f787dd4b5111439a80410a17b1b88b60\\ryujinx.stdout.log",
+      "raw_sha256": "3ea5aa584dccfc96b889e5331c2fa5dc038cac5909921b3b95976310d71e836d",
+      "sha256": "d199114281b6ff03ad07147ec642f7f4057663ba09ae1122f9e9d326341fa4cc"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/ryujinx.stderr.log",
+      "source": "local-artifacts\\m9\\external-runs\\f787dd4b5111439a80410a17b1b88b60\\ryujinx.stderr.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/logs/session-report.json",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f787dd4b5111439a80410a17b1b88b60\\logs\\session-report.json",
+      "raw_sha256": "a3c1f9d833f7a48625e6784e47ed1ee353a084fb07a87d65885f753c25599b5e",
+      "sha256": "de57861b47e5353ef4f764b35dee422d16515cb40ab54904f70974ccc3c86502"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/logs/teardown.log",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f787dd4b5111439a80410a17b1b88b60\\logs\\teardown.log",
+      "raw_sha256": "1fedf5f05b9a610c80d5f141e6516a5bc3f1f1104f02ef88f4e3a27ed91683dc",
+      "sha256": "1fedf5f05b9a610c80d5f141e6516a5bc3f1f1104f02ef88f4e3a27ed91683dc"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/logs/media-stop.log",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f787dd4b5111439a80410a17b1b88b60\\logs\\media-stop.log",
+      "raw_sha256": "325aec329ce213427bb202f1116573f6b68947310a4ce370e0fe8863a016d63b",
+      "sha256": "325aec329ce213427bb202f1116573f6b68947310a4ce370e0fe8863a016d63b"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/logs/jni-failures.log",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f787dd4b5111439a80410a17b1b88b60\\logs\\jni-failures.log",
+      "raw_sha256": "df145ee92bfdb4f470fb24298fc9a5ddf0205ec0adaa3064b61c82e318e315b0",
+      "sha256": "df145ee92bfdb4f470fb24298fc9a5ddf0205ec0adaa3064b61c82e318e315b0"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/logs/native-modules.log",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f787dd4b5111439a80410a17b1b88b60\\logs\\native-modules.log",
+      "raw_sha256": "a516b4aa2d2f675f0c076f9e2afc57be6bc4d277f4561fd6b7d89db393df4287",
+      "sha256": "a516b4aa2d2f675f0c076f9e2afc57be6bc4d277f4561fd6b7d89db393df4287"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/logs/native-compatibility.json",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f787dd4b5111439a80410a17b1b88b60\\logs\\native-compatibility.json",
+      "raw_sha256": "763f23fba2248dc89fa1889894b9ee731c487a1d4adc1da5d46687915a9f57f0",
+      "sha256": "508b84e1a5e98a569309ba559222e73ba2dee71f961a90de14bd8f04919893e0"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/logs/memory-admission.json",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f787dd4b5111439a80410a17b1b88b60\\logs\\memory-admission.json",
+      "raw_sha256": "ff47dccae9cef3bff37cc5f27270cc314265edd3adbd9113d8bade9121a04f7e",
+      "sha256": "dafcb8ebccb056dcfd3687797caadfd5dbcfee7bbbe88f2178ef45a658fc97e5"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/f787dd4b5111439a80410a17b1b88b60/logs/rust-std-platform.json",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f787dd4b5111439a80410a17b1b88b60\\logs\\rust-std-platform.json",
+      "raw_sha256": "16bce703ca24c164279b89515ab95fdd3ee883b370e186d43b1d9755374e1faa",
+      "sha256": "16bce703ca24c164279b89515ab95fdd3ee883b370e186d43b1d9755374e1faa"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/verification.json",
+      "source": "local-artifacts\\m9\\external-runs\\1504e963ce754df2a243ee06e0b51db3\\verification.json",
+      "raw_sha256": "e2b6566683b5793e49178e12916682a7c0c3388e358bc427c3484d94802b7f75",
+      "sha256": "f0b0b11dfa647e9e6d38da257bc3bbcc520037eeed8b73890ccba3dc43e7311a"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/emulator.json",
+      "source": "local-artifacts\\m9\\external-runs\\1504e963ce754df2a243ee06e0b51db3\\emulator.json",
+      "raw_sha256": "95a97d53899991de38d0bfebffc05be1dcb6de10810dd3ce6575221283a169ea",
+      "sha256": "e0705e00a475c0a5d69b57e60433fc6c83f1b9b1884b1075d942be45e8c9eaf4"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/launcher-test.json",
+      "source": "local-artifacts\\m9\\external-runs\\1504e963ce754df2a243ee06e0b51db3\\launcher-test.json",
+      "raw_sha256": "349545a41d6f0e71f3c4ccc57b417eb8f0d9f94c465742113ace01e87e06e770",
+      "sha256": "1f210517c071fcc603a2a35ac0e113a527d20d6bf8274d05f5910bf7038dff69"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/ryujinx.stdout.log",
+      "source": "local-artifacts\\m9\\external-runs\\1504e963ce754df2a243ee06e0b51db3\\ryujinx.stdout.log",
+      "raw_sha256": "e3fe5d0b80d6de6320974de26f6abcd0099b66b6233dc4e8d120f5c09b68a7f1",
+      "sha256": "255161545366f01f69b2e7e4ac730d5584de9e1eee8c7f0f1e8b6c35a0402301"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/ryujinx.stderr.log",
+      "source": "local-artifacts\\m9\\external-runs\\1504e963ce754df2a243ee06e0b51db3\\ryujinx.stderr.log",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/logs/session-report.json",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-1504e963ce754df2a243ee06e0b51db3\\logs\\session-report.json",
+      "raw_sha256": "b8f4f285dc9118c2dbd2d57683532b8f2ac8f60820671c00f7d7339c00f333a2",
+      "sha256": "be9b11cdf4d0bd4792dbef7041bc4e6ebd8b5b021df3e4473fcf1c697e6ba68c"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/logs/teardown.log",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-1504e963ce754df2a243ee06e0b51db3\\logs\\teardown.log",
+      "raw_sha256": "4d71c4e9800ba31762a4a222311729febeddee2726b88d00210bbe2fba249292",
+      "sha256": "4d71c4e9800ba31762a4a222311729febeddee2726b88d00210bbe2fba249292"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/logs/media-stop.log",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-1504e963ce754df2a243ee06e0b51db3\\logs\\media-stop.log",
+      "raw_sha256": "19c0c8e5f3c741269fb97392de509c0ee7472d78dbb7f28d7d3695299c465e5c",
+      "sha256": "19c0c8e5f3c741269fb97392de509c0ee7472d78dbb7f28d7d3695299c465e5c"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/logs/jni-failures.log",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-1504e963ce754df2a243ee06e0b51db3\\logs\\jni-failures.log",
+      "raw_sha256": "5bb6a4d590aa54e31702bae272e32d53236252513ce811f92809d372bf1543de",
+      "sha256": "5bb6a4d590aa54e31702bae272e32d53236252513ce811f92809d372bf1543de"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/logs/native-modules.log",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-1504e963ce754df2a243ee06e0b51db3\\logs\\native-modules.log",
+      "raw_sha256": "a516b4aa2d2f675f0c076f9e2afc57be6bc4d277f4561fd6b7d89db393df4287",
+      "sha256": "a516b4aa2d2f675f0c076f9e2afc57be6bc4d277f4561fd6b7d89db393df4287"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/logs/native-compatibility.json",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-1504e963ce754df2a243ee06e0b51db3\\logs\\native-compatibility.json",
+      "raw_sha256": "30733314c5bced64c2e63ee4cabd25dace787381ae24cdfa1ba7e05716e43232",
+      "sha256": "3466aeb5a9519c05668c7d48d329f4dd4dfa3b274501d02227476f4c570b8e80"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/logs/memory-admission.json",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-1504e963ce754df2a243ee06e0b51db3\\logs\\memory-admission.json",
+      "raw_sha256": "ac64b9e9b9c2717be24dd41d6064b6b532315d30f7c46383eb3607e8c6da188f",
+      "sha256": "578df905ed48d09d641d3fdcfac4b35ddeca533e775ccc5734fea7f632c8a36e"
+    },
+    {
+      "path": "reports/collection-state-20261026/external/1504e963ce754df2a243ee06e0b51db3/logs/rust-std-platform.json",
+      "source": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-1504e963ce754df2a243ee06e0b51db3\\logs\\rust-std-platform.json",
+      "raw_sha256": "690063084e9bacfa85ba6693e018106a65e9f62b7927b0059caf12e3dd758d2e",
+      "sha256": "690063084e9bacfa85ba6693e018106a65e9f62b7927b0059caf12e3dd758d2e"
+    }
+  ]
+}

@@ -15,10 +15,12 @@ PARITY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PARITY)
 
 
-def generate(logs, output, commit):
+def generate(logs, output, commit, target_build=None, external_run=None):
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Full implementation commit required")
-    subprocess.run(["git", "-C", str(ROOT), "cat-file", "-e", commit + "^{commit}"], check=True)
+    kind = subprocess.check_output(["git", "-C", str(ROOT), "cat-file", "-t", commit], text=True).strip()
+    if kind != "commit":
+        raise ValueError("Implementation object must be a Git commit")
     retained = output.with_suffix("")
     retained.mkdir(parents=True, exist_ok=True)
     evidence = []
@@ -56,7 +58,8 @@ def generate(logs, output, commit):
     for name in ("collections-upstream-bounded-tests.log", "collections-product-bounded-tests.log",
                  "collections-workspace-bounded-clippy.log", "collections-upstream-bounded-clippy.log",
                  "collections-upstream-source-audit.json", "collections-upstream-source-audit.log",
-                 "collections-upstream-tests.log", "collections-bridge-check.log"):
+                 "collections-upstream-tests.log", "collections-bridge-check.log",
+                 "collections-python-final.log", "collections-format.log"):
         keep(logs / name, name)
     for name in ("CollectionsFactoryOracle.java", "results.txt", "java-version.txt", "compile.log"):
         keep(logs / "collections-oracle" / name, "jvm/" + name)
@@ -83,6 +86,38 @@ def generate(logs, output, commit):
         current_hardware_candidate=dict(changed=False, nro_sha256="a3a34bab32cf31e182fb72efe524bad1e06b5a69107853e9a0aba893aaef2bf8"),
         horizon="not_run_for_this_source_checkpoint", emulator="not_run_for_this_source_checkpoint",
         physical_device="not_run_for_this_source_checkpoint", evidence=evidence)
+    if target_build:
+        build = json.loads(target_build.read_text(encoding="utf-8-sig"))
+        if build["source_commit"] != commit or build["rust_library_profile"] != "std":
+            raise ValueError("Target build must match the std implementation checkpoint")
+        report["horizon"] = dict(status="nro_built", build=build, execution_not_implied=True)
+        keep(target_build, "target-build.json")
+        for name in ("product-source.json", "product-std-platform.json", "product-mesa-link.json"):
+            source = target_build.parent / name
+            if source.exists():
+                keep(source, name)
+    if external_run:
+        if not target_build:
+            raise ValueError("An external run requires its frozen target build")
+        attempts = []
+        for directory in external_run:
+            receipt = json.loads((directory / "verification.json").read_text(encoding="utf-8-sig"))
+            if receipt["nro_sha256"] != build["nro_sha256"]:
+                raise ValueError("External probe artifact differs from the target build")
+            if receipt["sd_original_restore"] != "restored":
+                raise ValueError("External test SD restoration is not confirmed")
+            attempts.append(receipt)
+            for name in ("verification.json", "emulator.json", "launcher-test.json", "ryujinx.stdout.log", "ryujinx.stderr.log"):
+                if (directory / name).exists():
+                    keep(directory / name, "external/" + directory.name + "/" + name)
+            for name in ("session-report.json", "teardown.log", "media-stop.log", "jni-failures.log",
+                         "native-modules.log", "native-compatibility.json", "memory-admission.json",
+                         "rust-std-platform.json"):
+                source = Path(receipt["sd_result"]) / "logs" / name
+                if source.exists():
+                    keep(source, "external/" + directory.name + "/logs/" + name)
+        report["emulator"] = dict(attempts=attempts, application_first_screen="not_confirmed_by_this_report",
+                                  interpretation="A recorded attempt or transport pass is not application compatibility")
     output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     return report
 
@@ -92,6 +127,9 @@ if __name__ == "__main__":
     parser.add_argument("--logs", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--implementation-commit", required=True)
+    parser.add_argument("--target-build", type=Path)
+    parser.add_argument("--external-run", type=Path, action="append")
     args = parser.parse_args()
-    result = generate(args.logs.resolve(), args.output.resolve(), args.implementation_commit)
+    result = generate(args.logs.resolve(), args.output.resolve(), args.implementation_commit,
+                      args.target_build, args.external_run)
     print(result["status"], result["host"]["reference"]["totals"], result["host"]["product"]["totals"])

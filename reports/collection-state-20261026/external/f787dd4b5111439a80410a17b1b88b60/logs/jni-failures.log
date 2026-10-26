@@ -1,0 +1,1 @@
+jni_failure op=4 thread=0x12001c a=0x5 b=0x15 c=0x0 detail="error=HORIZON_WORKER_ERROR module=rd-vm" detail_bytes=39

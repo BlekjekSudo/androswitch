@@ -1,0 +1,394 @@
+{
+  "emulator_version": "1.3.3+e2143d4",
+  "inputs": [
+    {
+      "install_snapshot_step": 3,
+      "bytes": 13099584,
+      "index": 0,
+      "source": "D:\\Download\\mekorama-1-7-2.apk",
+      "staged_name": "0000-external.apk",
+      "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01"
+    }
+  ],
+  "visual_review": "required",
+  "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-f787dd4b5111439a80410a17b1b88b60",
+  "pid": 263212,
+  "launches": [
+    {
+      "source": "D:\\Download\\mekorama-1-7-2.apk",
+      "attempt": 0,
+      "bytes": 13099584,
+      "index": 0,
+      "expected_session_id": "f787dd4b5111439a80410a17b1b88b60-1",
+      "staged_name": "0000-external.apk",
+      "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+      "install_snapshot_step": 3
+    }
+  ],
+  "startup_wait_ms": 3000,
+  "latest_media_stop": [
+    {
+      "operation": "glsurface_wait_begin",
+      "result": 1,
+      "detail": 1179676,
+      "tick": 332082107
+    },
+    {
+      "operation": "egl_unbind_result",
+      "result": 1,
+      "detail": 1,
+      "tick": 332763605
+    },
+    {
+      "operation": "egl_destroy_context_result",
+      "result": 1,
+      "detail": 8669090880,
+      "tick": 334685112
+    },
+    {
+      "operation": "egl_destroy_surface_result",
+      "result": 1,
+      "detail": 8602843232,
+      "tick": 334871160
+    },
+    {
+      "operation": "egl_terminate_begin",
+      "result": 0,
+      "detail": 8602744208,
+      "tick": 334930095
+    },
+    {
+      "operation": "egl_terminate_end",
+      "result": 1,
+      "detail": 8602744208,
+      "tick": 335998174
+    },
+    {
+      "operation": "egl_close_result",
+      "result": 0,
+      "detail": 8602744208,
+      "tick": 336039050
+    },
+    {
+      "operation": "glsurface_wait_end",
+      "result": 0,
+      "detail": 0,
+      "tick": 336830302
+    },
+    {
+      "operation": "glsurface_thread_wait_end",
+      "result": 0,
+      "detail": 0,
+      "tick": 336853428
+    },
+    {
+      "operation": "glsurface_thread_close_end",
+      "result": 0,
+      "detail": 0,
+      "tick": 336918147
+    },
+    {
+      "operation": "glsurface_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 336934293
+    },
+    {
+      "operation": "opensl_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 336953153
+    },
+    {
+      "operation": "glsurface_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 337693167
+    },
+    {
+      "operation": "opensl_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 337707248
+    },
+    {
+      "operation": "cpu_capture_publish_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 374038341
+    }
+  ],
+  "commands": 5,
+  "backend": "ryujinx",
+  "root_stop_wait_attempts": 1,
+  "custom_session_events": false,
+  "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f787dd4b5111439a80410a17b1b88b60\\androswitch.nro",
+  "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+  "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+  "execution_attempted": true,
+  "status": "blocked_runtime",
+  "sd_original_restore": "restored",
+  "emulator_frontend": "headless_sdl2",
+  "observed_sessions": [
+    {
+      "completed_case_verified": false,
+      "session_id": "f787dd4b5111439a80410a17b1b88b60-1",
+      "package": "com.martinmagni.mekorama",
+      "revision": 1,
+      "runtime_status": "failed",
+      "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f787dd4b5111439a80410a17b1b88b60\\sessions\\f787dd4b5111439a80410a17b1b88b60-1\\session-report.json",
+      "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+      "error": "HORIZON_WORKER_ERROR [rd-vm]: HORIZON_WORKER_ERROR [start]: worker 4611686018427387905: platform result -140 [pc 0x2: Insn { opcode: 114, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 27514, regs: [0, 2, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V"
+    }
+  ],
+  "capture_ownership_contract": "Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.",
+  "latest_teardown": [
+    {
+      "phase": "stop_requested",
+      "tick": 322235575
+    },
+    {
+      "phase": "native_activity_stop",
+      "tick": 322514319
+    },
+    {
+      "phase": "java_activity_stop",
+      "tick": 322571591
+    },
+    {
+      "phase": "worker_admission_closed",
+      "tick": 325618339
+    },
+    {
+      "phase": "background_worker_quiesce",
+      "tick": 325695292
+    },
+    {
+      "phase": "media_thread_quiesce",
+      "tick": 327411137
+    },
+    {
+      "phase": "glsurface_join",
+      "tick": 327496876
+    },
+    {
+      "phase": "egl_wait_gpu",
+      "tick": 332457073
+    },
+    {
+      "phase": "egl_unbind",
+      "tick": 332712693
+    },
+    {
+      "phase": "egl_destroy_context",
+      "tick": 332788364
+    },
+    {
+      "phase": "egl_destroy_surface",
+      "tick": 334717274
+    },
+    {
+      "phase": "egl_terminate",
+      "tick": 334914422
+    },
+    {
+      "phase": "egl_terminated",
+      "tick": 336018948
+    },
+    {
+      "phase": "guest_thread_quiesce",
+      "tick": 336966600
+    },
+    {
+      "phase": "native_destructors",
+      "tick": 337415425
+    },
+    {
+      "phase": "media_reset",
+      "tick": 337754313
+    },
+    {
+      "phase": "media_released",
+      "tick": 337782222
+    },
+    {
+      "phase": "activity_dispose",
+      "tick": 337796131
+    },
+    {
+      "phase": "runtime_drop",
+      "tick": 337992111
+    },
+    {
+      "phase": "native_mapping_release",
+      "tick": 340036920
+    },
+    {
+      "phase": "native_resource_reset",
+      "tick": 340619873
+    },
+    {
+      "phase": "native_reset_guest_threads",
+      "tick": 340641722
+    },
+    {
+      "phase": "native_reset_cxx",
+      "tick": 340660233
+    },
+    {
+      "phase": "native_reset_keys",
+      "tick": 340683859
+    },
+    {
+      "phase": "native_reset_sync",
+      "tick": 340705163
+    },
+    {
+      "phase": "native_reset_locale",
+      "tick": 340726377
+    },
+    {
+      "phase": "native_reset_admitted",
+      "tick": 340745594
+    },
+    {
+      "phase": "native_mapping_release",
+      "tick": 340770343
+    },
+    {
+      "phase": "native_reset_anonymous_memory",
+      "tick": 341048682
+    },
+    {
+      "phase": "native_tls_reset",
+      "tick": 341096348
+    },
+    {
+      "phase": "native_resources_released",
+      "tick": 341115780
+    },
+    {
+      "phase": "display_geometry_reset",
+      "tick": 341153750
+    },
+    {
+      "phase": "runtime_closed",
+      "tick": 341209741
+    },
+    {
+      "phase": "launcher_refresh",
+      "tick": 341274455
+    },
+    {
+      "phase": "launcher_framebuffer_open",
+      "tick": 343815384
+    },
+    {
+      "phase": "launcher_ready",
+      "tick": 344523509
+    },
+    {
+      "phase": "launcher_stable",
+      "tick": 348492328
+    }
+  ],
+  "host_storage_preflight": {
+    "available_bytes": 16951361536,
+    "volume": "C:\\",
+    "scope": "Host staging estimate, separate from guest/Horizon memory admission",
+    "required_bytes": 617888056
+  },
+  "native_trace_requested": false,
+  "schema_version": 1,
+  "completed_sessions": 1,
+  "physical_device": "not_run",
+  "latest_memory_admission": {
+    "allocator_available_after_load": 1579040752,
+    "allocator_available_before_load": 1597407520,
+    "estimated_parser_bytes": 54122782,
+    "package": "com.martinmagni.mekorama",
+    "parser_budget_bytes": 268435456,
+    "raw_dex_bytes": 14703020,
+    "revision": 1,
+    "schema_version": 1,
+    "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+    "session_id": "f787dd4b5111439a80410a17b1b88b60-1",
+    "status": "vm_ready"
+  },
+  "root_stop_wait_ms": 457,
+  "session_id": "f787dd4b5111439a80410a17b1b88b60",
+  "cases": [
+    {
+      "first_screen": "not_visually_verified",
+      "status": "blocked_or_unreported",
+      "error": "HORIZON_WORKER_ERROR [rd-vm]: HORIZON_WORKER_ERROR [start]: worker 4611686018427387905: platform result -140 [pc 0x2: Insn { opcode: 114, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 27514, regs: [0, 2, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V",
+      "captures": [],
+      "presented_frames": null,
+      "returned_to_launcher": true,
+      "teardown_phases": [
+        "stop_requested",
+        "native_activity_stop",
+        "java_activity_stop",
+        "worker_admission_closed",
+        "background_worker_quiesce",
+        "media_thread_quiesce",
+        "glsurface_join",
+        "egl_wait_gpu",
+        "egl_unbind",
+        "egl_destroy_context",
+        "egl_destroy_surface",
+        "egl_terminate",
+        "egl_terminated",
+        "guest_thread_quiesce",
+        "native_destructors",
+        "media_reset",
+        "media_released",
+        "activity_dispose",
+        "runtime_drop",
+        "native_mapping_release",
+        "native_resource_reset",
+        "native_reset_guest_threads",
+        "native_reset_cxx",
+        "native_reset_keys",
+        "native_reset_sync",
+        "native_reset_locale",
+        "native_reset_admitted",
+        "native_mapping_release",
+        "native_reset_anonymous_memory",
+        "native_tls_reset",
+        "native_resources_released",
+        "display_geometry_reset",
+        "runtime_closed",
+        "launcher_refresh"
+      ],
+      "installed_identity_matches": true,
+      "runtime_status": "failed",
+      "input": {
+        "source": "D:\\Download\\mekorama-1-7-2.apk",
+        "attempt": 0,
+        "bytes": 13099584,
+        "index": 0,
+        "expected_session_id": "f787dd4b5111439a80410a17b1b88b60-1",
+        "staged_name": "0000-external.apk",
+        "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+        "install_snapshot_step": 3
+      },
+      "snapshots": []
+    }
+  ],
+  "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+  "userdata_seed": [],
+  "root_handle_pinned": true,
+  "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-hle-fixed-20261025\\Ryujinx.exe",
+  "nro_sha256": "00355a6eca7dccd49ee06be54a4199397ca1dffa8deb6705b56c018f1c4fdffd",
+  "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-f787dd4b5111439a80410a17b1b88b60",
+  "latest_session_report": {
+    "error": "HORIZON_WORKER_ERROR [rd-vm]: HORIZON_WORKER_ERROR [start]: worker 4611686018427387905: platform result -140 [pc 0x2: Insn { opcode: 114, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 27514, regs: [0, 2, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzV(Lcom/google/android/gms/internal/measurement/zzdu;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;-><init>(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)V\n  at Lcom/google/android/gms/internal/measurement/zzef;->zzg(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/os/Bundle;)Lcom/google/android/gms/internal/measurement/zzef;\n  at Lcom/google/firebase/analytics/FirebaseAnalytics;->getInstance(Landroid/content/Context;)Lcom/google/firebase/analytics/FirebaseAnalytics;\n  at Lcom/martinmagni/mekorama/Mekorama;->analytics_event(Ljava/lang/String;)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V",
+    "identity_status": "known",
+    "package": "com.martinmagni.mekorama",
+    "revision": 1,
+    "schema_version": 1,
+    "session_id": "f787dd4b5111439a80410a17b1b88b60-1",
+    "status": "failed"
+  }
+}

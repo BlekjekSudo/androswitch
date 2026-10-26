@@ -1,0 +1,14 @@
+emptyList.size=0
+emptySet.size=0
+emptyMap.size=0
+singletonList.null=true
+singleton.null=true
+singletonList.rejectsAdd=true
+emptyList.rejectsAdd=true
+emptySet.rejectsAdd=true
+emptyMap.rejectsPut=true
+EMPTY_LIST.identity=true
+unmodifiableList.sizeAfterSourceClear=0
+emptySortedSet.isSortedSet=true
+emptySortedMap.isSortedMap=true
+unmodifiableMap.null=NullPointerException

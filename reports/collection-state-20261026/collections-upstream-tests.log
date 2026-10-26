@@ -1,0 +1,19 @@
+   Compiling serde v1.0.229
+   Compiling sha2 v0.10.9
+   Compiling regex-syntax v0.8.11
+   Compiling regex-automata v0.4.18
+   Compiling as-sqlite v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-sqlite)
+   Compiling bit-vec v0.6.3
+   Compiling bit-set v0.5.3
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+   Compiling rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-dex)
+   Compiling rd-apk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-apk)
+   Compiling fancy-regex v0.13.0
+   Compiling regex v1.13.1
+   Compiling siphasher v1.0.4
+rustc-LLVM ERROR: out of memory
+Allocation failed
+error: could not compile `as-vm` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\Administrator\.rustup\toolchains\1.97.1-x86_64-pc-windows-gnu\bin\rustc.exe --crate-name rd_vm --edition=2021 crates\as-vm\..\rd-vm\src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --forbid=unsafe_code --cfg "feature=\"advanced-components\"" --cfg "feature=\"default\"" --cfg "feature=\"std\"" --cfg "feature=\"upstream-parity-tests\"" --cfg "feature=\"upstream-runtime\"" --cfg "feature=\"virtual-devices\"" --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"advanced-components\", \"default\", \"portable-test-support\", \"std\", \"upstream-parity-tests\", \"upstream-runtime\", \"virtual-devices\"))" -C metadata=088e4810318eeb87 -C extra-filename=-203df8eacb72b109 --out-dir C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps -C incremental=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\incremental -L dependency=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps --extern as_platform=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libas_platform-797ec133c8f2c72c.rmeta --extern as_sqlite=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libas_sqlite-301ffdc2f44fbad8.rmeta --extern fancy_regex=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libfancy_regex-b2086eccd6e85eb0.rmeta --extern libm=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\liblibm-fbff73ead1ea76d5.rmeta --extern rd_apk=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\librd_apk-daaed57cb1b3633a.rmeta --extern rd_dex=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\librd_dex-d53d2ef2f638eb95.rmeta --extern regex=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libregex-5ae17ad7dfbb523e.rmeta --extern serde=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libserde-101ad4d5b46e8e93.rmeta --extern serde_json=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libserde_json-7e61c2e008aa2f10.rmeta --extern siphasher=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libsiphasher-675d16d1948a7712.rmeta -L native=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\build\as-sqlite-ace2df9f86fdb9a0\out --check-cfg "cfg(feature, values(\"std\", \"desktop-runtime\", \"native\", \"jit\", \"advanced-components\", \"virtual-devices\"))"` (exit code: 3)

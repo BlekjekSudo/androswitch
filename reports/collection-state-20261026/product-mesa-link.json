@@ -1,0 +1,274 @@
+{
+  "schema_version": 1,
+  "policy": "separate Mesa Rust personality/Linux clock/sysconf ABI; Horizon C and AndroSwitch std keep newlib ABI",
+  "personality_symbols": {
+    "rust_eh_personality": "as_mesa_rust_eh_personality",
+    "DW.ref.rust_eh_personality": "DW.ref.as_mesa_rust_eh_personality"
+  },
+  "linux_rust_symbols": {
+    "clock_gettime": "as_mesa_clock_gettime",
+    "clock_getres": "as_mesa_clock_getres",
+    "sysconf": "as_mesa_sysconf"
+  },
+  "archives": [
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libEGL.a",
+      "source_sha256": "1f25fe42ab32f0b498a23ae1e6a9daf9614f80381a4863011e640ab0b8676ffe",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libEGL.a",
+      "output_sha256": "9e619c513c12931b01dbf8baebdd94666c4f66a85d5eb0b8151b6178f5d8ce39",
+      "linux_rust_objects": 0
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libGLESv2.a",
+      "source_sha256": "9124a703066a8178d67c86993b8c87576a6a0f2c8f5334f8c7593e7b15bb0375",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libGLESv2.a",
+      "output_sha256": "4c5b4d4772c7922f88572d18362c4cce6a504fb78a463675037f960e60d23cae",
+      "linux_rust_objects": 0
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libglapi.a",
+      "source_sha256": "fc614d85d48430f43f7905bc73ab198304258b34896a6da3e19d6925a756aa2d",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libglapi.a",
+      "output_sha256": "25eafe0ba1fd9f05980e9c3219b4321af1b3df3b94a78dc6fe3ab2d49e58fc27",
+      "linux_rust_objects": 0
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libvulkan.a",
+      "source_sha256": "36bb9ab68578897157b11bfeabe6c6b0b0895d5fb3c31a9b6f31982d85131351",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libvulkan.a",
+      "output_sha256": "e214b065c75671384fd65afe49797b3162c21c50730b96d2b630d4ade7676e2c",
+      "linux_rust_objects": 633
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libmesa_util_c11.a",
+      "source_sha256": "f25264964c7afda6610a0e91a3fe92abc168c34e03628308a01b7ec8d196d3b5",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libmesa_util_c11.a",
+      "output_sha256": "5b69d73d9316eb756995d44b90ef64ce3c92cef987f19f3cb8f94bc8a4edc958",
+      "linux_rust_objects": 0
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libblake3.a",
+      "source_sha256": "0c2cb7ab53fcbdd738a8262fa8f41f0142b0aa67542d3565409073ba9c776b61",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libblake3.a",
+      "output_sha256": "10c366b2848955ec3927fe617c6c28ae0783c58d9dc2d0e06c71f4db3c654b14",
+      "linux_rust_objects": 0
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libmesa_util.a",
+      "source_sha256": "a078decd7ac8807fd731919e7d4dc0f773ba9b6cadd718b992404d476d688ab4",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libmesa_util.a",
+      "output_sha256": "59f046f1bfdd369e3e35d89b76ec4bfe7f8f0a263e44980bd60080f4b738628a",
+      "linux_rust_objects": 0
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libmesa_util_simd.a",
+      "source_sha256": "9e88355006a320213908d310ab7d15b6cb919999a4d79ade8d4b636a1dd84bc8",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libmesa_util_simd.a",
+      "output_sha256": "84e77eaab0e6cae25d69a41351767eabd07afcb7cef6ffe6a45663100ea7507c",
+      "linux_rust_objects": 0
+    },
+    {
+      "source": "C:\\devkitPro\\portlibs\\switch\\lib\\libexpat.a",
+      "source_sha256": "935be427b0e5ccbac77a9b08770c38a0efdfe3d88c7fd6b2d0027bf321d1094e",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libexpat.a",
+      "output_sha256": "b139f2d23f1a8c856fdf9564ed82c4644b854efd222ed309a1df2d219f66d2a7",
+      "linux_rust_objects": 0
+    },
+    {
+      "source": "C:\\devkitPro\\portlibs\\switch\\lib\\libzstd.a",
+      "source_sha256": "040cf457c652b676522028a857f9e3994311e8887467549ee64e215d36b5e785",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libzstd.a",
+      "output_sha256": "92b1fbb19bce0264719318d4610f2ce6f08b2fddce9604404dd1e0ba75835606",
+      "linux_rust_objects": 0
+    },
+    {
+      "source": "C:\\devkitPro\\portlibs\\switch\\lib\\libz.a",
+      "source_sha256": "b923529e2b74133d6dbb519b1a4b2a3565944c7a8b59ef44167066a5f54bf3e0",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\lib\\libz.a",
+      "output_sha256": "b0b37822d480b2dd0264fa28c65245adab36d4d471a83f48bc0c54bd2f217be7",
+      "linux_rust_objects": 0
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libaddr2line-f88b4a5ad99efdaa.rlib",
+      "source_sha256": "e356f00102241f4a68f21f8188fbdeab770fbf8fd874ca715eca728dc331e0e9",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libaddr2line-f88b4a5ad99efdaa.rlib",
+      "output_sha256": "4d6a919806aecc42e8028f56f491caf5b311dc2b7f94526666a9ab0c5bf59c81",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libadler2-4d8a3a02880e0536.rlib",
+      "source_sha256": "a12e4602c87598fa46ffdda9d3b4f6a13c99f6957b13f8716edd1a1c7129d606",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libadler2-4d8a3a02880e0536.rlib",
+      "output_sha256": "a12e4602c87598fa46ffdda9d3b4f6a13c99f6957b13f8716edd1a1c7129d606",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\liballoc-9866fea3d1eb6a82.rlib",
+      "source_sha256": "be14d6b37f598ec0bc76c8ef9cc86e2f3b19d2b5f90ebc39e8c7cfbf5e2a86f8",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\liballoc-9866fea3d1eb6a82.rlib",
+      "output_sha256": "a02585857eb7adb190541765dabc691d619b03c0997d9097cea779a55f952c94",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libcfg_if-356797859cb38376.rlib",
+      "source_sha256": "9b3ca4a6428b3b43e782e1d0e0880538991f5ee4537124be04532a1872c3b2dd",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libcfg_if-356797859cb38376.rlib",
+      "output_sha256": "9b3ca4a6428b3b43e782e1d0e0880538991f5ee4537124be04532a1872c3b2dd",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libcompiler_builtins-5d97cb3e2cb35b44.rlib",
+      "source_sha256": "a2d22ab07b4d80d3fea3e65bff9229a90dff8419cadff6a8665c277387bef1a5",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libcompiler_builtins-5d97cb3e2cb35b44.rlib",
+      "output_sha256": "1e3b2d4395c393ea4877b4fa2565b9fb930a0e5059a09bc154a9d20b22f6ccce",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libcore-e288075ad1e23491.rlib",
+      "source_sha256": "ded61c6d3a23f325309ac913c6ddb4de3acb0228f1a52492c9ca6e3b164309d3",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libcore-e288075ad1e23491.rlib",
+      "output_sha256": "5bff017970e23f8bd3d8a7853c95b6998255b9e0496014c56db6976e41f9cb78",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libgetopts-707af06578ad0f27.rlib",
+      "source_sha256": "2ca275d91dd8634273b37aff0e32f483d4b56e4ba871d59a28857877ed1d088f",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libgetopts-707af06578ad0f27.rlib",
+      "output_sha256": "dd4d83d2d4b001bba391fb1d226cc1e83a4d60f0eb717923eec8b49300150066",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libgimli-10fd6397cdf8b576.rlib",
+      "source_sha256": "72efedf6d8c276221ddce73cf75f18eafea2ca419e9129ae5702d35d7e218947",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libgimli-10fd6397cdf8b576.rlib",
+      "output_sha256": "41fc132e42801f51f06610cb8b6b2bbae88aabc17cbd32f3f48e3142a51e628f",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libhashbrown-213446fa5a0e2a4b.rlib",
+      "source_sha256": "8ed264ce13c1b84033ca968aade9e0836afb89a7c40a4d1ea0bafa5a66d4cdb1",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libhashbrown-213446fa5a0e2a4b.rlib",
+      "output_sha256": "8ed264ce13c1b84033ca968aade9e0836afb89a7c40a4d1ea0bafa5a66d4cdb1",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\liblibc-5ed7db560aff3b66.rlib",
+      "source_sha256": "da36be842911f24ceae19e75d1e939432fb1d6b95a8c511d1fbbb70bb2cb0a6c",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\liblibc-5ed7db560aff3b66.rlib",
+      "output_sha256": "da36be842911f24ceae19e75d1e939432fb1d6b95a8c511d1fbbb70bb2cb0a6c",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libmemchr-48865b00bb1f788d.rlib",
+      "source_sha256": "b65278cc6cc75c1fbc872b53113957f70c15822c0f29408c9e81533745ff8ebb",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libmemchr-48865b00bb1f788d.rlib",
+      "output_sha256": "b65278cc6cc75c1fbc872b53113957f70c15822c0f29408c9e81533745ff8ebb",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libminiz_oxide-49d3eabad0af1e17.rlib",
+      "source_sha256": "7969b52a609a69f3d8042e5cf6a12ab597811fed8afe235d7ccbefbc7b9fcf4e",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libminiz_oxide-49d3eabad0af1e17.rlib",
+      "output_sha256": "7969b52a609a69f3d8042e5cf6a12ab597811fed8afe235d7ccbefbc7b9fcf4e",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libobject-9bb980a13aa1cc8f.rlib",
+      "source_sha256": "c85224d00fdd8a3e5753b148975ee9219e420872935626219eef75313deb211d",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libobject-9bb980a13aa1cc8f.rlib",
+      "output_sha256": "f6f4471128a4c6de1c4ec770b90e2096762c4647e9e59d5730558da014bfd453",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libpanic_unwind-798824c9340428bc.rlib",
+      "source_sha256": "3f1802524b83b4a7b1a61a5425d463bca509a256d40e4cdcb3d8f0b250d434d4",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libpanic_unwind-798824c9340428bc.rlib",
+      "output_sha256": "98e1210a57a1cc5ac84ea971180ac9c984734c33b749cccf89efceaf454186ba",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libproc_macro-bf9f397371e7c499.rlib",
+      "source_sha256": "24a7d67dfce46b8e1cf3885fd1dbcc94cda26be4a0f163a03ab54148be028664",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libproc_macro-bf9f397371e7c499.rlib",
+      "output_sha256": "3ba0e84f50480cc14b231a67b67480a1b026827fef39f5ec8c2b77a32e1cc1ff",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libprofiler_builtins-0422ff386be25f1e.rlib",
+      "source_sha256": "8ff011c85ac6e968f0bf2834afc0e569ed0285c63d9dbd8f5e8b468b1755165d",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libprofiler_builtins-0422ff386be25f1e.rlib",
+      "output_sha256": "b66cbd03cd857fc82d6ed9c087f1aa8cc17bc2ca764b59626b92d168b519be98",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_demangle-d8cf2e243f7f024b.rlib",
+      "source_sha256": "5be0e335187ab3793ea1539caa1aaaf37d5bb0b397d6b5bd3f7b607d583a80db",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\librustc_demangle-d8cf2e243f7f024b.rlib",
+      "output_sha256": "5be0e335187ab3793ea1539caa1aaaf37d5bb0b397d6b5bd3f7b607d583a80db",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_literal_escaper-34e4438e8fc96a33.rlib",
+      "source_sha256": "520b3d07fe687313478d302db92ee0461c7e2e67a3db7776249ed792f6e803b0",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\librustc_literal_escaper-34e4438e8fc96a33.rlib",
+      "output_sha256": "520b3d07fe687313478d302db92ee0461c7e2e67a3db7776249ed792f6e803b0",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_std_workspace_alloc-b31ee33f41285142.rlib",
+      "source_sha256": "b336aea56d84bf7acd8c816eedaeb28c668798d681179bf6e09f0a626a4f2581",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\librustc_std_workspace_alloc-b31ee33f41285142.rlib",
+      "output_sha256": "b336aea56d84bf7acd8c816eedaeb28c668798d681179bf6e09f0a626a4f2581",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_std_workspace_core-ddc0bfd59b2289e1.rlib",
+      "source_sha256": "f49b9a16b2d678ab1a8de69156110822cc15932a511c148d2c3d04910bba53b4",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\librustc_std_workspace_core-ddc0bfd59b2289e1.rlib",
+      "output_sha256": "f49b9a16b2d678ab1a8de69156110822cc15932a511c148d2c3d04910bba53b4",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_std_workspace_std-d699f95255bdce1b.rlib",
+      "source_sha256": "6942a43c1f25b30d478b8bbf4d407872782bbbad7f66ffc4ac02ae0547a631e4",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\librustc_std_workspace_std-d699f95255bdce1b.rlib",
+      "output_sha256": "6942a43c1f25b30d478b8bbf4d407872782bbbad7f66ffc4ac02ae0547a631e4",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libstd-fbcb7b14d0766431.rlib",
+      "source_sha256": "3374b9af6a5db51d75f4f89259bc62aa53925a0361413c41eea029a1c482d89d",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libstd-fbcb7b14d0766431.rlib",
+      "output_sha256": "2aa3e763bd983e6773f7e153d06f44daad5a92b09522a5e8307d2bb042e03701",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libstd_detect-de8ad90142ad622c.rlib",
+      "source_sha256": "46c8def928a2ee3d7322809712a82f0ec8dc872338817143941d9971ab23047b",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libstd_detect-de8ad90142ad622c.rlib",
+      "output_sha256": "80f0e22f6f98bc89a4d94ba21b99fe6803bed248907b0ed4ee41c1bc8926c2e6",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libsysroot-f9c715cd0292aef6.rlib",
+      "source_sha256": "25896e38c04def8fd3496321a41851620dc52af164ed3281029c6dcb155db697",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libsysroot-f9c715cd0292aef6.rlib",
+      "output_sha256": "25896e38c04def8fd3496321a41851620dc52af164ed3281029c6dcb155db697",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libtest-16eb038793a58b76.rlib",
+      "source_sha256": "bd97a22ead8dc52738350f713f491a03ee46e7d9b54dd08b52e6655ffba282f5",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libtest-16eb038793a58b76.rlib",
+      "output_sha256": "0514694971f78e3980560d2ef80ac72b725a3d10d86f9e63f60a749b69abe3e0",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libunwind-ad223e35a99bed2b.rlib",
+      "source_sha256": "2cf55bf5d41745d2ad409a8bc0135ee10902479ef3ef5740516452f15d098c8d",
+      "output": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\product-mesa-std-windows\\mesa-link\\rust\\libunwind-ad223e35a99bed2b.rlib",
+      "output_sha256": "2cf55bf5d41745d2ad409a8bc0135ee10902479ef3ef5740516452f15d098c8d",
+      "linux_rust_objects": "compiler-matched Rust runtime archive"
+    }
+  ]
+}

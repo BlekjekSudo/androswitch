@@ -1,0 +1,15 @@
+{"operation":"glsurface_wait_begin","result":1,"detail":1179676,"tick":332082107}
+{"operation":"egl_unbind_result","result":1,"detail":1,"tick":332763605}
+{"operation":"egl_destroy_context_result","result":1,"detail":8669090880,"tick":334685112}
+{"operation":"egl_destroy_surface_result","result":1,"detail":8602843232,"tick":334871160}
+{"operation":"egl_terminate_begin","result":0,"detail":8602744208,"tick":334930095}
+{"operation":"egl_terminate_end","result":1,"detail":8602744208,"tick":335998174}
+{"operation":"egl_close_result","result":0,"detail":8602744208,"tick":336039050}
+{"operation":"glsurface_wait_end","result":0,"detail":0,"tick":336830302}
+{"operation":"glsurface_thread_wait_end","result":0,"detail":0,"tick":336853428}
+{"operation":"glsurface_thread_close_end","result":0,"detail":0,"tick":336918147}
+{"operation":"glsurface_quiesce_result","result":0,"detail":0,"tick":336934293}
+{"operation":"opensl_quiesce_result","result":0,"detail":0,"tick":336953153}
+{"operation":"glsurface_quiesce_result","result":0,"detail":0,"tick":337693167}
+{"operation":"opensl_quiesce_result","result":0,"detail":0,"tick":337707248}
+{"operation":"cpu_capture_publish_result","result":0,"detail":0,"tick":374038341}

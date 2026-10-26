@@ -1,0 +1,385 @@
+{
+  "native_trace_requested": false,
+  "userdata_seed": [],
+  "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-hle-fixed-20261025\\Ryujinx.exe",
+  "status": "blocked_runtime",
+  "emulator_frontend": "headless_sdl2",
+  "latest_session_report": {
+    "error": "NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+    "identity_status": "known",
+    "package": "com.martinmagni.mekorama",
+    "revision": 1,
+    "schema_version": 1,
+    "session_id": "1504e963ce754df2a243ee06e0b51db3-1",
+    "status": "failed"
+  },
+  "latest_memory_admission": {
+    "allocator_available_after_load": 1579039920,
+    "allocator_available_before_load": 1597406688,
+    "estimated_parser_bytes": 54122782,
+    "package": "com.martinmagni.mekorama",
+    "parser_budget_bytes": 268435456,
+    "raw_dex_bytes": 14703020,
+    "revision": 1,
+    "schema_version": 1,
+    "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+    "session_id": "1504e963ce754df2a243ee06e0b51db3-1",
+    "status": "vm_ready"
+  },
+  "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-1504e963ce754df2a243ee06e0b51db3",
+  "latest_media_stop": [
+    {
+      "operation": "egl_unbind_result",
+      "result": 1,
+      "detail": 1,
+      "tick": 373760378
+    },
+    {
+      "operation": "egl_destroy_context_result",
+      "result": 1,
+      "detail": 8602594176,
+      "tick": 375955328
+    },
+    {
+      "operation": "egl_destroy_surface_result",
+      "result": 1,
+      "detail": 8626587968,
+      "tick": 376567257
+    },
+    {
+      "operation": "egl_terminate_begin",
+      "result": 0,
+      "detail": 8602919152,
+      "tick": 376628448
+    },
+    {
+      "operation": "worker_wait_end",
+      "result": 0,
+      "detail": 0,
+      "tick": 378627054
+    },
+    {
+      "operation": "egl_terminate_end",
+      "result": 1,
+      "detail": 8602919152,
+      "tick": 378734808
+    },
+    {
+      "operation": "glsurface_wait_begin",
+      "result": 1,
+      "detail": 1179676,
+      "tick": 378999782
+    },
+    {
+      "operation": "egl_close_result",
+      "result": 0,
+      "detail": 8602919152,
+      "tick": 379045680
+    },
+    {
+      "operation": "glsurface_wait_end",
+      "result": 0,
+      "detail": 0,
+      "tick": 379114840
+    },
+    {
+      "operation": "glsurface_thread_wait_end",
+      "result": 0,
+      "detail": 0,
+      "tick": 379141814
+    },
+    {
+      "operation": "glsurface_thread_close_end",
+      "result": 0,
+      "detail": 0,
+      "tick": 379166363
+    },
+    {
+      "operation": "glsurface_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 379185000
+    },
+    {
+      "operation": "opensl_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 379267438
+    },
+    {
+      "operation": "glsurface_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 379820691
+    },
+    {
+      "operation": "opensl_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 379840442
+    },
+    {
+      "operation": "cpu_capture_publish_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 419548694
+    }
+  ],
+  "startup_wait_ms": 10000,
+  "pid": 162452,
+  "backend": "ryujinx",
+  "cases": [
+    {
+      "input": {
+        "bytes": 13099584,
+        "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+        "source": "D:\\Download\\mekorama-1-7-2.apk",
+        "index": 0,
+        "attempt": 0,
+        "staged_name": "0000-external.apk",
+        "install_snapshot_step": 3,
+        "expected_session_id": "1504e963ce754df2a243ee06e0b51db3-1"
+      },
+      "first_screen": "not_visually_verified",
+      "teardown_phases": [
+        "stop_requested",
+        "egl_destroy_surface",
+        "native_activity_stop",
+        "java_activity_stop",
+        "egl_terminate",
+        "worker_admission_closed",
+        "background_worker_quiesce",
+        "media_thread_quiesce",
+        "glsurface_join",
+        "egl_terminated",
+        "guest_thread_quiesce",
+        "native_destructors",
+        "media_reset",
+        "media_released",
+        "activity_dispose",
+        "runtime_drop",
+        "native_mapping_release",
+        "native_resource_reset",
+        "native_reset_guest_threads",
+        "native_reset_cxx",
+        "native_reset_keys",
+        "native_reset_sync",
+        "native_reset_locale",
+        "native_reset_admitted",
+        "native_mapping_release",
+        "native_reset_anonymous_memory",
+        "native_tls_reset",
+        "native_resources_released",
+        "display_geometry_reset",
+        "runtime_closed",
+        "launcher_refresh"
+      ],
+      "error": "NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+      "presented_frames": null,
+      "installed_identity_matches": true,
+      "status": "blocked_or_unreported",
+      "runtime_status": "failed",
+      "captures": [],
+      "snapshots": [],
+      "returned_to_launcher": true
+    }
+  ],
+  "commands": 5,
+  "root_stop_wait_attempts": 1,
+  "host_storage_preflight": {
+    "scope": "Host staging estimate, separate from guest/Horizon memory admission",
+    "volume": "C:\\",
+    "required_bytes": 617888056,
+    "available_bytes": 16862224384
+  },
+  "completed_sessions": 1,
+  "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+  "root_handle_pinned": true,
+  "physical_device": "not_run",
+  "launches": [
+    {
+      "bytes": 13099584,
+      "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+      "source": "D:\\Download\\mekorama-1-7-2.apk",
+      "index": 0,
+      "attempt": 0,
+      "staged_name": "0000-external.apk",
+      "install_snapshot_step": 3,
+      "expected_session_id": "1504e963ce754df2a243ee06e0b51db3-1"
+    }
+  ],
+  "latest_teardown": [
+    {
+      "phase": "stop_requested",
+      "tick": 375971456
+    },
+    {
+      "phase": "egl_destroy_surface",
+      "tick": 376240978
+    },
+    {
+      "phase": "native_activity_stop",
+      "tick": 376419200
+    },
+    {
+      "phase": "java_activity_stop",
+      "tick": 376459269
+    },
+    {
+      "phase": "egl_terminate",
+      "tick": 376604999
+    },
+    {
+      "phase": "worker_admission_closed",
+      "tick": 377466312
+    },
+    {
+      "phase": "background_worker_quiesce",
+      "tick": 377522227
+    },
+    {
+      "phase": "media_thread_quiesce",
+      "tick": 378733261
+    },
+    {
+      "phase": "glsurface_join",
+      "tick": 378879934
+    },
+    {
+      "phase": "egl_terminated",
+      "tick": 379001151
+    },
+    {
+      "phase": "guest_thread_quiesce",
+      "tick": 379292257
+    },
+    {
+      "phase": "native_destructors",
+      "tick": 379369326
+    },
+    {
+      "phase": "media_reset",
+      "tick": 379887047
+    },
+    {
+      "phase": "media_released",
+      "tick": 379927785
+    },
+    {
+      "phase": "activity_dispose",
+      "tick": 379949792
+    },
+    {
+      "phase": "runtime_drop",
+      "tick": 380070176
+    },
+    {
+      "phase": "native_mapping_release",
+      "tick": 382280058
+    },
+    {
+      "phase": "native_resource_reset",
+      "tick": 382760987
+    },
+    {
+      "phase": "native_reset_guest_threads",
+      "tick": 382778928
+    },
+    {
+      "phase": "native_reset_cxx",
+      "tick": 382796144
+    },
+    {
+      "phase": "native_reset_keys",
+      "tick": 382817888
+    },
+    {
+      "phase": "native_reset_sync",
+      "tick": 382838979
+    },
+    {
+      "phase": "native_reset_locale",
+      "tick": 382862551
+    },
+    {
+      "phase": "native_reset_admitted",
+      "tick": 382888076
+    },
+    {
+      "phase": "native_mapping_release",
+      "tick": 382909994
+    },
+    {
+      "phase": "native_reset_anonymous_memory",
+      "tick": 383235889
+    },
+    {
+      "phase": "native_tls_reset",
+      "tick": 383284621
+    },
+    {
+      "phase": "native_resources_released",
+      "tick": 383303328
+    },
+    {
+      "phase": "display_geometry_reset",
+      "tick": 383335044
+    },
+    {
+      "phase": "runtime_closed",
+      "tick": 383362392
+    },
+    {
+      "phase": "launcher_refresh",
+      "tick": 383424833
+    },
+    {
+      "phase": "launcher_framebuffer_open",
+      "tick": 385880353
+    },
+    {
+      "phase": "launcher_ready",
+      "tick": 386620191
+    },
+    {
+      "phase": "launcher_stable",
+      "tick": 390707610
+    }
+  ],
+  "execution_attempted": true,
+  "session_id": "1504e963ce754df2a243ee06e0b51db3",
+  "root_stop_wait_ms": 490,
+  "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\1504e963ce754df2a243ee06e0b51db3\\androswitch.nro",
+  "observed_sessions": [
+    {
+      "package": "com.martinmagni.mekorama",
+      "session_id": "1504e963ce754df2a243ee06e0b51db3-1",
+      "runtime_status": "failed",
+      "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+      "completed_case_verified": false,
+      "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\1504e963ce754df2a243ee06e0b51db3\\sessions\\1504e963ce754df2a243ee06e0b51db3-1\\session-report.json",
+      "error": "NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V — a classe pode depender de plataforma fora do escopo M2; cleanup: ACTIVITY_STOP_ERROR: NOT_FOUND [rd-vm]: método Ljava/util/HashSet;-><init>(Ljava/util/Collection;)V não resolvido [pc 0x1a: Insn { opcode: 112, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 63697, regs: [0, 4, 0, 0, 0] } }]\n  at Lcom/google/android/gms/internal/consent_sdk/zzas;-><init>(Landroid/app/Application;)V\n  at Lcom/google/android/gms/internal/consent_sdk/zzat;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzm;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzdn;->zzb()Ljava/lang/Object;\n  at Lcom/google/android/gms/internal/consent_sdk/zzaj;->zzb()Lcom/google/android/gms/internal/consent_sdk/zzl;\n  at Lcom/google/android/ump/UserMessagingPlatform;->getConsentInformation(Landroid/content/Context;)Lcom/google/android/ump/ConsentInformation;\n  at Lcom/martinmagni/mekorama/Mekorama;->consent_show_os(Z)V\n  at Lcom/martinmagni/mekorama/RendererWrapper;->onSurfaceCreated(Ljavax/microedition/khronos/opengles/GL10;Ljavax/microedition/khronos/egl/EGLConfig;)V\n  at Lcom/martinmagni/mekorama/Mekorama;->onPause()V — a classe pode depender de plataforma fora do escopo M2",
+      "revision": 1
+    }
+  ],
+  "inputs": [
+    {
+      "index": 0,
+      "sha256": "9b8a5ef80de69095769c679bf65d5b339564478736f78b24700a4f0826bfec01",
+      "source": "D:\\Download\\mekorama-1-7-2.apk",
+      "install_snapshot_step": 3,
+      "bytes": 13099584,
+      "staged_name": "0000-external.apk"
+    }
+  ],
+  "visual_review": "required",
+  "nro_sha256": "00355a6eca7dccd49ee06be54a4199397ca1dffa8deb6705b56c018f1c4fdffd",
+  "schema_version": 1,
+  "custom_session_events": true,
+  "capture_ownership_contract": "Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.",
+  "emulator_version": "1.3.3+e2143d4",
+  "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+  "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+  "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-1504e963ce754df2a243ee06e0b51db3",
+  "sd_original_restore": "restored"
+}

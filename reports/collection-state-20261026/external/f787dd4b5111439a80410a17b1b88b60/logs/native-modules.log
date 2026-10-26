@@ -1,0 +1,2 @@
+module base=0x73e5fa000 length=0x9c000 phdrs=6 name="libBarcodeScannerLib.so" name_bytes=23
+module base=0x65f5da000 length=0x17d1000 phdrs=9 name="libmekorama.so" name_bytes=14

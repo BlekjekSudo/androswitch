@@ -96,6 +96,21 @@ The inherited unmodifiable wrappers are snapshots, not live Android views;
 that semantic gap remains explicit. The product does not inherit the desktop
 `synchronized*` identity/no-op substitution.
 
+The [collection integration checkpoint](../reports/collection-state-20261026.json)
+records source `3e37e6d`, 706 reference tests, 988 product regressions, strict
+workspace/reference Clippy, and a real std NRO build. The same unmodified
+Mekorama APK was attempted twice in pinned headless Ryujinx. A short run stopped
+while a render callback was still starting work (`ECANCELED` after worker
+admission closed); it did not prove a missing worker API. A longer run reached
+`RendererWrapper.onSurfaceCreated`, started its worker, and failed at
+`HashSet(Collection)`, whose inherited constructor is not yet connected to the
+product store. Both attempts returned to the console and restored the test SD;
+the constructor failure also appeared during Activity stop. No first frame is
+claimed. Candy Crush was not rerun in this checkpoint. Constructor/element-reader
+integration is the next collection boundary, using the original algorithms and
+common ownership rather than a package-specific exception. The hardware ZIP
+with NRO `a3a34bab...` remains its separately identified std qualification build.
+
 Compilation of both stores is not completion of any row. The default runner
 stays on its verified subset until the replacement can run the complete
 inherited and product corpus without selecting disconnected state. Native/JIT

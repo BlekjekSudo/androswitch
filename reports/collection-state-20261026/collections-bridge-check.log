@@ -1,0 +1,61 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling serde_core v1.0.229
+   Compiling generic-array v0.14.7
+   Compiling zmij v1.0.23
+    Checking cfg-if v1.0.5
+    Checking typenum v1.20.1
+   Compiling serde v1.0.229
+   Compiling crc32fast v1.5.2
+error: only metadata stub found for `rlib` dependency `core` please provide path to the corresponding .rmeta file with full metadata
+ --> C:\Users\Administrator\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\zmij-1.0.23\src\stdarch_x86.rs:3:9
+  |
+3 | pub use core::arch::x86_64::*;
+  |         ^^^^
+
+    Checking simd-adler32 v0.3.10
+error[E0432]: unresolved imports `crate::stdarch_x86::__m128i`, `crate::stdarch_x86::_mm_add_epi64`, `crate::stdarch_x86::_mm_cmpgt_epi8`, `crate::stdarch_x86::_mm_cvtsi128_si64`, `crate::stdarch_x86::_mm_load_si128`, `crate::stdarch_x86::_mm_movemask_epi8`, `crate::stdarch_x86::_mm_mul_epu32`, `crate::stdarch_x86::_mm_mulhi_epu16`, `crate::stdarch_x86::_mm_mullo_epi16`, `crate::stdarch_x86::_mm_or_si128`, `crate::stdarch_x86::_mm_setzero_si128`, `crate::stdarch_x86::_mm_srli_epi64`
+  --> C:\Users\Administrator\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\zmij-1.0.23\src\lib.rs:81:5
+   |
+81 |     __m128i, _mm_add_epi64, _mm_cmpgt_epi8, _mm_cvtsi128_si64, _mm_load_si128, _mm_movemask_epi8,
+   |     ^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^ no `_mm_movemask_epi8` in `stdarch_x86`
+   |     |        |              |               |                  |
+   |     |        |              |               |                  no `_mm_load_si128` in `stdarch_x86`
+   |     |        |              |               no `_mm_cvtsi128_si64` in `stdarch_x86`
+   |     |        |              no `_mm_cmpgt_epi8` in `stdarch_x86`
+   |     |        no `_mm_add_epi64` in `stdarch_x86`
+   |     no `__m128i` in `stdarch_x86`
+82 |     _mm_mul_epu32, _mm_mulhi_epu16, _mm_mullo_epi16, _mm_or_si128, _mm_set_epi64x,
+   |     ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^ no `_mm_or_si128` in `stdarch_x86`
+   |     |              |                |
+   |     |              |                no `_mm_mullo_epi16` in `stdarch_x86`
+   |     |              no `_mm_mulhi_epu16` in `stdarch_x86`
+   |     no `_mm_mul_epu32` in `stdarch_x86`
+83 |     _mm_setzero_si128, _mm_srli_epi64,
+   |     ^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+   |
+help: a similar name exists in the module
+   |
+81 -     __m128i, _mm_add_epi64, _mm_cmpgt_epi8, _mm_cvtsi128_si64, _mm_load_si128, _mm_movemask_epi8,
+81 +     __m128i, _mm_set_epi64x, _mm_cmpgt_epi8, _mm_cvtsi128_si64, _mm_load_si128, _mm_movemask_epi8,
+   |
+help: a similar name exists in the module
+   |
+81 -     __m128i, _mm_add_epi64, _mm_cmpgt_epi8, _mm_cvtsi128_si64, _mm_load_si128, _mm_movemask_epi8,
+81 +     __m128i, _mm_add_epi64, _mm_set_epi8, _mm_cvtsi128_si64, _mm_load_si128, _mm_movemask_epi8,
+   |
+help: a similar name exists in the module
+   |
+82 -     _mm_mul_epu32, _mm_mulhi_epu16, _mm_mullo_epi16, _mm_or_si128, _mm_set_epi64x,
+82 +     _mm_set_epi32, _mm_mulhi_epu16, _mm_mullo_epi16, _mm_or_si128, _mm_set_epi64x,
+   |
+help: a similar name exists in the module
+   |
+82 -     _mm_mul_epu32, _mm_mulhi_epu16, _mm_mullo_epi16, _mm_or_si128, _mm_set_epi64x,
+82 +     _mm_mul_epu32, _mm_mulhi_epu16, _mm_set_epi16, _mm_or_si128, _mm_set_epi64x,
+   |
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `zmij` (lib) due to 2 previous errors
+warning: build failed, waiting for other jobs to finish...

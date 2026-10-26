@@ -1,0 +1,87 @@
+00:00:00.002 |N| Application PrintSystemInfo:    ___                 __    _
+00:00:00.015 |N| Application PrintSystemInfo:   / _ \  __ __ __ __  / /   (_)  ___   ___ _
+00:00:00.015 |N| Application PrintSystemInfo:  / , _/ / // // // / / _ \ / /  / _ \ / _ `/
+00:00:00.015 |N| Application PrintSystemInfo: /_/|_|  \_, / \_,_/ /_.__//_/  /_//_/ \_, /
+00:00:00.015 |N| Application PrintSystemInfo:        /___/                         /___/
+00:00:00.016 |N| Application PrintSystemInfo: Ryujinx Version: 1.3.3
+00:00:00.016 |N| Application PrintSystemInfo: .NET Runtime: .NET 9.0.9
+00:00:00.026 |N| Application PrintSystemInfo: Operating System: Microsoft Windows 10.0.22631 (X64)
+00:00:00.026 |N| Application PrintSystemInfo: CPU: 11th Gen Intel(R) Core(TM) i5-11300H @ 3.10GHz ; 8 logical
+00:00:00.051 |N| Application PrintSystemInfo: RAM: Total 15.8 GiB ; Available 1.4 GiB
+00:00:00.054 |N| Application PrintSystemInfo: Logs Enabled: Info, Warning, Error, Trace
+00:00:00.055 |N| Application PrintSystemInfo: Launch Mode: UserProfile
+00:00:00.060 |N| Application ReloadConfig: Loading configuration from: C:\Users\[redacted]\.cache\androswitch\ryujinx-cfg-e2e\Config.json
+00:00:00.343 |I| Configuration LogValueChange: EnableFileLog set to: True
+00:00:00.344 |I| Configuration LogValueChange: ResScale set to: 1
+00:00:00.351 |I| Configuration LogValueChange: ResScaleCustom set to: 1
+00:00:00.351 |I| Configuration LogValueChange: MaxAnisotropy set to: -1
+00:00:00.352 |I| Configuration LogValueChange: AspectRatio set to: Fixed16x9
+00:00:00.353 |I| Configuration LogValueChange: PreferredGpu set to: 0x10DE_0x25A2
+00:00:00.354 |I| Configuration LogValueChange: ScalingFilterLevel set to: 80
+00:00:00.354 |I| Configuration LogValueChange: CustomVSyncInterval set to: 120
+00:00:00.354 |I| Configuration LogValueChange: EnableShaderCache set to: True
+00:00:00.354 |I| Configuration LogValueChange: EnableMacroHLE set to: True
+00:00:00.356 |I| Configuration LogValueChange: Language set to: AmericanEnglish
+00:00:00.357 |I| Configuration LogValueChange: Region set to: USA
+00:00:00.357 |I| Configuration LogValueChange: TimeZone set to: UTC
+00:00:00.360 |I| Configuration LogValueChange: SystemTimeOffset set to: -70
+00:00:00.360 |I| Configuration LogValueChange: EnableDockedMode set to: True
+00:00:00.360 |I| Configuration LogValueChange: EnablePtc set to: True
+00:00:00.362 |I| Configuration LogValueChange: TickScalar set to: 50
+00:00:00.362 |I| Configuration LogValueChange: EnableFsIntegrityChecks set to: True
+00:00:00.362 |I| Configuration LogValueChange: AudioVolume set to: 1
+00:00:00.363 |I| Configuration LogValueChange: UseHypervisor set to: True
+00:00:00.367 |I| Configuration LogValueChange: LdnPassphrase set to:
+00:00:00.367 |I| Configuration LogValueChange: LdnServer set to:
+00:00:00.368 |I| Configuration LogValueChange: GdbStubPort set to: 55555
+00:00:01.018 |I| Application HandlePlayerConfiguration: Player2 not configured
+00:00:01.018 |I| Application HandlePlayerConfiguration: Player3 not configured
+00:00:01.018 |I| Application HandlePlayerConfiguration: Player4 not configured
+00:00:01.018 |I| Application HandlePlayerConfiguration: Player5 not configured
+00:00:01.018 |I| Application HandlePlayerConfiguration: Player6 not configured
+00:00:01.018 |I| Application HandlePlayerConfiguration: Player7 not configured
+00:00:01.018 |I| Application HandlePlayerConfiguration: Player8 not configured
+00:00:01.018 |I| Configuration Load: Skipping handheld configuration as there are already other players configured.
+00:00:00.057 |I| Gpu : Backend Threading (Auto): True
+00:00:00.204 |N| Application LoadApplication: Using Firmware Version:
+00:00:00.204 |I| Application LoadApplication: Loading as Homebrew.
+00:00:00.226 |W| Loader GetNpdm: NPDM file not found, using default values!
+00:00:00.627 |I| Ptc Initialize: Initializing Profiled Persistent Translation Cache (enabled: False).
+00:00:00.631 |I| Application ParseCapability: Application requested cores with index range 0 to 2
+00:00:00.633 |I| Loader LoadNsos: Loading image 0 at 0x0000000008500000...
+00:00:00.654 |I| ModLoader LoadCheats: Build ids found for application 0000000000000000:
+    0C18C6266CEFF859D0A7A1B96B7D7F2207E4E9E9000000000000000000000000
+00:00:00.659 |E| ServiceTime InitializeLocationNameCache: TimeZoneBinary system title not found! TimeZone conversions will not work, provide the system archive to fix this error.
+00:00:00.666 |I| Loader Start: Application Loaded: Firmware Application AndroSwitch v0.1.0-dev [010000000000100d] [64-bit]
+00:00:00.678 |I| Hid Configure: Configured Controller ProController to Player1
+00:00:01.019 |I| Hid SetupNpad: Connected Controller ProController to Player1
+00:00:01.030 |E| Application : Failed to disable the cursor.
+00:00:02.393 |N| GUI.RenderLoop Gpu PrintGpuInformation: NVIDIA GeForce RTX 3050 Laptop GPU (Vulkan v1.4.303, Driver v576.52.0.0)
+00:00:02.393 |N| GUI.RenderLoop Gpu PrintGpuInformation: GPU Memory: 3965 MiB
+00:00:03.815 |S| HLE.OsThread.47 ServiceAm GetAppletResourceUserId: Stubbed. {appletResourceUserId: 1}
+00:00:03.832 |S| HLE.OsThread.47 ServiceAm AcquireForegroundRights: Stubbed.
+00:00:03.834 |S| HLE.OsThread.47 ServiceAm SetFocusHandlingMode: Stubbed. {unknownFlag1: False ; unknownFlag2: False ; unknownFlag3: True}
+00:00:03.835 |S| HLE.OsThread.47 ServiceAm SetOutOfFocusSuspendingEnabled: Stubbed. {outOfFocusSuspendingEnabled: False}
+00:00:03.852 |S| HLE.OsThread.47 ServiceAm SetOperationModeChangedNotification: Stubbed. {operationModeChangedNotification: True}
+00:00:03.852 |S| HLE.OsThread.47 ServiceAm SetPerformanceModeChangedNotification: Stubbed. {performanceModeChangedNotification: True}
+00:00:03.965 |I| HLE.OsThread.47 SurfaceFlinger CreateLayerFromId: Creating layer 1
+00:00:04.488 |S| HLE.OsThread.3 ServiceHid ActiveNpadImpl: Stubbed. {appletResourceUserId: 1 ; revision: 0}
+00:00:04.491 |S| HLE.OsThread.3 ServiceHid SetSupportedNpadIdType: Stubbed. 2 Players: Player1,Handheld
+00:00:04.492 |S| HLE.OsThread.3 ServiceHid SetSupportedNpadStyleSet: Stubbed. {pid: 127 ; appletResourceUserId: 1 ; type: ProController, Handheld, JoyconPair, JoyconLeft, JoyconRight}
+00:00:04.494 |S| HLE.OsThread.3 ServiceHid ActivateTouchScreen: Stubbed. {appletResourceUserId: 1}
+00:00:11.671 |S| HLE.OsThread.4 ServiceNv GetActiveSlotMask: Stubbed.
+00:00:11.686 |S| HLE.OsThread.4 ServiceNv InitializeEx: Stubbed.
+00:00:11.888 |S| HLE.OsThread.4 ServiceNv SetNvMapFd: Stubbed.
+00:00:11.890 |S| HLE.OsThread.4 ServiceNv AllocGpfifoEx2: Stubbed.
+00:00:11.891 |S| HLE.OsThread.4 ServiceNv AllocObjCtx: Stubbed.
+00:00:11.892 |S| HLE.OsThread.4 ServiceNv SetErrorNotifier: Stubbed.
+00:00:11.893 |S| HLE.OsThread.4 ServiceNv SetPriority: Stubbed.
+00:00:11.895 |S| HLE.OsThread.4 ServiceNv ZcullBind: Stubbed.
+00:00:15.789 |S| HLE.OsThread.4 ServiceNv SetNvMapFd: Stubbed.
+00:00:15.790 |S| HLE.OsThread.4 ServiceNv AllocGpfifoEx2: Stubbed.
+00:00:15.790 |S| HLE.OsThread.4 ServiceNv AllocObjCtx: Stubbed.
+00:00:15.790 |S| HLE.OsThread.4 ServiceNv SetErrorNotifier: Stubbed.
+00:00:15.790 |S| HLE.OsThread.4 ServiceNv SetPriority: Stubbed.
+00:00:16.137 |W| HLE.OsThread.4 ServiceNv Wait: GPU processing thread is too slow, waiting on CPU...
+00:00:17.584 |S| HLE.OsThread.4 ServiceNv SetErrorNotifier: Stubbed.
+00:00:17.589 |S| HLE.OsThread.4 ServiceNv SetErrorNotifier: Stubbed.

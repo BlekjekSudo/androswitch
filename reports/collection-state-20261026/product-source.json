@@ -1,0 +1,2418 @@
+{
+  "source_commit": "3e37e6d0b48a8ffa289cfb5b89edd2fe9ffb993f",
+  "files": [
+    {
+      "path": "Cargo.lock",
+      "sha256": "60a067b4e700fba2294d3af60c3e34e356081017c0fcf7a690a1b85f00c39b12"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "7949dabec6e92df1c78b1d9751c88ac072ef808fc599812a9993185aa630c68e"
+    },
+    {
+      "path": "crates/as-cli/Cargo.toml",
+      "sha256": "f9d2fb572c755edcd1614d76420a6a8c333d21a2fec3d3327378e3765a34fde7"
+    },
+    {
+      "path": "crates/as-cli/src/main.rs",
+      "sha256": "98c0e790adf718282cdfbc4cc0735119929940867a39a16e5220a14873257eb4"
+    },
+    {
+      "path": "crates/as-cli/tests/inspect.rs",
+      "sha256": "e63fa3d10a25dc299f06c90b1de218fe4aefbfd8046d52f709fa3b3d3b96de12"
+    },
+    {
+      "path": "crates/as-framework/Cargo.toml",
+      "sha256": "2a022ee2e2548af4b277a9454a79e8315d0181d99ed5aa1ae792a5a0c09666ea"
+    },
+    {
+      "path": "crates/as-framework/src/android.rs",
+      "sha256": "93f36ee1d415a7a3cd76f54ca5f065fd66b514361e80b10647518f460a1a46d9"
+    },
+    {
+      "path": "crates/as-framework/src/audio.rs",
+      "sha256": "869a4646ac37bb8e2cd8b85c055671f8666cd55a6880805327d3aa3056463dcb"
+    },
+    {
+      "path": "crates/as-framework/src/bin/as-conformance.rs",
+      "sha256": "c3b87e398e08b1b9bffdd5c6db5aea5716ee75082cf726f5cfded87778b81df5"
+    },
+    {
+      "path": "crates/as-framework/src/bin/as-corpus.rs",
+      "sha256": "2458152854aabd1eb77d2991a279a3b2d3b4091457de740482cdc1ed699da38b"
+    },
+    {
+      "path": "crates/as-framework/src/bin/as-ui-probe.rs",
+      "sha256": "515ab9469f57cd585b3e6b8710df71467b18089b2da64d17613d8be355ff6ac7"
+    },
+    {
+      "path": "crates/as-framework/src/lib.rs",
+      "sha256": "10855b1b545a16123a05f9e5e56975232bed980b07c93fe27bb13a8fb07521b6"
+    },
+    {
+      "path": "crates/as-framework/src/memory.rs",
+      "sha256": "cad05ac7cb0d68005d38bbef647e2a0b49a5f0bbef978b5fe30ff8b034698130"
+    },
+    {
+      "path": "crates/as-framework/src/properties.rs",
+      "sha256": "9a5d9bea724e46f42c3dc25bd9ef15973953648ba0bd12ab791e0ea91763129e"
+    },
+    {
+      "path": "crates/as-framework/src/raster.rs",
+      "sha256": "8b212d9c17a6b9a222113bb275b384ce222075ba73c1492c24d4542de2be30cf"
+    },
+    {
+      "path": "crates/as-framework/src/services/application_lifecycle.rs",
+      "sha256": "05926ed572de766ee6c2a9fe52ccb20737fd8c4db3dbd7b5ef87222d230743ff"
+    },
+    {
+      "path": "crates/as-framework/src/services/binder.rs",
+      "sha256": "27597438d7e8574e2be9953af8ecfb44487851eb8c7362c466fb796012e0837e"
+    },
+    {
+      "path": "crates/as-framework/src/services/bitmap.rs",
+      "sha256": "2c4afdee9769e662911001f12a2bfcc79ef344c74299f69c5afc877edb0410e9"
+    },
+    {
+      "path": "crates/as-framework/src/services/bitmap/png.rs",
+      "sha256": "679ca276b5b71d8e43f74f8754e9f8134bfac588ecc9bf40ceb3505ef445ee35"
+    },
+    {
+      "path": "crates/as-framework/src/services/bundle.rs",
+      "sha256": "7273c4bdfb5b65a50f03a091ebe50be4cf48ccbbc121e9f49fbe95bc0e7e0c28"
+    },
+    {
+      "path": "crates/as-framework/src/services/collections.rs",
+      "sha256": "8cc978b75b3c669302cce45c76c3f76d5f68319ff12b1b71e0a5e31ad366af6b"
+    },
+    {
+      "path": "crates/as-framework/src/services/communication.rs",
+      "sha256": "c22acc713e4c66e19a0baf96173529fffef8ac73bf989ed9df42eee4af59aa2c"
+    },
+    {
+      "path": "crates/as-framework/src/services/concurrent_map.rs",
+      "sha256": "7926a289ede141dac9352b90b13611c5944ce39089dde984a7bde2db65486ba7"
+    },
+    {
+      "path": "crates/as-framework/src/services/copy_on_write.rs",
+      "sha256": "96e409a371292f020e2583b10eb793507c55395e2c4db2e6796cfa0bb35e2dcd"
+    },
+    {
+      "path": "crates/as-framework/src/services/database.rs",
+      "sha256": "aa562ad2bc5443afca8806de40bfa74a954829dff63151bb8fc1b21c8489071a"
+    },
+    {
+      "path": "crates/as-framework/src/services/device_info.rs",
+      "sha256": "33df0ba935061e5925bb4d809aaa40acf2cad1fcb8cb43869a3348298f23b492"
+    },
+    {
+      "path": "crates/as-framework/src/services/enum_map.rs",
+      "sha256": "e31ab61c6caae2934cdf1c11a66aebdafc4bac852de0e616386e92e9357449e9"
+    },
+    {
+      "path": "crates/as-framework/src/services/executors.rs",
+      "sha256": "6f5e912e5dd31c5127bc6fa707849d7018c04155439e86527135607809433570"
+    },
+    {
+      "path": "crates/as-framework/src/services/glsurface.rs",
+      "sha256": "41500807e5361d817a4f09746783dc2f54d68cf3ad70b9edb20082d09a1c2e9c"
+    },
+    {
+      "path": "crates/as-framework/src/services/input_connection.rs",
+      "sha256": "3903d171c088835071c389d52efe6c863b92a443929755c39ab8be9481afaff2"
+    },
+    {
+      "path": "crates/as-framework/src/services/input_connection/editable.rs",
+      "sha256": "2d72da1ae1d057b14d951cc35bf58e6c1dbdf9fd0ec557673ab4f986e9db612b"
+    },
+    {
+      "path": "crates/as-framework/src/services/locale.rs",
+      "sha256": "af586fac2d5aa7a9b52a2164487290acb0577193f6d39b1e0195ea44314550d6"
+    },
+    {
+      "path": "crates/as-framework/src/services/mod.rs",
+      "sha256": "862c72ac50f432a19026883ee6f203ae358f6d302bedf5587628157aa7faea72"
+    },
+    {
+      "path": "crates/as-framework/src/services/package.rs",
+      "sha256": "20366dd6448cfd56c6228bbedb9539e2bf9d8384e4a2c8d6884c498d114bf615"
+    },
+    {
+      "path": "crates/as-framework/src/services/package/application.rs",
+      "sha256": "c104a018f01770b9a1f5b3427b06cf0d51ce0e6586509c0c17f5aa8a82eebcad"
+    },
+    {
+      "path": "crates/as-framework/src/services/package/features.rs",
+      "sha256": "82b02cff7f204500bd9f152ed7f77cf3b4246b9f959fe8a4680d7a0fac5b6ed7"
+    },
+    {
+      "path": "crates/as-framework/src/services/package/installed.rs",
+      "sha256": "664634caf5a238097ce135760af5ae6e6c4337e184821f5f63876cd7ac677459"
+    },
+    {
+      "path": "crates/as-framework/src/services/package/providers.rs",
+      "sha256": "47314c99ff780dfc5dad16006a210fa92a5d3e139c2386a1875106dedb28dbcf"
+    },
+    {
+      "path": "crates/as-framework/src/services/pair.rs",
+      "sha256": "0f1ab266532fbac5dfe95054c6e66e12179e14346207ab8e6bff3abfef10c7e9"
+    },
+    {
+      "path": "crates/as-framework/src/services/permissions.rs",
+      "sha256": "af9197cc625122bd42c3af21f521229bc215af2c449ffa5ab3ead12ccbefaf1a"
+    },
+    {
+      "path": "crates/as-framework/src/services/preferences.rs",
+      "sha256": "97e446f3a10e0de325e035467dac9e4395d9195aa691f0f2d037c4ad44632224"
+    },
+    {
+      "path": "crates/as-framework/src/services/reflection.rs",
+      "sha256": "5646c5ec6af1adef6fe79c05e311dfc3d69cfd7732177192c9ba79df92e6f7fd"
+    },
+    {
+      "path": "crates/as-framework/src/services/reflection/class_for_name.rs",
+      "sha256": "c8802f8f7660e1e972f767dcee8985d861482392a09cb35a867dc54f537cb7cc"
+    },
+    {
+      "path": "crates/as-framework/src/services/reflection/fields.rs",
+      "sha256": "17ae13c19d84787074c35db3f6dfb234c9265c1df441cfd862726dbe1f679e56"
+    },
+    {
+      "path": "crates/as-framework/src/services/reflection/instantiate.rs",
+      "sha256": "ec5aebfaf3e0094a18e33564680198a8776a77dc46266f917826ee65bb6e9c7e"
+    },
+    {
+      "path": "crates/as-framework/src/services/resource_names.rs",
+      "sha256": "eeaa187586da9c8b73021c8a40cc11ad7e568027cfef8c240e47d44d4ab42e0a"
+    },
+    {
+      "path": "crates/as-framework/src/services/runtime.rs",
+      "sha256": "59c3781ebe207194306516af24b8eb28e60193246007b1375d2825ceaaf271a3"
+    },
+    {
+      "path": "crates/as-framework/src/services/text_utils.rs",
+      "sha256": "3aa4c4ec69cbf4c5abece124102b326e5c7977ad23112109cc519c3bae909da1"
+    },
+    {
+      "path": "crates/as-framework/src/services/thread_local.rs",
+      "sha256": "765e91f0db61fb50a50c610dd750cd34030846fa11551956b52ee7618bce385f"
+    },
+    {
+      "path": "crates/as-framework/src/services/time_unit.rs",
+      "sha256": "aa7e0eeb1f81ad27da0f920f6f5ca2cfec1251ecf206fbc8e1fe3bba5e1a7e47"
+    },
+    {
+      "path": "crates/as-framework/src/services/timer.rs",
+      "sha256": "b25efbf5a85cf46d59eca62a3f04bf0e9b3573e0f949da882dc66f50f7937a45"
+    },
+    {
+      "path": "crates/as-framework/src/services/uncaught.rs",
+      "sha256": "ebae4cc1109e301f6447cfaa67a0e4641dc68f37695b319f12cb49848e221d4f"
+    },
+    {
+      "path": "crates/as-framework/tests/application_lifecycle.rs",
+      "sha256": "fdc8e6987b91f4b48334866b44782e92acaeaa604a6fec32641bedff0058bee6"
+    },
+    {
+      "path": "crates/as-framework/tests/bitmap.rs",
+      "sha256": "e57b12dfcc8b2ef7917cbc288f1f9bfca1456a108b84036494fbb3c7fe61fc5c"
+    },
+    {
+      "path": "crates/as-framework/tests/bundle.rs",
+      "sha256": "00b69b1564340119f5d242b19ce53505b9628f49605fb9d0b8f7a56d9b427eb2"
+    },
+    {
+      "path": "crates/as-framework/tests/class_forname.rs",
+      "sha256": "2877ba3951064ece0f6a4cecef82384790d7db4d6b0b9e13829956497f72ef35"
+    },
+    {
+      "path": "crates/as-framework/tests/collection_factories.rs",
+      "sha256": "29183b5ea78108ef75776f7544abf2432aa8642a2db4c5d0d51aa14964c43765"
+    },
+    {
+      "path": "crates/as-framework/tests/communication.rs",
+      "sha256": "37726d1c3447087305124a4b0fc2dab602e362f6bdf4aca4f9e4f99e5be422a0"
+    },
+    {
+      "path": "crates/as-framework/tests/conformance_contracts.rs",
+      "sha256": "115635702b5adb65a3d818227119c6821fb98989dbbba1860623144937c5c639"
+    },
+    {
+      "path": "crates/as-framework/tests/copy_on_write.rs",
+      "sha256": "5ee4eba5603b486351cd4378bd8c029461d601aa1058399825dea6dd36c3c888"
+    },
+    {
+      "path": "crates/as-framework/tests/executors.rs",
+      "sha256": "1b967cd7b260ddeabcc51dbce1ca0eb6b6c3b74f3401b402a9354a80fdccd2cb"
+    },
+    {
+      "path": "crates/as-framework/tests/glsurface.rs",
+      "sha256": "5aa830eeabfa165ce960e22cf7ea3c5bfffda1dbe8e87bcc57885931f5eb91fe"
+    },
+    {
+      "path": "crates/as-framework/tests/inherited_dispatch.rs",
+      "sha256": "48a5ce9ee3c9db9bcaa36f35a03a79988def2eec61ba5a97545d5447738e9c9d"
+    },
+    {
+      "path": "crates/as-framework/tests/input_connection.rs",
+      "sha256": "aa336f915b2fcce4389c3553ed00acc2aa3627d6c7846bd3f5efb2a56b8a4664"
+    },
+    {
+      "path": "crates/as-framework/tests/lifecycle.rs",
+      "sha256": "2a9a3ecab3a766cf9040f0d447587bfcf9fd0f0249291d17e2a720f966156268"
+    },
+    {
+      "path": "crates/as-framework/tests/m8_contracts.rs",
+      "sha256": "93adc1652d64faea3a76cb6098065492d7e6b12ccc2014cc99a47c04b267aa81"
+    },
+    {
+      "path": "crates/as-framework/tests/package_info.rs",
+      "sha256": "3540a96e76a8fbe002967bd241ede55e33bb000b9026e9a6fbf5a73ef91311e6"
+    },
+    {
+      "path": "crates/as-framework/tests/reflection_fields.rs",
+      "sha256": "e4682d1c1b4b9de67213575a613d815b30584054ebb2d5f79aa43dd0d93669f4"
+    },
+    {
+      "path": "crates/as-framework/tests/resource_names.rs",
+      "sha256": "79efcc8c814e920349a4633490158a97495947ed078f798dc6935ddae91c9d69"
+    },
+    {
+      "path": "crates/as-framework/tests/runtime_resources.rs",
+      "sha256": "baee67001237efa94325a8f4a737883cf9efac4edf7fb7b46c831ba925b979a9"
+    },
+    {
+      "path": "crates/as-framework/tests/text_utils.rs",
+      "sha256": "58c75e311ae60ddef3195dd3fd2e1eb05a4a727f6a8f72de1cf040909296d593"
+    },
+    {
+      "path": "crates/as-framework/tests/thread_local.rs",
+      "sha256": "7ac8bd4137cedf3aaa209409f06bb6eb203ed652a057319bfb05af95fb7c6a90"
+    },
+    {
+      "path": "crates/as-framework/tests/time_unit.rs",
+      "sha256": "7ec38cd3a553ccb91411a19278a018cdd5ac5d9d74c8a70c19761ad85f9597f6"
+    },
+    {
+      "path": "crates/as-framework/tests/timer.rs",
+      "sha256": "5209a95797f16d6216d381f92bd0d99e48194ae6e642c7c56f60700b7bdae138"
+    },
+    {
+      "path": "crates/as-framework/tests/uncaught.rs",
+      "sha256": "c3e5864d919d3c5d66d07ffcca7c0fdc32eb586522873d737aaad73503c88fbd"
+    },
+    {
+      "path": "crates/as-launcher/Cargo.toml",
+      "sha256": "04ab705dc72cb2553556679d8693197d6be5bd0931a1e7d7ffa868dea97c2a89"
+    },
+    {
+      "path": "crates/as-launcher/src/lib.rs",
+      "sha256": "dfa6ffd972599c1f5c838ac456d4fccde2125f1d6a71070dff89e34e32de1b32"
+    },
+    {
+      "path": "crates/as-launcher/src/png.rs",
+      "sha256": "0e96b665b3b1e8da602e5a8cdbbc6c880b8c39442c2af8da2f0bc802525a0b21"
+    },
+    {
+      "path": "crates/as-launcher/tests/workflow.rs",
+      "sha256": "9db18b7a90e87ea52bbcf0caf736b4d8166a0e051d98f3d83d3757644ef8a68a"
+    },
+    {
+      "path": "crates/as-native/Cargo.toml",
+      "sha256": "ede15ddd3b5078bf7f1421d8325bd53a4c3d46ab6a1fe61d7203601d9ee4219f"
+    },
+    {
+      "path": "crates/as-native/src/jni_refs.rs",
+      "sha256": "c23a89138a2a1d824423b94df293d0a0b119946812ac0d3f619bfe7f3ff5f1ab"
+    },
+    {
+      "path": "crates/as-native/src/lib.rs",
+      "sha256": "b7732ce43487d0b8c785d13a762ee9224fb255d2a317402e700a49b6f0650b60"
+    },
+    {
+      "path": "crates/as-native/src/oracle.rs",
+      "sha256": "f4197fd5f63b9e2d8725ccfb6dfa8ca09fbf80182476537100bd860d560cd501"
+    },
+    {
+      "path": "crates/as-native/tests/loader.rs",
+      "sha256": "12d21a48197d1d2f2e06ba552bd60c2bc0b13d889ce9b3383d31fb85948049c4"
+    },
+    {
+      "path": "crates/as-package/Cargo.toml",
+      "sha256": "9b6bf0170d881c44ca2456de5c68ea690c35c2ab4c4065a3c3470385b531d856"
+    },
+    {
+      "path": "crates/as-package/src/archive.rs",
+      "sha256": "bbc4958986927e5922df24ae3fe68fd90cb3fee5c606215425a9e39c796048c0"
+    },
+    {
+      "path": "crates/as-package/src/lib.rs",
+      "sha256": "8660762f7accf69a59becc18c0fd484ebbd6ab7047685bd337f5b7b0ca8559e8"
+    },
+    {
+      "path": "crates/as-package/tests/persistence.rs",
+      "sha256": "5567822f5076df474309c2f988f87fa231b1949f14c37099958b0998faddb235"
+    },
+    {
+      "path": "crates/as-platform/Cargo.toml",
+      "sha256": "3387a60b4cc9b176561c4f775b64fca9f6b519ae42a9ff2604c559f9150e4167"
+    },
+    {
+      "path": "crates/as-platform/src/fs.rs",
+      "sha256": "f00c9d5db079f4a404db55027e1dd18417518325125d5944222891f03552453a"
+    },
+    {
+      "path": "crates/as-platform/src/host_fs.rs",
+      "sha256": "0bc236067bbb6ae31e5e67dbcd4f80c012aff003a6aa2f3d83148f1df9f09ce4"
+    },
+    {
+      "path": "crates/as-platform/src/host.rs",
+      "sha256": "7d9d2919e5dd37fbfde009b39c6419f178a3b70ddacf43a1e1746dd61651a806"
+    },
+    {
+      "path": "crates/as-platform/src/lib.rs",
+      "sha256": "7647ed8ac677813e77fb8f2d5305912d2ceed8bb38a971aa5928292e9d27c7fd"
+    },
+    {
+      "path": "crates/as-platform/src/vfs.rs",
+      "sha256": "6013206879513b07a75ffd543dfcdcbe70ea710ebde6080d020788749e18e250"
+    },
+    {
+      "path": "crates/as-runtime/Cargo.toml",
+      "sha256": "4bab837f94060039052fd3a1941363dc868ab302612f86043d4dd50c8b0e0fdf"
+    },
+    {
+      "path": "crates/as-runtime/src/lib.rs",
+      "sha256": "1e988c8df888a121437650e8feabf9b71318d0c7cf1957b8e887269f3de5b345"
+    },
+    {
+      "path": "crates/as-runtime/tests/inspection.rs",
+      "sha256": "a58f67698e1ed8c9986de2061e6a277e8349f3ba841dc21c9b163e7e44802afe"
+    },
+    {
+      "path": "crates/as-sqlite/build.rs",
+      "sha256": "9cefd0c47737407845f7f349ba806f7419eeba4339b090b08815e83ace2c0fa9"
+    },
+    {
+      "path": "crates/as-sqlite/Cargo.toml",
+      "sha256": "23d68579e19da28488e2cce397ca2d74596e409dbc056135becfb184eb2d6b83"
+    },
+    {
+      "path": "crates/as-sqlite/src/ffi.rs",
+      "sha256": "d4eb8027bf8e83e05d46192c17c7f6f548f4327107659b8fc4f3bd1fbedf286c"
+    },
+    {
+      "path": "crates/as-sqlite/src/lib.rs",
+      "sha256": "2bb497ce8c8f35b4e074bd1fb6a9db45cc241f6106b90815778d5d9f83b1c206"
+    },
+    {
+      "path": "crates/as-storage/Cargo.toml",
+      "sha256": "262cc684fa20e58ad396ff24428f300a0e0e235d5734c6cfc90e67dee2e4a737"
+    },
+    {
+      "path": "crates/as-storage/src/faults.rs",
+      "sha256": "e246c1601f36bd90545ce4d79d8e89ddef68bd9ab885c945294cb3f641455e9a"
+    },
+    {
+      "path": "crates/as-storage/src/lib.rs",
+      "sha256": "fd388fcdc5e9c7078915a3ab896705ec2347c3a740af14a049ea7fa06f1a04d7"
+    },
+    {
+      "path": "crates/as-storage/src/preferences.rs",
+      "sha256": "7d1e83a3b144789a3ffb82d61b5154bb852e89d44f3448ba3e3fa01ffdd6f0b2"
+    },
+    {
+      "path": "crates/as-switch-smoke/Cargo.toml",
+      "sha256": "b289e0f4768103a818c9cb23c6ad46fd7ab3f3d1c7b31293cf67ec8a945774dd"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/application.rs",
+      "sha256": "78301e3935b0a7156a06df005169ffdcf86706caedc30bbb7317ad42d1668bd0"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/bin/as-probe.rs",
+      "sha256": "dfc72488dcad2388d7b1285940ffeaf9ca6b208616a9b811c36bdfebd451bff5"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_fs.rs",
+      "sha256": "07db0a1c3e55c69126494a14ef5388abb12018579d49fd1fb4aaf7e3da2b066d"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_graphics.rs",
+      "sha256": "849a3f8a996a62c6903801fbfb97a2cd4dbf7c558916a9f3c6aa7dfb4d381481"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_jni.rs",
+      "sha256": "c6599140b378d0c6932dd9e3844b80fce6b156f99d07030aebcd6cc3dd059749"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_native.rs",
+      "sha256": "b63fdfd6184b219aff22bc27515ecfd1959fd806e10227e4d15bacfa76c12e83"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_resources.rs",
+      "sha256": "262bd4712f4dbed9646229dd0822086275c450317d3216c3dbbc5a97338f83a0"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/device_workers.rs",
+      "sha256": "d7bdfb1e64362a832f481ba82bb1dc7173f556f819d9d8eb025a99c926097237"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/jni_constructor.rs",
+      "sha256": "f34122952972bfe3203beae72703a23aa26250fe5dbe71fd3f8aa1327d0e4a97"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/jni_exceptions.rs",
+      "sha256": "6b4918f40d13ced17717575c6d1e71b79c57f7bec4c46042cf4b3c505840d1c5"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/jni_objects.rs",
+      "sha256": "d1a669181feefcff042bb0fda9c75467e9daddac17d34295b017bd6dfdfcf2b6"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/jni_static_fields.rs",
+      "sha256": "a3ffd3f9f5d83ddb1a5004b3c6e124872ce4c88f2ff43f6cd7294f22c47f276b"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/launcher.rs",
+      "sha256": "78254571422a99c1739094056cf926d73515162d850fec5f42ddf412ae9456ec"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/lib.rs",
+      "sha256": "b8fabf008b404a42bbaedf3903caa2d2b08971db148f770c5b264d10507b95bc"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/native_probe.rs",
+      "sha256": "b6051f98ad59bfe5006472b190b6fa43f824b6d89a231902fe964f07584158d4"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/probe.rs",
+      "sha256": "82d72b3af257aa4b252fe44f35134ce4c77e2daecc91a17f95daf18986fd411b"
+    },
+    {
+      "path": "crates/as-switch-smoke/src/session_report.rs",
+      "sha256": "3d379c677ba400d9a2c7cbb96c6387bef7dd44c685378c6cce34a514172b95a2"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/jni_constructor.rs",
+      "sha256": "06b772ed0c62130ecb46f7328cb03fe6c253dbbe2695fd4729f77bdccdb3f13e"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/jni_method_metadata.rs",
+      "sha256": "19f58b986c3f957db60518046f201bf75a93572bba61172abf651c78f055dd20"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/jni_objects.rs",
+      "sha256": "6f46dcb836bd44e0be3d8cf953951c95c4d0ee4df7d879e1dabc5fa0c8041483"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_atomic.rs",
+      "sha256": "c74240c6524c61ee0e0178fb772c432bb64d8141b54c0382d9d5ee936aa654d7"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_class_names.rs",
+      "sha256": "95d0ff4715c42889863745f51e65d2cd681cb5d7b0eb0ab17049e1a899b031ab"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_core.rs",
+      "sha256": "3653d5812b9dd8587a80abd5a5a4cb8d16046aea62c2ac89c14e65f0c0d85528"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_encoding.rs",
+      "sha256": "275a2669e2da1cf626ccff6d27b00bbfcdb717a82dfbb0d5bec29423414dc631"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_enum.rs",
+      "sha256": "dcab414b2b2fbf941ce1ccb49c81c5040a8f1cd7df1414f10869a345a5d9d73d"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_execution.rs",
+      "sha256": "2b64a86e296ef31338a27e8ab841aa1bd66078bf90ebbf2a682d4cbe19c8bbf2"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_format.rs",
+      "sha256": "e633f8c5a6d2f1713c759931c2a5fc6bcc75750acf84d7b302fad6daf21b28b0"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_monitor.rs",
+      "sha256": "39f482f96082e2e8d963967f0025fd748b7e0ee059a2ccf09023011e7b64457a"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/portable_throwable.rs",
+      "sha256": "ff63bea026ecbbc9ebec87b4c19e0dcdc5e4ae09df50524a11d9cf2c373b96dd"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/shared_android_log.rs",
+      "sha256": "1c0fe6037f6cce65bc0a79236b7e34f727f43a98e48573ce7d0e5f407ac3773c"
+    },
+    {
+      "path": "crates/as-switch-smoke/tests/shared_boxes.rs",
+      "sha256": "b32ee6294a10c03811284a05b36e135711f75b940da10f108562ef62cd3edb35"
+    },
+    {
+      "path": "crates/as-testsupport/Cargo.toml",
+      "sha256": "8970abfb7f556bfc04dff551c887fce044fc636b3508c4b16d4730748a7b15ef"
+    },
+    {
+      "path": "crates/as-testsupport/src/lib.rs",
+      "sha256": "89a763f2acf6328c1d9f76c73ca81ff7cb7300f7327dee0fcff4c44df4451abf"
+    },
+    {
+      "path": "crates/as-vm-render-testsupport/Cargo.toml",
+      "sha256": "fbcb9f878d5425264ab87321a8dd21a2c1d9c9b5c82618c3a514926a70252f0e"
+    },
+    {
+      "path": "crates/as-vm-render-testsupport/src/lib.rs",
+      "sha256": "7b1bc245e8f78bd02a05e0c1fb21d6c85458cdd4029674ddc80ee7ea19467391"
+    },
+    {
+      "path": "crates/as-vm-testsupport/Cargo.toml",
+      "sha256": "2f9f3429e0f61f570ec0a6ad51beef0baa02053fd72b5856ff8baf0e1e976edb"
+    },
+    {
+      "path": "crates/as-vm/build.rs",
+      "sha256": "6c1d10f0c36ea6500371d8c21876e58a1ca55fc2a9187db59423c62dda17d775"
+    },
+    {
+      "path": "crates/as-vm/Cargo.toml",
+      "sha256": "076d74c809717ad1c4b2819ec07739e69c9b8f56273bb992413cf5d5c4349157"
+    },
+    {
+      "path": "crates/rd-agent/Cargo.toml",
+      "sha256": "c9d4cb8fe03d42031d1e978246da6b74b6ee7363ace67d9c8a297e0fe3f3feff"
+    },
+    {
+      "path": "crates/rd-agent/src/api_usage.rs",
+      "sha256": "2984aedd2374e0beff20bcfb0ab38dd85286cdcdf36f345cd884e0a9ac235580"
+    },
+    {
+      "path": "crates/rd-agent/src/lib.rs",
+      "sha256": "fc22da3f704fa19e381283a9052213454a3eab571323ca3fd7cf2ff256b7e547"
+    },
+    {
+      "path": "crates/rd-agent/src/m10_tools.rs",
+      "sha256": "fa1dcdc5cec70e07d0b4f98eaa3ea7dd42b7fa4fe89408d2442d5ac959dacc70"
+    },
+    {
+      "path": "crates/rd-agent/src/m9_tools.rs",
+      "sha256": "efbdc7452d581bb82e54dd06dcc820a159eacfb1bdcdf4cd340c8b07841f064c"
+    },
+    {
+      "path": "crates/rd-agent/src/mcp.rs",
+      "sha256": "ee3aab01a1cb6676fcdc14e333f72f7b93d8515c244fee7e9f4067b2b1d2974e"
+    },
+    {
+      "path": "crates/rd-agent/src/observe.rs",
+      "sha256": "059647df8ffe0487686ecfd649f404a7fd2f022e6d41ec3ef73ba4fa6896c544"
+    },
+    {
+      "path": "crates/rd-agent/src/runtime_tools_tests.rs",
+      "sha256": "dd7f379be4c9a2a3ff3a12acce82be200ea7de0966cb25605ee402654ebe04f9"
+    },
+    {
+      "path": "crates/rd-agent/src/runtime_tools.rs",
+      "sha256": "3e111321399c43a4f652290969ec529cf2f5af3990ec79dbe2bbf39a4d9b2812"
+    },
+    {
+      "path": "crates/rd-agent/src/snapshot.rs",
+      "sha256": "73d03caaed70cbf87e30c0e562f2f6be955746da29d196a8eefd6b27b13453f1"
+    },
+    {
+      "path": "crates/rd-agent/src/suite.rs",
+      "sha256": "fe54f3d9dc60f1e92a319b5c5e26a49d951578ece0dbce3febf0415b9d8db64f"
+    },
+    {
+      "path": "crates/rd-agent/src/ui_tools_tests.rs",
+      "sha256": "f63b74201120a0c4460525ee616e3497216c7ba86c51d9909f66a872256b9d00"
+    },
+    {
+      "path": "crates/rd-agent/src/ui_tools.rs",
+      "sha256": "902d33b3daff8a9b7e622d8af1a92dab500a880dc1f861b41f85e9805c12f820"
+    },
+    {
+      "path": "crates/rd-agent/tests/m10_mcp.rs",
+      "sha256": "ad622f59dadf10fd716b1f141cc4975319cb90a866c02bd933f1f1a5c35edc0e"
+    },
+    {
+      "path": "crates/rd-apk/Cargo.toml",
+      "sha256": "981136a56e8b73c46d125ba710ef4a212186842514703a8448477e643e7d612e"
+    },
+    {
+      "path": "crates/rd-apk/examples/dump_arsc.rs",
+      "sha256": "03b7bf69b6c073dcf01d7de39579d7cb82516e0507505b89bc83dfbf6187162f"
+    },
+    {
+      "path": "crates/rd-apk/examples/dump_manifest_attrs.rs",
+      "sha256": "aaf390eb4379f25348cb623faa421595c806afeb47df7596346f6643557d783c"
+    },
+    {
+      "path": "crates/rd-apk/examples/verify_config_apilevel.rs",
+      "sha256": "fd3392f26890afd4605f580f7e1eb6adcd0ebfeab59732b08f95753e99a5ce6f"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/Cargo.toml",
+      "sha256": "df99a7b58b5252e2cf5ca716c4f9744e9fcaa08dec10979e0a09d97eb3413184"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/apk_full.rs",
+      "sha256": "c7aa104ce03c50bc0c030f129c02c65866decf6d041443d3687a225cb471fbe5"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/arsc.rs",
+      "sha256": "c9d49ffb3eb50e95a991443d13149a41501a76336611f88e21ed4bea6fc6e780"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/axml.rs",
+      "sha256": "e1d37157bd8d7311e379fb65ce4741e4c6b08e4513ff3d1c7311079e5fd79c5f"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/zip.rs",
+      "sha256": "713f269af141586aad870569526cc6e03bc2ae35d6b67cf1bdd077bf37bdccf4"
+    },
+    {
+      "path": "crates/rd-apk/src/arsc_identifier.rs",
+      "sha256": "f6ef69dd6239fc824aba28a4ff371ce760556c2b69a9d06dcf0090125580131c"
+    },
+    {
+      "path": "crates/rd-apk/src/arsc.rs",
+      "sha256": "26295d93775e060982bb43d1985f4f2dcc7e12cec6dcdf0cd3e20bd47858266b"
+    },
+    {
+      "path": "crates/rd-apk/src/axml.rs",
+      "sha256": "119e03cfedf8fe145bfb6822296c557fa3626df52dd8aa3292d9ed2b11c0661e"
+    },
+    {
+      "path": "crates/rd-apk/src/error.rs",
+      "sha256": "47e43a0fe344638f6837c71e8ed1694c7e75d759619a40ca23b9f9ad6143aaae"
+    },
+    {
+      "path": "crates/rd-apk/src/lib.rs",
+      "sha256": "3d5da10eaf192fac6bb4376225c7179b609b9635607e8cd0a43064b03a5e54e6"
+    },
+    {
+      "path": "crates/rd-apk/src/manifest.rs",
+      "sha256": "a0dce04da5e2eab374957a96796d5bfb48f1659ae2ff3dd5ea972f60d8a21be4"
+    },
+    {
+      "path": "crates/rd-apk/src/paged.rs",
+      "sha256": "8eabac69625a8dd95015f857625b37e998501344645ee24863252c76639e2410"
+    },
+    {
+      "path": "crates/rd-apk/src/pool.rs",
+      "sha256": "4c590d4cc801da96e71ec65ecd6b5aa144ae6d0fdafcfbefccafb34fc80b34f7"
+    },
+    {
+      "path": "crates/rd-apk/src/signing.rs",
+      "sha256": "7f1fecdca1e1fb2605b515cf956828b652a6e950927a3b1b89399ff4f2c1dcf4"
+    },
+    {
+      "path": "crates/rd-apk/src/zip_source.rs",
+      "sha256": "ad36282bca5f5897eea7315d49c797f39283b751c71608ae818ec81fcd59fc25"
+    },
+    {
+      "path": "crates/rd-apk/src/zip.rs",
+      "sha256": "abd7d215039e537e3dbab96f2c50f8b06a32cd7af596aa2cf1e0b3e6a25b2199"
+    },
+    {
+      "path": "crates/rd-apk/tests/arsc_resource_names.rs",
+      "sha256": "5391049a1747a52a2d805388b22bf958fd69cf0d84480ab3f7bd654a95139e6b"
+    },
+    {
+      "path": "crates/rd-apk/tests/axml_manifest_253_254.rs",
+      "sha256": "0ee5f5c38b0796e7af0dfa9b70ff83034576eaa047a6066fc9f86b8c738f87d9"
+    },
+    {
+      "path": "crates/rd-apk/tests/integration_apk.rs",
+      "sha256": "9b9bccffb096c0a260fe10d14d81c9bded123fb994bd7b2a03b19e8eb31946e1"
+    },
+    {
+      "path": "crates/rd-apk/tests/signing_264.rs",
+      "sha256": "bfd911fa7690f96259133b2296217cd42435d034c35fb61e8faa9cb9b8d08674"
+    },
+    {
+      "path": "crates/rd-cli/Cargo.toml",
+      "sha256": "3098f1f4849af766f6acaa6898a8d0be5d6802f090ff22c49e04f0454d2f6fbc"
+    },
+    {
+      "path": "crates/rd-cli/src/api_coverage.rs",
+      "sha256": "e1a3185d83636ad01b70e18c619856f280a96b394dc44e7d2d97f276bc85618a"
+    },
+    {
+      "path": "crates/rd-cli/src/engines.rs",
+      "sha256": "423c2ef1c14ce678ac5de72e8d7ae71771e6138699a25d06fe45f0a95aa46ea4"
+    },
+    {
+      "path": "crates/rd-cli/src/gms_cli.rs",
+      "sha256": "5daec9b257034ea9efb75dabdb8bd2caf020d7b2e60d34a6e3f15f71ea5f197f"
+    },
+    {
+      "path": "crates/rd-cli/src/jetpack.rs",
+      "sha256": "92278c2acffd6e39c913d12f6ccd2b3c7ba2fd58c56ad13a05dd009f33f6c13b"
+    },
+    {
+      "path": "crates/rd-cli/src/main.rs",
+      "sha256": "5029d7c9ec0cc97b8abfd973afa3585c4112b841f7e6ad9edab8d9b407e66e67"
+    },
+    {
+      "path": "crates/rd-cli/src/perf.rs",
+      "sha256": "c213e5d281ad786a85d694c78f6446c0c7df900f4430ee958f56e0983595d10d"
+    },
+    {
+      "path": "crates/rd-cli/tests/api_coverage_cli.rs",
+      "sha256": "905e63829125c4c433a06bf3c3ef84589f9126cf96122cea54357c789e4e150c"
+    },
+    {
+      "path": "crates/rd-cli/tests/app_cli.rs",
+      "sha256": "36d0190b245d61e13aca0f4eba93b57bd6face652949037647d62f3c2169d301"
+    },
+    {
+      "path": "crates/rd-cli/tests/engine_cli.rs",
+      "sha256": "f5b2dee8d3441ba6adef14f384d10097f9d4e0f4502b6e8f991ffb3ae5497d1c"
+    },
+    {
+      "path": "crates/rd-cli/tests/inspect_cli.rs",
+      "sha256": "e72c0e0bc7873dbcda69874c8c549c10a30b41fe495b208a314ef1235ba0dbd7"
+    },
+    {
+      "path": "crates/rd-cli/tests/jetpack_gms_cli.rs",
+      "sha256": "a0aea3c2a5fe21c4a5744c05ceec4ad64884c283b7ab26d2e599e1b37badc4e3"
+    },
+    {
+      "path": "crates/rd-cli/tests/mcp_cli.rs",
+      "sha256": "28d13fc1cef179875851ab10a1fe0ba22a8cbb7a3032024108f1b39de1f66f5b"
+    },
+    {
+      "path": "crates/rd-cli/tests/perf_cli.rs",
+      "sha256": "3bfae39216a8034525301f5ae82f850d78212c297917c76d956c29509b080b0d"
+    },
+    {
+      "path": "crates/rd-cli/tests/readme_inspect.rs",
+      "sha256": "b2dd2c77c3050a18a3462386cc84bfb4ed6a0f880f25ef1c35c0898b3382029a"
+    },
+    {
+      "path": "crates/rd-cli/tests/test_cli.rs",
+      "sha256": "22bd52e8aeeacd8f96524fc72873ecbe8e61c63458a2bb51a0cb6eec97c93bc5"
+    },
+    {
+      "path": "crates/rd-dex/Cargo.toml",
+      "sha256": "d99f6db65f557a151aaee3b483e68f1114cc4d57ad419606e1cb62a5a32fb2b8"
+    },
+    {
+      "path": "crates/rd-dex/examples/dump_dex.rs",
+      "sha256": "da4b1a893bad5140508aad63e1c6b9f8327036e53354528513000cda08da97e7"
+    },
+    {
+      "path": "crates/rd-dex/fuzz/Cargo.toml",
+      "sha256": "15d565add271f23627650951882973a8b5a66c1f28473ff629fc4f992cf3912e"
+    },
+    {
+      "path": "crates/rd-dex/fuzz/fuzz_targets/dex.rs",
+      "sha256": "dcc3c0ebc8d59396528eeeb743e07dabb42829424c58aacf0a99e52bde7a0259"
+    },
+    {
+      "path": "crates/rd-dex/src/annotations.rs",
+      "sha256": "9033f5af63b5baef15e3383ac27953034c4beec60cd14b08259aeb2bb1b2e49b"
+    },
+    {
+      "path": "crates/rd-dex/src/budget.rs",
+      "sha256": "cc02d1ce1d4ccfec35d404e2aa2297a5361077f1f3cd8165721d8f93e02dcd37"
+    },
+    {
+      "path": "crates/rd-dex/src/classes.rs",
+      "sha256": "157afc8508945aff2fafdd41a3e35b5b94b05b6070d8c0727bb4a494a91bd15c"
+    },
+    {
+      "path": "crates/rd-dex/src/code.rs",
+      "sha256": "2619f9d834e9084c54e5bbcb029cac47309fb67fd80366246ccaaa5973294371"
+    },
+    {
+      "path": "crates/rd-dex/src/debug.rs",
+      "sha256": "6e8c6ff2f1c3f2a5a0c6f81e5fb0a7defd12a6bcbfaee1c01fd9c362e3225b37"
+    },
+    {
+      "path": "crates/rd-dex/src/dex.rs",
+      "sha256": "79416ed09ea347f2c0eef2342debeabf27c072aa78b4516b8c14686e7d51dfff"
+    },
+    {
+      "path": "crates/rd-dex/src/disasm.rs",
+      "sha256": "5e226415fc26a59022c04ea16b37672462eff2d4229e3b8ca98bc067a28d5b01"
+    },
+    {
+      "path": "crates/rd-dex/src/error.rs",
+      "sha256": "3c9407c7bd24bc460c7126de97b36afd5ec259972a55b68e8de1c63099158890"
+    },
+    {
+      "path": "crates/rd-dex/src/fields.rs",
+      "sha256": "eedb529763e1b73ab2b45ed913f759673e61bf13dc69d5887851032e82c597c4"
+    },
+    {
+      "path": "crates/rd-dex/src/lazy.rs",
+      "sha256": "a4a56f37e340c499a935d05cc9d0b41795ef4a0c99f8d6b769fb7713e46f5f60"
+    },
+    {
+      "path": "crates/rd-dex/src/lib.rs",
+      "sha256": "169d0d4a955af2ed120f6423006cb5793bb3be41ebc5852dc4821d9aaf556e22"
+    },
+    {
+      "path": "crates/rd-dex/src/methods.rs",
+      "sha256": "7bd0e026decbea36415eeadfd33560bffcdbc1a02e4639fbde329927b76ed803"
+    },
+    {
+      "path": "crates/rd-dex/src/mutf8.rs",
+      "sha256": "c2858bd469307046c0d9c26a51c0cf48eed9a29df47ca3d319bf34251942f9ed"
+    },
+    {
+      "path": "crates/rd-dex/src/opcode.rs",
+      "sha256": "363997c7f81e9a775bc0a491fe0c7f7b88f0a04ba10db6ecfde038f56d167dea"
+    },
+    {
+      "path": "crates/rd-dex/src/protos.rs",
+      "sha256": "562e84656ca4990d2e5f2d549565cf29a380f2e2a9258d582884dd0bec60c9d2"
+    },
+    {
+      "path": "crates/rd-dex/src/read.rs",
+      "sha256": "2a32f7947661665b7af672c40fccd7c8368ae2489df79be59ca99dff5e7c9a66"
+    },
+    {
+      "path": "crates/rd-dex/src/strings.rs",
+      "sha256": "0083c61089e707d6be573ac841a2113f41c954461d0bc7fc318fb2c74bfda219"
+    },
+    {
+      "path": "crates/rd-dex/src/sync.rs",
+      "sha256": "340575fa959853de1b4dec1a20758a8323035a01590b53948204005ba252f578"
+    },
+    {
+      "path": "crates/rd-dex/src/types.rs",
+      "sha256": "730b595770d3ccb7bcbbd0f8778e6c5b2deb78dc60395a9148f90ccac00957d0"
+    },
+    {
+      "path": "crates/rd-dex/tests/dex_security_332.rs",
+      "sha256": "16005fee29e625f96ffeb37b5fe854d4b91e96752d7416c972456efc9115deb8"
+    },
+    {
+      "path": "crates/rd-dex/tests/fuzz_dos_285.rs",
+      "sha256": "1c3486a490fe28cb1680c63df3a3dd90bfbee821a0dc6c6825f0657120005b34"
+    },
+    {
+      "path": "crates/rd-dex/tests/integration_dex.rs",
+      "sha256": "558c70b823c818d57d3814fd9e7001d211c9ad77028794e15959377bf51726f1"
+    },
+    {
+      "path": "crates/rd-dex/tests/lazy_dex.rs",
+      "sha256": "a77c0f14ae2df0f8340146cb192cc4207b6e4ca3ad39ea17189f0574f34269cf"
+    },
+    {
+      "path": "crates/rd-dex/tests/memory_budget.rs",
+      "sha256": "fe13157d1e2d24c5274d5a0d19a833ccdf37cab97a8ca5c33abcad08d7d83c17"
+    },
+    {
+      "path": "crates/rd-dex/tests/portable_index.rs",
+      "sha256": "cabb37941c5da5eb0ed22531023954ee40916a55ed8b5d90d7c649fc4bcdd488"
+    },
+    {
+      "path": "crates/rd-engine-registry/Cargo.toml",
+      "sha256": "089df7dcab817bf40128c31dc23380bd86ed9a0be813963c77d411165431d88f"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/contract.rs",
+      "sha256": "7255aebd248cd11a6b49683243252c603f1db212e9c35119fa320427fdeea8a2"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/detect.rs",
+      "sha256": "cbfb24c1c903231b0648918e9ddae34fe2098aade996ddded04e8e93ac14a3d7"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/lib.rs",
+      "sha256": "3802c16ffc9a8d11913baf12193b07111bbbb1aa4a4834c2e9e6454a6bf9266e"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/native_execution.rs",
+      "sha256": "74ba7a5a863f6f616be55fb0460221625befacecd2db982d456af32dc29c4d20"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/report.rs",
+      "sha256": "b49a3b0fac8fedd410dbf3fad225fe209334dea1b1c616086bd4e0c6396a59bd"
+    },
+    {
+      "path": "crates/rd-engine-registry/tests/native_entry_260.rs",
+      "sha256": "5962cc93f9669e78ab9d36df10dcd1ad323e8fe9a77f4f1c06842c153203301e"
+    },
+    {
+      "path": "crates/rd-engine-registry/tests/native_execution.rs",
+      "sha256": "516c7ea2514201cbd64a94deb83a4694222a9af5d4d120861769fcbffece83bf"
+    },
+    {
+      "path": "crates/rd-engine-registry/tests/registry.rs",
+      "sha256": "dee466c992fbf835c4dbdd061a7219d89b20845c48ece072586d5293ec57e114"
+    },
+    {
+      "path": "crates/rd-framework/Cargo.toml",
+      "sha256": "a8df57c05f1edfeffb6bda12bd22b8ab77ea59eee0015574f97395a99a827f41"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_api_coverage.rs",
+      "sha256": "0bed2b703ed1bfdab8eeedaf6aa30399a485e30b59ca879e4a25181b40fb2d11"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_behavior.rs",
+      "sha256": "9678949c3a22ece3860754879357d120f66e0f4cb98a41842d6d18a8947a04a6"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_devices.rs",
+      "sha256": "d21cf66c2d3bb1f605dc11aa19a621ed4d6d31fe4d96fa28c4464b3fd53aafc5"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_gms.rs",
+      "sha256": "24cf6e1aa28734ae7087a59da2ead8d4c67f52a7ee2f9bc9c4534202dc2c7c8b"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_jetpack.rs",
+      "sha256": "bb2712d6c276c3cc6064fd26ca21e49ee122a1e250adebeabc5b39e9136ae41a"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_permissions.rs",
+      "sha256": "389f31a9606fdfc31c3d619f5abfc579b2ed0234bcd2a6bf71f6e23054b93399"
+    },
+    {
+      "path": "crates/rd-framework/src/lib.rs",
+      "sha256": "7893456b9b344949fd9b5961dd52c7bed21c4cbfa8619be29ffd237b9fe9b81d"
+    },
+    {
+      "path": "crates/rd-jni/Cargo.toml",
+      "sha256": "d6a118b3c7972fa4485829cd7cafcc1c41e83fb53c976e2ee2eda3c56bc38cfd"
+    },
+    {
+      "path": "crates/rd-jni/src/jit.rs",
+      "sha256": "436f4310a866f2deab7a6bfa5e4356657a8b100016a8501a40470015cb6757d8"
+    },
+    {
+      "path": "crates/rd-jni/src/lib.rs",
+      "sha256": "278386d518c12a11e7a9cc8cc7f6dd7b967efeb6c60b8ee90da474e1ac9a523b"
+    },
+    {
+      "path": "crates/rd-ndk/Cargo.toml",
+      "sha256": "1c58268490629cf669356ad592ac920c99e1b9c3dbf8b2b1754714154f9199e9"
+    },
+    {
+      "path": "crates/rd-ndk/examples/elf_campaign.rs",
+      "sha256": "74bca02e1a7f1c1c8e4487c3e5cfcf6986ccdcc0598dbb658668e37858f694e8"
+    },
+    {
+      "path": "crates/rd-ndk/examples/native_probe.rs",
+      "sha256": "686857e1fa3ae6f04370a02a59cd92e824a12a6a54f05abdc12ef4fc80071d84"
+    },
+    {
+      "path": "crates/rd-ndk/src/elf.rs",
+      "sha256": "427d2a0e5c72db796d81801155922f12bb2ab025715eb501594894a0c47c0456"
+    },
+    {
+      "path": "crates/rd-ndk/src/lib.rs",
+      "sha256": "e0bd68fa8f3b16149380d01727671bc093a17ba2a58fa7bd5eb58f3cb84a0332"
+    },
+    {
+      "path": "crates/rd-ndk/src/runtime.rs",
+      "sha256": "d3c24fe8fccded6aaab149a992bc4593ff308c5a916f0b788bbc15439fa19236"
+    },
+    {
+      "path": "crates/rd-ndk/tests/native.rs",
+      "sha256": "6a0ee9ca2e7560f18ce74fc49d3c900eba3bdb93801ad33897426a65fe34c9bc"
+    },
+    {
+      "path": "crates/rd-ndk/tests/ndk_p0_242_255.rs",
+      "sha256": "2a5e9312ae6860f1a55d18fecdbafb409ec653ba42c340fe6ae02db20ad4b913"
+    },
+    {
+      "path": "crates/rd-ndk/worker/native_worker.py",
+      "sha256": "89e07c4fb89a7bba7c3ab073705972c4d47440032c6fd8590212028f4760f652"
+    },
+    {
+      "path": "crates/rd-render/Cargo.toml",
+      "sha256": "c67373e2c922c4a7440680860a4fc6ba329675acb672f8c756da03e03a970337"
+    },
+    {
+      "path": "crates/rd-render/src/lib.rs",
+      "sha256": "13bea0cb84c997e8e28058dbad310dd61542e3e1e3049ee25f90740e79369a4e"
+    },
+    {
+      "path": "crates/rd-render/src/shot.rs",
+      "sha256": "fbdadbf489a9c88b2e0f60fffe6eba0a737d7fea8977e571d3f5d2b863b9a388"
+    },
+    {
+      "path": "crates/rd-render/src/ui_dump.rs",
+      "sha256": "ebfdaa7d9e0ee69922ad1cb5820c2ddea2b0b5dfb745269be5905e28c4a8a37e"
+    },
+    {
+      "path": "crates/rd-testsupport/Cargo.toml",
+      "sha256": "8f3436cd823a9bf7a0b5efb4ef5ae62d11ada7b87449d64054383aa61d153190"
+    },
+    {
+      "path": "crates/rd-testsupport/src/apkfix.rs",
+      "sha256": "1333fe91a28d298514127f3678a0e7fb83769d79e157086e34fe2e97f02f7c88"
+    },
+    {
+      "path": "crates/rd-testsupport/src/lib.rs",
+      "sha256": "0d6c1f2cb5b4e5af979c977a19d9789859710698915f1aff31baf944357c78b5"
+    },
+    {
+      "path": "crates/rd-testsupport/src/m9_app.rs",
+      "sha256": "e54dbb6e3d3dd9238df076b82ca67e81c60affbe17fe510edf636aab35c5159f"
+    },
+    {
+      "path": "crates/rd-testsupport/src/trivial_app.rs",
+      "sha256": "7f9b550194946c5ae433f01e6afab138b6816ba175c39e747e58b3a45061cc59"
+    },
+    {
+      "path": "crates/rd-testsupport/src/vm.rs",
+      "sha256": "7e6a3566051377e61b8fb4a1b0a9c3aa4e5716b5c442520ecd0034bef770a43b"
+    },
+    {
+      "path": "crates/rd-vm/assets/glyphs.bin",
+      "sha256": "f9cd0a65b8f9f872bb317770c609dea7f71bbec63a423748e06160fceafb4665"
+    },
+    {
+      "path": "crates/rd-vm/Cargo.toml",
+      "sha256": "6b0ec7b724a761c9fb635d7d57a1e8a9198f487700d75d3ec390f4a697f57387"
+    },
+    {
+      "path": "crates/rd-vm/examples/efficiency_bench.rs",
+      "sha256": "1dae6e741bfa2bf1ce91b671d1cf7e8353d62138e0bd95557320b3573fdd8657"
+    },
+    {
+      "path": "crates/rd-vm/examples/native_gate.rs",
+      "sha256": "c70e03310f3f69225ddd9c9d35f45666d3d0e184bdfcbc03b1b5759e72498dd5"
+    },
+    {
+      "path": "crates/rd-vm/examples/scan_pure_methods.rs",
+      "sha256": "dd8177358f00e5e7a1c002299a8ad3b1de463df1ad63e464e9216e5b0151b191"
+    },
+    {
+      "path": "crates/rd-vm/src/accessibility_node.rs",
+      "sha256": "a8770a5a35e32bff9b98e220f48ca99322dd4368997c8c1b4064b5636efe9471"
+    },
+    {
+      "path": "crates/rd-vm/src/activity_callbacks.rs",
+      "sha256": "f816eecb9cd33ae9b99a4ddea26786540fb2c0dd7f841f5907efb16e635a5f01"
+    },
+    {
+      "path": "crates/rd-vm/src/activity_extras.rs",
+      "sha256": "2f79d2bacb82386108031987b46bd9bed70cfa355eda19d1b8a4f96c1b8e36db"
+    },
+    {
+      "path": "crates/rd-vm/src/android_build.rs",
+      "sha256": "ec0e7bc88e36356739341606561d62e75cf73de0a28dad67baa25f1e177b842e"
+    },
+    {
+      "path": "crates/rd-vm/src/android_colorspace.rs",
+      "sha256": "384085413a2e6cc55a3d5e723f3020a46a2e403786585e2117edd7ef29e1a90b"
+    },
+    {
+      "path": "crates/rd-vm/src/android_display.rs",
+      "sha256": "8e92349de21526b89ac3d2ff8f1d3742bb0b64ea800ed2ba56006d8dc383e0b6"
+    },
+    {
+      "path": "crates/rd-vm/src/android_drawable.rs",
+      "sha256": "1a21f0a0e957d70a8d5ee1359ea56ed90bff06ec4faeae00c2640b44a4b91234"
+    },
+    {
+      "path": "crates/rd-vm/src/android_env.rs",
+      "sha256": "8b3124faffb4acdb894ad34bf9c9de23fdcf5e85efb5cf65cb3579239d30980c"
+    },
+    {
+      "path": "crates/rd-vm/src/android_json.rs",
+      "sha256": "c413e44e3185a44033a0c8dea26cc88e41b231dd85aacc2af2a7ccb9708abdd8"
+    },
+    {
+      "path": "crates/rd-vm/src/android_log.rs",
+      "sha256": "b74045f577c5ed72a0ee98dc325f7dca7f131656ff52ff4e124e3d31ce09d520"
+    },
+    {
+      "path": "crates/rd-vm/src/android_motion.rs",
+      "sha256": "23d440a2ebe645e6adff46588dd52c2336cce74813a82a8e4752acd772b377f9"
+    },
+    {
+      "path": "crates/rd-vm/src/android_observable.rs",
+      "sha256": "a6b74884bda1296eac82c8473eb759cd289f79cfcb80b324f0b9c842b87bf80a"
+    },
+    {
+      "path": "crates/rd-vm/src/android_pm.rs",
+      "sha256": "40d6ec48131deef6914fbd5405574c9dcbf85c801e57da244e73dad7ca9ad52b"
+    },
+    {
+      "path": "crates/rd-vm/src/android_region.rs",
+      "sha256": "d8691a2f92db5496e8ee906fac7552139429b51671719bcc5d0adc661c5ba907"
+    },
+    {
+      "path": "crates/rd-vm/src/android_res.rs",
+      "sha256": "45b5a26a9f98036f6f423e9da28decdda26714b5b9daeea4de134cd4ac260432"
+    },
+    {
+      "path": "crates/rd-vm/src/android_spannable.rs",
+      "sha256": "36d10de5771a2dadca1c2ab2db903b8440d622b792ac53dd27d133d23e41dc1a"
+    },
+    {
+      "path": "crates/rd-vm/src/android_stub_surfaces.rs",
+      "sha256": "4c7bab12c95cbf1bbdca73d82c3b01d790847fdf428925b9c2e8f1bd22e4e4df"
+    },
+    {
+      "path": "crates/rd-vm/src/android_sysservices.rs",
+      "sha256": "3245ab488cc1fb2c0b01c22e192a053cfd0f1d9562fb01739e69180ae0f4d1d2"
+    },
+    {
+      "path": "crates/rd-vm/src/android_text.rs",
+      "sha256": "b7f16a6a1ce47cffc79c7d4cfa2b2ae0651e43ed4d29ff2d8f8735181c613503"
+    },
+    {
+      "path": "crates/rd-vm/src/android_uri.rs",
+      "sha256": "2e08b12dc00ef7f99efdfb0eb8fa63a301057c5ca2e14464a503aacccf8db304"
+    },
+    {
+      "path": "crates/rd-vm/src/android_util.rs",
+      "sha256": "070c82cc7585a57c1ccb610880c4aa2c50dc43cdc41e07dc8d5e672dc2311806"
+    },
+    {
+      "path": "crates/rd-vm/src/android_velocity.rs",
+      "sha256": "b0290e8c50e7e5b9359daf215db6b67c7af0168d08e756c20fc575d106cadcdf"
+    },
+    {
+      "path": "crates/rd-vm/src/androidx.rs",
+      "sha256": "03c58231034c70482578bbd9c586b0f705a56f69f9f3e7e06ef492af3d4d1abc"
+    },
+    {
+      "path": "crates/rd-vm/src/app_output.rs",
+      "sha256": "e8fbb1c8350e3cec6066a5a77fb02c16b25378daf7935d360a438bf55d370a67"
+    },
+    {
+      "path": "crates/rd-vm/src/arrays.rs",
+      "sha256": "a42ce61a44d9f84912693c28a84b23b47ad8785ae94b5bba6a7b166cae7f5c97"
+    },
+    {
+      "path": "crates/rd-vm/src/atomics.rs",
+      "sha256": "36b765904986a8bfa529d77cbb3d79bc7a77ac2cde9bd1392633734890a2bd38"
+    },
+    {
+      "path": "crates/rd-vm/src/boxes.rs",
+      "sha256": "4365b465d783a89c9e0d9b163ab4ad978606217e611766738cf50e56569bed26"
+    },
+    {
+      "path": "crates/rd-vm/src/bundle.rs",
+      "sha256": "e7d18c03f2aad62f7d3a8b01c0da38047b374e474868ee9fc8b71def0bffe421"
+    },
+    {
+      "path": "crates/rd-vm/src/choreographer.rs",
+      "sha256": "05a41fce49dabad4bbd8942ccd99d621495786a0898ef9a8e327607ec38e8d86"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "sha256": "c65aeb1ac2a7212ec8ceb56ff21cb2e3eb51be2f3ea2f2c8d46f7346ba235a5d"
+    },
+    {
+      "path": "crates/rd-vm/src/collection_clock.rs",
+      "sha256": "61215802449df9e64875792bb44f12c436d10e26b7843d3ba5c35deacb6c80d3"
+    },
+    {
+      "path": "crates/rd-vm/src/collection_factories.rs",
+      "sha256": "0c353e8842565f7d23673a264569ff6fc7da8c3f4861e9b9d0f2c2c5d55baf66"
+    },
+    {
+      "path": "crates/rd-vm/src/collection_values.rs",
+      "sha256": "b234f92be4c9ae1a6c0fe1dcff2b847765f9767d2f9a880bb2f09ee6d22ae554"
+    },
+    {
+      "path": "crates/rd-vm/src/collections.rs",
+      "sha256": "c756c22d7bfb33c2b7728ec181d4ffa02c0b8c21bc36f52a503bb83991b5f212"
+    },
+    {
+      "path": "crates/rd-vm/src/content.rs",
+      "sha256": "329ef0b619c12908f6a94e9d821225edf8342038a0bb795db61b867f6ed42e06"
+    },
+    {
+      "path": "crates/rd-vm/src/engine.rs",
+      "sha256": "86f41422c2553bde9e328b0fcdefa01ef94f96418c0122e3ad99aa78e442b22a"
+    },
+    {
+      "path": "crates/rd-vm/src/err.rs",
+      "sha256": "59205ac2d1f3e197a2a878da1305324253e1388988d69e2fd6ffeda58c2a4e93"
+    },
+    {
+      "path": "crates/rd-vm/src/framework_host.rs",
+      "sha256": "a7f65c86c683eaa1d87088d50e6a660b26e3cf3d3d5b046ccee8f2d6f198e8a7"
+    },
+    {
+      "path": "crates/rd-vm/src/framework.rs",
+      "sha256": "b8d14421d02f357da4f6dca1e7e3bab075e28f39217e694ebfbf4307eb6d5ecb"
+    },
+    {
+      "path": "crates/rd-vm/src/gc.rs",
+      "sha256": "e1bfbc565e2ce7b3344b8b9afd848cb28dcb3b18d22ca7a967be2eb9cc5822d5"
+    },
+    {
+      "path": "crates/rd-vm/src/gms.rs",
+      "sha256": "5451a2ce7a3f127c74d20cf56a8581a84cc9dc3fa243a2980ad790785467ec78"
+    },
+    {
+      "path": "crates/rd-vm/src/graphics.rs",
+      "sha256": "4a1439f8a8e93db5938053b68526e387fc9464a0ac02c7ae14a66223faccfb77"
+    },
+    {
+      "path": "crates/rd-vm/src/handler_msg.rs",
+      "sha256": "06721a13b734684103b7afaa82ce1150769f427c18c3ed3bf6801d51ac0ec5bb"
+    },
+    {
+      "path": "crates/rd-vm/src/heap.rs",
+      "sha256": "adb5f3012c4ba555575d75ba51cc9e307d5d8c9969cac69a699f6405e3608b84"
+    },
+    {
+      "path": "crates/rd-vm/src/inflate.rs",
+      "sha256": "d5440811e021fa7f64fe34fbab356269912a00fc1735dec2e1ddee5a200f75e8"
+    },
+    {
+      "path": "crates/rd-vm/src/integer_bits.rs",
+      "sha256": "34713658dc6e4d06643fe46a201a17bc910f374179c7143625c51e01e8b12171"
+    },
+    {
+      "path": "crates/rd-vm/src/interp.rs",
+      "sha256": "6b94e18bbdb43fc02dc8726ef3c0a2370b6c3cb050c4015f1a73667e37b18097"
+    },
+    {
+      "path": "crates/rd-vm/src/intrinsics.rs",
+      "sha256": "5be49a7e223f76d8fc035eaea61cb0493d44bb43581451a98024743576ab4ed4"
+    },
+    {
+      "path": "crates/rd-vm/src/jannotations.rs",
+      "sha256": "f2e8a42bc6b264243c3c4190604d4bd8bfd90906f5602486dec7941680cb81d5"
+    },
+    {
+      "path": "crates/rd-vm/src/java_format.rs",
+      "sha256": "814dfbd897351d5b44db1ec6ecc019e3a2594766902794277a19959d5dd613cb"
+    },
+    {
+      "path": "crates/rd-vm/src/java_values.rs",
+      "sha256": "38aa484a4b753d3042b6691ff208b7a4158114d4d76f860bc3194ee3e644ae47"
+    },
+    {
+      "path": "crates/rd-vm/src/jbigdecimal.rs",
+      "sha256": "4700203249aec17bb4a942bf1b74b52383da0691f88996949571b66945d25e6d"
+    },
+    {
+      "path": "crates/rd-vm/src/jbitset.rs",
+      "sha256": "3e5757404066148e91b0800519cf8a4dd9d7e803426665cb2a8cae91ef7c76f1"
+    },
+    {
+      "path": "crates/rd-vm/src/jbreakiter.rs",
+      "sha256": "9f8553a7332e7c8fe913bb80b9bc984964d86e31da0ec7c8da634d8b464dd715"
+    },
+    {
+      "path": "crates/rd-vm/src/jcollections.rs",
+      "sha256": "a9f819dced885f1f477b93fff69e5f53211714f0b2f45b74591f58adbd78265d"
+    },
+    {
+      "path": "crates/rd-vm/src/jfile.rs",
+      "sha256": "63d7f996857cb06be890c26e6e1bb21aa48949e838d68f100fc2a29bcf36c269"
+    },
+    {
+      "path": "crates/rd-vm/src/jio_chars.rs",
+      "sha256": "05533ea1121928071ad4220322d9e3e6a6f55cc196957e0f599184a281d71128"
+    },
+    {
+      "path": "crates/rd-vm/src/jit.rs",
+      "sha256": "8bc13ca119e3f7c4ac6de3633006fbfef5cc8f7302f941e52f611add24c92e8e"
+    },
+    {
+      "path": "crates/rd-vm/src/jiterator.rs",
+      "sha256": "651071ca763b57e10be5cae4d364dd88c146b6c8c27e5e24edd0950b1e8f9c3d"
+    },
+    {
+      "path": "crates/rd-vm/src/jlclass.rs",
+      "sha256": "88a02cc48a6ec1e353b7dce7ffe7335848f55f33dd276782d1ef433c678c3d5f"
+    },
+    {
+      "path": "crates/rd-vm/src/jlocks.rs",
+      "sha256": "48f3e72b69ed50297e4dd7277cf39c5cc9d0748b0b083cecc6a5092c04d95c9f"
+    },
+    {
+      "path": "crates/rd-vm/src/jlstring.rs",
+      "sha256": "5f1a39438aaf743eb9acf2ba83b34aeb243779b5b3da954ed86cc9b70542289d"
+    },
+    {
+      "path": "crates/rd-vm/src/jlsystem.rs",
+      "sha256": "8f4981e3a7ff45bb95d2ede2fa5dc39d2d186ba06f63724a6d4d455113c09e11"
+    },
+    {
+      "path": "crates/rd-vm/src/jnormalizer.rs",
+      "sha256": "fdd6a26d8843ed6b6a7080e1678635155c19b128706637cb700b54ccbb7ff5ca"
+    },
+    {
+      "path": "crates/rd-vm/src/jpriorityqueue.rs",
+      "sha256": "4c41434ff6004098d95580b9e5832f6a13aa18e6a9780673438ba35cf5653b12"
+    },
+    {
+      "path": "crates/rd-vm/src/jrandom.rs",
+      "sha256": "2574f1f25bfcda3a2425c167624768d42b0f99be3952f4be183f60c06e682c5e"
+    },
+    {
+      "path": "crates/rd-vm/src/jregex.rs",
+      "sha256": "afd433e7c0bd41e7d9b878a0b643b9a171cf2b66085936fa7d5fe1577af6e5ad"
+    },
+    {
+      "path": "crates/rd-vm/src/jresources.rs",
+      "sha256": "3aed221569d629ede3aefcf65287ccf9ae6641d4ab952397600ce4d860583be4"
+    },
+    {
+      "path": "crates/rd-vm/src/jsb.rs",
+      "sha256": "458564a158263265d76f3c8efdf2da981f301d342b88765d0650bb3e3a677d61"
+    },
+    {
+      "path": "crates/rd-vm/src/jsecurity.rs",
+      "sha256": "01c827499c578ae081208088826aee51b9dd17b68a8717a421e1ef8bbe9db33f"
+    },
+    {
+      "path": "crates/rd-vm/src/jsorted.rs",
+      "sha256": "210fbb00012838f978711a211a39a8e2145861b65b33115cf9438d2db9a5fead"
+    },
+    {
+      "path": "crates/rd-vm/src/jsqlite.rs",
+      "sha256": "9b75d87d31ab535beb5d877feb053783280ad465a0fa8d882c7f080a9377c2ab"
+    },
+    {
+      "path": "crates/rd-vm/src/jstring_tokenizer.rs",
+      "sha256": "2d5a6dfa3d95cd102321a07028e9763a9926b975269ba22343a16df312a3e621"
+    },
+    {
+      "path": "crates/rd-vm/src/jtext_format.rs",
+      "sha256": "cbf8b0d8016d8ce63840382b276c45456167655eec17227a007321aff8342763"
+    },
+    {
+      "path": "crates/rd-vm/src/jtime.rs",
+      "sha256": "a530229eed1642b353d92162bb80e98992a20809852b8e5acdf16d94299c1564"
+    },
+    {
+      "path": "crates/rd-vm/src/juuid.rs",
+      "sha256": "76df73a791743572c690706ad7fbfc3c570a6ef69ea5e0980baee4e9f3052fd3"
+    },
+    {
+      "path": "crates/rd-vm/src/jxml.rs",
+      "sha256": "d218e7d9863bcb5e8fc699cd15d1f274345f86705a77587892f53e9119af496c"
+    },
+    {
+      "path": "crates/rd-vm/src/lib.rs",
+      "sha256": "238c271d87b76979cc5a91dcd09c1d48f88e8ff5e0872502080a83a2cf950998"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/biometrics.rs",
+      "sha256": "7ee09168c8bd43b9e5a8dd900797b1a931c6e253d65bada5270509ccfa3e88be"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/camera.rs",
+      "sha256": "a540069e67278c117e73e750631b96ac2e40dfd716cba823f78d600f406c44f5"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/connectivity.rs",
+      "sha256": "8e04c815e1cd15b3d986e1a73d3666d2a6a9fa4de2e51019dc2fc516562c44e1"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/location.rs",
+      "sha256": "5e06460ee0e020c8451a1220433cdec7c976bca3ee64e1f7fc73e6b76a360c08"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/media.rs",
+      "sha256": "7e9044df096fb90301b14e31a6749643e263df4cd6cff113b213b090a5deedb5"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/mod.rs",
+      "sha256": "de91dc81ba5646a9d00d4bee07fa4331b0b45bc9757187d0bde07d81da8e0151"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/sensors.rs",
+      "sha256": "04cb9fb8a7f936225f1a2caf0c14b47e520336afefc44669ea8a89a588b1bb70"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/sysconfig.rs",
+      "sha256": "4df65bfce1eaa9116890fb622543b279ce472c3c52f3b678dec3e12050cf339f"
+    },
+    {
+      "path": "crates/rd-vm/src/m8.rs",
+      "sha256": "b292117e57c26e27a6d1df5d3cad96f23f2c659eb4dd25249d07e67f8153a36f"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/accessibility.rs",
+      "sha256": "d863385cdc7b5a5eda51fa5b1c611e1fdb4a06a99e69fd5c9c3271321563fe1e"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/ime.rs",
+      "sha256": "48b07dd9a02f18f467dc36a959f1b65d5d921213c69501ac64b91d6f4a95e8bc"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/mod.rs",
+      "sha256": "5eed744efe832276fcc96b04f87b00266e6f81a938638999be77bdaf756c45c3"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/notifications.rs",
+      "sha256": "84642e10164f17fa7134358cf3419cdf0c8f2e9c66e660ad54b15d4a8c6aa355"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/shortcuts.rs",
+      "sha256": "b40f9831511f7deacf2a2c1a4924cb8b1678b2a161621902cc77efafead65e7f"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/widgets.rs",
+      "sha256": "7ab79e11a6f3aeca01d4471e9fecc908106c4837ded595c255c9fccc30c0b2ed"
+    },
+    {
+      "path": "crates/rd-vm/src/module_tables.rs",
+      "sha256": "856210c76cf53da1adec7defa208f3b6811abe7b66f0272e8021bc25d812f99e"
+    },
+    {
+      "path": "crates/rd-vm/src/native_host.rs",
+      "sha256": "199b756c5cc3880efe85f725e0440f95e12a611a461400b520cb4e757a510883"
+    },
+    {
+      "path": "crates/rd-vm/src/native.rs",
+      "sha256": "7c91f4c8429222c65d19ea0ea19a1c9608fc59e359156e9253996989d2370346"
+    },
+    {
+      "path": "crates/rd-vm/src/numerics.rs",
+      "sha256": "008f3240c94ec0ea86f064e707a18a6e75d1eeffab42a09baa5a10c5b19a7ce9"
+    },
+    {
+      "path": "crates/rd-vm/src/parcel.rs",
+      "sha256": "c1c1ea6970301bf5430724dc4477981bc565a92269b52fae5057b8cd4371b45e"
+    },
+    {
+      "path": "crates/rd-vm/src/perms.rs",
+      "sha256": "62087396386e3c618ad45b317be9b1607026bc53967adda2c89e6ebb8cdf8a56"
+    },
+    {
+      "path": "crates/rd-vm/src/platform_base.rs",
+      "sha256": "ef2012ba81f14ca5a782e45ccb6ca91072124b879529e9b4f2f20f0981583f77"
+    },
+    {
+      "path": "crates/rd-vm/src/port_env.rs",
+      "sha256": "d9f9893da2cc87350c57bade99cf4363fff29443f65e24935745788b5709be68"
+    },
+    {
+      "path": "crates/rd-vm/src/port_float.rs",
+      "sha256": "2510afadf6ef6be568445b5dc81b1991c16309b40dbc8b72eb3e597d37b19af1"
+    },
+    {
+      "path": "crates/rd-vm/src/port_prelude.rs",
+      "sha256": "679bd01d368c0c84e07e3a799aa14434bdbe58ddb2f7a775c63b8d18baeaf9ef"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/atomic_number.rs",
+      "sha256": "95542603ac062f5e74d4de0d1f03eccc1d6e85d2d31ccc253704bb852e28e0e0"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/atomic_reference.rs",
+      "sha256": "a676166c33b877a3bf92ad3f69643540fc60914d3c816b917f52d96c21b24735"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/atomic.rs",
+      "sha256": "5cf6703a88f205818500412b733720ec2819c2fb60ad3944ada7e4fa573a3bbe"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/charset_catalog.rs",
+      "sha256": "17d93625ff81ae1de8bef32febf4e1a802c1153556df414457d5cccdee858bb2"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/classes.rs",
+      "sha256": "3b112ef1f34bdef5a4ca6fced7084260899240793fbc2cc19e3fffda218617eb"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/enums.rs",
+      "sha256": "598e5bf822f15b04205243a103f6e6e61eb563968002b33d9ace149b6894dd55"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/execution_contracts.rs",
+      "sha256": "a065322f525323bb82f140c47722fc9aee690d80be690190f10ab22644870fe8"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/execution.rs",
+      "sha256": "bd68895e7dc16eeeea49366f4798c58190b0f38e9ffb803d432fde5395eb38cf"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/file.rs",
+      "sha256": "293478bcffe279bcde710457e71a502da9bb47e20a4eee3fb00e9e24d6eeef0d"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/format.rs",
+      "sha256": "305ffed51ea28bc0f7d335a297e44bec24af9521d5e315eef818f5c39b722275"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/gc.rs",
+      "sha256": "d205da86dfea9452647e38f25b91bc07d44291360122178e9d5a51611c1ff7cc"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/intrinsics.rs",
+      "sha256": "dcb5e7c8d37c0d0a6f6ae15674c7a8b10110a2d6f2d91313ebbe4beb7d19e6e3"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "sha256": "9f61c2751d8620ee1d035ca014000d2030135dd99464d64df5ef7e5ba935323f"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/monitor.rs",
+      "sha256": "dd8dc060d2006d2307f0e76dd1cd33b128eddb37f9b169539f6574ac22ab1dba"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/random_access.rs",
+      "sha256": "5b2ae421991f0f64b05583fc5aa7d1de7df147e27f449d1ec0237e8c00463353"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/string_encoding.rs",
+      "sha256": "a8ddf674ea40597f290dc363930203bbb9474aed4991d97320c37ded99ff68d9"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/text_contracts.rs",
+      "sha256": "7d89e755dc3e21eeed35002287fe7a127963cbf2c6b46ca9ddf9ff2b5896f75a"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/throwables.rs",
+      "sha256": "8c75169d89b27dc7065adc82840dcfa001be99b9b771c2ac8b0b083e98c84430"
+    },
+    {
+      "path": "crates/rd-vm/src/prefs.rs",
+      "sha256": "7e5ee004aa5687c9666bc78060dffa5c80c888dc462751f9eafd6de807352c7f"
+    },
+    {
+      "path": "crates/rd-vm/src/primitive_parse.rs",
+      "sha256": "fc0327470665d5abcd61f81afba5e49f4b9a53beee21ef05d27d044e3b337987"
+    },
+    {
+      "path": "crates/rd-vm/src/reference_filesystem.rs",
+      "sha256": "2c52d75fc5ba5385dfd0b3bd472a6ed9b1a8475b67f8f1bef53c7b0306a8983c"
+    },
+    {
+      "path": "crates/rd-vm/src/reflect.rs",
+      "sha256": "0ff36c857e5ebd65e131eb343e8a161db3f86f44204465ee9c01e1ef73c1ddb6"
+    },
+    {
+      "path": "crates/rd-vm/src/repr.rs",
+      "sha256": "cef872b37c8a1045dc85175e621a0b80ba37d4dc906f69783cdc9e853133ed86"
+    },
+    {
+      "path": "crates/rd-vm/src/screen_model.rs",
+      "sha256": "843830016d30f807f21be7bb99f98a1bc8f0b123c3b92e811cf5893a7fb5387b"
+    },
+    {
+      "path": "crates/rd-vm/src/sdk_types.rs",
+      "sha256": "f64ce36883f7dc13da1b9c73b6a23b88c9e712522f384c33fb7ac069e52f7ed0"
+    },
+    {
+      "path": "crates/rd-vm/src/shared_call.rs",
+      "sha256": "53ea7db2779b0acd36ebe2bf98b16488cb6bca068764fc494efa0f54aae19cb0"
+    },
+    {
+      "path": "crates/rd-vm/src/threads.rs",
+      "sha256": "2cb1155e74588bb7ddf995234055e34919e2fb147702a0c691bc5fe9966a5423"
+    },
+    {
+      "path": "crates/rd-vm/src/throwable_message.rs",
+      "sha256": "4e036ab15414ac9c0537aa77127944bd341c113ef7600543f46809f3df2e68f0"
+    },
+    {
+      "path": "crates/rd-vm/src/throwable.rs",
+      "sha256": "ebdb940a525fcaaceb27453d3673d38d93229e10f66bdc2a5e1ccca302d0dbff"
+    },
+    {
+      "path": "crates/rd-vm/src/value.rs",
+      "sha256": "edd5287124e4a68a0474519a027c50d563c4974a96638d0bf6a4e169f32d8dbb"
+    },
+    {
+      "path": "crates/rd-vm/src/view_attach.rs",
+      "sha256": "03d822f43b5402aaac31816ad3f091a04e560e56826b190df106c8780706bf73"
+    },
+    {
+      "path": "crates/rd-vm/src/view_layout.rs",
+      "sha256": "831f838dad3b64671b44058b2252a7ad95e2fd235c5a7637a040162be52637a9"
+    },
+    {
+      "path": "crates/rd-vm/src/view_props.rs",
+      "sha256": "3d279a7a43b6a72b64f29435e8540c685aa12f6cd814b2e7907c44359c37158a"
+    },
+    {
+      "path": "crates/rd-vm/src/vto.rs",
+      "sha256": "e94fa150bf4a1525e2e72e6d3f68384416a17764c333f8773ae8daf9ad7da7f2"
+    },
+    {
+      "path": "crates/rd-vm/src/window.rs",
+      "sha256": "324de639a2963de78a358c253456696c1d4c7e2bf329274aad7455ab40311e82"
+    },
+    {
+      "path": "crates/rd-vm/src/xml_res.rs",
+      "sha256": "95014a6487eddb03c37c481153ac12d3882765561ffec5100ea2be4f3ecaa62e"
+    },
+    {
+      "path": "crates/rd-vm/tests/accessibility_virtual.rs",
+      "sha256": "3ea92180e7c8c7acec62638c81e92cc8557e156a34691e0c16ca3ea98705ad71"
+    },
+    {
+      "path": "crates/rd-vm/tests/activity_history.rs",
+      "sha256": "99bdd0768be0a118249d1627f7ed0cf6f08152b848cce875912e2de687f069fe"
+    },
+    {
+      "path": "crates/rd-vm/tests/alloc_budget_311.rs",
+      "sha256": "ba035660da6009a8151ae6ad47c2094f7c4c12fb389ba1f96285c77a2d695e46"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_array_containers.rs",
+      "sha256": "b2a1a73673b06738847b85739b49a2b7404c8070fcb9ad1d472249bbe42cb849"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_assets.rs",
+      "sha256": "75249e7a64dfd225cee203d89b4d9a2e4e61b354b8d8d3a7e822331fd3922ab8"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_atomic_file.rs",
+      "sha256": "e80de942bf6e1e55f607f2fac50fd54376689b6c123bd24671eb4a5c78c9f2fc"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_base64_streams.rs",
+      "sha256": "2a3e940bd7a144558eb2683488e38c50e2171269d74d495136a72fd999165814"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_bitset.rs",
+      "sha256": "fd47f124564d19e84bdec531d5e246dd83fa391ed311572bc0265f5eee3a55dd"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_display.rs",
+      "sha256": "bd5c020699c5131bf10527f2ce64f285e53c96e062d35e0205b4af6b9e284917"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_inherited_dispatch.rs",
+      "sha256": "0b348738dcddb36b52fa58dcc09ae0fbedacc3c55565547561e4436f0e267843"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_json_274.rs",
+      "sha256": "13d43a83d052ce4d3de04709af594179cfc8dce43b98168fdccabba654532b57"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_json.rs",
+      "sha256": "d47d84a2561d9959afdf9a8ad8f7e3eaa66373d470892f580f7dcbe57adec48b"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_stub_surfaces.rs",
+      "sha256": "2a664b9d25ec604f2c5408ce523776481642377ee74b0ea196f81ccfab2f7316"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_sysservices_batch1.rs",
+      "sha256": "9586a49ab0dc077a92503721726d668086e5d0b9140e537cd505a8daa886ec8b"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_sysservices_batch6.rs",
+      "sha256": "713d4155c0d3b4f41a78dc580b59de3229e843e8d0f02cdcce7e5394aae7533d"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_touch.rs",
+      "sha256": "b71836795bc067846a342eb4f51dcb7dc7a6ebcb780f7bfe41e1502280666a7e"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_uri_267.rs",
+      "sha256": "b30f74464b4948019c573b0708937cc88ffc75a354e9609c24a6a81184afe676"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_util_lru.rs",
+      "sha256": "6cbb2783a5bc8b9457744d4fc6f917124e228a2090c441e1c305a0c943d4db42"
+    },
+    {
+      "path": "crates/rd-vm/tests/androidx_hierarchy.rs",
+      "sha256": "7b5717edb5e971a25c5b2430f96a66a18fde1275f059080f9ce90bd2c8523741"
+    },
+    {
+      "path": "crates/rd-vm/tests/androidx.rs",
+      "sha256": "9dc3227754c45e04a2fc09a8665dfb173af92b8e5ebcd42b8079095ede1472b3"
+    },
+    {
+      "path": "crates/rd-vm/tests/app_xml.rs",
+      "sha256": "938fb4de77edf442676f5e4bdd58248cd6b363ef05507ef9a6859f1535803e17"
+    },
+    {
+      "path": "crates/rd-vm/tests/app.rs",
+      "sha256": "558346bf230550c91b99bd160c748ceff60f94300d3177d3f290cbc2cdeb7fd8"
+    },
+    {
+      "path": "crates/rd-vm/tests/arrays_303.rs",
+      "sha256": "8fdc573f0771c8d58f9fcfe60a335ff0e9cda91d61437770c505bed90f3e7a2d"
+    },
+    {
+      "path": "crates/rd-vm/tests/bigdecimal_272.rs",
+      "sha256": "d01096188385fe439fb2d4e49ef3e90252e92ef5880ede939bc29c497fff6ee2"
+    },
+    {
+      "path": "crates/rd-vm/tests/camera_305.rs",
+      "sha256": "47a0fabdb38a07e607b3f9e924d769dc9a0a3275c7a20076709a72bc044b4e81"
+    },
+    {
+      "path": "crates/rd-vm/tests/collections_gc.rs",
+      "sha256": "64e8f51ec9d75bef8bfae9fb08c75d6f36390f0fd83ec3a4e4eecb61dda30447"
+    },
+    {
+      "path": "crates/rd-vm/tests/common/mod.rs",
+      "sha256": "0211722728827d2e50b11625572cdcc871fbd1efadb644189b4410e2665dca10"
+    },
+    {
+      "path": "crates/rd-vm/tests/file_300.rs",
+      "sha256": "5b6b7375ea0de1c47f887f72205a5401cf968f475df05040e0652acc03722de9"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-atomic/AtomicFixture.java",
+      "sha256": "3a698a08fa6c1a3fa831fbb1b026e842d9cdd4ae5ce08e4bf7375d6c89f0e763"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-atomic/build.ps1",
+      "sha256": "b885e60b63f839b0d52ffe61514fc72cf0c960cd5bb68e6a3434cae83dfef20e"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-atomic/ReferenceFixture.java",
+      "sha256": "d97a822e0e4456c0d8848b3309d3265a8181e7cf3a699a36a921cf80791d0270"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-boxes/ArraysFixture.java",
+      "sha256": "ddd7cef3c5e94862130e7ab6f07eae1d8caf965ecc36b1ababd6f436d8333ecd"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-boxes/bit_contracts.rs",
+      "sha256": "955b45fe19be4be5dc3acdc9a397fa49e5ada2497498ddbe7c4dffa9022f5fda"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-boxes/BitFixture.java",
+      "sha256": "98009d0e5d28d51b71f7b6b92dcdc280824c11475153e3ba25977ef4b36c6a6a"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-boxes/BoxFixture.java",
+      "sha256": "b74dfc1cf8d2a8eb2b334291019a6d794481db86bf63051c1f31667f2203d3c9"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-boxes/build.ps1",
+      "sha256": "b21bfda5ace62a2e5e2ca608bf0f1bad156aead8ed9cbc3c6fdb350370ee59e0"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-boxes/contracts.rs",
+      "sha256": "85609a7defbf8bd8485ff65574e8badceb6656da6af2459a5bedd0cb4a21d4c3"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-boxes/StringDispatchFixture.java",
+      "sha256": "2d71f74b39e418456e4ce5cc05c14fd473913d4ff38f77f5bf9812bed2fbc7a8"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-class-names/build.ps1",
+      "sha256": "4072651b5fcc3ef825b0d7912e8a2c4068f076ac16c77dee7b52f92479b2c71b"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-class-names/ClassNamesFixture.java",
+      "sha256": "816f00b5dd6acb5275c75abf47f844b72dbb7d2ac2806ce9615c6dd011426539"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-encoding/build.ps1",
+      "sha256": "b4d797dd85b6b2f27d90033f25a7ed65c64fd9d6325fed119c0d3e663f441a1e"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-encoding/EncodingFixture.java",
+      "sha256": "774e5a86e312f26a3ba6ee057a52fb7dbaf8cdc388e107fabc905aa88d653417"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-enum/build.ps1",
+      "sha256": "3b966d527bc509ee6fb8e83d4badacecd4bc900ac50ee135e6812cac4171bbb9"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-enum/EnumFixture.java",
+      "sha256": "177379a2e08b52e4c585dc857a7ce9b9989cbf1bb333dc4847e9aa8ee923b66f"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-execution/build.ps1",
+      "sha256": "29163b30180e32a4db096893f0cecb92239398d833e9a5fd72e2a5b4ff14a4e2"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-execution/ExecutionFixture.java",
+      "sha256": "5b9c86fd4e4a6a65866bc94aac57853a4ae6fbdaa70f2cdc086d8f37eb875aa5"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-format/build.ps1",
+      "sha256": "17d73ccf93eecfc5067db9d3e9f4bd65c53d7292ee8eee814b108bc44caa89bc"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-format/FormatFixture.java",
+      "sha256": "876f9d99bc17d5353ab4f7bbb1d6a955da7355090ef37c408b3d1533af638bf0"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-format/MathFixture.java",
+      "sha256": "edf813a6391f9d8f85ffa76888b97378a79c7083bbeb8b114e84200a8ea1b310"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-monitor/build.ps1",
+      "sha256": "0470b47bdc50f3fe45e81c694b4823b209f5aab5c087279159a283d808a2c2d1"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-monitor/MonitorFixture.java",
+      "sha256": "9a15cc0f9002bee14c032f872fafed038f014acd0829b07f44b60696a8a859ab"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-throwable/build.ps1",
+      "sha256": "da6641aca5f790247759ec796c23d88c4d2c1b7e0edb8fb9346273eb97d20fda"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/portable-throwable/ThrowableFixture.java",
+      "sha256": "a2194042613836212bb3ab72f915f4ef84b7b33b34940171a02670295a7a1a1e"
+    },
+    {
+      "path": "crates/rd-vm/tests/fixtures/shared_android_log.rs",
+      "sha256": "681baf5e2561617d65590c9493a92958c2f2157348c01b844a08ec5c226b76b8"
+    },
+    {
+      "path": "crates/rd-vm/tests/gc_generations.rs",
+      "sha256": "1b5c932e6941dd3587b4de0a3968acd3922eb3e6dc9cfb7c67d802b38686734b"
+    },
+    {
+      "path": "crates/rd-vm/tests/gc.rs",
+      "sha256": "7c886ebcae4f0914d76a0a9df8281db751087d6fe5ef71babe1130768a098d90"
+    },
+    {
+      "path": "crates/rd-vm/tests/gms.rs",
+      "sha256": "a3cc3a29a30a074d64fc78bbeb6137ed91f233c9ab9f59602539f34912477557"
+    },
+    {
+      "path": "crates/rd-vm/tests/graphics_301.rs",
+      "sha256": "ce4c872e343ddda7f3641da7f16a22982f295bb4bda642cb0ba90d70fedf7237"
+    },
+    {
+      "path": "crates/rd-vm/tests/inflate_263.rs",
+      "sha256": "5dbc47527a8d8b9cb5c782196f0ebd95cf8770b15f6e51d4254112eef94f5e0b"
+    },
+    {
+      "path": "crates/rd-vm/tests/io_chars_266.rs",
+      "sha256": "04f7af8fccb550886ee467713f9e976c3e30ef3712ac598f3d3218eac9cce7a8"
+    },
+    {
+      "path": "crates/rd-vm/tests/jit.rs",
+      "sha256": "c07eb0fe3a2b470eb3ec4f322c8098c08d9a5ffbbe80fa8a849cb3d1823f8925"
+    },
+    {
+      "path": "crates/rd-vm/tests/jtext_format_295.rs",
+      "sha256": "b2d9d0372e4bc41337c0d1b15ae2938de63a7d04d235c15330d23dca8516eb51"
+    },
+    {
+      "path": "crates/rd-vm/tests/m10.rs",
+      "sha256": "af6b3797b3f8d62b375dc6fac87ace90c571a831c95360ae739a30fba9a45b3d"
+    },
+    {
+      "path": "crates/rd-vm/tests/m8.rs",
+      "sha256": "8031c874ef88f84e25e336d6f8bc51a06b587a23348407156839fd17a1722dec"
+    },
+    {
+      "path": "crates/rd-vm/tests/m9.rs",
+      "sha256": "d57e3e34b1807765c8c6ad1a576615d258e3d68636161f38ba9ac3f88891fd51"
+    },
+    {
+      "path": "crates/rd-vm/tests/narrow_arrays_250.rs",
+      "sha256": "5d9b2873108a28577357d539c02eedbf943a8011a227ff7e029f32fa9390f323"
+    },
+    {
+      "path": "crates/rd-vm/tests/native.rs",
+      "sha256": "5d91c1f288d221c679cc829c0c2c1c7316af350959262e07798996036e4ca080"
+    },
+    {
+      "path": "crates/rd-vm/tests/numerics_319.rs",
+      "sha256": "5064400fa301bfa2fc31295c371b9ed8db3512b74da0bfed4c7e2057c6379caf"
+    },
+    {
+      "path": "crates/rd-vm/tests/parcel_261.rs",
+      "sha256": "46c87268a5093cd0e1355c41fa4005af532ce96f32b39a8d7291d036fbd4275e"
+    },
+    {
+      "path": "crates/rd-vm/tests/parcel_binder.rs",
+      "sha256": "98986217bb99c6060ec719441b2d959c25c85a43f4fa3944e919e2ea9e94dc2a"
+    },
+    {
+      "path": "crates/rd-vm/tests/regex_262.rs",
+      "sha256": "ab951ad6a64dd9c4835295801cb37e42b96fa5d80b603e4cca835fd0b3e00355"
+    },
+    {
+      "path": "crates/rd-vm/tests/regex_lookaround.rs",
+      "sha256": "856c97ad0c6064e0b3f92cb8c35891236210a3d8bcb77c93397680088f10ca23"
+    },
+    {
+      "path": "crates/rd-vm/tests/shared_android_log.rs",
+      "sha256": "fa5b3e763372641fff0c52cf7f674158cd3565378fd6249c491d330305cc715d"
+    },
+    {
+      "path": "crates/rd-vm/tests/shared_boxes.rs",
+      "sha256": "3f11540e0f85cbbfd7fbd10960c2239c2e3f4f601332bea6deeb3c1ba5f09c4f"
+    },
+    {
+      "path": "crates/rd-vm/tests/sqlite_prefs_257.rs",
+      "sha256": "75ca28da10f479ece8187059816985c6e0d906c0b03150ce4280241f78368317"
+    },
+    {
+      "path": "crates/rd-vm/tests/string_270.rs",
+      "sha256": "20a9e3b54d62cbd6484e322c3d29d4da6a47749379635a29920e5b93eea29780"
+    },
+    {
+      "path": "crates/rd-vm/tests/view_hierarchy_316.rs",
+      "sha256": "ed988e3f8788d2543b2ee6d7e4d2ef62899f96ac0062de1b2c645c1b4303ea22"
+    },
+    {
+      "path": "crates/rd-vm/tests/vm_exec.rs",
+      "sha256": "dea085ed74a441ca1d60340d69b0a13e764365ad0a7f3b61c303fe16fbaf7973"
+    },
+    {
+      "path": "crates/rd-vm/tests/xml_269.rs",
+      "sha256": "d6ecb398413eb4ce9564271b9035aa66a2e3448fd575371d15f0328f0ae86b34"
+    },
+    {
+      "path": "platform/androswitch/cpu_time.c",
+      "sha256": "724ebab781b2af6a49514f4753a79ba281256fb824e46c71756ed126625ad3cc"
+    },
+    {
+      "path": "platform/androswitch/cpu_time.h",
+      "sha256": "adb065c4e6151c2ed92887c8bd8dbe7d68fa7d7b554656b17abfc453c970b31a"
+    },
+    {
+      "path": "platform/androswitch/display_geometry.h",
+      "sha256": "1b072b3fb3750fe80d37c3650f23792a95e60c8e8aedcf350a60babf594742c1"
+    },
+    {
+      "path": "platform/androswitch/display.c",
+      "sha256": "0e125b3b0279f13f1ea707cee7b20672b40a3e7409fabcabd4659dbf7573ce19"
+    },
+    {
+      "path": "platform/androswitch/display.h",
+      "sha256": "347fa3f7e05c81f110ec9cf49486701f126df8e8668b91d3ae0c82e60a115024"
+    },
+    {
+      "path": "platform/androswitch/framebuffer_copy.h",
+      "sha256": "886ba44f63572ef616b139c17b394a8bd218124011c7cd59f23992018d0a8ac7"
+    },
+    {
+      "path": "platform/androswitch/gles2_imports.inc",
+      "sha256": "c628db079425a2f85c6661ba83a1bae20055da66083bf8e508b3bbb273b0b2fa"
+    },
+    {
+      "path": "platform/androswitch/glsurface.c",
+      "sha256": "dfdac8d65a4b70d55909d6c4a39759b9d9c5377db17340ba926224c80d38042d"
+    },
+    {
+      "path": "platform/androswitch/glsurface.h",
+      "sha256": "6e70700a421a9a675b9418fd40fdadb0cb792265b1f1bf288d0ff01d24de080b"
+    },
+    {
+      "path": "platform/androswitch/main.c",
+      "sha256": "fec480278b4128cbfc443972ec70c71c630d44f573bf78d1cd95f5baa0e24f9f"
+    },
+    {
+      "path": "platform/androswitch/Makefile",
+      "sha256": "973d1e9cabdd9cd8a7e1b70c8304202dddb05d5aa12140f0dd848f91df193050"
+    },
+    {
+      "path": "platform/androswitch/media_format.c",
+      "sha256": "4a24c93012d99f351e2dd4318562d4b4f87f4e91b2a819b08643d4ed67fda307"
+    },
+    {
+      "path": "platform/androswitch/media_format.h",
+      "sha256": "df8825ec36945100229aa240b5e7ff30ab88f4a58418b97a2b22a25f8fded62c"
+    },
+    {
+      "path": "platform/androswitch/media.c",
+      "sha256": "75060cabbbe4a4807aef2085d02d0bfcfa0e9015b57848cfd269591f604f1aad"
+    },
+    {
+      "path": "platform/androswitch/media.h",
+      "sha256": "a2ae3ef0df5322a9dcf40b6329203e96cc2cbc7290bd724bcecdf6ddf7979ac6"
+    },
+    {
+      "path": "platform/androswitch/memory_policy.h",
+      "sha256": "fef208063c81d398f8b475013539bca85db6be2224640b8b22a71e8640f5205f"
+    },
+    {
+      "path": "platform/androswitch/memory.c",
+      "sha256": "4deaa40da2f04ec52fdd301d192f46c8071c0beaa3b19e9a82706640d652470d"
+    },
+    {
+      "path": "platform/androswitch/memory.h",
+      "sha256": "688077331e06cad89a37a8ef7d0b3883d839ee0befebd5d02a22d5ce8240a5ca"
+    },
+    {
+      "path": "platform/androswitch/opensl.c",
+      "sha256": "2b865a7b32ea4df13cef7adf9f9d682b70a1123456ba18711517cc6269840de8"
+    },
+    {
+      "path": "platform/androswitch/pcm_volume.h",
+      "sha256": "82e4200f0b59735e13786741076955df1dae0fed3e2cbd1484138d2bf113476c"
+    },
+    {
+      "path": "platform/androswitch/ppm_publish.h",
+      "sha256": "a76dcfb9e5f6a76dc24a5371da6d475e46334450cb8fe2af15a7cd1e75e88cfe"
+    },
+    {
+      "path": "platform/androswitch/rgba_ppm.h",
+      "sha256": "c2df79c3ea4093c148e18b418e1c22a8d4afd362de8f1d3226d4b409be8eb646"
+    },
+    {
+      "path": "platform/androswitch/sdk_compat.c",
+      "sha256": "41f44dd57b41a479c92bd2a418d67b2f29eba6fa88c31b53d599cd073e8ef426"
+    },
+    {
+      "path": "platform/androswitch/sdk_futex.c",
+      "sha256": "561fc6454c873aa9a3593bf8d3f7b7c4dd6a944f93d48bc8899952a09d87744a"
+    },
+    {
+      "path": "platform/androswitch/sdk_futex.h",
+      "sha256": "4a884927496f6c160600892280da35772d42145cedb28d7763d20219afff841a"
+    },
+    {
+      "path": "platform/androswitch/tests/background_workers.c",
+      "sha256": "ad3d6422aea1065a2997018796947f2336762c97d397a228721c2becfbd5aac2"
+    },
+    {
+      "path": "platform/androswitch/tests/display_rotation.c",
+      "sha256": "94d0f5b30c276ddcaf6c67bd375afee5870a027247b3795ead7ad0fe36ec8810"
+    },
+    {
+      "path": "platform/androswitch/tests/fake-display/switch.h",
+      "sha256": "b08c8c67459c3fca9cb674bd5055a929f99795fc6c60d112672c73dbe96b4be7"
+    },
+    {
+      "path": "platform/androswitch/tests/fake-switch/switch.h",
+      "sha256": "e99a17f4c8c5d7322beec6acccc00ac67b8ff4c19e51ebabe142978d3857ba18"
+    },
+    {
+      "path": "platform/androswitch/tests/fake-workers/switch.h",
+      "sha256": "4a0a464b0280e33e8d6595fb028996c4fe81665591609873d528a12e8219d37e"
+    },
+    {
+      "path": "platform/androswitch/tests/framebuffer_copy.c",
+      "sha256": "913a4435ce84dc202a3f8e453ac6f47e11bb4dff20f2b33aca958b2af3c26381"
+    },
+    {
+      "path": "platform/androswitch/tests/glsurface_worker.c",
+      "sha256": "46edfddd754f1668d9c2ee8402a8dd8d5dd965ee12e80733caa429f6c1c127e8"
+    },
+    {
+      "path": "platform/androswitch/tests/media_format.c",
+      "sha256": "78afd5c392c1a65f422f75f344847c5b856a790fd802e3d89eea97d9224c8aab"
+    },
+    {
+      "path": "platform/androswitch/tests/memory_policy.c",
+      "sha256": "5b3fb1ff3258a885286b47cbf7cb4d6b9650701a1fa103f0cc9fa254c84585ec"
+    },
+    {
+      "path": "platform/androswitch/tests/pcm_volume.c",
+      "sha256": "9323a1bb28fb3cb708fe982bf54be9bf2762b8b5cb38c4f96717b748b6219d75"
+    },
+    {
+      "path": "platform/androswitch/tests/ppm_publish.c",
+      "sha256": "72bed6c74a9fadf3b0e347003ea04552130b76cfd56bdb8c31535a0887e11eb6"
+    },
+    {
+      "path": "platform/androswitch/vulkan_bridge.c",
+      "sha256": "20df1ceb140216796746ba0f2a51b868f5ece5942d3ab1f1aed92d2cb8f90713"
+    },
+    {
+      "path": "platform/androswitch/vulkan_bridge.h",
+      "sha256": "1e8f2dbd067da911d02d39691b6b766a4118c5a5a18acdbbdaefe9c2bd810728"
+    },
+    {
+      "path": "platform/androswitch/workers.c",
+      "sha256": "74e175e83a54d015bbb18bd0ed5b44e6dcf7da505032fb61a0334a61b4d836cd"
+    },
+    {
+      "path": "platform/androswitch/workers.h",
+      "sha256": "6842406338aa06265748323168ff935f74803973634268a2276ca73ea2b43aa1"
+    },
+    {
+      "path": "platform/horizon-std/aarch64-androswitch-newlib.json",
+      "sha256": "bbe39be0af7b829ddf4c646aaaa4b937d3525e8cc0d23854ce715fba657689ab"
+    },
+    {
+      "path": "platform/horizon-std/rust-source.lock.json",
+      "sha256": "bc87196f3129a4a6a3bbdfda50423841145f068b9f6d78834c98887788352386"
+    },
+    {
+      "path": "platform/horizon-std/support.c",
+      "sha256": "0d29449e8d41d42922a24b6342f76777a7efc98eaa8a2a63287b9eafd2843912"
+    },
+    {
+      "path": "platform/horizon-std/support.h",
+      "sha256": "aa2e4437886fcdccadb4a2e50bdf8f93a3e94cebe250b4f2a1d01d6b1724053a"
+    },
+    {
+      "path": "platform/sqlite/memory_vfs.c",
+      "sha256": "552fd148fa1a058948e8b9f4affabb6a4b55b174302ca3e36ef3c428e93fc6b8"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_auxv.h",
+      "sha256": "3ddbe9a507d04a17e216e90040f45d90efa89da52699f7be41751cce535b3d7a"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_cxx.c",
+      "sha256": "6cadc734dd71e01a265acde7746047b1bd16a5f3c9ceb2463ea9eb10cb38f1d0"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_cxx.h",
+      "sha256": "1b3f0330faf7603277fe53cffd36e2d3dd2b9ecc93842ce55320b657f97ee405"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_descriptors.inc",
+      "sha256": "6c68caaf4a2238ce0791d46a547882049a2af8ce9808aa926b793ecd4281f283"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_dlfcn.c",
+      "sha256": "ac1a9e0e27af771266aeef0701bc6cf4c7f405ab2a16a6ad7ef9f2ef3ecadfc0"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_dlfcn.h",
+      "sha256": "40ccb5a3bb0666106f64d4c5610747bd1e18472652cfdc508e25c76e7802209d"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_errno.h",
+      "sha256": "cfb487ad9d8b194f5d66fa74269f76a5f7434657c0abc905e7a17fa5d76158fd"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_finalize.c",
+      "sha256": "30072d5754001cb87651de4c447e112bede00bf2bc22dfc5d51af856942bc826"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_finalize.h",
+      "sha256": "77f8e10777fc6f156d89c07832926da8d7ff93df8dcdf26429964e44753c940a"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_io.c",
+      "sha256": "1b2d9cc1e384926940c823192511cc2a1870b641e58a176284acdf45a91bd0cb"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_keys.c",
+      "sha256": "f54ebf263e42feb73d97268569751b14aea9660978c1eaba2728db5ef39222e8"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_libc.c",
+      "sha256": "ee1eb22d40e1e5940b72bdd16da25172423c86ebbc6fbdee611cbfa7049d0a60"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_locale.c",
+      "sha256": "e518ab58d00609b21eb73326fe4bb4b565b0c61981eda62445ec38b035b58562"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_locale.h",
+      "sha256": "3832bf917a8e37127fac8c7664ff809e7498563b18f5601af891d97e1941c6e4"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_log.c",
+      "sha256": "482751931c109e9568e729e4feed381da6ca78b9917e03397cee37548f3b65cd"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_memory.c",
+      "sha256": "8e518ea4354f395103ce817bfdf003b6f1b67f44ef3b8d5c922958121b75a3fd"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_memory.h",
+      "sha256": "a864741b568607ad686f9be8466f5e3b9f7d238d64d36b4276399f642cac5721"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_multibyte.c",
+      "sha256": "e45749bac9ffe6303248e601e333c37b31af44f4ffe1c5b422bc80db32e4d0ed"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_multibyte.h",
+      "sha256": "3e0f632f3b9a18082360e8be0f278432ce936192e2fa1266c7b9e74a9ff8b645"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_properties.h",
+      "sha256": "5b46950099ad15a8b54c2a17f81ab76b8330b47c2be73749a607ae1ee6389c42"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_random.c",
+      "sha256": "cd018960a81a468bd93c409649566b831839bfae05bd74b82be9a0d4df8ab4be"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_random.h",
+      "sha256": "1c73d031b7231dafd1ff26815014579daa36d740a9e727a80b65b739187aa5bc"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_signals.inc",
+      "sha256": "c76d25eeaba4c8a57d405b4fae6d793f5d3c78dad4c87c9ca1ecba497bb08a75"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_sync.c",
+      "sha256": "6d0bf287e476f535a49fc7dd76ff922785a038e653fb77dbe403894405e83aa7"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_vfs.c",
+      "sha256": "d9447372dc5ffb2d7dd4ab65402b160fab44b910d06daca1a0fffab07f0a9dc4"
+    },
+    {
+      "path": "platform/switch-smoke/bionic_vfs.h",
+      "sha256": "9a9936fec8085c3ac718036efdbc81c670545441209b3065dfc12a465bc50dd6"
+    },
+    {
+      "path": "platform/switch-smoke/fs.c",
+      "sha256": "b188bb9889d67aa4e92b0399d57acdd1c830de2a5cd3aa58bff8cc724a510923"
+    },
+    {
+      "path": "platform/switch-smoke/jni_arguments.h",
+      "sha256": "a7d4759d47a9b2addad90056b1d91804eb8949f9496f601d19ba086de1f9e052"
+    },
+    {
+      "path": "platform/switch-smoke/jni_construct.inc",
+      "sha256": "5b71d68109a2b9eeb6d780364b8b99d365e5915f9417688603467d99e9231289"
+    },
+    {
+      "path": "platform/switch-smoke/jni_static_fields.inc",
+      "sha256": "73f6552ca790277648be117a610f20acf9d59dd07fe164ef4ba9dd0c22e9249f"
+    },
+    {
+      "path": "platform/switch-smoke/jni_traps.inc",
+      "sha256": "d9402f07f94e1308b9a0597e2c4a75c773a2a680c5bdfdaf645af4f4790d325a"
+    },
+    {
+      "path": "platform/switch-smoke/jni.c",
+      "sha256": "a9161e2a8605e9bcb120f3b43a41f42fa736551f574e6b59146c08d299928c25"
+    },
+    {
+      "path": "platform/switch-smoke/main.c",
+      "sha256": "30b134eeca6957d082b339fc39a88da834113aaeb22b45e8927cb88ba7b938f9"
+    },
+    {
+      "path": "platform/switch-smoke/Makefile",
+      "sha256": "8beac73b33001c6d449ff5850bf5408db6a0de737de47446bb423cab113fb1b3"
+    },
+    {
+      "path": "platform/switch-smoke/missing_import.c",
+      "sha256": "10ba3b123332d5e2b39cff9562b58192d7cc055a81304f11447738ef0a22ea0b"
+    },
+    {
+      "path": "platform/switch-smoke/native_call.S",
+      "sha256": "e03f715b48d10e20b738f1a5c0b18f41b49b68be537c0b31705afdc5f58cc0a7"
+    },
+    {
+      "path": "platform/switch-smoke/native.c",
+      "sha256": "3d8ae9c4c422c795def1aafdf59f8537c3034d6864e184b90aa47098d89d0d7b"
+    },
+    {
+      "path": "platform/switch-smoke/native.h",
+      "sha256": "c8291ac1d7403d5bb2b447210bc4e4c8f771d835495ee9c6fe2bba2cce030d4f"
+    },
+    {
+      "path": "platform/switch-smoke/resource_extra.c",
+      "sha256": "cd78ea677f8714f17215ea9c04a2b5f2295b216069108ecccece2137ceee29b6"
+    },
+    {
+      "path": "platform/switch-smoke/resource_info.c",
+      "sha256": "3fa81273a95fee509248761ddfda654370aab48e3de50e1cf50252a5077d0457"
+    },
+    {
+      "path": "platform/switch-smoke/resource_info.h",
+      "sha256": "f6e039eb317a43875c95e0239581619d0d198828fdd36b74413dc62f9331329f"
+    },
+    {
+      "path": "platform/switch-smoke/runtime_properties.inc",
+      "sha256": "88ba493d3f0fab8d3f275edcafa55bae7ce6da78f8dc85cad66bd71a561022b4"
+    },
+    {
+      "path": "platform/switch-smoke/tests/fake-extra/switch.h",
+      "sha256": "4491213c00198fd6bec60d9d3b65813af7d184339d0cf252a97d7057b1d10882"
+    },
+    {
+      "path": "platform/switch-smoke/tests/fake-resources/switch.h",
+      "sha256": "a4e0d19e2b40a649d6316f8e4d8863367f63915c8d139320622b11e6678ef13a"
+    },
+    {
+      "path": "platform/switch-smoke/tests/resource_extra.c",
+      "sha256": "22d3a263cefc89a2c66658d93306155d327b7868d6c9623158a55fd3c5c97a2a"
+    },
+    {
+      "path": "platform/switch-smoke/tests/resource_info.c",
+      "sha256": "0ba9daf6d0e7b5cb5bae7fd85e84ac6f7215f03614027cb6ef71e59aa2458cf2"
+    },
+    {
+      "path": "platform/switch-smoke/worker_admission.c",
+      "sha256": "17d056f2387750835dc4ce619dbbe84482472e503f95dfc25a6c848ec4e5850e"
+    },
+    {
+      "path": "platform/switch-smoke/worker_admission.h",
+      "sha256": "b7e599afe5369c7d88f8c177448225224d893c928b354b4475efde410baca1e8"
+    },
+    {
+      "path": "scripts/build-androswitch.ps1",
+      "sha256": "b949032068c5968189cbae4c6705062e2ba2a9a6e076d01af4086a8398107c4b"
+    },
+    {
+      "path": "scripts/prepare-horizon-std-toolchain.py",
+      "sha256": "1d57cda7253a0e1ac631374493949d9b551774c6ff9e6c6b19503ad17ee8632b"
+    },
+    {
+      "path": "scripts/prepare-horizon-std.py",
+      "sha256": "dba768a342acaa5342f4d44b79c2b65de26cdbdb69e14a387b5a073580ff3f3d"
+    },
+    {
+      "path": "scripts/prepare-mesa-std-link.py",
+      "sha256": "8f7f699ece8799d12e1bd51772b6e43589581f71314dceca1934c74c61e7ff42"
+    },
+    {
+      "path": "third_party/android-charset/LICENSE",
+      "sha256": "2023a2d68dfcdb1f7b7c5dccb96f88aabba112f63f250cb9e533cc64625eff07"
+    },
+    {
+      "path": "third_party/android-charset/SOURCE.md",
+      "sha256": "bce0d2b338c1b816e5d5536fa120dc2d61f366b0b3bdb53e27a6b606c13e4684"
+    },
+    {
+      "path": "third_party/android/jni.h",
+      "sha256": "5df9074457c041b372f2c68ff646d6e8600cd673a223885e8df21c44c94ec667"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES_Android.h",
+      "sha256": "284ad1666c8951068a5d544ab842a4a47410aa2f3a5b9579ca4008e914bf92d7"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES_AndroidConfiguration.h",
+      "sha256": "3b3e5e81dc1120448c2f890480c5ccdac68f27b703c20af72e2da311f249c5a9"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES_AndroidMetadata.h",
+      "sha256": "d159a419fcfeaedc471355f4e00269c055d8ba05bc1785db32b77d6bfcd1da4a"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES_IID.c",
+      "sha256": "6b7c2d6ea5b61ff695b95e929827900e5715dfbce0a7571f8ad9ff2916b7a627"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES_Platform.h",
+      "sha256": "993bd76a087fd99e12205b9872c19567b0a17098f124ff71800bb1a3e5fef28a"
+    },
+    {
+      "path": "third_party/android/opensles/OpenSLES.h",
+      "sha256": "580dca493bdf75a0541ed18b7d05b9e087e1bf95fe5e8d52695584670de03e20"
+    },
+    {
+      "path": "third_party/fonts/DejaVu.LICENSE",
+      "sha256": "7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93"
+    },
+    {
+      "path": "third_party/libnx-framebuffer.LICENSE",
+      "sha256": "5b6675f85016009624d29c9222201d3c0fc6a2d5c59253367f27d3e15011cdb2"
+    },
+    {
+      "path": "third_party/mesa-switch-reference.json",
+      "sha256": "f64e893713e59eb0682cbabd5e32eaa2ab13045ba7dcf885c107149be121c49d"
+    },
+    {
+      "path": "third_party/mesa-switch-rust.lock.json",
+      "sha256": "eff7407017a0673c6a091b2d77e1a85eac0ab5ca5a81acb68bec2c2fe7148608"
+    },
+    {
+      "path": "third_party/README.md",
+      "sha256": "8b9dab29779570cafd26d79c8b5b3906872691adb5439771c966dc813272c5bd"
+    },
+    {
+      "path": "third_party/so_util.LICENSE",
+      "sha256": "fec1f8b2d059658c82660fea5e25320f7ec7fecdd4b2fb5e335ce6365412dcbd"
+    },
+    {
+      "path": "third_party/SQLite-NOTICE.txt",
+      "sha256": "ae80d0129c762e5721c181350ecf6db07ea5c091fa63b7448a0bcac6957c2459"
+    },
+    {
+      "path": "third_party/sqlite.lock.json",
+      "sha256": "cce2cc3f0b3e6354568cc3da7d6067980ef88788f451349711975d7cb7f85e95"
+    }
+  ],
+  "source_hash_convention": "actual working-tree input bytes; Git text blobs normalize CRLF to LF"
+}
