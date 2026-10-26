@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-26",
+  "status": "passed_archive_validation",
+  "archive": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\releases\\androswitch-m9-candidate-20261026-112442-1c3e18e4.zip",
+  "archive_sha256": "67d16cdb4a0513ed9e6dc6a7b11cc8989a52fcfe11913dbca22986b669f82606",
+  "archive_bytes": 11524188,
+  "source_commit": "bef3617d839ace25322cd1572cb16d8c8419d4bf",
+  "implementation_commit": "ed594603a15c234286efd63f29f154f0a45eb023",
+  "nro_sha256": "a3a34bab32cf31e182fb72efe524bad1e06b5a69107853e9a0aba893aaef2bf8",
+  "nro_count": 1,
+  "apk_count": 1,
+  "conformance_apk_sha256": "f77a08b2463d60fef05e2a2c0130d5126fab77eb10e4c24ff76ccdc42a279157",
+  "catalog_cases": 219,
+  "retained_evidence_files": 128,
+  "dependency_notice_files_verified": 87,
+  "checks": [
+    "ZIP CRC; expected directory structure",
+    "Exactly one NRO and one unchanged Conformance APK; artifact hashes",
+    "All retained evidence hashes; dependency notice inventory hashes",
+    "RustyDroid credit and licenses; packaged entry-point links",
+    "Candidate-only and hardware-not-run declarations preserved"
+  ],
+  "verification": {
+    "host": "passed scoped upstream/product/ABI regression gates",
+    "emulator": "std probe 32/32 three runs; conformance 216 PASS / 3 NOT_RUN; 11 launcher sessions; normal graphics/audio process exit",
+    "physical_device": "not_run_for_this_std_binary"
+  },
+  "all_upstream_apis_1_to_1_on_horizon": false
+}
