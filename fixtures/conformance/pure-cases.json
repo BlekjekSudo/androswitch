@@ -590,5 +590,93 @@
   {
     "id": "io.writer-dex-raw-utf16",
     "group": "I/O"
+  },
+  {
+    "id": "numeric.floor-div",
+    "group": "Math"
+  },
+  {
+    "id": "numeric.floor-mod-zero",
+    "group": "Math"
+  },
+  {
+    "id": "numeric.round",
+    "group": "Math"
+  },
+  {
+    "id": "numeric.rint",
+    "group": "Math"
+  },
+  {
+    "id": "numeric.ulp",
+    "group": "Math"
+  },
+  {
+    "id": "numeric.min-max",
+    "group": "Math"
+  },
+  {
+    "id": "numeric.transcendental",
+    "group": "Math"
+  },
+  {
+    "id": "numeric.pow-hypot",
+    "group": "Math"
+  },
+  {
+    "id": "numeric.float-min-max",
+    "group": "Math"
+  },
+  {
+    "id": "numeric.identifier-unicode",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.digit-radix",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.to-chars",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.builder-codepoint",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.sequence-callback-gc",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.integer-radix",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.long-radix",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.floating-parse",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.boxed-parse-gc",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.character-classify",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.to-chars-errors",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.character-categories",
+    "group": "Numbers"
+  },
+  {
+    "id": "numeric.ieee-order-hash",
+    "group": "Numbers"
   }
 ]

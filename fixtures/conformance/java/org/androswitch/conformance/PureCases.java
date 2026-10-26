@@ -1,5 +1,12 @@
 package org.androswitch.conformance;
 public final class PureCases {
+  private static final class NumericSequence implements CharSequence {
+    final String text = "a\uD83D\uDE42z";
+    public int length() { return text.length(); }
+    public char charAt(int i) { System.gc(); return text.charAt(i); }
+    public CharSequence subSequence(int a, int b) { return text.subSequence(a,b); }
+    public String toString() { return "not-the-sequence"; }
+  }
   private static final class ProxyWriter extends java.io.Writer {
     final java.io.StringWriter sink = new java.io.StringWriter();
     public void write(char[] c, int off, int n) { sink.write(c, off, n); }
@@ -746,6 +753,113 @@ public final class PureCases {
         java.io.BufferedWriter w = new java.io.BufferedWriter(p);
         w.write(0xD83D); w.flush(); p.sink.write(0xDE42); return p.sink.toString();
       }
+      case 148: {
+        return Math.floorDiv(4,-3) + ":" + Math.floorDiv(-4,3) + ":" +
+            Math.floorDiv(Integer.MIN_VALUE,-1) + ":" + StrictMath.floorDiv(-4L,3L);
+      }
+      case 149: {
+        int caught=0; try { Math.floorDiv(1,0); } catch (ArithmeticException e) { caught++; }
+        try { StrictMath.floorMod(1L,0L); } catch (ArithmeticException e) { caught++; }
+        return Math.floorMod(4,-3) + ":" + Math.floorMod(-4,3) + ":" +
+            StrictMath.floorMod(Long.MIN_VALUE,-1L) + ":" + caught;
+      }
+      case 150: {
+        return Math.round(-1.5f) + ":" + Math.round(Float.NaN) + ":" +
+            Math.round(Double.POSITIVE_INFINITY) + ":" + StrictMath.round(-2.5) + ":" +
+            Math.round(Float.intBitsToFloat(0x3effffff)) + ":" +
+            StrictMath.round(Double.longBitsToDouble(0x3fdfffffffffffffL));
+      }
+      case 151: {
+        return Math.rint(2.5) + ":" + Math.rint(3.5) + ":" +
+            Double.doubleToLongBits(StrictMath.rint(-0.5));
+      }
+      case 152: {
+        return Double.doubleToLongBits(Math.ulp(-0.0)) + ":" +
+            Float.floatToIntBits(StrictMath.ulp(Float.MAX_VALUE)) + ":" +
+            Double.isNaN(Math.ulp(Double.NaN));
+      }
+      case 153: {
+        return Double.doubleToLongBits(Math.min(0.0,-0.0)) + ":" +
+            Double.doubleToLongBits(StrictMath.max(-0.0,0.0)) + ":" +
+            Float.isNaN(Math.min(Float.NaN,3.0f));
+      }
+      case 154: {
+        return Math.sin(0.0) + ":" + StrictMath.cos(0.0) + ":" + Math.sqrt(9.0) +
+            ":" + Math.expm1(0.0) + ":" + StrictMath.log1p(0.0);
+      }
+      case 155: {
+        return Math.pow(2.0,3.0) + ":" + StrictMath.hypot(3.0,4.0) + ":" +
+            Math.atan2(0.0,1.0) + ":" + Math.floor(-1.2) + ":" + StrictMath.ceil(-1.2);
+      }
+      case 156: {
+        return Float.floatToIntBits(Float.min(0.0f,-0.0f)) + ":" +
+            Float.floatToIntBits(Float.max(-0.0f,0.0f)) + ":" + Float.isNaN(Float.max(1,Float.NaN));
+      }
+      case 157: {
+        return Character.isJavaIdentifierStart('\u03C0') + ":" +
+            Character.isJavaIdentifierStart('\u20AC') + ":" +
+            Character.isJavaIdentifierPart(0x301) + ":" + Character.isIdentifierIgnorable(0x200C);
+      }
+      case 158: {
+        return Character.digit('f',16) + ":" + Character.digit('z',36) + ":" +
+            Character.digit('1',Integer.MIN_VALUE) + ":" + Character.digit(0x41,37);
+      }
+      case 159: {
+        char[] c = new char[]{'x','x','x','x'};
+        int n=Character.toChars(0x1F642,c,1);
+        return n + ":" + (int)c[0] + ":" + (int)c[1] + ":" + (int)c[2] + ":" + (int)c[3];
+      }
+      case 160: {
+        StringBuilder b = new StringBuilder(); b.append('\uD83D');
+        int raw=Character.codePointAt(b,0); b.append('\uDE42'); System.gc();
+        return raw + ":" + Character.codePointAt(b,0) + ":" + Character.codePointBefore(b,2);
+      }
+      case 161: {
+        CharSequence s = new NumericSequence(); System.gc();
+        return Character.codePointAt(s,1) + ":" + Character.codePointBefore(s,3);
+      }
+      case 162: {
+        return Integer.toString(-255,16) + ":" + Integer.toBinaryString(-1).length() + ":" +
+            Integer.toOctalString(64) + ":" + Integer.parseInt("+7fffffff",16);
+      }
+      case 163: {
+        return Long.toString(Long.MIN_VALUE,16) + ":" + Long.parseLong("-8000000000000000",16)
+            + ":" + Long.toBinaryString(-1L).length();
+      }
+      case 164: {
+        int caught=0, nullable=0;
+        try { Float.parseFloat("NaNf"); } catch (NumberFormatException e) { caught++; }
+        try { Double.parseDouble("1.0ff"); } catch (NumberFormatException e) { caught++; }
+        try { Float.parseFloat(null); } catch (NullPointerException e) { nullable++; }
+        try { Double.valueOf((String)null); } catch (NullPointerException e) { nullable++; }
+        return Double.parseDouble(" -2.5f ") + ":" + Float.parseFloat("1.25F") + ":" + caught + ":" + nullable;
+      }
+      case 165: {
+        Number a=Integer.valueOf("7f",16), b=Long.valueOf("9223372036854775807");
+        Number c=Float.valueOf("-2.5"), d=Double.valueOf("1.25"); System.gc();
+        return a.intValue() + ":" + b.longValue() + ":" + c.floatValue() + ":" + d.doubleValue();
+      }
+      case 166: {
+        return (int)Character.toUpperCase('a') + ":" + Character.toLowerCase(0x41) + ":" +
+            Character.isWhitespace('\n') + ":" + Character.isWhitespace('\u00A0') + ":" +
+            Character.isSpaceChar('\u00A0');
+      }
+      case 167: {
+        int caught=0;
+        try { Character.toChars(-1,null,0); } catch (IllegalArgumentException e) { caught+=1; }
+        try { Character.toChars(65,null,0); } catch (NullPointerException e) { caught+=2; }
+        try { Character.toChars(65,new char[1],-1); } catch (IndexOutOfBoundsException e) { caught+=4; }
+        return Integer.toString(caught);
+      }
+      case 168: {
+        return Character.getType('A') + ":" + Character.getType('a') + ":" +
+            Character.getType('0') + ":" + Character.getDirectionality('A');
+      }
+      case 169: {
+        return Double.compare(-0.0,0.0) + ":" + Float.compare(Float.NaN,Float.POSITIVE_INFINITY)
+            + ":" + Double.hashCode(Double.NaN) + ":" + Double.doubleToRawLongBits(-0.0)
+            + ":" + Double.doubleToRawLongBits(Math.signum(Double.longBitsToDouble(0x7ff8000000000123L)));
+      }
       default:
         throw new IllegalArgumentException("unknown pure case");
     }
@@ -755,7 +869,7 @@ public final class PureCases {
     // legacy encoding. A surrogate/Unicode test must preserve its real value.
     java.io.PrintWriter out = args.length == 0 ? new java.io.PrintWriter(System.out) :
         new java.io.PrintWriter(new java.io.OutputStreamWriter(new java.io.FileOutputStream(args[0]), "UTF-8"));
-    for (int i = 0; i < 148; i++) out.println(i + "\t" + run(i));
+    for (int i = 0; i < 170; i++) out.println(i + "\t" + run(i));
     out.flush(); if (args.length != 0) out.close();
   }
 }

@@ -71,6 +71,10 @@ pub fn call_static_intrinsic(
     if let Some(value) = crate::boxes::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    #[cfg(feature = "std")]
+    if let Some(value) = crate::numerics::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     if let Some(value) = crate::portable::monitor::call_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }

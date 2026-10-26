@@ -29,6 +29,33 @@ fn str_arg(vm: &Engine, v: Option<&Value>) -> Result<String, VmExit> {
         ))),
     }
 }
+fn floating_arg(vm: &Engine, value: Option<&Value>) -> Result<String, VmExit> {
+    if matches!(value, None | Some(Value::Null | Value::Int(0))) {
+        return Err(Throwable::new(
+            "Ljava/lang/NullPointerException;",
+            "floating parse input == null",
+        )
+        .into());
+    }
+    str_arg(vm, value)
+}
+
+fn sequence_unit(vm: &mut Engine, reference: crate::ObjRef, index: i32) -> Result<u16, VmExit> {
+    // String is final and its immutable heap text is the canonical value.
+    // Other CharSequences must execute their real virtual implementation.
+    if let Ok(text) = vm.heap.as_str(reference) {
+        return text.encode_utf16().nth(index as usize).ok_or_else(|| {
+            Throwable::new(
+                "Ljava/lang/StringIndexOutOfBoundsException;",
+                "code point index",
+            )
+            .into()
+        });
+    }
+    Ok(vm
+        .invoke_instance(reference, "charAt", "(I)C", &[Value::Int(index)])?
+        .as_int()? as u16)
+}
 
 fn to_radix(mut v: i128, radix: u32) -> String {
     let radix = if (2..=36).contains(&radix) { radix } else { 10 };
@@ -124,7 +151,168 @@ fn java_identifier_part(c: char) -> bool {
             .is_match(&c.to_string())
 }
 
-pub(crate) fn static_intrinsic(
+/// Exact implemented overloads shared by VM dispatch and JNI lookup. A class
+/// being known never grants arbitrary Character or Math signatures.
+pub fn method_metadata(
+    class: &str,
+    name: &str,
+    sig: &str,
+) -> Option<crate::framework_host::HostMethodKind> {
+    use crate::framework_host::HostMethodKind::Static;
+    if crate::integer_bits::metadata(class, name, sig) {
+        return Some(Static);
+    }
+    let c = class.strip_prefix("Ljava/lang/")?.strip_suffix(';')?;
+    let supported = match c {
+        "Integer" => matches!(
+            (name, sig),
+            (
+                "toHexString" | "toBinaryString" | "toOctalString" | "toString",
+                "(I)Ljava/lang/String;"
+            ) | ("toString", "(II)Ljava/lang/String;")
+                | (
+                    "parseInt",
+                    "(Ljava/lang/String;)I" | "(Ljava/lang/String;I)I"
+                )
+                | (
+                    "valueOf",
+                    "(Ljava/lang/String;)Ljava/lang/Integer;"
+                        | "(Ljava/lang/String;I)Ljava/lang/Integer;"
+                )
+        ),
+        "Long" => matches!(
+            (name, sig),
+            (
+                "toHexString" | "toBinaryString" | "toString",
+                "(J)Ljava/lang/String;"
+            ) | ("toString", "(JI)Ljava/lang/String;")
+                | (
+                    "parseLong",
+                    "(Ljava/lang/String;)J" | "(Ljava/lang/String;I)J"
+                )
+                | ("valueOf", "(Ljava/lang/String;)Ljava/lang/Long;")
+        ),
+        "Float" => matches!(
+            (name, sig),
+            ("floatToIntBits" | "floatToRawIntBits" | "hashCode", "(F)I")
+                | ("intBitsToFloat", "(I)F")
+                | ("isNaN" | "isInfinite" | "isFinite", "(F)Z")
+                | ("compare", "(FF)I")
+                | ("min" | "max", "(FF)F")
+                | ("toString", "(F)Ljava/lang/String;")
+                | ("parseFloat", "(Ljava/lang/String;)F")
+                | ("valueOf", "(Ljava/lang/String;)Ljava/lang/Float;")
+        ),
+        "Double" => matches!(
+            (name, sig),
+            ("doubleToLongBits" | "doubleToRawLongBits", "(D)J")
+                | ("longBitsToDouble", "(J)D")
+                | ("isNaN" | "isInfinite" | "isFinite", "(D)Z")
+                | ("hashCode", "(D)I")
+                | ("compare", "(DD)I")
+                | ("toString", "(D)Ljava/lang/String;")
+                | ("parseDouble", "(Ljava/lang/String;)D")
+                | ("valueOf", "(Ljava/lang/String;)Ljava/lang/Double;")
+        ),
+        "Boolean" => matches!(
+            (name, sig),
+            ("parseBoolean", "(Ljava/lang/String;)Z")
+                | ("hashCode", "(Z)I")
+                | ("compare", "(ZZ)I")
+                | ("toString", "(Z)Ljava/lang/String;")
+        ),
+        "Character" => matches!(
+            (name, sig),
+            ("charCount", "(I)I")
+                | (
+                    "isJavaIdentifierStart"
+                        | "isJavaIdentifierPart"
+                        | "isIdentifierIgnorable"
+                        | "isDigit"
+                        | "isLetter"
+                        | "isLetterOrDigit"
+                        | "isUpperCase"
+                        | "isLowerCase"
+                        | "isWhitespace"
+                        | "isSpaceChar"
+                        | "isISOControl",
+                    "(C)Z" | "(I)Z"
+                )
+                | ("isHighSurrogate" | "isLowSurrogate" | "isSurrogate", "(C)Z")
+                | ("isSurrogatePair", "(CC)Z")
+                | ("toCodePoint", "(CC)I")
+                | ("toLowerCase" | "toUpperCase", "(C)C" | "(I)I")
+                | ("digit", "(CI)I" | "(II)I")
+                | ("getType", "(C)I" | "(I)I")
+                | ("getDirectionality", "(C)B" | "(I)B")
+                | (
+                    "codePointAt" | "codePointBefore",
+                    "(Ljava/lang/CharSequence;I)I"
+                )
+                | ("toChars", "(I[CI)I")
+        ),
+        "Math" | "StrictMath" => matches!(
+            (name, sig),
+            ("abs", "(I)I" | "(J)J" | "(F)F" | "(D)D")
+                | ("min" | "max", "(II)I" | "(JJ)J" | "(FF)F" | "(DD)D")
+                | (
+                    "sin"
+                        | "cos"
+                        | "tan"
+                        | "asin"
+                        | "acos"
+                        | "atan"
+                        | "sinh"
+                        | "cosh"
+                        | "tanh"
+                        | "exp"
+                        | "expm1"
+                        | "log"
+                        | "log10"
+                        | "log1p"
+                        | "cbrt"
+                        | "sqrt"
+                        | "rint"
+                        | "toDegrees"
+                        | "toRadians"
+                        | "signum"
+                        | "ulp"
+                        | "floor"
+                        | "ceil",
+                    "(D)D"
+                )
+                | ("signum" | "ulp", "(F)F")
+                | ("copySign", "(FF)F" | "(DD)D")
+                | ("atan2" | "hypot" | "pow", "(DD)D")
+                | ("round", "(F)I" | "(D)J")
+                | ("floorDiv" | "floorMod", "(II)I" | "(JJ)J")
+        ),
+        _ => false,
+    };
+    supported.then_some(Static)
+}
+
+pub fn static_intrinsic(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if method_metadata(class, name, sig).is_none() {
+        return Ok(None);
+    }
+    crate::shared_call::with_values(vm, args, |vm| {
+        if let Some(value) = static_inner(vm, class, name, sig, args)? {
+            return Ok(Some(value));
+        }
+        // Preserve the original dispatcher order: dedicated numerics first,
+        // then the base Math arms formerly in intrinsics.rs.
+        math_base(class, name, sig, args)
+    })
+}
+
+fn static_inner(
     vm: &mut Engine,
     class: &str,
     name: &str,
@@ -215,25 +403,17 @@ pub(crate) fn static_intrinsic(
         ("Float", "isFinite", "(F)Z") => b(f(0).is_finite()),
         ("Float", "hashCode", "(F)I") => Value::Int(canonical_fbits(f(0))),
         ("Float", "compare", "(FF)I") => Value::Int(cmp_f64(f(0) as f64, f(1) as f64)),
-        ("Float", "max", "(FF)F") => Value::Float(if f(0).is_nan() || f(1).is_nan() {
-            f32::NAN
-        } else {
-            f(0).max(f(1))
-        }),
-        ("Float", "min", "(FF)F") => Value::Float(if f(0).is_nan() || f(1).is_nan() {
-            f32::NAN
-        } else {
-            f(0).min(f(1))
-        }),
+        ("Float", "max", "(FF)F") => Value::Float(java_max_f32(f(0), f(1))),
+        ("Float", "min", "(FF)F") => Value::Float(java_min_f32(f(0), f(1))),
         ("Float", "toString", "(F)Ljava/lang/String;") => {
             s(vm, java_double_to_string(f(0) as f64, true))?
         }
         ("Float", "parseFloat", "(Ljava/lang/String;)F") => {
-            let t = str_arg(vm, args.first())?;
+            let t = floating_arg(vm, args.first())?;
             Value::Float(parse_float32(&t)?)
         }
         ("Float", "valueOf", "(Ljava/lang/String;)Ljava/lang/Float;") => {
-            let t = str_arg(vm, args.first())?;
+            let t = floating_arg(vm, args.first())?;
             let x = parse_float32(&t)?;
             Value::Obj(crate::boxes::box_value(
                 vm,
@@ -257,11 +437,11 @@ pub(crate) fn static_intrinsic(
             s(vm, java_double_to_string(d(0), false))?
         }
         ("Double", "parseDouble", "(Ljava/lang/String;)D") => {
-            let t = str_arg(vm, args.first())?;
+            let t = floating_arg(vm, args.first())?;
             Value::Double(parse_float(&t)?)
         }
         ("Double", "valueOf", "(Ljava/lang/String;)Ljava/lang/Double;") => {
-            let t = str_arg(vm, args.first())?;
+            let t = floating_arg(vm, args.first())?;
             let x = parse_float(&t)?;
             Value::Obj(crate::boxes::box_value(
                 vm,
@@ -371,41 +551,44 @@ pub(crate) fn static_intrinsic(
                 }
                 _ => return Ok(None),
             };
-            let text: Vec<u16> = match vm.heap.as_str(r) {
-                Ok(t) => t.encode_utf16().collect(),
-                Err(_) => crate::intrinsics::object_to_string(vm, r)?
-                    .encode_utf16()
-                    .collect(),
+            // CharSequence is a virtual interface. Do not materialize it via
+            // Object.toString or lose a builder's raw surrogate edit state.
+            let length = if let Ok(text) = vm.heap.as_str(r) {
+                text.encode_utf16().count() as i32
+            } else {
+                vm.invoke_instance(r, "length", "()I", &[])?.as_int()?
             };
             let idx = i(1);
-            let mut p = if name == "codePointAt" {
-                if idx < 0 || (idx as usize) >= text.len() {
+            let p = if name == "codePointAt" {
+                if idx < 0 || idx >= length {
                     return Err(VmExit::Exception(Throwable::new(
                         "Ljava/lang/StringIndexOutOfBoundsException;",
                         format!("index {idx}"),
                     )));
                 }
-                idx as usize
+                idx
             } else {
-                if idx < 1 || (idx as usize) > text.len() {
+                if idx < 1 || idx > length {
                     return Err(VmExit::Exception(Throwable::new(
                         "Ljava/lang/StringIndexOutOfBoundsException;",
                         format!("index {idx}"),
                     )));
                 }
-                (idx as usize) - 1
+                idx - 1
             };
-            if name == "codePointBefore"
-                && p > 0
-                && (0xDC00..=0xDFFF).contains(&text[p])
-                && (0xD800..=0xDBFF).contains(&text[p - 1])
-            {
-                p -= 1;
-            }
-            let cp = char::decode_utf16(text[p..].iter().copied())
-                .next()
-                .and_then(|r| r.ok())
-                .map_or(text[p] as i32, |c| c as i32);
+            let unit = sequence_unit(vm, r, p)?;
+            let pair = if name == "codePointBefore" && p > 0 && (0xdc00..=0xdfff).contains(&unit) {
+                let high = sequence_unit(vm, r, p - 1)?;
+                (0xd800..=0xdbff).contains(&high).then_some((high, unit))
+            } else if name == "codePointAt" && p + 1 < length && (0xd800..=0xdbff).contains(&unit) {
+                let low = sequence_unit(vm, r, p + 1)?;
+                (0xdc00..=0xdfff).contains(&low).then_some((unit, low))
+            } else {
+                None
+            };
+            let cp = pair.map_or(i32::from(unit), |(high, low)| {
+                0x10000 + ((i32::from(high) - 0xd800) << 10) + i32::from(low) - 0xdc00
+            });
             Value::Int(cp)
         }
         ("Character", "toChars", "(I[CI)I") => {
@@ -678,4 +861,217 @@ mod tests {
             Value::Int(0)
         );
     }
+}
+
+// Original Math arms and scalar helpers extracted from intrinsics.rs. Both
+// dispatchers now use this same source, including signed zero and FLOOR rules.
+fn math_base(class: &str, name: &str, sig: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
+    const MATH: &str = "Ljava/lang/Math;";
+    const ARITH: &str = "Ljava/lang/ArithmeticException;";
+    let class = if class == "Ljava/lang/StrictMath;" {
+        MATH
+    } else {
+        class
+    };
+    match (class, name, sig) {
+        (MATH, "abs", "(I)I") => Ok(Some(Value::Int(args[0].as_int()?.wrapping_abs()))),
+        (MATH, "abs", "(J)J") => Ok(Some(Value::Long(args[0].as_long()?.wrapping_abs()))),
+        (MATH, "abs", "(F)F") => Ok(Some(Value::Float(args[0].as_float()?.abs()))),
+        (MATH, "abs", "(D)D") => Ok(Some(Value::Double(args[0].as_double()?.abs()))),
+        (MATH, "min", "(II)I") => Ok(Some(Value::Int(args[0].as_int()?.min(args[1].as_int()?)))),
+        (MATH, "max", "(II)I") => Ok(Some(Value::Int(args[0].as_int()?.max(args[1].as_int()?)))),
+        (MATH, "min", "(JJ)J") => Ok(Some(Value::Long(
+            args[0].as_long()?.min(args[1].as_long()?),
+        ))),
+        (MATH, "max", "(JJ)J") => Ok(Some(Value::Long(
+            args[0].as_long()?.max(args[1].as_long()?),
+        ))),
+        (MATH, "min", "(FF)F") => Ok(Some(Value::Float(java_min_f32(
+            args[0].as_float()?,
+            args[1].as_float()?,
+        )))),
+        (MATH, "max", "(FF)F") => Ok(Some(Value::Float(java_max_f32(
+            args[0].as_float()?,
+            args[1].as_float()?,
+        )))),
+        (MATH, "min", "(DD)D") => Ok(Some(Value::Double(java_min_f64(
+            args[0].as_double()?,
+            args[1].as_double()?,
+        )))),
+        (MATH, "max", "(DD)D") => Ok(Some(Value::Double(java_max_f64(
+            args[0].as_double()?,
+            args[1].as_double()?,
+        )))),
+        (MATH, "sqrt", "(D)D") => Ok(Some(Value::Double(args[0].as_double()?.sqrt()))),
+        (MATH, "pow", "(DD)D") => Ok(Some(Value::Double(java_pow(
+            args[0].as_double()?,
+            args[1].as_double()?,
+        )))),
+        (MATH, "floor", "(D)D") => Ok(Some(Value::Double(args[0].as_double()?.floor()))),
+        (MATH, "ceil", "(D)D") => Ok(Some(Value::Double(args[0].as_double()?.ceil()))),
+        // issue #27: rotina emitida por d8 em código real
+        (MATH, "round", "(F)I") => {
+            let v = args[0].as_float()?;
+            Ok(Some(Value::Int(java_round_f32(v))))
+        }
+        (MATH, "round", "(D)J") => {
+            let v = args[0].as_double()?;
+            Ok(Some(Value::Long(java_round_f64(v))))
+        }
+        (MATH, "floorDiv", "(II)I") => {
+            let a = args[0].as_int()?;
+            let b = args[1].as_int()?;
+            if b == 0 {
+                return Err(VmExit::Exception(Throwable::new(ARITH, "divide by zero")));
+            }
+            // issue #48: floor real do Java (não euclidiano)
+            Ok(Some(Value::Int(java_floor_div_i32(a, b))))
+        }
+        (MATH, "floorMod", "(II)I") => {
+            let a = args[0].as_int()?;
+            let b = args[1].as_int()?;
+            if b == 0 {
+                return Err(VmExit::Exception(Throwable::new(ARITH, "divide by zero")));
+            }
+            Ok(Some(Value::Int(java_floor_mod_i32(a, b))))
+        }
+        (MATH, "floorDiv", "(JJ)J") => {
+            let a = args[0].as_long()?;
+            let b = args[1].as_long()?;
+            if b == 0 {
+                return Err(VmExit::Exception(Throwable::new(ARITH, "divide by zero")));
+            }
+            Ok(Some(Value::Long(java_floor_div_i64(a, b))))
+        }
+        (MATH, "floorMod", "(JJ)J") => {
+            let a = args[0].as_long()?;
+            let b = args[1].as_long()?;
+            if b == 0 {
+                return Err(VmExit::Exception(Throwable::new(ARITH, "divide by zero")));
+            }
+            Ok(Some(Value::Long(java_floor_mod_i64(a, b))))
+        }
+        (MATH, "signum", "(D)D") => {
+            let v = args[0].as_double()?;
+            Ok(Some(Value::Double(if v.is_nan() {
+                f64::NAN
+            } else if v == 0.0 {
+                v
+            } else if v > 0.0 {
+                1.0
+            } else {
+                -1.0
+            })))
+        }
+        _ => Ok(None),
+    }
+}
+/// Semântica FLOOR do Java (issue #48): `div_euclid`/`rem_euclid` do Rust são
+/// SEMÂNTICA EUCLIDIANA — `floorDiv(4,−3)` Java = −2, `div_euclid` dá −1.
+/// floorDiv = truncado com ajuste quando o resto é não-zero e tem sinal
+/// oposto ao divisor; floorMod = a − floorDiv·b (com wrapping nos cantos
+/// MIN/−1, que a JVM também sofre por contrato).
+fn java_floor_div_i32(a: i32, b: i32) -> i32 {
+    let q = a.wrapping_div(b);
+    let r = a.wrapping_rem(b);
+    if r != 0 && ((r < 0) != (b < 0)) {
+        q.wrapping_sub(1)
+    } else {
+        q
+    }
+}
+fn java_floor_mod_i32(a: i32, b: i32) -> i32 {
+    a.wrapping_sub(java_floor_div_i32(a, b).wrapping_mul(b))
+}
+fn java_floor_div_i64(a: i64, b: i64) -> i64 {
+    let q = a.wrapping_div(b);
+    let r = a.wrapping_rem(b);
+    if r != 0 && ((r < 0) != (b < 0)) {
+        q.wrapping_sub(1)
+    } else {
+        q
+    }
+}
+fn java_floor_mod_i64(a: i64, b: i64) -> i64 {
+    a.wrapping_sub(java_floor_div_i64(a, b).wrapping_mul(b))
+}
+
+/// min/max/pow do Java: NaN em qualquer arg → NaN (diferente do Rust, que
+/// ignora NaN em min/max); ±0.0 decide por sinal (issue #37 — Rust deixa
+/// não-especificado, Java retorna -0.0 no min e +0.0 no max).
+fn java_min_f32(a: f32, b: f32) -> f32 {
+    if a.is_nan() || b.is_nan() {
+        f32::NAN
+    } else if a == 0.0 && b == 0.0 {
+        if a.is_sign_negative() {
+            a
+        } else {
+            b
+        } // -0.0 vence no min
+    } else {
+        a.min(b)
+    }
+}
+fn java_max_f32(a: f32, b: f32) -> f32 {
+    if a.is_nan() || b.is_nan() {
+        f32::NAN
+    } else if a == 0.0 && b == 0.0 {
+        if a.is_sign_positive() {
+            a
+        } else {
+            b
+        } // +0.0 vence no max
+    } else {
+        a.max(b)
+    }
+}
+fn java_min_f64(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else if a == 0.0 && b == 0.0 {
+        if a.is_sign_negative() {
+            a
+        } else {
+            b
+        }
+    } else {
+        a.min(b)
+    }
+}
+fn java_max_f64(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        f64::NAN
+    } else if a == 0.0 && b == 0.0 {
+        if a.is_sign_positive() {
+            a
+        } else {
+            b
+        }
+    } else {
+        a.max(b)
+    }
+}
+
+/// Math.round with Java's tie direction and saturating cast. Split the integer
+/// and fractional parts: adding 0.5 first rounds the representable value just
+/// below 0.5 up to 1.0 before floor, which changes the Java result.
+fn java_round_f32(v: f32) -> i32 {
+    let integral = v.floor();
+    (if v - integral >= 0.5 {
+        integral + 1.0
+    } else {
+        integral
+    }) as i32
+}
+fn java_round_f64(v: f64) -> i64 {
+    let integral = v.floor();
+    (if v - integral >= 0.5 {
+        integral + 1.0
+    } else {
+        integral
+    }) as i64
+}
+fn java_pow(a: f64, b: f64) -> f64 {
+    // Java Math.pow casos especiais mínimos cobertos por pow do Rust
+    a.powf(b)
 }

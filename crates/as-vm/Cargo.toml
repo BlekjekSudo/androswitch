@@ -48,6 +48,16 @@ virtual-devices = ["upstream-runtime"]
 upstream-parity-tests = ["upstream-runtime", "advanced-components", "rd-render/upstream-tests"]
 
 [[test]]
+name = "shipping_numeric_catalog"
+path = "tests/shipping_numeric_catalog.rs"
+required-features = ["std"]
+
+[[test]]
+name = "shipping_numerics"
+path = "tests/shipping_numerics.rs"
+required-features = ["std"]
+
+[[test]]
 name = "shipping_io_chars"
 path = "tests/shipping_io_chars.rs"
 required-features = ["std"]

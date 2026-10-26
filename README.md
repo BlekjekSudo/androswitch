@@ -73,7 +73,7 @@ completes the available SDK corpus in two guarded headless Ryujinx launches:
 PCV clock observations and physical testing of this binary remain open.
 
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
-274 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,
+296 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,
 inspect results and export JSON from one installation. See [scope and actual
 platform observations](docs/CONFORMANCE_SUITE.md); this is not official CTS or
 complete Android coverage.

@@ -1,6 +1,6 @@
 # AndroSwitch Conformance
 
-One normal, development-signed **Android API 26 / ARM64 APK**, with 274 original
+One normal, development-signed **Android API 26 / ARM64 APK**, with 296 original
 cases and no sensor tests. Install `AndroSwitchConformance.apk` once and use
 **Run all / resume**. Results persist in the app's ordinary internal storage.
 This is a growing, explicit catalog, not all Android behavior or official CTS.
@@ -19,7 +19,7 @@ They use the same ordinary APK/UI; the JVM oracle is written as UTF-8 bytes.
 
 | Family | Cases | Examples |
 | --- | ---: | --- |
-| Java / DEX | 148 | arithmetic, exceptions, UTF-16, collections, reflection, TimeUnit, ThreadLocal, atomics, character/byte streams |
+| Java / DEX | 170 | arithmetic, exceptions, UTF-16, collections, reflection, TimeUnit, ThreadLocal, atomics, character/byte streams |
 | Android / platform | 93 | CPU access, host facts, Build, clocks, orientation, Activity/Application/Intent/Handler, files, preferences, Bundle, SQLite, audio, input editor, shared channels, AtomicFile |
 | JNI / native / graphics | 33 | ARM64 calling convention, references, callbacks, GC, native thread, shared files, libc/TLS/clocks, EGL/GLES rendering, Vulkan discovery |
 
@@ -40,7 +40,7 @@ From the runtime repository, with JDK, Python, Android SDK platform/build-tools
 ```
 
 The build produces `local-artifacts/conformance/AndroSwitchConformance.apk`,
-`catalog.json`, a 148-row **actual JDK oracle**, signature verification and a
+`catalog.json`, a 170-row **actual JDK oracle**, signature verification and a
 source/toolchain/artifact hash receipt. It signs with a local public development
 key; do not package the generated private key. Pure cases are compiled with
 Java release 8, DEX minSdk 26, and native code targets aarch64-linux-android26.
