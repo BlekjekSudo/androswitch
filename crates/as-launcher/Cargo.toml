@@ -15,4 +15,6 @@ serde = {version="1.0",default-features=false,features=["derive","alloc"]}
 serde_json = {version="1.0",default-features=false,features=["alloc"]}
 miniz_oxide = {version="=0.9.1",default-features=false,features=["with-alloc"]}
 [features]
+default = ["std"]
+std = ["as-platform/std", "as-package/std", "as-framework/std", "rd-apk/std", "serde/std", "serde_json/std"]
 host = ["as-platform/std"]

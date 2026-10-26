@@ -88,7 +88,23 @@ try{
   $rustNotices=Join-Path $rustRoot 'share/doc/rust/COPYRIGHT-library.html'
   if(-not(Test-Path $rustNotices)){throw 'Device Rust library copyright notice missing'}
   Copy-Item $rustNotices "$output/rust/COPYRIGHT-library.html"
-  $inventory.Add(@{component='Rust core/alloc libraries';source='installed device nightly';files=@(@{path='rust/COPYRIGHT-library.html';sha256=(Get-FileHash "$output/rust/COPYRIGHT-library.html").Hash.ToLowerInvariant()})})
+  $inventory.Add(@{component='Rust std/core/alloc libraries and bundled library dependencies';source='pinned device nightly 787af2b8c; task-local std source adaptation';files=@(@{path='rust/COPYRIGHT-library.html';sha256=(Get-FileHash "$output/rust/COPYRIGHT-library.html").Hash.ToLowerInvariant()})})
+  if($build.rust_library_profile -eq 'std'){
+    $libc="$projectRoot/local-artifacts/horizon-std/libc-0.2.189"
+    $stdFiles=@()
+    foreach($name in @('LICENSE-MIT','LICENSE-APACHE')){
+      $target="$output/rust/horizon-libc/$name"
+      New-Item -ItemType Directory -Force (Split-Path -Parent $target)|Out-Null
+      Copy-Item -LiteralPath "$libc/$name" -Destination $target
+      $stdFiles+=@{path="rust/horizon-libc/$name";sha256=(Get-FileHash $target).Hash.ToLowerInvariant()}
+    }
+    foreach($name in @('libc-source.json','libc-adaptation.patch','rust-std-adaptation.patch')){
+      $target="$output/rust/$name"
+      Copy-Item -LiteralPath "$projectRoot/local-artifacts/horizon-std/$name" -Destination $target
+      $stdFiles+=@{path="rust/$name";sha256=(Get-FileHash $target).Hash.ToLowerInvariant()}
+    }
+    $inventory.Add(@{component='rust-lang/libc 0.2.189; Horizon ABI adaptation';license='MIT OR Apache-2.0';source='https://crates.io/crates/libc/0.2.189';files=$stdFiles})
+  }
   Copy-Item "$projectRoot/third_party/android/opensles" "$output/android/opensles" -Recurse -Force
   Copy-Item "$projectRoot/third_party/android/jni.h" "$output/android/jni.h"
   Copy-Item "$projectRoot/LICENSE-APACHE" "$output/android/LICENSE-APACHE"

@@ -1,5 +1,5 @@
 //! Console navigation and package operations shared by Horizon and host tests.
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 mod png;
 use alloc::{

@@ -19,8 +19,12 @@ AndroSwitch's contracts and status live in `docs/ANDROSWITCH_ROADMAP.md`,
 ## Implementation rules
 
 - Work in milestone order. Preserve existing changes and upstream tests.
-- `as-vm` builds the original `rd-vm/src/lib.rs` as an isolated Cargo package; do not copy its source or add a desktop `std` feature. Keep full-workspace compile and combined host/device VM checks.
-- Device core is `no_std + alloc`; host adapters may use `std`. Do not put
+- `as-vm` builds the original `rd-vm/src/lib.rs` as an isolated Cargo package; do not copy its source or expose the legacy `desktop-runtime` execution backend. `std` selects Rust library services independently. Keep full-workspace compile and combined host/device VM checks.
+- The user authorized full Horizon `std` migration on 26 October 2026. Use the
+  pinned task-local std PAL/sysroot, retain execution-owner/JNI/storage contracts,
+  and qualify every change against both upstream and product suites. Portable
+  libraries may retain core/alloc interfaces; `std` is the device build profile.
+  Do not put
   Python, Unicorn, a guest Linux kernel, or desktop process APIs in device builds.
 - Route OS behavior through platform interfaces; Java and native code must share
   storage and application state. Unavailable behavior returns a structured error.

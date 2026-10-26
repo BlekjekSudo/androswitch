@@ -34,9 +34,14 @@ def main():
                     raise SystemExit("Unsafe archive member")
                 path = base.joinpath(*parts)
                 path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(package.extractfile(member).read())
+                content = package.extractfile(member).read()
+                # Leave the adapted source for the checked rewrite below.
+                if member.name.endswith("/src/unix/newlib/mod.rs"):
+                    original_bytes = content
+                elif not path.exists() or path.read_bytes() != content:
+                    path.write_bytes(content)
     path = base / "libc-0.2.189/src/unix/newlib/mod.rs"
-    original = path.read_text(encoding="utf-8")
+    original = original_bytes.decode("utf-8")
     adapted = original
     # ARM64 devkitA64/newlib headers differ from the inherited 3DS definitions.
     # The runtime probe compares sizes, offsets and constants against C first.
@@ -74,15 +79,16 @@ def main():
     if adapted.count(marker) != 1:
         raise SystemExit("Unexpected condition attribute size")
     adapted = adapted.replace(marker, marker.replace("CONDATTR_T: usize = 4;", "CONDATTR_T: usize = 8;"))
-    adapted += "\n// Standalone devkitA64/newlib std experiment only.\npub const AT_FDCWD: c_int = -2;\n"
-    path.write_text(adapted, encoding="utf-8", newline="\n")
+    adapted += "\n// AndroSwitch pinned devkitA64/newlib std PAL.\npub const AT_FDCWD: c_int = -2;\n"
+    if not path.exists() or path.read_bytes() != adapted.encode("utf-8"):
+        path.write_text(adapted, encoding="utf-8", newline="\n")
     patch = "".join(difflib.unified_diff(original.splitlines(True), adapted.splitlines(True),
                                        fromfile="libc-0.2.189/src/unix/newlib/mod.rs",
                                        tofile="libc-0.2.189/src/unix/newlib/mod.rs"))
     (base / "libc-adaptation.patch").write_text(patch, encoding="utf-8", newline="\n")
     receipt = {"url": URL, "sha256": SHA256, "source": str(path),
                "adapted_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-               "scope": "standalone experiment only; not the product dependency graph"}
+               "scope": "Horizon std probe and product build-std graph; host dependencies unchanged"}
     (base / "libc-source.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(receipt))
 

@@ -91,7 +91,9 @@ class UpstreamAudit(unittest.TestCase):
                 '[lib]\npath = "' + source + '"\n[dependencies]\nrd-vm = { package = "as-vm" }\n', encoding="utf-8")
         self.assertEqual(AUDIT.verify_vm_boundary(self.root), [])
         core = self.root / "crates/as-vm/Cargo.toml"
-        core.write_text(core.read_text(encoding="utf-8").replace("../rd-vm/src/lib.rs", "src/copied.rs") + "[features]\nstd = []\n", encoding="utf-8")
+        core.write_text(core.read_text(encoding="utf-8") + "[features]\nstd = []\n", encoding="utf-8")
+        self.assertEqual(AUDIT.verify_vm_boundary(self.root), [])
+        core.write_text(core.read_text(encoding="utf-8").replace("../rd-vm/src/lib.rs", "src/copied.rs") + "desktop-runtime = []\n", encoding="utf-8")
         failures = AUDIT.verify_vm_boundary(self.root)
         self.assertTrue(any("DUPLICATED_UPSTREAM_SOURCE" in error for error in failures))
         self.assertIn("DESKTOP_FEATURE_EXPOSED_ON_DEVICE_VM", failures)

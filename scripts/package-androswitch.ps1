@@ -1,5 +1,6 @@
-param([switch]$WithoutSamples,[string]$OutputRoot='local-artifacts/releases',[string]$EvidencePath='reports/m6-m7.json',[ValidateSet('m7-alpha','m9-candidate')][string]$Stage='m7-alpha')
+param([switch]$WithoutSamples,[switch]$ConformanceOnly,[string]$OutputRoot='local-artifacts/releases',[string]$EvidencePath='reports/m6-m7.json',[ValidateSet('m7-alpha','m9-candidate')][string]$Stage='m7-alpha')
 $ErrorActionPreference='Stop'
+if($WithoutSamples -and $ConformanceOnly){throw 'Choose either WithoutSamples or ConformanceOnly'}
 $projectRoot=Split-Path -Parent $PSScriptRoot
 $output=if([IO.Path]::IsPathRooted($OutputRoot)){$OutputRoot}else{Join-Path $projectRoot $OutputRoot}
 $id=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8)
@@ -42,7 +43,13 @@ Copy-Item "$projectRoot/third_party/so_util.LICENSE" "$package/licenses/so_util.
 Copy-Item "$projectRoot/third_party/libnx-framebuffer.LICENSE" "$package/licenses/libnx-framebuffer.LICENSE"
 Copy-Item "$projectRoot/third_party/README.md" "$package/licenses/SOURCE-NOTICES.md"
 $samples=@()
-if(-not $WithoutSamples){
+if($ConformanceOnly){
+  $source=Join-Path $projectRoot 'local-artifacts/conformance/AndroSwitchConformance.apk'
+  Copy-Item -LiteralPath $source -Destination "$sd/apks/AndroSwitchConformance.apk"
+  $samples+=@{file='switch/androswitch/apks/AndroSwitchConformance.apk';sha256=(Get-FileHash $source).Hash.ToLowerInvariant()}
+  Copy-Item -LiteralPath "$projectRoot/local-artifacts/conformance/catalog.json" -Destination "$package/CONFORMANCE-CATALOG.json"
+  [IO.File]::WriteAllText("$package/licenses/SAMPLE-APKS.txt","AndroSwitch Conformance APK: original sensor-free Java/native test suite, MIT OR Apache-2.0. Source: https://github.com/BlekjekSudo/androswitch/tree/main/fixtures/conformance . This is not official Android CTS. See docs/CONFORMANCE_SUITE.md for case scope and platform limits.`n")
+}elseif(-not $WithoutSamples){
   foreach($spec in @(@('m5/fixture/java-ui.apk','java-ui.apk'),@('m5/fixture/kotlin-ui.apk','kotlin-ui.apk'),@('m6/fixture/mixed-media.apk','mixed-media.apk'),@('m6/fixture/native-media.apk','native-media.apk'))){
     $source=Join-Path $projectRoot "local-artifacts/$($spec[0])";if(-not(Test-Path $source)){throw "Sample missing: $source"};Copy-Item $source "$sd/apks/$($spec[1])";$samples+=@{file="switch/androswitch/apks/$($spec[1])";sha256=(Get-FileHash $source).Hash.ToLowerInvariant()}
   }

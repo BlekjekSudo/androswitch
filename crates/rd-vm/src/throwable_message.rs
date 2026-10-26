@@ -1,7 +1,7 @@
 //! One private detail-message slot for interpreted, host, and JNI throwables.
 //! Application fields named `message` cannot shadow java.lang.Throwable state.
 use crate::{err, Engine, ObjRef, Value, VmExit};
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 use alloc::string::String;
 use alloc::{string::ToString, vec};
 pub(crate) const SLOT: &str = "java.lang.Throwable#detailMessage";
@@ -28,7 +28,7 @@ pub(crate) fn stored(vm: &Engine, object: ObjRef) -> Result<Value, VmExit> {
     }
     Ok(value)
 }
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 pub(crate) fn message(vm: &Engine, object: ObjRef) -> Result<Option<String>, VmExit> {
     stored(vm, object)?
         .as_ref()?

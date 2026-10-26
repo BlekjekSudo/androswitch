@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "../../platform/horizon-std/support.h"
 
 size_t __nx_heap_size = 128 * 1024 * 1024;
 extern int as_std_probe_run(void);
@@ -36,10 +37,9 @@ int main(int argc, char **argv) {
     if (strspn(session, "0123456789abcdef") != strlen(session)) return 113;
     if (strcmp(phase, "suite") && strcmp(phase, "restart") && strcmp(phase, "panic")) return 115;
     if (atexit(shutdown_marker)) return 114;
-    Result random = csrngInitialize();
-    if (R_FAILED(random)) return 110;
+    if (as_horizon_std_init()) return 110;
     int result = as_std_probe_run();
-    csrngExit();
+    if (as_horizon_std_shutdown(5000)) result=120;
     char path[256];
     snprintf(path, sizeof(path), "sdmc:/switch/androswitch-std-probe/%s/returned-%s.txt", session, phase);
     FILE *file = fopen(path, "w");

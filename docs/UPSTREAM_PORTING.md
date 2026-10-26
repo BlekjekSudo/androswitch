@@ -57,7 +57,8 @@ data registries and tests retain their original locations.
 ## Shared implementation and target adapters
 
 `as-vm` is a separate Cargo package whose library points directly at
-`rd-vm/src/lib.rs`. It has no Cargo `std` feature. The retained desktop tools
+`rd-vm/src/lib.rs`. Its default `std` feature supplies Rust library services;
+it does not expose the legacy `desktop-runtime` backend. The retained desktop tools
 still depend on `rd-vm`, so building them together cannot unify desktop features
 into the device VM. This fixes a full-workspace compile failure that previously
 selected the wrong Engine API. `as-vm-testsupport` likewise points to the original
@@ -68,7 +69,8 @@ Core unit tests and combined desktop/portable fixture tests verify the boundary.
 The synchronization includes the latest APK/DEX hardening, lazy DEX/string
 cache, VM/framework updates, native oracle changes, registries and original
 tests. Portable parsers use `alloc`/`core`. The immutable upstream lazy caches
-use a synchronized `OnceLock` adapter backed by `spin::Once` on device;
+use std's synchronized `OnceLock` on the std device profile, with a
+`spin::Once` adapter retained for parser-only core/alloc consumers;
 initialization only parses immutable bytes and never calls guest code. They
 retain thread-safe publication instead of replacing it with an unsynchronized
 cell. The positional ZIP interface is shared by Horizon VFS and the original

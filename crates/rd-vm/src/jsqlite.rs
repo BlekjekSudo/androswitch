@@ -48,9 +48,9 @@ use crate::maps::HashSet;
 #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
 #[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
 use crate::port_prelude::*;
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 use std::io::{BufRead, BufReader, Write};
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use serde_json::{json, Value as J};
@@ -69,7 +69,7 @@ const CLOSABLE: &str = "Landroid/database/sqlite/SQLiteClosable;";
 const SQL_CURSOR: &str = "Landroid/database/sqlite/SQLiteCursor;";
 const DRIVER: &str = "Landroid/database/sqlite/SQLiteDirectCursorDriver;";
 
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 const PY: &str = r#"
 import sys, json, sqlite3, base64, math
 dbs = {}
@@ -140,14 +140,14 @@ pub enum Sv {
     Blob(Vec<u8>),
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 struct Proc {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 impl Drop for Proc {
     fn drop(&mut self) {
         let _ = self.child.kill();
@@ -174,9 +174,9 @@ struct Cursor {
 /// Per-Engine SQLite state (lives in `M8State`).
 #[derive(Default)]
 pub struct SqlState {
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     proc: Option<Proc>,
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     connections: HashMap<String, as_sqlite::Connection>,
     /// The backend failed to start: use the m8 subset.
     pub(crate) unavailable: bool,
@@ -222,7 +222,7 @@ struct Res {
     last: i64,
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 fn backend_ready(vm: &mut Engine) -> bool {
     let st = &mut vm.fw.m8.sqlx;
     if st.proc.is_some() {
@@ -378,7 +378,7 @@ fn sql_trace() -> bool {
     *ON.get_or_init(|| crate::port_env::var("RD_SQL_TRACE").is_ok_and(|v| v != "0"))
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 fn send(vm: &mut Engine, req: &J) -> Result<J, VmExit> {
     let line = {
         let p =
@@ -431,7 +431,7 @@ fn ensure_loaded(vm: &mut Engine, db: &str) -> Result<(), VmExit> {
     // a typed corruption error rather than a reason to retry on every SQL op.
     vm.fw.m8.sqlx.loaded.insert(db.to_string());
     let Some(bytes) = crate::jfile::read_bytes(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         db,
     )
@@ -469,7 +469,7 @@ fn persist_db(vm: &mut Engine, db: &str) -> Result<(), VmExit> {
         .unwrap_or_default();
     if !data.is_empty() {
         crate::jfile::write_bytes(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             db,
             data,
@@ -526,7 +526,7 @@ fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit>
     let req = json!({"op": "exec", "db": db, "sql": sql, "args": args.iter().map(sv_json).collect::<Vec<_>>()});
     let r = send(vm, &req)?;
     if sql_trace() {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         eprintln!(
             "S/RustyDroid: sql {sql} args={} err={}",
             req["args"],
@@ -741,7 +741,7 @@ fn new_db(vm: &mut Engine, path: &str) -> Result<ObjRef, VmExit> {
     vm.fw.m8.sqlx.dbs.insert(r, path.to_string());
     if path.starts_with('/') {
         crate::jfile::touch(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             path,
         );
@@ -1626,7 +1626,7 @@ fn helper_open(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
                 vm.fw.package_name.clone()
             };
             crate::jfile::mkdirs_pub(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &format!("/data/user/0/{pkg}/databases"),
             );
@@ -1868,7 +1868,7 @@ pub fn static_intrinsic(
         }
         let deleted_file = persistent_db(&path)
             && crate::jfile::delete_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &path,
             );
@@ -1886,12 +1886,12 @@ pub fn static_intrinsic(
 
 // The portable reference keeps the upstream SQL/Java protocol and substitutes only its
 // transport. No Python process or in-memory SQL approximation is involved.
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 fn backend_ready(_vm: &mut Engine) -> bool {
     true
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 fn send(vm: &mut Engine, req: &J) -> Result<J, VmExit> {
     use as_sqlite::{Connection, Value as Native};
     fn input(v: Sv) -> Native {

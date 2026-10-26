@@ -1,7 +1,7 @@
 //! Native SQLite with bounded in-memory databases and explicit snapshot I/O.
 //! The runtime storage adapter owns durable publication; SQLite never spawns a
 //! process or forwards a guest/Linux filesystem operation to Horizon.
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 use alloc::{string::String, vec::Vec};
 #[allow(unsafe_code)] // Documented C API ownership, pointer lengths and global lease.

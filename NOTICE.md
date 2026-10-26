@@ -36,6 +36,13 @@ and external fixtures retain their respective licenses and credits. The
 project's license choice does not replace those terms. External APKs, generated
 libraries, toolchains and emulator binaries are not committed to this repo.
 
+The Horizon std profile uses Rust source commit
+`787af2b8c80638c51a4fc8e44f84e6891f243ec7` and rust-lang/libc 0.2.189
+(MIT OR Apache-2.0). AndroSwitch modifies copied std filesystem/thread source
+and copied libc newlib ABI definitions. Source pins, generated diffs and the
+PAL are documented in [the std migration](docs/HORIZON_STD_MIGRATION.md).
+Rust/newlib/libnx original notices remain required for redistribution.
+
 See [CREDITS](CREDITS.md), [LICENSE-MIT](LICENSE-MIT) and
 [LICENSE-APACHE](LICENSE-APACHE).
 

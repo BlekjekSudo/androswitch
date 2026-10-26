@@ -1,9 +1,18 @@
-//! M1 proof: actual upstream APK/DEX parsers and interpreter without `std`.
+//! Horizon runner using Rust std and the shared RustyDroid interpreter.
 //! Method execution is not an Android Application/Activity lifecycle runner.
-#![cfg_attr(target_os = "horizon", no_std)]
-#![cfg_attr(target_os = "horizon", feature(alloc_error_handler))]
+#![cfg_attr(all(target_os = "horizon", not(feature = "std")), no_std)]
+#![cfg_attr(
+    all(target_os = "horizon", not(feature = "std")),
+    feature(alloc_error_handler)
+)]
 
 extern crate alloc;
+
+#[allow(unsafe_code)] // Exported scalar build-profile evidence; no pointers.
+#[no_mangle]
+pub extern "C" fn as_runtime_rust_std_enabled() -> u32 {
+    u32::from(cfg!(feature = "std") && rd_vm::RUST_STD_ENABLED)
+}
 
 #[cfg(target_os = "horizon")]
 mod application;
@@ -150,7 +159,7 @@ pub unsafe extern "C" fn as_smoke_run_apk(
     report.len()
 }
 
-#[cfg(target_os = "horizon")]
+#[cfg(all(target_os = "horizon", not(feature = "std")))]
 mod device {
     use core::{
         alloc::{GlobalAlloc, Layout},

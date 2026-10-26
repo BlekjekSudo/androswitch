@@ -16,3 +16,7 @@ sha2 = { version = "=0.10.9", default-features = false }
 [dev-dependencies]
 as-platform = { path = "../as-platform", features = ["std"] }
 as-testsupport = { path = "../as-testsupport" }
+
+[features]
+default = ["std"]
+std = ["as-platform/std", "rd-apk/std", "rd-dex/std", "serde/std", "serde_json/std"]

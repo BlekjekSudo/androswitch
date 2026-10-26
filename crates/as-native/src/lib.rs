@@ -1,6 +1,6 @@
 //! General ARM64 ELF loading. Memory ownership/execution belongs to a backend;
 //! this crate never dereferences guest addresses or selects behavior by APK.
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 pub mod jni_refs;
 #[cfg(feature = "oracle")]

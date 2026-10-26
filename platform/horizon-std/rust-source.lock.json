@@ -1,0 +1,10 @@
+{
+  "compiler_commit": "787af2b8c80638c51a4fc8e44f84e6891f243ec7",
+  "library_tree_sha256": "ced5aec7ddb3f4b4ad91e0d56872bc7a498f07b395df8d9867ce4993347439e8",
+  "library_file_count": 3631,
+  "source_sha256": {
+    "std/src/sys/fs/unix.rs": "a25c02ec631e41bc634d2eef5ffcc76689955b531f77a3159e492e9a006c8305",
+    "std/src/sys/thread/unix.rs": "93784ff17f94154d57299d568afb42bf77adce9d4f4a15efeed55716f601c2d0",
+    "Cargo.lock": "fc922f114685e5cbdb3dce572cb7e3b7023a45b57e3a436e23abf35d240c5d9f"
+  }
+}

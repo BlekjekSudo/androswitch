@@ -96,7 +96,7 @@ pub(crate) fn exec_frame(
 
         let cur_pc = pc;
         *frame_pc = cur_pc;
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             vm.last_pc = cur_pc;
         }
@@ -358,7 +358,7 @@ pub(crate) fn exec_frame(
                         )
                     );
                 }
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 {
                     let object = regs[*a as usize].as_ref()?.ok_or_else(|| {
                         err::vm_error("VM_TYPE_ERROR", "monitor reference disappeared")
@@ -380,7 +380,7 @@ pub(crate) fn exec_frame(
                 if let Some(r) = regs[*a as usize].as_ref()? {
                     let cls = vm.heap.class_of(r)?.to_string();
                     if cls != target && !vm.cp.is_subtype(&cls, &target) {
-                        #[cfg(feature = "std")]
+                        #[cfg(feature = "desktop-runtime")]
                         if std::env::var_os("RD_VM_TRACE_CAST").is_some() {
                             eprintln!(
                                 "[cast] {} pc={cur_pc}: {cls} -> {target}",
@@ -544,7 +544,7 @@ pub(crate) fn exec_frame(
                     None => vm.vm_exception(NPE, "throw com null")?,
                     Some(r) => {
                         let cls = vm.heap.class_of(r)?.to_string();
-                        #[cfg(feature = "std")]
+                        #[cfg(feature = "desktop-runtime")]
                         let msg =
                             crate::throwable_message::stored(vm, r)
                                 .ok()
@@ -552,7 +552,7 @@ pub(crate) fn exec_frame(
                                     Value::Obj(m) => vm.heap.as_str(m).ok().map(str::to_string),
                                     _ => None,
                                 });
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         let msg = crate::portable::throwables::message(vm, r)?;
                         Throwable {
                             class: cls,
@@ -776,11 +776,11 @@ pub(crate) fn exec_frame(
                     Ok(Some(r)) => Ok(r),
                     Err(e) => Err(e.into()),
                 });
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 let v = step!(crate::portable::instance_field(
                     vm, r, &_class, &fname, &ftype
                 ));
-                #[cfg(feature = "std")]
+                #[cfg(feature = "desktop-runtime")]
                 let v = match vm.heap.get_field(r, &fname) {
                     Ok(v) => v,
                     Err(_) => default_for(&ftype), // campo nunca escrito → default
@@ -832,7 +832,7 @@ pub(crate) fn exec_frame(
                 // issues #43/#48: System.out/.err materializam um PrintStream
                 // embutido na primeira leitura (println/print são intrínsecos;
                 // saída vai para stdout/stderr do host, spec PrintStream: nunca lança)
-                #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+                #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
                 {
                     if owner == "Ljava/lang/System;" && (fname == "out" || fname == "err") {
                         let key = (owner.clone(), fname.clone());
@@ -929,7 +929,7 @@ pub(crate) fn exec_frame(
                         }
                     }
                 }
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
                     && vm.cp.find_class(&owner).is_none()
                     && crate::boxes::static_field_descriptor(&owner, &fname) == Some(ftype.as_str())
@@ -938,7 +938,7 @@ pub(crate) fn exec_frame(
                         vm.statics.insert((owner.clone(), fname.clone()), value);
                     }
                 }
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
                     && vm.cp.find_class(&owner).is_none()
                 {
@@ -950,7 +950,7 @@ pub(crate) fn exec_frame(
                         }
                     }
                 }
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
                     && vm.cp.find_class(&owner).is_none()
                 {
@@ -982,7 +982,7 @@ pub(crate) fn exec_frame(
                 let owner = step!(vm.resolve_static_owner(&ref_class, &fname));
                 // issue #41: EIIE de <clinit> despacha na frame corrente
                 step!(vm.ensure_initialized(&owner));
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 if vm.cp.find_class(&owner).is_none() {
                     return Err(err::vm_error(
                         "API_UNAVAILABLE",
@@ -1686,14 +1686,14 @@ fn do_invoke(
             return Ok(v);
         }
         // M8: subsistemas de compat real (OkHttp/WorkManager/Room/Uri…)
-        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if let Some(v) = crate::m8::call_m8_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
             return Ok(v);
         }
         // Apêndice D: shims host AndroidX (FileProvider, AppInitializer,
         // DataStore keys, MultiDex.install…) — `None` mantém o DEX real.
-        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if let Some(v) =
             crate::androidx::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
@@ -1702,12 +1702,12 @@ fn do_invoke(
         // Apêndice E (Google Play Services / Firebase, modo "sem GMS"
         // honesto): só responde por classes GMS/Firebase/Billing, antes do
         // host `Landroid` genérico — `None` continua para DEX.
-        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if let Some(v) = crate::gms::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
             return Ok(v);
         }
         // M3: classes android/* são HOST (framework.rs) — nunca estão no DEX
-        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if mref.class.starts_with("Landroid/") {
             return match crate::framework::call_host_static(
                 vm,
@@ -1749,7 +1749,7 @@ fn do_invoke(
         return Err(err::vm_error("INVALID_FORMAT", "invoke não-static sem receiver").into());
     };
     // java/lang/Object.<init> é no-op (raiz de toda hierarquia de usuário)
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     if mref.class == "Ljava/lang/Object;" && mref.name == "<init>" {
         return Ok(Value::Null);
     }
@@ -1771,7 +1771,7 @@ fn do_invoke(
         Ok(Some(r)) => r,
     };
     let recv_class = vm.heap.class_of(recv)?.to_string();
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     {
         if !vm.cp.is_subtype(&recv_class, &mref.class) {
             return Err(err::vm_error(
@@ -1803,9 +1803,9 @@ fn do_invoke(
     // intrínseco de instância (String/StringBuilder/Throwable/Object)
     // DEX toString overrides can invoke-super an implemented platform base.
     // Resolve that base rather than reselecting the virtual DEX override.
-    #[cfg(not(any(feature = "std", feature = "upstream-runtime")))]
+    #[cfg(not(any(feature = "desktop-runtime", feature = "upstream-runtime")))]
     let throwable_super = is_super && vm.cp.is_subtype(&mref.class, "Ljava/lang/Throwable;");
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     let throwable_super = false;
     let intrinsic_class = if throwable_super {
         frame_super.unwrap_or(&mref.class)
@@ -1874,14 +1874,14 @@ fn do_invoke(
 
     // M8: compat real — host sequestra só os métodos listados em m8.rs;
     // `None` cai para o DEX real da biblioteca (androidx/okhttp no APK).
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     if let Some(v) =
         crate::m8::call_m8_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
     {
         return Ok(v);
     }
 
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     if let Some(host) = vm.framework_host() {
         // Preserve virtual overrides and direct/super constructor dispatch.
         let start = if is_super {
@@ -1901,7 +1901,7 @@ fn do_invoke(
             }
         }
     }
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     {
         // Apêndice D: shims host AndroidX por módulo (lifecycle, livedata,
         // viewmodel, collection, datastore valores, work Data, navigation,
@@ -1928,7 +1928,7 @@ fn do_invoke(
 
     // M3: framework host (Activity/View/TextView/Button/LinearLayout/
     // Handler/Intent/Bundle) — a classe DECLARANTE do method ref é android/*
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     if mref.class.starts_with("Landroid/") {
         if !is_direct && !is_super {
             if let Some((d2, def, m)) = vm.cp.resolve_method(&recv_class, &mref.name, &mref.proto) {
@@ -1942,7 +1942,7 @@ fn do_invoke(
         }
         // Generic property storage is strictly last: it must not swallow
         // inherited View IDs, EditText text, or Activity/Context state.
-        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if let Some(value) = crate::view_props::fallback(
             vm,
             &mref.class,
@@ -1990,7 +1990,7 @@ fn do_invoke(
     let Some((d2, def, m)) = vm.cp.resolve_method(&start_class, &mref.name, &mref.proto) else {
         // D8 may use an app subclass as the inherited Android method owner.
         // DEX overrides above always win; direct app constructors stay direct.
-        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if !is_direct || is_super {
             if let Some(value) = inherited_android_host(
                 vm,
@@ -2007,7 +2007,7 @@ fn do_invoke(
             crate::classpath::unresolved_method(&start_class, &mref.name, &mref.proto).into(),
         );
     };
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     if m.access_flags & ACC_STATIC != 0 {
         return Err(err::vm_error(
             "INVALID_FORMAT",
@@ -2022,7 +2022,7 @@ fn do_invoke(
 }
 
 /// Resolve only real inherited Android hosts; never invent an app method.
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) fn inherited_android_host(
     vm: &mut Engine,
     start: &str,
@@ -2084,7 +2084,7 @@ pub(crate) fn inherited_android_host(
         // Try generic properties only after every concrete Android host has had
         // a chance to handle the call (e.g. View.setId must not be shadowed by
         // a generic setId property on an intermediate EditText ancestor).
-        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if let Some(value) = crate::view_props::fallback(vm, &class, name, sig, recv, args)? {
             return Ok(Some(value));
         }

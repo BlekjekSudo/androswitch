@@ -5,6 +5,9 @@
 #include <malloc.h>
 #include <inttypes.h>
 #include "../androswitch/memory_policy.h"
+#include "../horizon-std/support.h"
+
+static void close_std(void) { (void)as_horizon_std_shutdown(5000); }
 
 // This parser smoke needs a bounded heap, not all application RAM.
 size_t __nx_heap_size = 256 * 1024 * 1024;
@@ -86,6 +89,7 @@ void as_memory_stage(const char *stage) {
 }
 
 int main(int argc, char **argv) {
+    if (as_horizon_std_init() || atexit(close_std)) return 120;
     consoleInit(NULL);
     const char *base = "sdmc:/switch/androswitch-smoke";
     (void)argc; (void)argv;

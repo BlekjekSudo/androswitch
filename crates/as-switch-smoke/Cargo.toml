@@ -3,7 +3,7 @@ name = "as-switch-smoke"
 version = "0.1.0"
 edition.workspace = true
 license.workspace = true
-description = "AndroSwitch M1 no_std APK/DEX/interpreter libnx proof"
+description = "AndroSwitch Horizon std runtime, JNI bridge, and console runner"
 
 [lib]
 crate-type = ["staticlib", "rlib"]
@@ -25,6 +25,8 @@ as-launcher = { path = "../as-launcher" }
 rd-jni = { path = "../rd-jni", default-features = false }
 
 [features]
+default = ["std"]
+std = ["rd-vm/std", "rd-dex/std", "rd-apk/std", "rd-jni/std", "as-platform/std", "as-package/std", "as-native/std", "as-framework/std", "as-launcher/std", "serde/std", "serde_json/std"]
 host-cli = ["as-platform/std"]
 host-native = ["host-cli","as-native/oracle"]
 portable-tests = ["rd-vm/portable-test-support"]

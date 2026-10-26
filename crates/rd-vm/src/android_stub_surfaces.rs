@@ -19381,7 +19381,7 @@ fn sysos_fd_arg(vm: &mut Engine, args: &[Value], index: usize) -> Result<(ObjRef
             if path.is_empty() {
                 -1
             } else if let Some(registered) = crate::jfile::os_register_path(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &path,
                 2,
@@ -19398,7 +19398,7 @@ fn sysos_fd_arg(vm: &mut Engine, args: &[Value], index: usize) -> Result<(ObjRef
 }
 fn sysos_new_fd_obj(vm: &mut Engine, fd: i32) -> Result<Value, VmExit> {
     let path = crate::jfile::os_fd_path(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         fd,
     )
@@ -19936,7 +19936,7 @@ fn android_os_static(
                 vm,
                 "access",
                 crate::jfile::os_access(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &path,
                     iarg(args, 1),
@@ -19949,7 +19949,7 @@ fn android_os_static(
                 vm,
                 "chmod",
                 crate::jfile::os_chmod(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &path,
                     iarg(args, 1),
@@ -19963,7 +19963,7 @@ fn android_os_static(
                 vm,
                 name,
                 crate::jfile::os_chown(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &path,
                     iarg(args, 1),
@@ -19978,7 +19978,7 @@ fn android_os_static(
                 vm,
                 "close",
                 crate::jfile::os_close(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     fd,
                 ),
@@ -19992,7 +19992,7 @@ fn android_os_static(
                 vm,
                 "dup",
                 crate::jfile::os_dup(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     fd,
                 ),
@@ -20005,7 +20005,7 @@ fn android_os_static(
                 vm,
                 "dup2",
                 crate::jfile::os_dup2(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     fd,
                     iarg(args, 1),
@@ -20032,7 +20032,7 @@ fn android_os_static(
                 vm,
                 "fchmod",
                 crate::jfile::os_fchmod(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     fd,
                     iarg(args, 1),
@@ -20046,7 +20046,7 @@ fn android_os_static(
                 vm,
                 "fchown",
                 crate::jfile::os_fchown(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     fd,
                     iarg(args, 1),
@@ -20061,7 +20061,7 @@ fn android_os_static(
                 vm,
                 name,
                 crate::jfile::os_fsync(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     fd,
                 ),
@@ -20074,7 +20074,7 @@ fn android_os_static(
                 vm,
                 "fstat",
                 crate::jfile::os_fstat(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     fd,
                 ),
@@ -20087,7 +20087,7 @@ fn android_os_static(
                 vm,
                 "fstatvfs",
                 crate::jfile::os_fstatvfs(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     fd,
                 ),
@@ -20100,7 +20100,7 @@ fn android_os_static(
                 vm,
                 "ftruncate",
                 crate::jfile::os_ftruncate(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     fd,
                     larg(args, 1),
@@ -20161,7 +20161,7 @@ fn android_os_static(
                 vm,
                 "lseek",
                 crate::jfile::os_lseek(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     fd,
                     larg(args, 1),
@@ -20176,7 +20176,7 @@ fn android_os_static(
                 vm,
                 name,
                 crate::jfile::os_stat(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &path,
                 ),
@@ -20189,7 +20189,7 @@ fn android_os_static(
                 vm,
                 "statvfs",
                 crate::jfile::os_statvfs(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &path,
                 ),
@@ -20202,7 +20202,7 @@ fn android_os_static(
                 vm,
                 "mkdir",
                 crate::jfile::os_mkdir(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &path,
                     iarg(args, 1),
@@ -20216,7 +20216,7 @@ fn android_os_static(
                 vm,
                 "open",
                 crate::jfile::os_open(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &path,
                     iarg(args, 1),
@@ -20235,7 +20235,7 @@ fn android_os_static(
                     vm,
                     "read",
                     crate::jfile::os_read(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         fd,
                         count,
@@ -20260,7 +20260,7 @@ fn android_os_static(
                     vm,
                     "pread",
                     crate::jfile::os_pread(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         fd,
                         count,
@@ -20286,7 +20286,7 @@ fn android_os_static(
                     vm,
                     "write",
                     crate::jfile::os_write(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         fd,
                         &bytes,
@@ -20304,7 +20304,7 @@ fn android_os_static(
                     vm,
                     "pwrite",
                     crate::jfile::os_pwrite(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         fd,
                         &bytes,
@@ -20321,7 +20321,7 @@ fn android_os_static(
                 vm,
                 "readlink",
                 crate::jfile::os_stat(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &path,
                 ),
@@ -20337,7 +20337,7 @@ fn android_os_static(
                     vm,
                     "realpath",
                     crate::jfile::os_realpath(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         &path,
                     ),
@@ -20351,7 +20351,7 @@ fn android_os_static(
                 vm,
                 "remove",
                 crate::jfile::os_remove(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &path,
                 ),
@@ -20364,7 +20364,7 @@ fn android_os_static(
                 vm,
                 "unlink",
                 crate::jfile::os_unlink(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &path,
                 ),
@@ -20378,7 +20378,7 @@ fn android_os_static(
                 vm,
                 "rename",
                 crate::jfile::os_rename(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &old_path,
                     &new_path,

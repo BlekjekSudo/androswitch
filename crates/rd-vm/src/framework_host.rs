@@ -86,11 +86,11 @@ pub trait FrameworkHost {
 }
 impl Engine {
     pub fn device_class_object(&mut self, descriptor: &str) -> Result<ObjRef, VmExit> {
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             self.class_object_for(descriptor)
         }
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             let _ = descriptor;
             Err(crate::err::vm_error("PORTABLE_CORE_REQUIRED", "device class object").into())
@@ -101,11 +101,11 @@ impl Engine {
         package: &str,
         filesystem: alloc::boxed::Box<dyn as_platform::vfs::GuestFileSystem>,
     ) -> Result<(), VmExit> {
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             self.bind_storage(package, filesystem)
         }
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             let _ = (package, filesystem);
             Err(crate::err::vm_error(

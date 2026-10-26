@@ -18,7 +18,7 @@
 use crate::port_prelude::*;
 use alloc::collections::BTreeMap;
 use alloc::collections::BTreeSet;
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 use core::cell::RefCell;
 
 use crate::engine::Engine;
@@ -59,7 +59,7 @@ pub(crate) struct Vfs {
     next_desc: i64,
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 thread_local! {
     static VFS: RefCell<Vfs> = RefCell::new(Vfs::default());
 }
@@ -70,11 +70,11 @@ thread_local! {
 // the product runner until the filesystem adapter migration is complete.
 macro_rules! vfs {
     ($vm:expr) => {{
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             &VFS
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             $vm.parity_vfs.clone()
         }
@@ -136,7 +136,7 @@ fn parent_of(p: &str) -> Option<String> {
     }
 }
 
-fn mkdirs(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) {
+fn mkdirs(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) {
     let p = absolute(p);
     vfs!(vm).with(|v| {
         let mut v = v.borrow_mut();
@@ -149,14 +149,14 @@ fn mkdirs(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) {
     });
 }
 
-fn is_dir(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) -> bool {
+fn is_dir(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) -> bool {
     if p.is_empty() {
         return false;
     }
     let p = absolute(p);
     p == "/" || vfs!(vm).with(|v| v.borrow().dirs.contains(&p))
 }
-fn is_file(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) -> bool {
+fn is_file(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) -> bool {
     if p.is_empty() {
         return false;
     }
@@ -180,7 +180,7 @@ pub(crate) fn new_file(vm: &mut Engine, path: &str) -> Result<Value, VmExit> {
 /// VM's virtual filesystem (never mapped to host disk).
 pub(crate) fn external_storage_path(vm: &mut Engine, path: &str) -> Result<Value, VmExit> {
     mkdirs(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         "/storage/emulated/0",
     );
@@ -218,7 +218,7 @@ fn app_dir(vm: &mut Engine, sub: &str) -> Result<Value, VmExit> {
         format!("/data/user/0/{pkg}/{sub}")
     };
     mkdirs(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         &p,
     );
@@ -341,7 +341,7 @@ pub fn context_dirs(
             };
             let p = format!("/storage/emulated/0/Android/data/{pkg}/{sub}");
             mkdirs(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &p,
             );
@@ -411,7 +411,7 @@ pub fn static_intrinsic(
                 _ => "/data/local/tmp".into(),
             };
             mkdirs(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &dir,
             );
@@ -444,7 +444,11 @@ fn atomic_paths(vm: &Engine, recv: ObjRef) -> Result<(String, String), VmExit> {
     Ok((absolute(&path_of(vm, base)), absolute(&path_of(vm, backup))))
 }
 
-fn atomic_rename(#[cfg(not(feature = "std"))] vm: &Engine, from: &str, to: &str) -> bool {
+fn atomic_rename(
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
+    from: &str,
+    to: &str,
+) -> bool {
     vfs!(vm).with(|v| {
         let mut v = v.borrow_mut();
         let Some(bytes) = v.files.remove(from) else {
@@ -488,19 +492,23 @@ fn atomic_close_stream(vm: &mut Engine, args: &[Value]) {
     }
 }
 
-fn atomic_restore_backup(#[cfg(not(feature = "std"))] vm: &Engine, base: &str, backup: &str) {
+fn atomic_restore_backup(
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
+    base: &str,
+    backup: &str,
+) {
     if is_file(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         backup,
     ) {
         delete_file(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             base,
         );
         atomic_rename(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             backup,
             base,
@@ -511,7 +519,7 @@ fn atomic_restore_backup(#[cfg(not(feature = "std"))] vm: &Engine, base: &str, b
 fn atomic_open_read(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
     let (base, backup) = atomic_paths(vm, recv)?;
     atomic_restore_backup(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         &base,
         &backup,
@@ -546,29 +554,29 @@ fn atomic_file_intrinsic(
         ("startWrite", "()Ljava/io/FileOutputStream;") => {
             let (base, backup) = atomic_paths(vm, recv)?;
             if is_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &base,
             ) || is_dir(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &base,
             ) {
                 if !is_file(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &backup,
                 ) && !is_dir(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &backup,
                 ) {
                     if !is_file(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         &base,
                     ) || !atomic_rename(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         &base,
                         &backup,
@@ -582,7 +590,7 @@ fn atomic_file_intrinsic(
                     // A pre-existing backup is the older committed state;
                     // the current base is an interrupted replacement.
                     delete_file(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         &base,
                     );
@@ -595,12 +603,12 @@ fn atomic_file_intrinsic(
                         return Err(error);
                     };
                     mkdirs(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         &parent,
                     );
                     if !is_dir(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         &parent,
                     ) {
@@ -614,7 +622,7 @@ fn atomic_file_intrinsic(
             atomic_close_stream(vm, args);
             let (_, backup) = atomic_paths(vm, recv)?;
             delete_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &backup,
             );
@@ -624,17 +632,17 @@ fn atomic_file_intrinsic(
             atomic_close_stream(vm, args);
             let (base, backup) = atomic_paths(vm, recv)?;
             delete_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &base,
             );
             if is_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &backup,
             ) {
                 atomic_rename(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &backup,
                     &base,
@@ -684,12 +692,12 @@ fn atomic_file_intrinsic(
         ("delete", "()V") => {
             let (base, backup) = atomic_paths(vm, recv)?;
             delete_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &base,
             );
             delete_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &backup,
             );
@@ -787,21 +795,21 @@ pub fn instance_intrinsic(
             None => Value::Null,
         },
         "exists" => b(is_dir(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             &p,
         ) || is_file(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             &p,
         )),
         "isDirectory" => b(is_dir(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             &p,
         )),
         "isFile" => b(is_file(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             &p,
         )),
@@ -811,11 +819,11 @@ pub fn instance_intrinsic(
             && p != ".."
             && p.rsplit('/').next().is_some_and(|n| n.starts_with('.'))),
         "canRead" | "canWrite" | "canExecute" => b(is_dir(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             &p,
         ) || is_file(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             &p,
         )),
@@ -832,11 +840,11 @@ pub fn instance_intrinsic(
         }),
         "lastModified" => Value::Long(
             if is_dir(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &p,
             ) || is_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &p,
             ) {
@@ -848,18 +856,18 @@ pub fn instance_intrinsic(
         "mkdir" => {
             let ok = !p.is_empty()
                 && !is_dir(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &p,
                 )
                 && !is_file(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &p,
                 )
                 && parent_of(&abs).is_some_and(|x| {
                     is_dir(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         &x,
                     )
@@ -872,18 +880,18 @@ pub fn instance_intrinsic(
         "mkdirs" => {
             let ok = !p.is_empty()
                 && !is_dir(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &p,
                 )
                 && !is_file(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &p,
                 );
             if ok {
                 mkdirs(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &abs,
                 );
@@ -898,18 +906,18 @@ pub fn instance_intrinsic(
                 ));
             }
             let ok = !is_dir(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &p,
             ) && !is_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &p,
             );
             if ok {
                 if let Some(par) = parent_of(&abs) {
                     if !is_dir(
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         vm,
                         &par,
                     ) {
@@ -967,7 +975,7 @@ pub fn instance_intrinsic(
             }
             let dst = absolute(&dst_raw);
             b(os_rename(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &abs,
                 &dst,
@@ -976,7 +984,7 @@ pub fn instance_intrinsic(
         }
         "list" | "listFiles" if sig.starts_with("()") => {
             if !is_dir(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &p,
             ) {
@@ -1126,12 +1134,12 @@ fn stream_intrinsic(
             let append = matches!(args.get(1), Some(Value::Int(1)));
             if parent_of(&abs).is_some_and(|p| {
                 !is_dir(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &p,
                 )
             }) || is_dir(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &abs,
             ) {
@@ -1146,7 +1154,7 @@ fn stream_intrinsic(
             });
         } else if class == FIS
             && !is_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 &abs,
             )
@@ -1242,7 +1250,7 @@ fn stream_intrinsic(
                     OS_O_RDONLY
                 };
                 if let Some(fd) = os_register_path(
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     vm,
                     &p,
                     flags,
@@ -1261,7 +1269,7 @@ fn stream_intrinsic(
         }
         (FD, "valid") => match vm.heap.get_field(recv, "descriptor") {
             Ok(Value::Int(fd)) => Value::Int(os_fd_valid(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 vm,
                 fd,
             ) as i32),
@@ -1356,20 +1364,20 @@ fn stream_intrinsic(
 }
 
 /// Creates `p`'s parent directories (public entry for other host modules).
-pub(crate) fn mkdirs_pub(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) {
+pub(crate) fn mkdirs_pub(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) {
     mkdirs(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         p,
     );
 }
 
 /// Ensures a file exists at `p` (parents included), keeping its content.
-pub(crate) fn touch(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) {
+pub(crate) fn touch(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) {
     let p = absolute(p);
     if let Some(parent) = parent_of(&p) {
         mkdirs(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             &parent,
         );
@@ -1381,18 +1389,25 @@ pub(crate) fn touch(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) {
 
 /// Reads a virtual file's bytes for another host module (e.g. SQLite loads
 /// its serialized database image from the app-private VFS path).
-pub(crate) fn read_bytes(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) -> Option<Vec<u8>> {
+pub(crate) fn read_bytes(
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
+    p: &str,
+) -> Option<Vec<u8>> {
     let p = absolute(p);
     vfs!(vm).with(|v| v.borrow().files.get(&p).cloned())
 }
 
 /// Replaces a virtual file's bytes, creating parent directories as Android
 /// does for app-private storage paths.
-pub(crate) fn write_bytes(#[cfg(not(feature = "std"))] vm: &Engine, p: &str, bytes: Vec<u8>) {
+pub(crate) fn write_bytes(
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
+    p: &str,
+    bytes: Vec<u8>,
+) {
     let p = absolute(p);
     if let Some(parent) = parent_of(&p) {
         mkdirs(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             &parent,
         );
@@ -1403,7 +1418,7 @@ pub(crate) fn write_bytes(#[cfg(not(feature = "std"))] vm: &Engine, p: &str, byt
 }
 
 /// Deletes a virtual file. Returns whether a file existed.
-pub(crate) fn delete_file(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) -> bool {
+pub(crate) fn delete_file(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) -> bool {
     let p = absolute(p);
     vfs!(vm).with(|v| v.borrow_mut().files.remove(&p).is_some())
 }
@@ -1417,7 +1432,7 @@ pub(crate) fn delete_file(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) -> 
 /// getExternalFilesDir/getExternalCacheDir). Sem isto,
 /// `package_clear`/`package_remove` no MCP só resetavam permissões e
 /// os dados "apagados" continuavam legíveis.
-pub fn clear_package_data(#[cfg(not(feature = "std"))] vm: &Engine, package: &str) {
+pub fn clear_package_data(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, package: &str) {
     let roots = [
         format!("/data/user/0/{package}"),
         format!("/data/data/{package}"),
@@ -1449,7 +1464,7 @@ pub fn clear_package_data(#[cfg(not(feature = "std"))] vm: &Engine, package: &st
 /// Issue #230: sessão nova = dispositivo limpo. Zera o VFS inteiro
 /// (arquivos, metadados e descritores) — chamado na criação de cada
 /// `AgentSession`, de onde nascem os cenários isolados do `rd test`.
-pub fn reset_all(#[cfg(not(feature = "std"))] vm: &Engine) {
+pub fn reset_all(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine) {
     vfs!(vm).with(|cell| *cell.borrow_mut() = Vfs::default());
 }
 
@@ -1461,28 +1476,28 @@ mod tests {
     use crate::port_prelude::*;
     #[test]
     fn paths_and_vfs() {
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         let vm = crate::Engine::new(alloc::vec![], Default::default());
 
         assert_eq!(normalize("/a/./b/../c/"), "/a/c");
         assert_eq!(parent_of("/a/c").as_deref(), Some("/a"));
         assert_eq!(parent_of("/a").as_deref(), Some("/"));
         mkdirs(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             &vm,
             "/x/y/z",
         );
         assert!(
             is_dir(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 &vm,
                 "/x/y"
             ) && is_dir(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 &vm,
                 "/x/y/z"
             ) && !is_file(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 &vm,
                 "/x/y"
             )
@@ -1491,45 +1506,45 @@ mod tests {
 
     #[test]
     fn clear_package_data_isolates_packages_and_reset_all_clears() {
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         let vm = crate::Engine::new(alloc::vec![], Default::default());
 
         reset_all(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             &vm,
         );
         write_bytes(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             &vm,
             "/data/user/0/com.example.a/files/x.txt",
             b"a".to_vec(),
         );
         write_bytes(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             &vm,
             "/storage/emulated/0/Android/data/com.example.a/files/ext.txt",
             b"e".to_vec(),
         );
         write_bytes(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             &vm,
             "/data/user/0/com.example.b/files/y.txt",
             b"b".to_vec(),
         );
         write_bytes(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             &vm,
             "/data/user/0/com.example.ab/files/z.txt",
             b"z".to_vec(),
         );
         clear_package_data(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             &vm,
             "com.example.a",
         );
         assert_eq!(
             read_bytes(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 &vm,
                 "/data/user/0/com.example.a/files/x.txt"
             ),
@@ -1538,7 +1553,7 @@ mod tests {
         );
         assert_eq!(
             read_bytes(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 &vm,
                 "/storage/emulated/0/Android/data/com.example.a/files/ext.txt"
             ),
@@ -1547,7 +1562,7 @@ mod tests {
         );
         assert_eq!(
             read_bytes(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 &vm,
                 "/data/user/0/com.example.ab/files/z.txt"
             ),
@@ -1556,7 +1571,7 @@ mod tests {
         );
         assert_eq!(
             read_bytes(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 &vm,
                 "/data/user/0/com.example.b/files/y.txt"
             ),
@@ -1564,12 +1579,12 @@ mod tests {
             "pacote vizinho fica intacto"
         );
         reset_all(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             &vm,
         );
         assert_eq!(
             read_bytes(
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 &vm,
                 "/data/user/0/com.example.b/files/y.txt"
             ),
@@ -1769,7 +1784,7 @@ fn os_stat_in(vfs: &mut Vfs, path: &str) -> Result<OsStatData, i32> {
 }
 
 pub(crate) fn os_stat(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     path: &str,
 ) -> Result<OsStatData, i32> {
     let path = os_abs(path);
@@ -1777,7 +1792,7 @@ pub(crate) fn os_stat(
 }
 
 pub(crate) fn os_access(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     path: &str,
     mode: i32,
 ) -> Result<bool, i32> {
@@ -1818,7 +1833,7 @@ fn os_alloc_desc(vfs: &mut Vfs, path: String, flags: i32, pos: u64) -> i32 {
 }
 
 pub(crate) fn os_open(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     path: &str,
     flags: i32,
     mode: i32,
@@ -1886,7 +1901,7 @@ pub(crate) fn os_open(
 }
 
 pub(crate) fn os_register_path(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     path: &str,
     flags: i32,
     pos: u64,
@@ -1917,7 +1932,10 @@ fn os_cleanup_desc(vfs: &mut Vfs, desc_id: i64) {
     }
 }
 
-pub(crate) fn os_close(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Result<(), i32> {
+pub(crate) fn os_close(
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
+    fd: i32,
+) -> Result<(), i32> {
     vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let desc_id = vfs.fds.remove(&fd).ok_or(OS_EBADF)?;
@@ -1926,7 +1944,10 @@ pub(crate) fn os_close(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Res
     })
 }
 
-pub(crate) fn os_dup(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Result<i32, i32> {
+pub(crate) fn os_dup(
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
+    fd: i32,
+) -> Result<i32, i32> {
     vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let desc_id = os_desc_id(&vfs, fd)?;
@@ -1940,7 +1961,7 @@ pub(crate) fn os_dup(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Resul
 }
 
 pub(crate) fn os_dup2(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     new_fd: i32,
 ) -> Result<i32, i32> {
@@ -1961,35 +1982,38 @@ pub(crate) fn os_dup2(
     })
 }
 
-pub(crate) fn os_fd_path(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Result<String, i32> {
+pub(crate) fn os_fd_path(
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
+    fd: i32,
+) -> Result<String, i32> {
     vfs!(vm).with(|v| {
         let vfs = v.borrow();
         Ok(os_desc_snapshot(&vfs, fd)?.1)
     })
 }
 
-pub(crate) fn os_fd_valid(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> bool {
+pub(crate) fn os_fd_valid(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, fd: i32) -> bool {
     vfs!(vm).with(|v| v.borrow().fds.contains_key(&fd))
 }
 
 pub(crate) fn os_fstat(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
 ) -> Result<OsStatData, i32> {
     let path = os_fd_path(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         fd,
     )?;
     os_stat(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         &path,
     )
 }
 
 fn os_read_at(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     count: usize,
     offset: Option<i64>,
@@ -2027,12 +2051,12 @@ fn os_read_at(
 }
 
 pub(crate) fn os_read(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     count: usize,
 ) -> Result<Vec<u8>, i32> {
     os_read_at(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         fd,
         count,
@@ -2041,13 +2065,13 @@ pub(crate) fn os_read(
 }
 
 pub(crate) fn os_pread(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     count: usize,
     offset: i64,
 ) -> Result<Vec<u8>, i32> {
     os_read_at(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         fd,
         count,
@@ -2056,7 +2080,7 @@ pub(crate) fn os_pread(
 }
 
 fn os_write_at(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     data: &[u8],
     offset: Option<i64>,
@@ -2112,12 +2136,12 @@ fn os_write_at(
 }
 
 pub(crate) fn os_write(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     data: &[u8],
 ) -> Result<usize, i32> {
     os_write_at(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         fd,
         data,
@@ -2126,13 +2150,13 @@ pub(crate) fn os_write(
 }
 
 pub(crate) fn os_pwrite(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     data: &[u8],
     offset: i64,
 ) -> Result<usize, i32> {
     os_write_at(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         fd,
         data,
@@ -2141,7 +2165,7 @@ pub(crate) fn os_pwrite(
 }
 
 pub(crate) fn os_lseek(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     offset: i64,
     whence: i32,
@@ -2175,7 +2199,7 @@ pub(crate) fn os_lseek(
 }
 
 pub(crate) fn os_ftruncate(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     length: i64,
 ) -> Result<(), i32> {
@@ -2208,7 +2232,10 @@ pub(crate) fn os_ftruncate(
     })
 }
 
-pub(crate) fn os_fsync(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Result<(), i32> {
+pub(crate) fn os_fsync(
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
+    fd: i32,
+) -> Result<(), i32> {
     vfs!(vm).with(|v| {
         let vfs = v.borrow();
         os_desc_id(&vfs, fd).map(|_| ())
@@ -2216,7 +2243,7 @@ pub(crate) fn os_fsync(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Res
 }
 
 pub(crate) fn os_chmod(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     path: &str,
     mode: i32,
 ) -> Result<(), i32> {
@@ -2239,17 +2266,17 @@ pub(crate) fn os_chmod(
 }
 
 pub(crate) fn os_fchmod(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     mode: i32,
 ) -> Result<(), i32> {
     let path = os_fd_path(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         fd,
     )?;
     os_chmod(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         &path,
         mode,
@@ -2257,7 +2284,7 @@ pub(crate) fn os_fchmod(
 }
 
 fn os_chown_path(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     path: &str,
     uid: i32,
     gid: i32,
@@ -2284,13 +2311,13 @@ fn os_chown_path(
 }
 
 pub(crate) fn os_chown(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     path: &str,
     uid: i32,
     gid: i32,
 ) -> Result<(), i32> {
     os_chown_path(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         path,
         uid,
@@ -2299,18 +2326,18 @@ pub(crate) fn os_chown(
 }
 
 pub(crate) fn os_fchown(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
     uid: i32,
     gid: i32,
 ) -> Result<(), i32> {
     let path = os_fd_path(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         fd,
     )?;
     os_chown_path(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         &path,
         uid,
@@ -2319,7 +2346,7 @@ pub(crate) fn os_fchown(
 }
 
 pub(crate) fn os_mkdir(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     path: &str,
     mode: i32,
 ) -> Result<(), i32> {
@@ -2354,7 +2381,10 @@ fn os_dir_empty(vfs: &Vfs, path: &str) -> bool {
         && !vfs.files.keys().any(|file| file.starts_with(&prefix))
 }
 
-pub(crate) fn os_remove(#[cfg(not(feature = "std"))] vm: &Engine, path: &str) -> Result<(), i32> {
+pub(crate) fn os_remove(
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
+    path: &str,
+) -> Result<(), i32> {
     let path = os_abs(path);
     vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
@@ -2381,7 +2411,10 @@ pub(crate) fn os_remove(#[cfg(not(feature = "std"))] vm: &Engine, path: &str) ->
     })
 }
 
-pub(crate) fn os_unlink(#[cfg(not(feature = "std"))] vm: &Engine, path: &str) -> Result<(), i32> {
+pub(crate) fn os_unlink(
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
+    path: &str,
+) -> Result<(), i32> {
     let path = os_abs(path);
     vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
@@ -2409,7 +2442,7 @@ fn os_move_prefix(value: &str, old: &str, new: &str) -> String {
 }
 
 pub(crate) fn os_rename(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     old_path: &str,
     new_path: &str,
 ) -> Result<(), i32> {
@@ -2420,7 +2453,7 @@ pub(crate) fn os_rename(
     let new_path = os_abs(new_path);
     if old_path == new_path {
         return os_stat(
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             vm,
             &old_path,
         )
@@ -2504,7 +2537,7 @@ pub(crate) fn os_rename(
 }
 
 pub(crate) fn os_statvfs(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     path: &str,
 ) -> Result<OsStatVfsData, i32> {
     let path = os_abs(path);
@@ -2536,29 +2569,29 @@ pub(crate) fn os_statvfs(
 }
 
 pub(crate) fn os_fstatvfs(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     fd: i32,
 ) -> Result<OsStatVfsData, i32> {
     let path = os_fd_path(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         fd,
     )?;
     os_statvfs(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         &path,
     )
 }
 
 pub(crate) fn os_realpath(
-    #[cfg(not(feature = "std"))] vm: &Engine,
+    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
     path: &str,
 ) -> Result<String, i32> {
     // The VFS has no symbolic links, so canonicalization is normalization
     // after verifying that the path exists.
     os_stat(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         path,
     )?;

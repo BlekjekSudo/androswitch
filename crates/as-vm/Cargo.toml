@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "Feature-isolated no_std build of the shared RustyDroid VM source"
+description = "Shared RustyDroid VM with isolated embedded execution and Horizon std support"
 build = "build.rs"
 
 [lib]
@@ -36,7 +36,8 @@ rd-jni = { path = "../rd-jni" }
 rd-testsupport = { package = "as-vm-testsupport", path = "../as-vm-testsupport" }
 
 [features]
-default = []
+default = ["std"]
+std = ["as-platform/std", "rd-dex/std", "rd-apk/std", "serde/std"]
 portable-test-support = []
 upstream-runtime = ["dep:as-sqlite", "dep:serde_json", "dep:regex", "dep:fancy-regex", "dep:libm", "dep:siphasher"]
 

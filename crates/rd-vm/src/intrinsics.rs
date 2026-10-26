@@ -176,7 +176,7 @@ fn java_floor_mod_i64(a: i64, b: i64) -> i64 {
 pub(crate) fn host_print(vm: &Engine, fd: i32, s: &str) {
     let _ = vm.output.write(vm.framework_host().as_deref(), fd, s);
 }
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub(crate) fn print_sink(fd: i32, s: &str) {
     use std::io::Write;
     if fd == 2 {
@@ -210,7 +210,7 @@ pub(crate) fn print_sink(fd: i32, s: &str) {
 /// Destino do fd=1 do app (System.out). fd=2 (System.err) é SEMPRE o stderr
 /// do host — Android real manda app stdout/Log para o logcat, nunca para o
 /// stream do dump.
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 #[derive(Clone, Default, Debug)]
 pub enum HostOut {
     /// stdout do host (default da biblioteca — semântica Java).
@@ -222,23 +222,23 @@ pub enum HostOut {
     Buffer(alloc::sync::Arc<std::sync::Mutex<Vec<u8>>>),
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 static APP_STDOUT: std::sync::Mutex<HostOut> = std::sync::Mutex::new(HostOut::Std);
 
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 fn app_stdout_mode() -> HostOut {
     APP_STDOUT.lock().expect("app stdout mode").clone()
 }
 
 /// Configura o destino do System.out do app (issue #55).
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub fn set_app_stdout(mode: HostOut) {
     *APP_STDOUT.lock().expect("app stdout mode") = mode;
 }
 
 /// Roteia System.out do app para o STDERR do host (contrato de máquina:
 /// stdout reservado ao artefato do comando — issue #55). Idempotente.
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub fn route_app_stdout_to_stderr() {
     set_app_stdout(HostOut::Stderr);
 }
@@ -5662,7 +5662,7 @@ fn java_pow(a: f64, b: f64) -> f64 {
 }
 
 /// Native loading is never silently ignored, including in minimal builds.
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub(crate) fn call_native_loader(
     vm: &mut Engine,
     class: &str,
@@ -5673,7 +5673,7 @@ pub(crate) fn call_native_loader(
     vm.with_host_roots(|vm| call_native_loader_rooted(vm, class, name, sig, args))
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 fn call_native_loader_rooted(
     vm: &mut Engine,
     class: &str,

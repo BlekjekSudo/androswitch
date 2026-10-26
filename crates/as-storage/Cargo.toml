@@ -13,3 +13,7 @@ xmlparser = { version = "=0.13.6", default-features = false }
 sha2 = { version = "=0.10.9", default-features = false }
 [dev-dependencies]
 as-platform = { path = "../as-platform", features = ["std"] }
+
+[features]
+default = ["std"]
+std = ["as-platform/std", "as-sqlite/std"]

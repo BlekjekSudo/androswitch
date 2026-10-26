@@ -1,5 +1,5 @@
 //! Per-Engine output transport. Java API algorithms do not own stdout globals.
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 use crate::framework_host::FrameworkHost;
 use crate::{Engine, VmExit};
 use alloc::{rc::Rc, string::String, vec::Vec};
@@ -16,7 +16,7 @@ pub(crate) struct Output {
     bytes: Cell<usize>,
 }
 impl Output {
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) fn write(
         &self,
         host: Option<&dyn FrameworkHost>,
@@ -30,12 +30,12 @@ impl Output {
         if let Some(host) = host {
             return host.write_log(fd, text);
         }
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             crate::upstream_print_sink(fd, text);
             Ok(text.len())
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             // A standalone reference VM retains real output for inspection.
             // A bound Horizon framework writes through its persistent log sink.

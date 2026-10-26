@@ -19,9 +19,10 @@ storage, clock and logging contracts, with host and libnx filesystem adapters. F
 are added with their implementation milestones. The inherited `rd-*` crates
 retain their upstream behavior and tests.
 
-M1 adds a `std` feature boundary to `rd-vm` and `rd-apk`. The device uses the
+M1 originally added a `std` feature boundary to `rd-vm` and `rd-apk`. The device uses the
 same Engine, opcode dispatcher, classpath, heap and exception code as the host.
-Desktop framework services remain behind std. Portable VM side state is owned
+The current migration separates Rust library `std` from the `desktop-runtime`
+execution backend. Embedded VM side state is owned
 per Engine, including interned strings and canonical class objects, with a
 precise full mark-sweep collector. See [ADR 012](adr/012-portable-interpreter.md).
 The no_std APK path shares ZIP/AXML/ARSC/manifest code and uses bounded raw
@@ -35,15 +36,20 @@ and real JNI to the Engine. This remains separate from the future
 [ADR 013](adr/013-persistent-package-revisions.md) and
 [ADR 014](adr/014-native-horizon-jni.md).
 
-The device path uses `no_std + alloc` and C ABI adapters for libnx. OS access,
-environment configuration, thread-local VM state and subprocesses must leave
-the portable core. Host tools may retain `std` and Unicorn as an oracle.
+The device path uses real Rust `std` built for a pinned Horizon/newlib target,
+with C ABI adapters for libnx. The isolated `as-vm` package enables std without
+exposing `desktop-runtime`; desktop process APIs, Unicorn and Python are not
+device dependencies. JNI, guest TLS, lifecycle and persistent files retain one
+embedded state graph. Rust std's host filesystem is not an Android VFS: guest
+paths still use the shared Java/native mount resolver. See the
+[std migration](HORIZON_STD_MIGRATION.md).
+Host tools may retain Unicorn as an oracle.
 Unicorn results do not verify native Horizon execution.
 
 An API missing on this path may already exist in the inherited desktop
 framework. Audit that implementation before adding a replacement: extract
 compatible pure behavior for both paths and adapt OS/state/GC dependencies.
-`no_std` does not require a second implementation of every Java class. The
+The library profile does not require a second implementation of every Java class. The
 [upstream reuse audit](UPSTREAM_REUSE_AUDIT.md) records the current dispatch
 split, known semantic differences and family-by-family integration priorities.
 

@@ -10,12 +10,12 @@ use rd_vm::m8::*;
 use rd_vm::value::Value;
 use rd_vm::{Engine, VmConfig};
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 thread_local! { static SESSION_FS: rd_vm::ReferenceFileSystem = Default::default(); }
 fn engine() -> Engine {
     #[allow(unused_mut)]
     let mut engine = Engine::new(Vec::new(), VmConfig::default());
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     SESSION_FS.with(|filesystem| engine.bind_reference_filesystem(filesystem).unwrap());
     engine
 }

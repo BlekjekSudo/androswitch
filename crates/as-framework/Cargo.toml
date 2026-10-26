@@ -18,6 +18,8 @@ rd-dex = { path = "../rd-dex", default-features = false }
 serde_json = { version = "1.0", optional = true }
 as-package = { path = "../as-package" }
 [features]
+default = ["std"]
+std = ["rd-vm/std", "as-platform/std", "as-storage/std", "as-package/std", "rd-apk/std", "rd-dex/std", "serde/std"]
 host = ["as-platform/std", "dep:serde_json"]
 [[bin]]
 name = "as-ui-probe"

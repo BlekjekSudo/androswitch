@@ -451,9 +451,9 @@ fn build_model(walk: ScreenWalk) -> ScreenModel {
             })
         })
     });
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     let mut hs = std::collections::hash_map::DefaultHasher::new();
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     let mut hs = siphasher::sip::SipHasher13::new();
     for t in &texts {
         t.text.hash(&mut hs);

@@ -101,11 +101,11 @@ pub(crate) fn with_host_reentrant<T, F>(vm: &mut Engine, f: F) -> Result<T, VmEx
 where
     F: FnOnce(&mut Engine) -> Result<T, VmExit>,
 {
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     let depth = vm.host_reentrant_depth;
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     let owner = vm.heap.checked_execution_owner()?;
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     let depth = vm.portable.host_depth.get(&owner).copied().unwrap_or(0);
     if depth >= MAX_HOST_REENTRANT_DEPTH {
         return Err(VmExit::Exception(Throwable::new(
@@ -113,18 +113,18 @@ where
             "host reentrant call depth exceeded",
         )));
     }
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     {
         vm.host_reentrant_depth += 1;
     }
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     vm.portable.host_depth.insert(owner, depth + 1);
     let res = f(vm);
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     {
         vm.host_reentrant_depth = depth;
     }
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     {
         if depth == 0 {
             vm.portable.host_depth.remove(&owner);

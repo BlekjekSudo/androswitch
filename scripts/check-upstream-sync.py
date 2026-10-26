@@ -115,7 +115,7 @@ def verify_vm_boundary(root: Path) -> list[str]:
         data = tomllib.loads(manifest.read_text(encoding="utf-8"))
         if data.get("lib", {}).get("path") != expected:
             errors.append(f"DUPLICATED_UPSTREAM_SOURCE: {package} must use {expected}")
-        if package == "as-vm" and "std" in data.get("features", {}):
+        if package == "as-vm" and "desktop-runtime" in data.get("features", {}):
             errors.append("DESKTOP_FEATURE_EXPOSED_ON_DEVICE_VM")
     for package in ["as-framework", "as-switch-smoke", "as-vm-testsupport"]:
         manifest = root / "crates" / package / "Cargo.toml"

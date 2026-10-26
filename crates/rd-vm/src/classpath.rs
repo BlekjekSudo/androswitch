@@ -438,7 +438,7 @@ impl Classpath {
     /// proof that the receiver has a class implementation. Portable hosts
     /// complete the class chain outside DEX (for example Activity/Context)
     /// before interface defaults/abstract declarations are selected.
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     pub(crate) fn has_class_method(&mut self, class: &str, name: &str, proto: &str) -> bool {
         self.resolve_method(class, name, proto)
             .is_some_and(|(_, definition, _)| definition.access_flags & 0x0200 == 0)

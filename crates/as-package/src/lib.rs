@@ -1,6 +1,6 @@
 //! Immutable installation revisions. Publish a durable record by renaming to
 //! a *new* commit marker: no rename-overwrite assumption on Horizon's SD FS.
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 mod archive;
 use alloc::{

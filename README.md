@@ -19,11 +19,17 @@ original tests. The [full source audit](docs/UPSTREAM_PORTING.md) tracks all
 from the device build. **Horizon behavior parity is not yet 1:1 with upstream.**
 The isolated `as-vm` package compiles the original RustyDroid source directly,
 so desktop Cargo features cannot switch the runner to desktop VM state.
+The device build now uses the real Rust standard library through a pinned
+Horizon/newlib PAL. Rust `std` and the legacy `desktop-runtime` backend are
+independent features; enabling std preserves the Switch's existing JNI,
+execution-owner and persistent-storage contracts. See the
+[std migration report](docs/HORIZON_STD_MIGRATION.md) for its separate host,
+emulator and hardware evidence.
 Latest upstream Arrays/BitSet code and lazy parser improvements now share the
 portable path; source synchronization is kept separate from execution evidence.
 
 The complete framework dependency closure now has an experimental
-`as-vm/upstream-runtime` reference path using `core + alloc`, the inherited
+`as-vm/upstream-runtime` reference path using std, the inherited
 intrinsic dispatcher and GC, Engine-owned module tables, and native SQLite
 instead of a Python subprocess. All 50 original VM integration suites are
 registered against that path. **It is not enabled in the shipping runner**:

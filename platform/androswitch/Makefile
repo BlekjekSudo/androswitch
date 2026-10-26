@@ -5,7 +5,7 @@ CC := $(DEVKITA64)/bin/aarch64-none-elf-gcc
 TOOLS := $(DEVKITPRO)/tools/bin
 LIBNX := $(DEVKITPRO)/libnx
 OUTPUT_DIR ?= ../../local-artifacts/product
-RUST_LIBRARY ?= ../../target/switch/aarch64-nintendo-switch-freestanding/release/libas_switch_smoke.a
+RUST_LIBRARY ?= ../../target/switch/aarch64-androswitch-newlib/release/libas_switch_smoke.a
 SQLITE_SOURCE ?= ../../local-artifacts/dependencies/sqlite
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 MESA_SDK ?=
@@ -14,19 +14,24 @@ MESA_OBJECTS := $(OUTPUT_DIR)/sdk_futex.o $(OUTPUT_DIR)/sdk_compat.o
 MESA_WRAPPERS := -Wl,--wrap=syscall,--wrap=clock_gettime,--wrap=clock_getres,--wrap=getauxval,--wrap=posix_memalign,--wrap=__xpg_strerror_r,--wrap=open64,--wrap=fstat64,--wrap=stat64,--wrap=mmap64,--wrap=munmap,--wrap=dl_iterate_phdr,--wrap=writev,--wrap=vk_drm_syncobj_copy_payloads
 MESA_RUST_LINK := @$(OUTPUT_DIR)/mesa-rust-libs.rsp
 MESA_CFLAGS := -I$(MESA_SDK)/include -DANDROSWITCH_MESA_UNIFIED
-MESA_LINK := -L$(MESA_SDK)/lib
+MESA_LINK_LIB ?= $(MESA_SDK)/lib
+MESA_LINK := -L$(MESA_LINK_LIB)
 MESA_LIBRARIES := -lEGL -lGLESv2 -lglapi -lvulkan -lmesa_util_c11 -lblake3 -lmesa_util -lmesa_util_simd -lexpat -lzstd -lz -lpthread
 else
 MESA_LIBRARIES := -lEGL -lGLESv2 -lglapi -ldrm_nouveau
 endif
 CFLAGS := $(ARCH) $(MESA_CFLAGS) -D__SWITCH__ -O2 -Wall -Wextra -Werror -I$(LIBNX)/include -I$(DEVKITPRO)/portlibs/switch/include -I../switch-smoke -I../../third_party/android
 OBJECTS := $(addprefix $(OUTPUT_DIR)/,main.o display.o cpu_time.o vulkan_bridge.o memory.o media.o media_format.o glsurface.o workers.o opensl.o fs.o resource_info.o resource_extra.o native.o worker_admission.o native_call.o jni.o bionic_io.o bionic_sync.o bionic_cxx.o bionic_finalize.o bionic_libc.o bionic_memory.o bionic_dlfcn.o bionic_locale.o bionic_multibyte.o bionic_random.o bionic_keys.o bionic_log.o bionic_vfs.o missing_import.o sqlite3.o sqlite_memory.o)
+OBJECTS += $(OUTPUT_DIR)/rust_std.o
+STD_WRAPPERS := -Wl,--wrap=pthread_create,--wrap=pthread_join,--wrap=pthread_detach,--wrap=pthread_attr_init
 SQLITE_FLAGS := -DSQLITE_OS_OTHER=1 -DSQLITE_THREADSAFE=0 -DSQLITE_TEMP_STORE=3 -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_OMIT_WAL -DSQLITE_DEFAULT_MEMSTATUS=1 -DSQLITE_DEFAULT_CACHE_SIZE=-1024
 .PHONY: all
 all: $(OUTPUT_DIR)/androswitch.nro
 $(OUTPUT_DIR):
 	mkdir -p "$@"
-$(OUTPUT_DIR)/main.o: main.c cpu_time.h media.h glsurface.h framebuffer_copy.h memory.h display.h display_geometry.h ppm_publish.h rgba_ppm.h | $(OUTPUT_DIR)
+$(OUTPUT_DIR)/main.o: main.c cpu_time.h media.h glsurface.h framebuffer_copy.h memory.h display.h display_geometry.h ppm_publish.h rgba_ppm.h ../horizon-std/support.h | $(OUTPUT_DIR)
+	$(CC) $(CFLAGS) -c "$<" -o "$@"
+$(OUTPUT_DIR)/rust_std.o: ../horizon-std/support.c ../horizon-std/support.h | $(OUTPUT_DIR)
 	$(CC) $(CFLAGS) -c "$<" -o "$@"
 $(OUTPUT_DIR)/sdk_futex.o: sdk_futex.c sdk_futex.h | $(OUTPUT_DIR)
 	$(CC) $(CFLAGS) -c "$<" -o "$@"
@@ -70,7 +75,7 @@ $(OUTPUT_DIR)/bionic_libc.o: ../switch-smoke/bionic_auxv.h ../switch-smoke/bioni
 $(OUTPUT_DIR)/native_call.o: ../switch-smoke/native_call.S | $(OUTPUT_DIR)
 	$(CC) $(ARCH) -c "$<" -o "$@"
 $(OUTPUT_DIR)/androswitch.elf: $(OBJECTS) $(MESA_OBJECTS) $(RUST_LIBRARY) Makefile
-	$(CC) $(ARCH) -specs=$(LIBNX)/switch.specs $(MESA_LINK) -L$(LIBNX)/lib -L$(DEVKITPRO)/portlibs/switch/lib $(OBJECTS) $(MESA_OBJECTS) $(MESA_WRAPPERS) -Wl,--wrap=threadCreate,--wrap=threadClose -Wl,--start-group "$(RUST_LIBRARY)" $(MESA_LIBRARIES) $(MESA_RUST_LINK) -lstdc++ -lnx -lm -Wl,--end-group -o "$@"
+	$(CC) $(ARCH) -specs=$(LIBNX)/switch.specs $(MESA_LINK) -L$(LIBNX)/lib -L$(DEVKITPRO)/portlibs/switch/lib $(OBJECTS) $(MESA_OBJECTS) $(MESA_WRAPPERS) $(STD_WRAPPERS) -Wl,--wrap=threadCreate,--wrap=threadClose -Wl,--start-group "$(RUST_LIBRARY)" $(MESA_LIBRARIES) $(MESA_RUST_LINK) -lstdc++ -lnx -lm -Wl,--end-group -o "$@"
 $(OUTPUT_DIR)/androswitch.nacp: Makefile | $(OUTPUT_DIR)
 	$(TOOLS)/nacptool --create "AndroSwitch" "AndroSwitch / RustyDroid contributors" "0.1.0-dev" "$@"
 $(OUTPUT_DIR)/androswitch.nro: $(OUTPUT_DIR)/androswitch.elf $(OUTPUT_DIR)/androswitch.nacp

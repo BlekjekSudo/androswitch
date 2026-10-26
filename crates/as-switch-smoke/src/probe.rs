@@ -91,6 +91,7 @@ pub struct Report {
     pub target_sdk: u32,
     pub dex_files: usize,
     pub portable_vm: bool,
+    pub rust_std: bool,
     pub application_lifecycle: bool,
     pub jni: bool,
     pub calls: Vec<CallResult>,
@@ -220,6 +221,7 @@ pub fn run_with_fs(
         target_sdk: apk.manifest.target_sdk,
         dex_files: apk.dex_files.len(),
         portable_vm: rd_vm::PORTABLE_CORE,
+        rust_std: rd_vm::RUST_STD_ENABLED,
         application_lifecycle: false,
         jni: cfg!(target_os = "horizon")
             && !apk.native_libs.is_empty()

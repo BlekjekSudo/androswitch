@@ -23,14 +23,14 @@ pub(crate) fn with_values(
         Err(VmExit::Exception(exception)) => exception.obj,
         _ => None,
     };
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     {
         vm.heap.gc_scope_restore(mark);
         if let Some(reference) = returned {
             vm.heap.gc_pin_return(reference);
         }
     }
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     vm.heap.gc_scope_restore_return(mark, returned);
     result
 }

@@ -1,6 +1,6 @@
 /* Bounded native Rust SDK ABI adapters, MIT OR Apache-2.0.
- * The portable VM is still no_std. The optional Mesa shader compiler's matching
- * Rust libraries use these host adapters, not Android guest syscall imports.
+ * AndroSwitch's Horizon std uses newlib. The optional Mesa shader compiler's
+ * separate GNU/Linux Rust libraries use these bounded host ABI adapters.
  */
 #include <errno.h>
 #include <fcntl.h>

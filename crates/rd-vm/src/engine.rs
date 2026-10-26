@@ -57,9 +57,9 @@ impl Default for VmConfig {
 /// (`Engine::gc` / `maybe_gc`, ver `gc.rs`) e descartado quando o Engine cai.
 pub struct Engine {
     pub(crate) output: alloc::rc::Rc<crate::app_output::Output>,
-    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
     pub(crate) parity_vfs: crate::module_tables::Local<core::cell::RefCell<crate::jfile::Vfs>>,
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) module_tables: crate::module_tables::ModuleTables,
     pub(crate) framework_backend: Option<alloc::rc::Rc<dyn crate::framework_host::FrameworkHost>>,
     #[cfg(feature = "jit")]
@@ -77,109 +77,109 @@ pub struct Engine {
     /// The collectors retain these VM-owned constants until Engine teardown.
     pub(crate) boxed_cache: HashMap<(String, i64), ObjRef>,
     clinit_done: HashSet<String>,
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     clinit_running: HashSet<String>,
     /// Only the actual initializing owner may recursively observe its class.
     /// Entries are removed on every completed/failed initialization.
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     clinit_running: HashMap<String, u64>,
     /// classes cujo `<clinit>` falhou — JLS 12.4.2: acessos seguintes levantam
     /// NoClassDefFoundError (issue #37)
     clinit_failed: HashSet<String>,
     /// M3: estado host do framework (Activity/View/Handler/…)
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub fw: crate::framework::HostState,
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     depth: usize,
     pub(crate) fuel_used: u64,
     pub(crate) fuel_window_start: u64,
     /// AG-09: cobertura de métodos — chave `(dex_idx << 32) | method_idx`
     /// de cada corpo DEX que chegou a executar neste Engine.
     coverage: HashSet<u64>,
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     pub(crate) frame_labels: Vec<String>,
     /// Cooperative green threads (threads.rs)
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub threads: crate::threads::Threads,
     /// Session permission grant set (perms.rs); None = all granted.
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub granted_permissions: Option<HashSet<String>>,
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) pending_permission_results: Vec<crate::perms::PendingPermissionResult>,
     /// window → (decor, content frame) (window.rs)
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) window_decor:
         HashMap<crate::heap::ObjRef, (crate::heap::ObjRef, crate::heap::ObjRef)>,
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) system_ui_visibility: HashMap<crate::heap::ObjRef, i32>,
     /// General View property store (view_props.rs): (view, property) → value
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) view_props: HashMap<(crate::heap::ObjRef, String), Value>,
     /// `java.text.BreakIterator` state (jbreakiter.rs)
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) break_iters: HashMap<crate::heap::ObjRef, crate::jbreakiter::BreakState>,
     /// BigDecimal/BigInteger values: (unscaled, scale) (jbigdecimal.rs).
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) bignums: HashMap<crate::heap::ObjRef, (i128, i32)>,
     /// dex pc of the instruction the interpreter executed last (diagnostics:
     /// VM errors name the faulting instruction of the innermost frame)
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     pub(crate) last_pc: usize,
     /// view_attach.rs: OnAttachStateChangeListeners per view
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) attach_listeners: HashMap<crate::heap::ObjRef, Vec<crate::heap::ObjRef>>,
     /// view_attach.rs: views currently attached to a window
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) attached_views: HashSet<crate::heap::ObjRef>,
     /// graphics.rs: native state of host graphics objects + window display list
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) gfx: crate::graphics::Gfx,
     /// android_util.rs: sparse-array contents (sorted)
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) sparse: HashMap<crate::heap::ObjRef, alloc::collections::BTreeMap<i64, Value>>,
     /// view_attach.rs: windows made visible (makeVisible)
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) window_attached: HashSet<crate::heap::ObjRef>,
     /// vto.rs: ViewTreeObserver state, and the observer of each tree root
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) vto: HashMap<crate::heap::ObjRef, crate::vto::Observer>,
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) vto_by_root: HashMap<crate::heap::ObjRef, crate::heap::ObjRef>,
     /// view_attach.rs: the window token handed to attached views
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) window_token: Option<crate::heap::ObjRef>,
     /// choreographer.rs: frame callbacks
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) frames: crate::choreographer::FrameState,
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) frame_pump_active: bool,
     /// activity_callbacks.rs: ActivityLifecycleCallbacks registry
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) activity_callbacks: crate::activity_callbacks::Registry,
     /// activity_extras.rs: setResult, back dispatchers and their callbacks
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) activity_results: HashMap<crate::heap::ObjRef, (i32, Option<crate::heap::ObjRef>)>,
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) back_dispatchers: HashMap<crate::heap::ObjRef, crate::heap::ObjRef>,
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) back_callbacks: HashMap<crate::heap::ObjRef, Vec<(i32, crate::heap::ObjRef)>>,
     /// bundle.rs: Intent action/data/type/flags/package/categories
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) intent_meta: HashMap<crate::heap::ObjRef, crate::bundle::IntentMeta>,
     /// content.rs: ContentResolver observers + Settings table
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) content: crate::content::ContentState,
     /// Mark-sweep collector statistics (`gc.rs`).
     pub(crate) gc_stats: crate::gc::GcStats,
     pub(crate) gc_slots_after: usize,
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) gc_frames: Vec<Vec<crate::heap::ObjRef>>,
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     pub(crate) execution_frames: crate::portable::execution::Frames,
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     pub(crate) portable: crate::portable::State,
     /// Active host->host reentrant call depth (`object_to_string`, `obj_equals`, `obj_hash`, etc.).
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     pub(crate) host_reentrant_depth: usize,
 }
 
@@ -208,14 +208,14 @@ impl Engine {
     pub fn new(dexes: Vec<rd_dex::Dex>, config: VmConfig) -> Self {
         // Issue #230: nasce um Heap novo (ObjRefs reiniciam) — o estado
         // host thread_local indexado por refs do heap anterior morre aqui.
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         crate::reset_host_thread_state();
         let budget = config.heap_budget;
         Engine {
             output: Default::default(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             module_tables: Default::default(),
-            #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+            #[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
             parity_vfs: crate::module_tables::Local::new(core::cell::RefCell::new(
                 Default::default(),
             )),
@@ -232,74 +232,74 @@ impl Engine {
             clinit_done: HashSet::new(),
             clinit_running: Default::default(),
             clinit_failed: HashSet::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             fw: Default::default(),
-            #[cfg(feature = "std")]
+            #[cfg(feature = "desktop-runtime")]
             depth: 0,
             fuel_used: 0,
             fuel_window_start: 0,
             coverage: HashSet::new(),
-            #[cfg(feature = "std")]
+            #[cfg(feature = "desktop-runtime")]
             frame_labels: Vec::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             threads: Default::default(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             granted_permissions: None,
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             pending_permission_results: Vec::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             window_decor: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             system_ui_visibility: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             view_props: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             break_iters: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             bignums: HashMap::new(),
-            #[cfg(feature = "std")]
+            #[cfg(feature = "desktop-runtime")]
             last_pc: 0,
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             attach_listeners: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             attached_views: HashSet::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             gfx: Default::default(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             sparse: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             window_attached: HashSet::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             vto: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             vto_by_root: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             window_token: None,
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             frames: Default::default(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             frame_pump_active: false,
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             activity_callbacks: Default::default(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             activity_results: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             back_dispatchers: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             back_callbacks: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             intent_meta: HashMap::new(),
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             content: Default::default(),
             gc_stats: Default::default(),
             gc_slots_after: 0,
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             gc_frames: Vec::new(),
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             execution_frames: Default::default(),
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             portable: Default::default(),
-            #[cfg(feature = "std")]
+            #[cfg(feature = "desktop-runtime")]
             host_reentrant_depth: 0,
             #[cfg(feature = "jit")]
             jit: {
@@ -341,7 +341,7 @@ impl Engine {
     /// AndroidManifest.xml (`android:name`). Quando presente, `launch_app`
     /// instancia ESSA classe (e não `Landroid/app/Application;`) e roda o
     /// onCreate DEX dela antes do onCreate da activity — como o Android faz.
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub fn set_application_class(&mut self, application_desc: String) {
         self.fw.application_class = Some(application_desc);
     }
@@ -362,11 +362,11 @@ impl Engine {
     }
 
     pub(crate) fn frame_depth(&self) -> usize {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             self.depth
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             self.execution_frames.depth(self.heap.execution_owner())
         }
@@ -374,11 +374,11 @@ impl Engine {
     pub(crate) fn frame_labels(
         &self,
     ) -> impl DoubleEndedIterator<Item = &String> + ExactSizeIterator {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             self.frame_labels.iter()
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             self.execution_frames.labels(self.heap.execution_owner())
         }
@@ -394,7 +394,7 @@ impl Engine {
     /// diagnostic labels or another suspended thread's frame are consulted.
     /// No frame means a direct host call has no Java access-checking caller.
     pub fn active_declaring_class(&self) -> Result<Option<String>, VmExit> {
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             let owner = match self.native_host() {
                 None => 0,
@@ -410,7 +410,7 @@ impl Engine {
                 .declaring_class(owner)
                 .map(str::to_string))
         }
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         Err(crate::err::vm_error(
             "API_UNAVAILABLE",
             "portable DEX caller metadata is unavailable on the legacy engine",
@@ -462,11 +462,11 @@ impl Engine {
         if let Some(v) = intrinsics::call_static_intrinsic(self, class, method, sig, &args)? {
             return Ok(v);
         }
-        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if let Some(v) = crate::m8::call_m8_static(self, class, method, sig, &args)? {
             return Ok(v);
         }
-        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if class.starts_with("Landroid/") {
             if let Some(v) = crate::framework::call_host_static(self, class, method, sig, &args)? {
                 return Ok(v);
@@ -532,9 +532,9 @@ impl Engine {
             .collect::<Result<Vec<_>, VmExit>>()?;
         let class = self.heap.class_of(recv)?.to_string();
         let resolved = self.cp.resolve_method(&class, method, sig);
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         let try_host = !self.cp.has_class_method(&class, method, sig);
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         let try_host = resolved.is_none();
         if try_host {
             // Host receiver (String, collections, java.io, android.*): the
@@ -544,23 +544,23 @@ impl Engine {
             )? {
                 return Ok(v);
             }
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             if let Some(host) = self.framework_host() {
                 if let Some(value) = host.call(self, &class, method, sig, recv, &args)? {
                     return Ok(value);
                 }
             }
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             if let Some(v) = crate::m8::call_m8_instance(self, &class, method, sig, recv, &args)? {
                 return Ok(v);
             }
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             if let Some(v) =
                 crate::interp::inherited_android_host(self, &class, method, sig, recv, &args)?
             {
                 return Ok(v);
             }
-            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             if let Some(v) = crate::view_props::fallback(self, &class, method, sig, recv, &args)? {
                 return Ok(v);
             }
@@ -595,7 +595,7 @@ impl Engine {
         // ACC_DECLARED_SYNCHRONIZED (0x20000) is only a source declaration
         // marker in DEX; its non-native body contains explicit monitor ops.
         // ACC_SYNCHRONIZED (0x20), including native methods, needs VM locking.
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         let monitor = if m.access_flags & 0x20 != 0 {
             let object = if m.access_flags & ACC_STATIC != 0 {
                 let owner = self.cp.dexes[dex_idx].type_str(def.class_idx).to_string();
@@ -616,7 +616,7 @@ impl Engine {
             None
         };
         let result = self.call_body(dex_idx, def, m, ins);
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         if let Some(object) = monitor {
             self.monitor_exit(object)?;
         }
@@ -640,7 +640,7 @@ impl Engine {
             )
             .into());
         }
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         if let Some(pat) = trace_method_pattern() {
             let label = self.method_label(dex_idx, m);
             if label.contains(pat) {
@@ -673,7 +673,7 @@ impl Engine {
                         &ins,
                     );
                 }
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 if let Some(backend) = self.native_host() {
                     let owner = self.heap.checked_execution_owner()?;
                     let r = self.cp.method_ref(dex_idx, m.method_idx)?;
@@ -741,16 +741,16 @@ impl Engine {
             }
         }
         let frame_label = self.method_label(dex_idx, m);
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         self.frame_labels.push(frame_label);
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             self.depth += 1;
         }
         let scope_depth = self.heap.gc_scope_depth();
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         let outermost = self.gc_frames.is_empty();
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         let outermost = self.frame_depth() == 0;
         let roots = ins
             .iter()
@@ -759,9 +759,9 @@ impl Engine {
                 _ => None,
             })
             .collect();
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         self.gc_frames.push(roots);
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         let frame = self.execution_frames.enter(
             self.heap.execution_owner(),
             frame_label,
@@ -783,18 +783,18 @@ impl Engine {
             ins,
             &mut frame_pc,
         );
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         self.gc_frames.pop();
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         self.execution_frames.leave(frame);
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         self.heap
             .gc_scope_restore_return(scope_depth, returned_object(&ret));
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         self.heap.gc_scope_restore(scope_depth);
         // A guest allocation returned into a Rust host temporary must survive
         // the host's next guest callback, even before it is stored in a table.
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         match &ret {
             Ok(Value::Obj(r)) => self.heap.gc_pin_return(*r),
             Err(VmExit::Exception(t)) => {
@@ -804,7 +804,7 @@ impl Engine {
             }
             _ => {}
         }
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             self.depth -= 1;
             self.frame_labels.pop();
@@ -843,9 +843,9 @@ impl Engine {
                 Err(VmExit::Error(ref mut e)) if e.code != "RD_THREAD_PARK" => {
                     if !e.cause.contains("\n  at ") {
                         // innermost frame: name the faulting instruction
-                        #[cfg(feature = "std")]
+                        #[cfg(feature = "desktop-runtime")]
                         let pc = self.last_pc;
-                        #[cfg(not(feature = "std"))]
+                        #[cfg(not(feature = "desktop-runtime"))]
                         let pc = frame_pc;
                         if let Some((_, insn)) = code.instructions.iter().find(|(a, _)| *a == pc) {
                             let mut d = format!("{insn:?}");
@@ -960,7 +960,7 @@ impl Engine {
         if self.clinit_done.contains(class) {
             return Ok(());
         }
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         if self.clinit_running.contains(class) {
             return Ok(());
         }
@@ -970,7 +970,7 @@ impl Engine {
                 format!("{class} falhou na inicialização anterior (JLS 12.4.2)"),
             )));
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             let owner = self.heap.checked_execution_owner()?;
             if let Some(initializing_owner) = self.clinit_running.get(class) {
@@ -985,7 +985,7 @@ impl Engine {
             }
             self.clinit_running.insert(class.to_string(), owner);
         }
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         self.clinit_running.insert(class.to_string());
         let result = self.initialize_class(class);
         self.clinit_running.remove(class);
@@ -1000,7 +1000,7 @@ impl Engine {
                 // their precise code/cause while preventing a partial <clinit>
                 // from being retried. A contended class rejected above was
                 // never entered and is not poisoned by another owner's call.
-                #[cfg(not(feature = "std"))]
+                #[cfg(not(feature = "desktop-runtime"))]
                 if matches!(&e, VmExit::Error(_)) {
                     return Err(e);
                 }
@@ -1008,7 +1008,7 @@ impl Engine {
                 // já está embrulhado em EIIE/NCDFE), propaga o erro ORIGINAL —
                 // duplo-wrap divergia da JVM e mentia na message
                 if let VmExit::Exception(t) = &e {
-                    #[cfg(not(feature = "std"))]
+                    #[cfg(not(feature = "desktop-runtime"))]
                     if self.cp.is_subtype(&t.class, "Ljava/lang/Error;") {
                         // JLS12.4.2 step11: an Error is propagated unchanged;
                         // only non-Error Java exceptions are wrapped in EIIE.
@@ -1063,7 +1063,7 @@ impl Engine {
     /// o LayoutInflater usa para resolver `@dimen`/`@bool` por referência.
     /// Erro tipado se o resid não existe ou o tipo não é representável
     /// (nunca default silencioso — resíduo da deferral da #46).
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub fn resolve_resource_value(
         &self,
         resid: u32,
@@ -1272,7 +1272,7 @@ pub fn parse_param_types(sig: &str) -> Option<Vec<String>> {
     Some(out)
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 fn returned_object(result: &Result<Value, VmExit>) -> Option<ObjRef> {
     match result {
         Ok(Value::Obj(object)) => Some(*object),
@@ -1283,7 +1283,7 @@ fn returned_object(result: &Result<Value, VmExit>) -> Option<ObjRef> {
 
 /// `RD_TRACE_METHOD=<substring>`: log every guest method entry whose label
 /// (`Lpkg/Class;->name(sig)`) contains the substring (debugging aid).
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 fn trace_method_pattern() -> Option<&'static str> {
     static PAT: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     PAT.get_or_init(|| {

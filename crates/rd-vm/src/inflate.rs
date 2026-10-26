@@ -808,7 +808,7 @@ fn apply_attrs(vm: &mut Engine, r: ObjRef, el: &XmlElement, caps: AxisCaps) -> R
             }
             _other => {
                 if crate::port_env::var("RD_FW_DEBUG").is_ok() {
-                    #[cfg(feature = "std")]
+                    #[cfg(feature = "desktop-runtime")]
                     eprintln!("[fw] inflate: attr android:{_other} ignorado no modelo headless M3");
                 }
             }

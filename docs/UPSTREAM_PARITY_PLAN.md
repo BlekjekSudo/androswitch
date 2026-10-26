@@ -22,7 +22,8 @@ replacement needs comparison of its actual Android-visible contracts.
 
 1. Preserve the whole upstream tree and history; reject omitted files and
    unreviewed adaptations using `check-upstream-sync.py`.
-2. Compile the complete framework dependency closure using `core + alloc`,
+2. Compile the complete framework dependency closure on the Horizon std profile
+   (the earlier core/alloc proof is retained as historical evidence),
    including AndroidX, GMS, advanced components, and reference devices.
 3. Reuse the original dispatcher and GC. Make module tables Engine-owned while
    retaining actual native execution-owner roots and scopes.
@@ -38,6 +39,11 @@ replacement needs comparison of its actual Android-visible contracts.
    applies only to the exact binary tested.
 
 ## Development path
+
+The device now enables real Rust std independently of desktop execution; see
+[ADR 018](adr/018-horizon-std-and-execution-backends.md) and the
+[migration report](HORIZON_STD_MIGRATION.md). This removes the library-profile
+restriction, while the state/platform integration ledger below still applies.
 
 `as-vm/upstream-runtime` is explicit work in progress. The shipping runner does
 not enable it. Compiling this path is not completed Horizon support. Its

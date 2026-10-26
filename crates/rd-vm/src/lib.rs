@@ -16,37 +16,39 @@ use alloc::{
 };
 
 mod app_output;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 mod collection_clock;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 mod module_tables;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 mod port_env;
 #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
 mod port_float;
 #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
 mod port_prelude;
 pub use app_output::AppOutput;
-#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
 mod reference_filesystem;
 mod sdk_types;
 mod throwable_message;
-#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
 pub use reference_filesystem::ReferenceFileSystem;
 pub mod framework_host;
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 pub mod native_host;
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 mod portable;
 /// Internal contracts exposed only to the isolated portable host test target.
 #[doc(hidden)]
-#[cfg(all(not(feature = "std"), feature = "portable-test-support"))]
+#[cfg(all(not(feature = "desktop-runtime"), feature = "portable-test-support"))]
 pub mod portable_test_support {
     pub use crate::portable::execution::contracts::*;
 }
 #[cfg(feature = "std")]
 pub(crate) mod maps {
-    pub use std::collections::{hash_map::Entry, HashMap, HashSet};
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+    pub use std::collections::hash_map::Entry;
+    pub use std::collections::{HashMap, HashSet};
 }
 #[cfg(not(feature = "std"))]
 pub(crate) mod maps {
@@ -57,221 +59,223 @@ pub(crate) mod maps {
 
 #[cfg(feature = "advanced-components")]
 pub mod accessibility_node;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod activity_callbacks;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod activity_extras;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod android_build;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_colorspace;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_display;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_drawable;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_env;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_json;
 pub mod android_log;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_motion;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_observable;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_pm;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_region;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_res;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_spannable;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_stub_surfaces;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_sysservices;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_text;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_uri;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_util;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod android_velocity;
 /// Apêndice D — shims host AndroidX/Jetpack (data/jetpack.toml).
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod androidx;
 pub mod arrays;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod atomics;
 pub mod boxes;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod bundle;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod choreographer;
 pub mod classpath;
 pub mod collection_values;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod collections;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod content;
 pub mod engine;
 pub mod err;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod framework;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod gc;
-#[cfg(all(not(feature = "std"), not(feature = "upstream-runtime")))]
+#[cfg(all(not(feature = "desktop-runtime"), not(feature = "upstream-runtime")))]
 #[path = "portable/gc.rs"]
 pub mod gc;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod gms;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod graphics;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod handler_msg;
 pub mod heap;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod inflate;
 mod integer_bits;
 pub mod interp;
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub mod intrinsics;
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 #[path = "portable/intrinsics.rs"]
 pub mod intrinsics;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jannotations;
 mod java_format;
 mod java_values;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jbigdecimal;
 pub mod jbitset;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jbreakiter;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jcollections;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jfile;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jio_chars;
 #[cfg(feature = "jit")]
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub mod jit;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jiterator;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jlclass;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jlocks;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jlstring;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jlsystem;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jnormalizer;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jpriorityqueue;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jrandom;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jregex;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jresources;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jsb;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jsecurity;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jsorted;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jsqlite;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jstring_tokenizer;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jtext_format;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jtime;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod juuid;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jxml;
 #[cfg(feature = "virtual-devices")]
 pub mod m10;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod m8;
 #[cfg(feature = "advanced-components")]
 pub mod m9;
 #[cfg(feature = "native")]
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub mod native;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod numerics;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod parcel;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod perms;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod platform_base;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod prefs;
 mod primitive_parse;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod reflect;
 pub mod repr;
 mod shared_call;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod threads;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod throwable;
-#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
 #[path = "intrinsics.rs"]
 pub(crate) mod upstream_intrinsics;
 pub mod value;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod view_attach;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod view_layout;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod view_props;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod vto;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod window;
-#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod xml_res;
 
 use rd_dex::annotations::EncodedValue;
 use rd_dex::Dex;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub(crate) use intrinsics::print_sink as upstream_print_sink;
 
 pub use engine::{ClassCoverage, CoverageSnapshot, Engine, VmConfig};
 pub use err::{Throwable, VmExit};
 pub use heap::ObjRef;
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub use intrinsics::{route_app_stdout_to_stderr, set_app_stdout, HostOut};
 pub use value::Value;
 
 /// Módulo do contrato de erro.
 pub const MODULE_ID: &str = "rd-vm";
 /// Explicit evidence of the linked VM variant (Cargo features are additive).
-pub const PORTABLE_CORE: bool = !cfg!(feature = "std");
+pub const PORTABLE_CORE: bool = !cfg!(feature = "desktop-runtime");
+/// Actual Rust library profile, independent of the execution backend.
+pub const RUST_STD_ENABLED: bool = cfg!(feature = "std");
 
 /// Legacy host boundary, retained for callers built against RustyDroid.
 /// Object-indexed module tables are now Engine-owned and drop with their heap;
 /// constructing a second Engine cannot reset another live Engine's state.
 /// Persistent filesystem/session data is still reset through its own adapter.
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub fn reset_host_thread_state() {}
 
 /// Issue #230: apaga o armazenamento privado de um pacote no VFS
 /// (`/data/user/0/<pkg>/`) — backend de `package_clear`/`package_remove`.
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub use jfile::clear_package_data;
 /// Issue #230: zera o VFS inteiro — fronteira de sessão nova.
-#[cfg(feature = "std")]
+#[cfg(feature = "desktop-runtime")]
 pub use jfile::reset_all as reset_vfs;
 
 /// Converte um `EncodedValue` (static_values de class_def) em `Value`,

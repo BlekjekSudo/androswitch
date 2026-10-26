@@ -166,7 +166,7 @@ impl<F: FnMut(ObjRef)> core::fmt::Write for RefScanner<F> {
 // formatter stream (no hashes and no large temporary copy); any change falls
 // back to the inherited conservative trace. Host-object ephemerons and the APK
 // are removed by the caller and are traced separately.
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 fn framework_is_default(state: &crate::framework::HostState) -> bool {
     static DEFAULT: rd_dex::sync::OnceLock<String> = rd_dex::sync::OnceLock::new();
     struct Compare<'a> {
@@ -217,9 +217,9 @@ impl Engine {
         // the parsed APK (zip, arsc, layouts) holds no heap refs: skip it
         let objects = core::mem::take(&mut self.fw.objects);
         let resources = self.fw.resources.take();
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         let scan_framework = true;
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         let scan_framework = !framework_is_default(&self.fw);
         if scan_framework {
             let _ = write!(s, "{:?}", self.fw);
@@ -297,7 +297,7 @@ impl Engine {
         {
             m.push(r);
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             for r in self
                 .execution_frames
@@ -326,7 +326,7 @@ impl Engine {
             scanner.finish()
         };
         // Root phase now includes tokenization, rather than only formatting.
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         let t_roots = t0.elapsed();
         // objects with side state (host half, gfx object, module tables):
         // one bitmap built per cycle instead of ~5 hash lookups per object
@@ -366,7 +366,7 @@ impl Engine {
         // descriptor rather than allocating its clone for every reference.
         let mut is_weak_class: crate::maps::HashMap<&str, bool> = Default::default();
         while let Some(r) = m.stack.pop() {
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             if let Some(host) = self.framework_host() {
                 cand.extend(host.references(r));
             }
@@ -520,7 +520,7 @@ impl Engine {
                 cleared_weak_keys += before - entries.len();
             }
         }
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         let t_mark = t0.elapsed();
         // sweep
         let mut freed = 0usize;
@@ -536,7 +536,7 @@ impl Engine {
                 freed_bytes += b;
             }
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             if let Some(host) = self.framework_host() {
                 host.collect(&m.marked);
@@ -560,7 +560,7 @@ impl Engine {
         crate::jrandom::gc_purge(self, &alive_ref);
         crate::android_uri::gc_purge(self, &alive_ref);
         crate::jannotations::gc_purge(self, &alive_ref);
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         if crate::port_env::var("RD_GC_TRACE").is_ok() {
             eprintln!(
                 "[rd gc] roots {:?} ({} B text, {} candidates) mark {:?} total {:?}",
@@ -623,11 +623,11 @@ impl Engine {
     }
 
     fn has_gc_frames(&self) -> bool {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             !self.gc_frames.is_empty()
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         {
             !self.gc_frames.is_empty() || !self.execution_frames.is_empty()
         }
@@ -684,9 +684,9 @@ impl Engine {
         result: &Value,
         exception: Option<ObjRef>,
     ) {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         let roots = self.gc_frames.last_mut();
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         let roots = self
             .execution_frames
             .current_roots(self.heap.execution_owner());

@@ -71,7 +71,8 @@ def analyze(run, build_dir):
             "physical_device": "not_run", "product_runner_changed": False,
             "android_api_parity": "not_established_by_this_probe",
             "scope": "real std standalone libnx NRO; finite smoke contracts, not complete std certification",
-            "recommendation": "continue_current_core_alloc_integration; retain std prototype for later qualification"}
+            "recommendation": "qualify_std_product_regressions_separately" if complete and not counts["fail"]
+                              else "resolve_reported_std_failures_before_product_migration"}
 
 
 def main():

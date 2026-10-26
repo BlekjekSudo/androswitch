@@ -1,5 +1,28 @@
 # Building AndroSwitch
 
+## Current device profile: Horizon std
+
+The device product now builds real Rust `std` with the pinned compiler commit
+`787af2b8c80638c51a4fc8e44f84e6891f243ec7` and a task-local Horizon/newlib
+source overlay. Installed toolchain sources and global defaults are unchanged.
+Use an already installed selector with matching rust-src (`-Toolchain`).
+`build-androswitch.ps1` prepares the isolated libc/std adapters automatically.
+
+```powershell
+./scripts/build-androswitch.ps1 -Toolchain nightly -LinkBackend Windows `
+  -MesaSdk local-artifacts/dependencies/mesa-switch-0ff52079/sdk/opt/devkitpro/portlibs/switch
+```
+
+The unified Mesa build uses LLVM objcopy from NDK 28.2.13676358 by default;
+`-MesaObjcopy` accepts another explicit path. It isolates Mesa's older Rust
+personality in copied archives. Product objects use
+`local-artifacts/product-mesa-std-windows`; the Rust library is under
+`target/switch/aarch64-androswitch-newlib/release`. `-TargetDirectory` overrides
+that cache. `-RustOnly` builds the same std library without linking a product.
+The parser smoke builder delegates to this profile as well. Earlier M1
+freestanding core/alloc commands and results below are historical; current
+builders use std. See [qualification and limits](HORIZON_STD_MIGRATION.md).
+
 M2–M4 native/JNI fixture builds additionally require Android NDK
 `28.2.13676358`, Kotlin compiler dependencies in the Gradle cache and a native
 Windows GCC/G++ toolchain for the JVM JNI oracle. See the explicit parameters
@@ -137,7 +160,8 @@ proof, not `androswitch.nro` or the planned install/launcher package.
 Install the devkitPro Switch Mesa/GL portlibs in the same WSL toolchain as
 libnx. The recorded packages are libnx `4.12.0-1`, Switch Mesa `20.1.0-5`,
 and `switch-libdrm_nouveau 1.0.1-2`. Mesa includes a C++ shader compiler, so
-the product linker also includes libstdc++. Device core remains no_std Rust.
+the product linker also includes libstdc++. These are the historical M7 tools;
+the current unified SDK/std profile is documented above.
 Use `cargo +nightly ...` only for the freestanding build; do not change the
 global toolchain. This workspace's installed nightly corresponds to the pinned
 manifest date documented above.

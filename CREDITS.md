@@ -48,7 +48,7 @@ notices and source attribution when redistributing or extending the project.
 [BlekjekSudo/androswitch](https://github.com/BlekjekSudo/androswitch) maintains
 the Horizon port and its own evidence. Current additions include:
 
-- Portable `no_std + alloc` paths and a libnx C ABI boundary.
+- Shared portable interfaces, a Horizon Rust std PAL and a libnx C ABI boundary.
 - Per-Engine portable state and a collector for that state graph.
 - Host inspection tools, the bounded method-probe protocol and the Ryujinx
   harness with JVM comparisons and recorded failures.
@@ -70,9 +70,23 @@ Mesa, Nouveau, NVK, Collabora, NVIDIA and Mesa Switch contributors. It retains
 their licenses and provenance. It provides the actual Horizon EGL/NVC0/NVK
 driver implementations; AndroSwitch supplies Android ABI/lifetime/TLS bridges.
 The SDK's shader compiler requires its matching Rust 1.101.0 nightly component.
-This is separate from the portable RustyDroid VM, which remains `no_std+alloc`.
+This is separate from the RustyDroid VM's Horizon/newlib std. The Mesa archives'
+exception personality is namespaced in build-local copies so compiler versions
+do not accidentally share that ABI.
 See [renderer port details](docs/MESA_SWITCH_PORT.md) for pinned artifacts,
 platform adapters, limits and verification; a successful link is not a GPU pass.
+
+## Rust standard library and Horizon PAL
+
+Rust project contributors provide the actual `std`, `core` and `alloc`
+implementations under MIT OR Apache-2.0. The device compiler and source are
+pinned at `787af2b8c80638c51a4fc8e44f84e6891f243ec7`. AndroSwitch adapts two std
+source files in an independent, task-local source overlay and adapts
+rust-lang/libc 0.2.189's newlib ABI definitions. Installed toolchains and Cargo
+registry sources are unchanged. devkitPro/newlib and switchbrew/libnx
+contributors provide the SDK heap, pthread/TLS, clock and filesystem services.
+AndroSwitch adds detached-thread reclamation, real process core queries and
+CSRNG transport. See [the migration report](docs/HORIZON_STD_MIGRATION.md).
 
 ## Android SDK declaration metadata
 

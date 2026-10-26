@@ -963,7 +963,7 @@ pub struct HostState {
     pub(crate) main_thread: Option<ObjRef>,
     /// M8: objetos `Class` canônicos por descritor (getClass devolve sempre a
     /// mesma referência para a mesma classe — identidade como na JVM).
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     class_objs: HashMap<String, ObjRef>,
     /// M8: ClassLoader canônico (um por VM — single-classloader; a distinção
     /// bootstrap=null do Java não se aplica ao runtime host).
@@ -1184,7 +1184,7 @@ impl Engine {
     /// Anexa estado host a um objeto recém-alocado (chamado do new-instance).
     /// A herança é por DESCRIÇÃO de superclass gravada no DEX — caminhar
     /// nomes não exige as classes de plataforma no DEX.
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     pub fn attach_host_state(&mut self, class: &str, object: ObjRef) -> Result<(), VmExit> {
         self.attach_upstream_host_state(class, object)
     }
@@ -1298,7 +1298,7 @@ impl Engine {
     /// M8: objeto `Class` canônico do descritor (lazy; identidade estável —
     /// `a.getClass() == a.getClass()`). Campo de heap "class_name" guarda o
     /// DESCRITOR (ex.: "Lcom/x/Y;"); os métodos de Class o convertem.
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     pub(crate) fn class_object_for(&mut self, desc: &str) -> Result<ObjRef, VmExit> {
         if let Some(c) = self.fw.class_objs.get(desc) {
             return Ok(*c);
@@ -1865,7 +1865,7 @@ impl Engine {
         }
         let Some(content) = self.window_content_of(activity) else {
             if crate::port_env::var("RD_FW_DEBUG").is_ok() {
-                #[cfg(feature = "std")]
+                #[cfg(feature = "desktop-runtime")]
                 eprintln!("[fw] touch: sem content (window vazia)");
             }
             return Ok(false); // sem setContentView: nada a tocar
@@ -1873,16 +1873,16 @@ impl Engine {
         if crate::port_env::var("RD_FW_DEBUG").is_ok() {
             let mut d = String::from("[fw] tree no touch:\n");
             self.dump_view(content, 0, &mut d);
-            #[cfg(feature = "std")]
+            #[cfg(feature = "desktop-runtime")]
             eprintln!("{d}");
         }
         let Some(target) = self.hit_test(content, x, y) else {
             if crate::port_env::var("RD_FW_DEBUG").is_ok() {
-                #[cfg(feature = "std")]
+                #[cfg(feature = "desktop-runtime")]
                 eprintln!("[fw] touch: hit-test sem alvo em ({x},{y})");
                 let mut d = String::new();
                 self.dump_view(content, 0, &mut d);
-                #[cfg(feature = "std")]
+                #[cfg(feature = "desktop-runtime")]
                 eprintln!("{d}");
             }
             return Ok(false);
@@ -2010,10 +2010,10 @@ impl Engine {
             self.call(d, def, &m, vec![Value::Obj(activity), Value::Obj(target)])?;
             return Ok(true);
         }
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         if crate::port_env::var("RD_FW_DEBUG").is_ok() {
             let cls = self.heap.class_of(target).unwrap_or("?");
-            #[cfg(feature = "std")]
+            #[cfg(feature = "desktop-runtime")]
             eprintln!("[fw] touch: alvo #{target} ({cls}) sem listener nem android:onClick");
         }
         Ok(false)
@@ -2530,7 +2530,7 @@ impl Engine {
             if self.fw.traversal_pending && !self.fw.in_traversal {
                 self.fw.traversal_pending = false;
                 if crate::port_env::var("RD_TRACE_DRAW").is_ok() {
-                    #[cfg(feature = "std")]
+                    #[cfg(feature = "desktop-runtime")]
                     eprintln!(
                         "D/RustyDroid: traversal at {} ms (frame callbacks {})",
                         self.fw.clock_ms,
@@ -2589,7 +2589,7 @@ impl Engine {
                 queue.remove(idx);
             }
             if crate::port_env::var("RD_FW_DEBUG").is_ok() {
-                #[cfg(feature = "std")]
+                #[cfg(feature = "desktop-runtime")]
                 eprintln!(
                     "[fw] drain: runnable #{} ({}) quando {} <= {}",
                     msg.runnable,
@@ -3279,7 +3279,7 @@ fn call_host_instance_rooted(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     if crate::port_env::var("RD_FW_DEBUG").is_ok() {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         eprintln!("[fw] host dispatch: {mref_class}->{name}{sig} recv=#{recv}");
     }
     // classes do receiver (concreto) e da method ref (declarante)
@@ -3290,7 +3290,7 @@ fn call_host_instance_rooted(
     let is_view = |vm: &Engine| {
         let r = vm.cp.is_subtype(&recv_class, VIEW);
         if crate::port_env::var("RD_FW_DEBUG").is_ok() && !r {
-            #[cfg(feature = "std")]
+            #[cfg(feature = "desktop-runtime")]
             eprintln!(
                 "[fw] is_subtype({recv_class}, VIEW) = false; sup={:?}",
                 vm.cp.superclass_of(&recv_class)
@@ -4624,7 +4624,7 @@ fn ensure_prefs_loaded(vm: &mut Engine, name: &str) {
     }
     let path = crate::prefs::path(&vm.fw.package_name, name);
     let store = crate::jfile::read_bytes(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         &path,
     )
@@ -4655,7 +4655,7 @@ fn persist_prefs(vm: &Engine, name: &str) -> bool {
         .map(crate::prefs::serialize)
         .unwrap_or_else(|| crate::prefs::serialize(&Default::default()));
     crate::jfile::write_bytes(
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         vm,
         &crate::prefs::path(&vm.fw.package_name, name),
         bytes,

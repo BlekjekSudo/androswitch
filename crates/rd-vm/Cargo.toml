@@ -32,7 +32,8 @@ rd-render = { path = "../rd-render" }
 rd-testsupport = { path = "../rd-testsupport" }
 
 [features]
-default = ["std", "advanced-components"]
+default = ["std", "desktop-runtime", "advanced-components"]
+desktop-runtime = ["std"]
 # Explicit host contract harness; never enabled by the device runtime build.
 portable-test-support = []
 # The device build is the isolated as-vm package. Desktop reference builds
@@ -41,6 +42,6 @@ upstream-runtime = ["std"]
 std = ["serde/std", "dep:serde_json", "rd-dex/std", "rd-apk/std", "dep:regex", "dep:fancy-regex"]
 advanced-components = ["std", "virtual-devices"]
 virtual-devices = ["std"]
-native = ["std", "dep:rd-ndk", "dep:rd-jni", "rd-ndk/native"]
+native = ["desktop-runtime", "dep:rd-ndk", "dep:rd-jni", "rd-ndk/native"]
 
-jit = ["std", "dep:rd-jni", "rd-jni/jit"]
+jit = ["desktop-runtime", "dep:rd-jni", "rd-jni/jit"]

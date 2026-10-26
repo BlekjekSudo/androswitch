@@ -1,5 +1,5 @@
 //! Android API contracts on the shared RustyDroid Engine, with no host OS dependency.
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 mod android;
 mod audio;

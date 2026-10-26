@@ -1,14 +1,16 @@
 # Standalone Horizon Rust `std` proof
 
 This experiment embeds the real Rust standard library in a libnx NRO. It is
-outside the product workspace and does not enable `std` in `as-vm` or replace
-the Android runtime. The product remains a RustyDroid fork, with credits in
+outside the product workspace and now qualifies the same PAL used by the std
+product build. It does not replace Android semantics. The product remains a RustyDroid fork, with credits in
 [CREDITS.md](../../CREDITS.md).
 
 The pinned compiler is `nightly-2026-08-26`, commit
 `787af2b8c80638c51a4fc8e44f84e6891f243ec7`. The custom target starts from
 Rust's `aarch64-nintendo-switch-freestanding` definition and adds Unix/newlib
-selection. Standard library Rust sources are unmodified. Selecting these cfgs
+selection. Two std source files are adapted in an independent task-local
+overlay: fixed-permission SD file copying and the real process-core query.
+Selecting these cfgs
 does not make Horizon a Linux guest.
 
 The build script defaults to the locally installed `nightly` selector, verifies
@@ -19,11 +21,13 @@ can be selected with `-Toolchain`.
 `prepare-horizon-std.py` verifies the libc 0.2.189 archive checksum, extracts it
 under ignored `local-artifacts`, then adapts the actual devkitA64 file/pthread
 ABI. `abi.c` compares 33 sizes, alignments, offsets and constants with Rust at
-runtime. OS calls use SDK libsysbase/libnx; `support.c` provides the missing
-page-size query and actual CSRNG entropy transport. Its `pthread_detach` wrapper
-observes the original return value, preserving any error. A failed detach is
-joined by the harness after its worker finishes; this recovery is not a working
-`std` detach implementation.
+runtime. OS calls use SDK libsysbase/libnx. The shared
+[`platform/horizon-std`](../../platform/horizon-std/support.c) PAL provides
+page-size/core-mask queries and real CSRNG entropy. A reaper reclaims SDK
+pthread resources after detached workers finish, including TLS destructors.
+The test asserts 128 real detached workers are reclaimed; the harness does not
+repair failed detaches. It also checks explicit chmod stays unsupported while
+file contents can be copied on the fixed-permission SD mount.
 
 From the runtime repository in PowerShell, with Rust/Cargo and Python on PATH:
 

@@ -14,6 +14,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <switch.h>
+#include "../horizon-std/support.h"
+extern unsigned as_runtime_rust_std_enabled(void);
+
+static void close_rust_std(void) {
+  int result=as_horizon_std_shutdown(5000);
+  FILE *f=fopen("sdmc:/switch/androswitch/logs/rust-std-shutdown.txt","w");
+  if(f){fprintf(f,"%d\n",result);fclose(f);}
+}
 static u32 pinned_map_fd, pinned_fence_fd;
 static unsigned display_generation, display_frames;
 static bool display_monitor;
@@ -275,6 +283,10 @@ static int close_application(uint64_t app) {
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;
+  if(as_horizon_std_init() || !as_runtime_rust_std_enabled()) return 120;
+  if(atexit(close_rust_std)) return 121;
+  FILE *profile=fopen("sdmc:/switch/androswitch/rust-build-profile.txt","w");
+  if(profile){fputs("std=1\nbackend=horizon\n",profile);fclose(profile);}
   (void)as_cpu_time_init(); // Missing accounting stays an explicit clock error.
   as_memory_log("process_start");
   if (!as_memory_runtime_ready()) {

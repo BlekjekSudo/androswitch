@@ -1670,13 +1670,13 @@ impl Engine {
         let mw = (prop(self, root, "MeasuredWidth").unwrap_or(fw_) & 0x00ff_ffff).clamp(0, fw_);
         let mh = (prop(self, root, "MeasuredHeight").unwrap_or(fh_) & 0x00ff_ffff).clamp(0, fh_);
         let (x, y) = (fw_.saturating_sub(mw) / 2, fh_.saturating_sub(mh) / 2);
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         if crate::port_env::var("RD_TRACE_DRAW").is_ok() {
             let kids = match self.fw.get(root) {
                 Some(HostObj::View { children, .. }) => children.len(),
                 _ => 0,
             };
-            #[cfg(feature = "std")]
+            #[cfg(feature = "desktop-runtime")]
             eprintln!(
                 "D/RustyDroid: dialog window {} spec=({lw},{lh}) measured={mw}x{mh} at ({x},{y}) children={kids}",
                 self.heap.class_of(root).unwrap_or("?")

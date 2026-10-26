@@ -93,15 +93,15 @@ pub struct Heap {
     young: Vec<bool>,
     remembered: HashSet<ObjRef>,
     // Some = host scope (pin allocations); None = guest execution.
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     gc_scopes: Vec<Option<Vec<ObjRef>>>,
     births: Vec<u64>,
     allocation_clock: u64,
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     existing_cutoffs: Vec<(usize, u64)>,
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     execution_identity: crate::portable::execution::Identity,
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     owned_scopes: crate::portable::execution::OwnerScopes,
 }
 
@@ -115,27 +115,27 @@ impl Heap {
             free: Vec::new(),
             young: Vec::new(),
             remembered: Default::default(),
-            #[cfg(feature = "std")]
+            #[cfg(feature = "desktop-runtime")]
             gc_scopes: Vec::new(),
             births: Vec::new(),
             allocation_clock: 0,
-            #[cfg(feature = "std")]
+            #[cfg(feature = "desktop-runtime")]
             existing_cutoffs: Vec::new(),
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             execution_identity: Default::default(),
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "desktop-runtime"))]
             owned_scopes: Default::default(),
         }
     }
 
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) fn is_young(&self, r: ObjRef) -> bool {
         self.young
             .get(r.wrapping_sub(1) as usize)
             .copied()
             .unwrap_or(true)
     }
-    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) fn remembered(&self) -> impl Iterator<Item = ObjRef> + '_ {
         self.remembered.iter().copied()
     }
@@ -147,31 +147,31 @@ impl Heap {
         }
         self.remembered.clear();
     }
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     pub(crate) fn bind_execution_identity(
         &mut self,
         provider: alloc::rc::Rc<dyn crate::native_host::NativeHost>,
     ) {
         self.execution_identity.bind(provider);
     }
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     pub(crate) fn execution_owner(&self) -> u64 {
         self.execution_identity.owner()
     }
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     pub(crate) fn checked_execution_owner(&self) -> Result<u64, crate::VmExit> {
         self.execution_identity.checked_owner()
     }
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     pub(crate) fn gc_scope_depth(&self) -> usize {
         self.gc_scopes.len()
     }
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     pub(crate) fn gc_scope_depth(&self) -> crate::portable::execution::ScopeMark {
         self.owned_scopes.mark(self.execution_owner())
     }
     pub(crate) fn gc_host_enter(&mut self, existing: bool) {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         {
             if existing {
                 self.existing_cutoffs
@@ -179,7 +179,7 @@ impl Heap {
             }
             self.gc_scopes.push(Some(Vec::new()));
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         self.owned_scopes.host_enter(
             self.execution_owner(),
             existing.then_some(self.allocation_clock),
@@ -188,7 +188,7 @@ impl Heap {
     /// A nested Rust host call can return a temporary to its enclosing host
     /// callback. Preserve all nested pins conservatively until that callback
     /// returns, but never promote them through an intervening Java frame.
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     pub(crate) fn gc_host_restore(&mut self, depth: usize) {
         let roots = self
             .gc_scopes
@@ -202,25 +202,28 @@ impl Heap {
     }
 
     pub(crate) fn gc_guest_enter(&mut self) {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         self.gc_scopes.push(None);
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         self.owned_scopes.guest_enter(self.execution_owner());
     }
-    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
     pub(crate) fn gc_host_restore(&mut self, mark: crate::portable::execution::ScopeMark) {
         self.owned_scopes.restore_host(mark);
     }
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     pub(crate) fn gc_scope_restore(&mut self, depth: usize) {
         self.gc_scopes.truncate(depth);
         self.existing_cutoffs.retain(|(d, _)| *d < depth);
     }
-    #[cfg(all(not(feature = "std"), any(test, feature = "portable-test-support")))]
+    #[cfg(all(
+        not(feature = "desktop-runtime"),
+        any(test, feature = "portable-test-support")
+    ))]
     pub(crate) fn gc_scope_restore(&mut self, mark: crate::portable::execution::ScopeMark) {
         self.owned_scopes.restore(mark);
     }
-    #[cfg(not(feature = "std"))]
+    #[cfg(not(feature = "desktop-runtime"))]
     pub(crate) fn gc_scope_restore_return(
         &mut self,
         mark: crate::portable::execution::ScopeMark,
@@ -229,23 +232,23 @@ impl Heap {
         self.owned_scopes.restore_return(mark, object);
     }
     pub(crate) fn gc_pinned_roots(&self) -> impl Iterator<Item = ObjRef> + '_ {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         let cutoff = self
             .existing_cutoffs
             .iter()
             .map(|(_, c)| *c)
             .max()
             .unwrap_or(0);
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         let cutoff = self.owned_scopes.cutoff();
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         let pins = self
             .gc_scopes
             .iter()
             .filter_map(Option::as_ref)
             .flatten()
             .copied();
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         let pins = self.owned_scopes.roots();
         pins.chain(
             self.births.iter().enumerate().filter(move |(_, birth)| **birth <= cutoff)
@@ -254,17 +257,17 @@ impl Heap {
                 )
         )
     }
-    #[cfg(feature = "std")]
+    #[cfg(feature = "desktop-runtime")]
     pub(crate) fn gc_pin_return(&mut self, r: ObjRef) {
         self.pin_allocation(r);
     }
 
     pub(crate) fn pin_allocation(&mut self, r: ObjRef) {
-        #[cfg(feature = "std")]
+        #[cfg(feature = "desktop-runtime")]
         if let Some(Some(roots)) = self.gc_scopes.last_mut() {
             roots.push(r);
         }
-        #[cfg(not(feature = "std"))]
+        #[cfg(not(feature = "desktop-runtime"))]
         self.owned_scopes.pin(self.execution_owner(), r);
     }
 

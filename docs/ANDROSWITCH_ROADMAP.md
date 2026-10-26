@@ -36,10 +36,16 @@ are inferred from scaffolding.
 ## Current evidence
 
 Complete RustyDroid API parity is the active foundation gate. The experimental
-full `core + alloc` reference runtime and all 50 inherited VM suite routes are
+full inherited reference runtime and all 50 original VM suite routes are
 tracked in [the port plan](UPSTREAM_PARITY_PLAN.md). Its original dispatcher,
 GC and Engine-owned tables do not yet establish the shipping runner's platform
 integration. Neither M9 nor complete upstream parity is marked finished.
+
+The user authorized a full device Rust std migration on 26 October 2026.
+The [std migration record](HORIZON_STD_MIGRATION.md) supersedes the original
+core/alloc-only product build decision. Rust library support and the embedded
+Android execution backend are separate; past hardware results do not qualify
+the new binary.
 
 The M9 work now includes a complete latest-upstream merge and a source omission
 gate. See [upstream porting](UPSTREAM_PORTING.md). This records every upstream

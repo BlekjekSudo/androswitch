@@ -40,7 +40,10 @@ mod bridge {
         static as_sdk_abi: [u64; 33];
         fn as_std_c_exchange(path: *const std::ffi::c_char) -> i32;
         fn as_std_detach_result() -> i32;
-        fn as_std_reap_failed_detach() -> i32;
+        fn as_std_reaper_drain(timeout_ms: u32) -> i32;
+        fn as_std_reaped_threads() -> u32;
+        fn as_std_live_threads() -> u32;
+        fn as_std_process_core_count() -> i64;
     }
     pub fn abi() -> Outcome {
         use std::mem::{align_of, offset_of, size_of};
@@ -90,9 +93,16 @@ mod bridge {
         require(result == 0, format!("C exchange return={result}"))
     }
     pub fn detach_result() -> (i32, i32) {
-        // SAFETY: instrumentation exposes no pointers; only the finished probe
-        // worker can be reaped here. Its original SDK failure is preserved.
-        unsafe { (as_std_detach_result(), as_std_reap_failed_detach()) }
+        // SAFETY: the PAL drains its real detached-thread resource reaper.
+        unsafe { (as_std_detach_result(), as_std_reaper_drain(5000)) }
+    }
+    pub fn thread_counts() -> (u32, u32) {
+        // SAFETY: bounded counters, no borrowed pointers.
+        unsafe { (as_std_reaped_threads(), as_std_live_threads()) }
+    }
+    pub fn core_count() -> i64 {
+        // SAFETY: direct current-process kernel query with no arguments.
+        unsafe { as_std_process_core_count() }
     }
 }
 fn journal(root: &Path, id: &str, result: &Outcome) -> Result<(), String> {
@@ -172,9 +182,18 @@ const CASES: &[Probe] = &[
     }),
     ("io.copy", |r| {
         let n = fs::copy(r.join("b.txt"), r.join("c.txt")).map_err(io)?;
+        let file = File::open(r.join("c.txt")).map_err(io)?;
+        let permission_error = file
+            .set_permissions(file.metadata().map_err(io)?.permissions())
+            .expect_err("SD chmod must remain unsupported");
         require(
-            n == 10 && fs::read(r.join("c.txt")).map_err(io)? == b"persistent",
-            "rename/copy contents",
+            n == 10
+                && fs::read(r.join("c.txt")).map_err(io)? == b"persistent"
+                && permission_error.kind() == std::io::ErrorKind::Unsupported,
+            format!(
+                "copy contents; explicit chmod stays {:?}",
+                permission_error.kind()
+            ),
         )
     }),
     ("io.directory", |r| {
@@ -293,26 +312,37 @@ const CASES: &[Probe] = &[
         )
     }),
     ("thread.detached_handle", |_| {
+        let before = bridge::thread_counts().0;
+        let dtor_before = DTORS.load(Ordering::SeqCst);
         let done = Arc::new(AtomicUsize::new(0));
-        let other = done.clone();
-        let w = thread::Builder::new()
-            .spawn(move || {
-                thread::sleep(Duration::from_millis(10));
-                other.store(1, Ordering::Release);
-            })
-            .map_err(io)?;
-        drop(w);
-        let start = Instant::now();
-        while done.load(Ordering::Acquire) == 0 && start.elapsed() < Duration::from_secs(3) {
-            thread::sleep(Duration::from_millis(1));
+        for _ in 0..4 {
+            for _ in 0..32 {
+                let done = done.clone();
+                let w = thread::Builder::new()
+                    .spawn(move || {
+                        SENTINEL.with(|_| ());
+                        thread::sleep(Duration::from_millis(2));
+                        done.fetch_add(1, Ordering::Release);
+                    })
+                    .map_err(io)?;
+                drop(w);
+            }
+            let (detach, drain) = bridge::detach_result();
+            if detach != 0 || drain != 0 {
+                return Err(format!("detach={detach}; drain={drain}"));
+            }
         }
-        if done.load(Ordering::Acquire) != 1 {
-            return Err("detached worker did not finish".into());
-        }
-        let (result, repaired) = bridge::detach_result();
+        let (after, live) = bridge::thread_counts();
+        let drops = DTORS.load(Ordering::SeqCst) - dtor_before;
         require(
-            result == 0 && repaired == 0,
-            format!("SDK pthread_detach={result}; harness recovery join={repaired}"),
+            after - before == 128
+                && live == 0
+                && drops == 128
+                && done.load(Ordering::Acquire) == 128,
+            format!(
+                "detached=128; reclaimed={}; live={live}; destructors={drops}",
+                after - before
+            ),
         )
     }),
     ("sync.mutex_contention", |_| {
@@ -432,9 +462,12 @@ const CASES: &[Probe] = &[
         )
     }),
     ("thread.available_parallelism", |_| {
-        thread::available_parallelism()
-            .map(|n| format!("reported={n}"))
-            .map_err(io)
+        let n = thread::available_parallelism().map_err(io)?.get();
+        let kernel = bridge::core_count();
+        require(
+            kernel > 0 && n as i64 == kernel,
+            format!("reported={n}; kernel_process_mask_count={kernel}"),
+        )
     }),
     (
         "process.unsupported",
@@ -463,11 +496,18 @@ fn execute() -> Result<i32, String> {
     let root = base.join(session);
     fs::create_dir_all(&root).map_err(io)?;
     fs::write(root.join("started.txt"), format!("{session}\n{mode}\n")).map_err(io)?;
-    if mode == "panic" {
+    {
         let root = root.clone();
+        let file = if mode == "panic" {
+            "panic.txt"
+        } else {
+            "unexpected-panic.txt"
+        };
         std::panic::set_hook(Box::new(move |info| {
-            let _ = fs::write(root.join("panic.txt"), info.to_string());
+            let _ = fs::write(root.join(file), info.to_string());
         }));
+    }
+    if mode == "panic" {
         panic!("intentional std probe panic: abort policy");
     }
     let mut failures = 0;
