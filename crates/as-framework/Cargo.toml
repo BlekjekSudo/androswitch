@@ -8,7 +8,7 @@ description = "Portable Android lifecycle, UI and event-loop adapter for AndroSw
 workspace = true
 [dependencies]
 as-storage = { path = "../as-storage" }
-rd-vm = { path = "../rd-vm", default-features = false }
+rd-vm = { package = "as-vm", path = "../as-vm" }
 rd-apk = { path = "../rd-apk", default-features = false }
 as-platform = { path = "../as-platform", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }

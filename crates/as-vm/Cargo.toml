@@ -1,0 +1,29 @@
+[package]
+name = "as-vm"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Feature-isolated no_std build of the shared RustyDroid VM source"
+build = "build.rs"
+
+[lib]
+# One implementation tree. Do not copy the interpreter or shared intrinsics.
+path = "../rd-vm/src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+as-platform = { path = "../as-platform", default-features = false }
+rd-dex = { path = "../rd-dex", default-features = false }
+rd-apk = { path = "../rd-apk", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+
+[dev-dependencies]
+rd-testsupport = { package = "as-vm-testsupport", path = "../as-vm-testsupport" }
+
+[features]
+default = []
+portable-test-support = []

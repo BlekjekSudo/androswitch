@@ -145,3 +145,14 @@ CLI JSON is versioned; errors include operation, module and cause. Static
 inspection checks SDK, native ABI inventory and split markers. It does not
 prove API coverage, DEX/ELF validity, APK authenticity or execution. Record
 fixture identity, toolchain, commands and results with each milestone.
+
+## VM dependency identity
+
+The Horizon runner and `as-framework` depend on `as-vm`, whose library path is
+the existing `rd-vm/src/lib.rs`. Desktop RustyDroid tools keep `rd-vm`. These
+Cargo package identities prevent additive host features from selecting desktop
+Engine state in a simultaneous workspace build. There is one implementation
+source, including shared intrinsic families. `as-vm` exposes no `std` feature;
+its build script only declares the cfg names present in the shared source.
+The test-only `as-vm-testsupport` reuses the original builder source with the
+portable Engine dependency. See [the porting audit](UPSTREAM_PORTING.md).

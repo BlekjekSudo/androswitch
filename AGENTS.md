@@ -19,6 +19,7 @@ AndroSwitch's contracts and status live in `docs/ANDROSWITCH_ROADMAP.md`,
 ## Implementation rules
 
 - Work in milestone order. Preserve existing changes and upstream tests.
+- `as-vm` builds the original `rd-vm/src/lib.rs` as an isolated Cargo package; do not copy its source or add a desktop `std` feature. Keep full-workspace compile and combined host/device VM checks.
 - Device core is `no_std + alloc`; host adapters may use `std`. Do not put
   Python, Unicorn, a guest Linux kernel, or desktop process APIs in device builds.
 - Route OS behavior through platform interfaces; Java and native code must share

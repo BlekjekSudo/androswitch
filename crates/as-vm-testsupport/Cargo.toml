@@ -1,0 +1,18 @@
+[package]
+name = "as-vm-testsupport"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Original RustyDroid test builders bound to the isolated portable VM"
+
+[lib]
+path = "../rd-testsupport/src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+rd-dex = { path = "../rd-dex", default-features = false }
+rd-vm = { package = "as-vm", path = "../as-vm" }

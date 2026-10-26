@@ -68,6 +68,35 @@ class UpstreamAudit(unittest.TestCase):
         self.assertFalse(result["source_sync_pass"])
         self.assertFalse(result["device_behavior_parity_pass"])
 
+    def test_cargo_boundary_rejects_source_copies_and_desktop_feature_leakage(self):
+        for name in ["as-vm", "as-vm-testsupport", "as-framework", "as-switch-smoke"]:
+            folder = self.root / "crates" / name
+            folder.mkdir(parents=True)
+            source = "../rd-vm/src/lib.rs" if name == "as-vm" else "../rd-testsupport/src/lib.rs"
+            (folder / "Cargo.toml").write_text(
+                '[lib]\npath = "' + source + '"\n[dependencies]\nrd-vm = { package = "as-vm" }\n', encoding="utf-8")
+        self.assertEqual(AUDIT.verify_vm_boundary(self.root), [])
+        core = self.root / "crates/as-vm/Cargo.toml"
+        core.write_text(core.read_text(encoding="utf-8").replace("../rd-vm/src/lib.rs", "src/copied.rs") + "[features]\nstd = []\n", encoding="utf-8")
+        failures = AUDIT.verify_vm_boundary(self.root)
+        self.assertTrue(any("DUPLICATED_UPSTREAM_SOURCE" in error for error in failures))
+        self.assertIn("DESKTOP_FEATURE_EXPOSED_ON_DEVICE_VM", failures)
+        consumer = self.root / "crates/as-framework/Cargo.toml"
+        consumer.write_text('[dependencies]\nrd-vm = { path = "../rd-vm" }\n', encoding="utf-8")
+        self.assertIn("DESKTOP_VM_DEPENDENCY_LEAK: as-framework", AUDIT.verify_vm_boundary(self.root))
+
+    def test_extracted_helpers_cannot_evade_the_upstream_file_inventory(self):
+        import hashlib
+        folder = self.root / "crates/rd-vm/src"
+        folder.mkdir(parents=True)
+        helper = folder / "shared.rs"
+        helper.write_bytes(b"derived\n")
+        self.assertIn("FORK_CORE_MANIFEST_INCOMPLETE_OR_CHANGED", AUDIT.verify_fork_core(self.root, set(), []))
+        entry = {"path": "crates/rd-vm/src/shared.rs", "sha256": hashlib.sha256(b"derived\n").hexdigest()}
+        self.assertEqual(AUDIT.verify_fork_core(self.root, set(), [entry]), [])
+        helper.write_bytes(b"unreviewed change\n")
+        self.assertIn("FORK_CORE_ADAPTATION_DRIFT", AUDIT.verify_fork_core(self.root, set(), [entry])[0])
+
 
 if __name__ == "__main__":
     unittest.main()

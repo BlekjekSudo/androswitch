@@ -44,10 +44,16 @@ pub fn values_equal(heap: &crate::heap::Heap, a: &Value, b: &Value) -> Result<bo
                 | "Ljava/lang/Byte;"
                 | "Ljava/lang/Character;" => Ok(heap.get_field(*x, "value")?.as_int()?
                     == heap.get_field(*y, "value")?.as_int()?),
-                "Ljava/lang/Double;" => Ok(heap.get_field(*x, "value")?.as_double()?
-                    == heap.get_field(*y, "value")?.as_double()?),
-                "Ljava/lang/Float;" => Ok(heap.get_field(*x, "value")?.as_float()?
-                    == heap.get_field(*y, "value")?.as_float()?),
+                "Ljava/lang/Double;" => {
+                    let a = heap.get_field(*x, "value")?.as_double()?;
+                    let b = heap.get_field(*y, "value")?.as_double()?;
+                    Ok((a.is_nan() && b.is_nan()) || a.to_bits() == b.to_bits())
+                }
+                "Ljava/lang/Float;" => {
+                    let a = heap.get_field(*x, "value")?.as_float()?;
+                    let b = heap.get_field(*y, "value")?.as_float()?;
+                    Ok((a.is_nan() && b.is_nan()) || a.to_bits() == b.to_bits())
+                }
                 _ => Ok(false), // identidade (já comparada acima)
             }
         }

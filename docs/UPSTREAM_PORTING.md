@@ -21,8 +21,11 @@ disconnected Android environment inside the Switch runner.
 in the upstream Git tree, rather than selected class families. Each entry has
 the original Git blob ID. A changed file also records its reviewed adaptation
 reason and canonical SHA-256. Text canonicalization only normalizes CRLF to LF.
-Missing files, duplicate entries, an incomplete manifest, an unreviewed change,
+The 31 added core files, including extracted shared helpers, have their own
+reviewed hashes and provenance where applicable. Missing files, duplicate
+entries, an incomplete manifest, an unreviewed change,
 or drift after review fail the gate.
+The audit uses Python 3.11+ and its standard-library TOML parser.
 
 ```powershell
 python -X utf8 scripts/check-upstream-sync.py --check-latest --report target/evidence/upstream-sync-inventory.json
@@ -53,6 +56,15 @@ data registries and tests retain their original locations.
 
 ## Shared implementation and target adapters
 
+`as-vm` is a separate Cargo package whose library points directly at
+`rd-vm/src/lib.rs`. It has no Cargo `std` feature. The retained desktop tools
+still depend on `rd-vm`, so building them together cannot unify desktop features
+into the device VM. This fixes a full-workspace compile failure that previously
+selected the wrong Engine API. `as-vm-testsupport` likewise points to the original
+RustyDroid builder source with the portable Engine dependency. These packages
+separate dependency identities, not implementations; there is one source tree.
+Core unit tests and combined desktop/portable fixture tests verify the boundary.
+
 The synchronization includes the latest APK/DEX hardening, lazy DEX/string
 cache, VM/framework updates, native oracle changes, registries and original
 tests. Portable parsers use `alloc`/`core`. The immutable upstream lazy caches
@@ -69,11 +81,13 @@ sort or BitSet implementation. Exact overload metadata feeds device JNI lookup;
 missing overloads remain unavailable. Array snapshots pin their copied references
 across guest callbacks and GC. Callback recursion depth belongs to the actual
 execution owner on Horizon. JVM observations justify reference-array store
-checks and normalization of DEX's zero/null register representation.
+checks and normalization of DEX's zero/null register representation. A 32-row
+JVM corpus also corrects inherited boxed Float/Double equality for NaN and
+signed zero in the shared value helper.
 
 Original BitSet and narrow-array test files are used directly as portable test
-targets; [rd-testsupport](../crates/rd-testsupport/Cargo.toml) can select either
-VM dependency without accidentally enabling desktop `std` in the device build.
+targets; [as-vm-testsupport](../crates/as-vm-testsupport/Cargo.toml) binds the same
+builder source to the portable VM, while upstream `rd-testsupport` stays intact.
 The existing combined Java/DEX fixture gains array contracts; no extra APK is
 needed for every small API addition. This includes a JVM comparison and a
 separate inherited snapshot/GC contract. Mutating a sort input from its comparator

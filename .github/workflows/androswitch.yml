@@ -27,6 +27,9 @@ jobs:
       - name: Verify the upstream omission and drift gate
         run: python -X utf8 -m unittest discover -s scripts/tests -p test_upstream_sync.py -v
       - run: cargo fmt --all -- --check
+      - name: Check host tools and the portable VM together without feature leakage
+        run: cargo check --workspace --locked
+      - run: cargo test -p as-vm --lib --locked
       - run: cargo clippy -p as-platform -p as-package -p as-native -p as-runtime -p as-cli --all-targets --locked -- -D warnings
       - run: cargo test -p as-platform -p as-package -p as-native -p as-runtime -p as-cli --locked
       - run: cargo check -p as-native --no-default-features --locked
@@ -34,6 +37,7 @@ jobs:
       - run: cargo check -p as-platform --no-default-features --locked
       - run: cargo check -p rd-dex --no-default-features --locked
       - run: cargo clippy -p rd-apk -p rd-vm --no-default-features --lib --locked -- -D warnings
+      - run: cargo clippy -p as-vm --lib --locked -- -D warnings
       - run: cargo test -p as-switch-smoke --locked
       - run: cargo test -p as-switch-smoke --features portable-tests --test portable_core --locked
       - name: Run original upstream contracts on the portable VM

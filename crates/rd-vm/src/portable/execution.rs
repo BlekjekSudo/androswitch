@@ -7,7 +7,7 @@ use core::fmt;
 
 const MAX_OWNERS: usize = 1024;
 
-#[cfg(any(test, feature = "portable-test-support"))]
+#[cfg(feature = "portable-test-support")]
 #[path = "execution_contracts.rs"]
 mod invocation_contracts;
 
@@ -223,6 +223,7 @@ impl OwnerScopes {
 
 #[cfg(any(test, feature = "portable-test-support"))]
 pub(crate) mod contracts {
+    #[cfg(feature = "portable-test-support")]
     pub use super::invocation_contracts::*;
     use super::*;
     use alloc::{vec, vec::Vec};

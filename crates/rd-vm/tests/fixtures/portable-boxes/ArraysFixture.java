@@ -72,11 +72,15 @@ public final class ArraysFixture {
                 drop = true;
                 return Arrays.toString(exposed).hashCode();
             }
+            case 28: return Arrays.equals(new Object[] {Float.valueOf(Float.NaN)}, new Object[] {Float.valueOf(Float.NaN)}) ? 1 : 0;
+            case 29: return Arrays.equals(new Object[] {Float.valueOf(-0f)}, new Object[] {Float.valueOf(0f)}) ? 1 : 0;
+            case 30: return Arrays.equals(new Object[] {Double.valueOf(Double.NaN)}, new Object[] {Double.valueOf(Double.NaN)}) ? 1 : 0;
+            case 31: return Arrays.equals(new Object[] {Double.valueOf(-0.0)}, new Object[] {Double.valueOf(0.0)}) ? 1 : 0;
             default: throw new IllegalArgumentException();
         }
     }
     public static void main(String[] args) {
-        for (int i = 0; i < 28; ++i) System.out.println(i + "\t" + observe(i));
+        for (int i = 0; i < 32; ++i) System.out.println(i + "\t" + observe(i));
     }
     // This preserves the inherited RustyDroid snapshot contract, separately
     // from the JVM corpus: mutating a sort input inside compare is unspecified.

@@ -7,6 +7,8 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
+#[cfg(all(test, not(feature = "std")))]
+extern crate std;
 
 use alloc::{
     format,
@@ -412,6 +414,7 @@ pub fn unescaped_java(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
 
     #[test]
     fn stub_contract_gone_vm_has_real_api() {

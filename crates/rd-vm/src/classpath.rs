@@ -3595,6 +3595,7 @@ fn is_shadowed_platform_stub(descriptor: &str, access_flags: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
     fn legacy_interface_closure(cp: &Classpath, start: &str, sup: &str) -> bool {
         let mut queue = cp.interfaces_of(start);
         let mut visited: HashSet<String> = queue.iter().cloned().collect();

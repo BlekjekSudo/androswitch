@@ -96,7 +96,7 @@ fn shared_arrays_match_jvm_and_keep_detached_callback_snapshots_alive() {
     let dex = rd_dex::Dex::parse(std::fs::read(root.join("dex/classes.dex")).unwrap()).unwrap();
     let mut vm = Engine::new(vec![dex], VmConfig::default());
     let oracle = std::fs::read_to_string(root.join("arrays-oracle.tsv")).unwrap();
-    assert_eq!(oracle.lines().count(), 28);
+    assert_eq!(oracle.lines().count(), 32);
     for _ in 0..2 {
         for row in oracle.lines() {
             let (id, wanted) = row.split_once('\t').unwrap();

@@ -109,11 +109,11 @@ dependencies = [
  "as-package",
  "as-platform",
  "as-storage",
+ "as-vm",
  "libm",
  "miniz_oxide",
  "rd-apk",
  "rd-dex",
- "rd-vm",
  "serde",
  "serde_json",
 ]
@@ -197,11 +197,11 @@ dependencies = [
  "as-native",
  "as-package",
  "as-platform",
+ "as-vm",
+ "as-vm-testsupport",
  "rd-apk",
  "rd-dex",
  "rd-jni",
- "rd-testsupport",
- "rd-vm",
  "serde",
  "serde_json",
 ]
@@ -209,6 +209,25 @@ dependencies = [
 [[package]]
 name = "as-testsupport"
 version = "0.1.0"
+
+[[package]]
+name = "as-vm"
+version = "0.1.0"
+dependencies = [
+ "as-platform",
+ "as-vm-testsupport",
+ "rd-apk",
+ "rd-dex",
+ "serde",
+]
+
+[[package]]
+name = "as-vm-testsupport"
+version = "0.1.0"
+dependencies = [
+ "as-vm",
+ "rd-dex",
+]
 
 [[package]]
 name = "bit-set"

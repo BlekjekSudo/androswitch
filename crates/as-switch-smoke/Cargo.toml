@@ -14,7 +14,7 @@ unsafe_code = "deny"
 [dependencies]
 rd-dex = { path = "../rd-dex", default-features = false }
 rd-apk = { path = "../rd-apk", default-features = false }
-rd-vm = { path = "../rd-vm", default-features = false }
+rd-vm = { package = "as-vm", path = "../as-vm" }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 as-platform = { path = "../as-platform", default-features = false }
@@ -100,7 +100,7 @@ path = "tests/jni_objects.rs"
 required-features = ["portable-tests", "host-cli"]
 
 [dev-dependencies]
-rd-testsupport = { path = "../rd-testsupport", default-features = false }
+rd-testsupport = { package = "as-vm-testsupport", path = "../as-vm-testsupport" }
 
 [[test]]
 name = "upstream_bitset"

@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 import subprocess
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -93,6 +94,52 @@ def vm_routes(root: Path, upstream_paths: set[str]) -> list[dict]:
     return routes
 
 
+def verify_vm_boundary(root: Path) -> list[str]:
+    errors = []
+    for package, expected in [("as-vm", "../rd-vm/src/lib.rs"),
+                              ("as-vm-testsupport", "../rd-testsupport/src/lib.rs")]:
+        manifest = root / "crates" / package / "Cargo.toml"
+        if not manifest.is_file():
+            errors.append(f"PORTABLE_PACKAGE_MISSING: {package}")
+            continue
+        data = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        if data.get("lib", {}).get("path") != expected:
+            errors.append(f"DUPLICATED_UPSTREAM_SOURCE: {package} must use {expected}")
+        if package == "as-vm" and "std" in data.get("features", {}):
+            errors.append("DESKTOP_FEATURE_EXPOSED_ON_DEVICE_VM")
+    for package in ["as-framework", "as-switch-smoke", "as-vm-testsupport"]:
+        manifest = root / "crates" / package / "Cargo.toml"
+        if not manifest.is_file():
+            errors.append(f"PORTABLE_DEPENDENCY_MANIFEST_MISSING: {package}")
+            continue
+        dependency = tomllib.loads(manifest.read_text(encoding="utf-8")).get("dependencies", {}).get("rd-vm", {})
+        if not isinstance(dependency, dict) or dependency.get("package") != "as-vm":
+            errors.append(f"DESKTOP_VM_DEPENDENCY_LEAK: {package}")
+    return errors
+
+
+def verify_fork_core(root: Path, upstream: set[str], entries: list[dict]) -> list[str]:
+    # Extracted helpers must not disappear from the audit just because their
+    # new filenames did not exist in the original tree.
+    actual = set()
+    for package in ["rd-vm", "rd-dex", "rd-apk", "rd-jni", "rd-ndk"]:
+        for path in (root / "crates" / package / "src").rglob("*.rs"):
+            relative = path.relative_to(root).as_posix()
+            if relative not in upstream:
+                actual.add(relative)
+    declared = {entry["path"] for entry in entries}
+    errors = []
+    if actual != declared or len(declared) != len(entries):
+        errors.append("FORK_CORE_MANIFEST_INCOMPLETE_OR_CHANGED")
+    for entry in entries:
+        path = safe_path(root, entry["path"])
+        if not path.is_file():
+            errors.append(f"FORK_CORE_SOURCE_MISSING: {entry['path']}")
+        elif hashlib.sha256(canonical(path)).hexdigest() != entry["sha256"]:
+            errors.append(f"FORK_CORE_ADAPTATION_DRIFT: {entry['path']}")
+    return errors
+
+
 def audit(root: Path, lock: dict, check_latest: bool = False) -> dict:
     revision = lock["revision"]
     # Checking the actual Git tree prevents an accidentally shortened manifest
@@ -103,6 +150,8 @@ def audit(root: Path, lock: dict, check_latest: bool = False) -> dict:
         tree[path] = meta.split()[2]
     declared = {entry["path"]: entry["blob"] for entry in lock["files"]}
     files, errors = verify_entries(root, lock["files"])
+    errors.extend(verify_vm_boundary(root))
+    errors.extend(verify_fork_core(root, set(tree), lock.get("fork_core_files", [])))
     if tree != declared:
         errors.append("UPSTREAM_MANIFEST_INCOMPLETE_OR_CHANGED")
     if git(root, "show", "-s", "--format=%T", revision) != lock["tree"]:
@@ -120,6 +169,7 @@ def audit(root: Path, lock: dict, check_latest: bool = False) -> dict:
         "adapted_files": sum(f["status"] == "adapted" for f in files),
         "relocated_files": sum(f["path"] != f["local_path"] for f in files),
         "errors": errors, "files": files, "vm_modules": modules,
+        "fork_core_files": lock.get("fork_core_files", []),
         "host_only_originals": excluded,
         # Compilation, source equality and aggregate hardware test counts are
         # insufficient for claiming all upstream behavior works on Horizon.

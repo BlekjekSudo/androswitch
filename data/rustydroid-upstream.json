@@ -124,13 +124,13 @@
       "path": "Cargo.lock",
       "blob": "e49c73cdaab443b04b6a9b89db617f22dac69fe6",
       "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained.",
-      "sha256": "3d1c5a399e368eab201bbd70761fe03facffd7417c5f5653e22db226385a7aed"
+      "sha256": "cf530f7e9c44d99e02f1076b88ff2f3eac251f2a0be54f29ebcc9649db1622d0"
     },
     {
       "path": "Cargo.toml",
       "blob": "709e70d00a0a57b521838749779c47344e3c4fa7",
       "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained.",
-      "sha256": "c2d906db4a03b80b0fbbb3a01bbad0dc485b53633be0dca5f2f77735870361ea"
+      "sha256": "62a523a105226038e8fa18e7d2f0b044a6b9b6a91b61dbccbc89ecc733a8cb14"
     },
     {
       "path": "GOVERNANCE.md",
@@ -672,9 +672,7 @@
     },
     {
       "path": "crates/rd-testsupport/Cargo.toml",
-      "blob": "fb27f40b65dc79959326a9c01f96771e402f3880",
-      "reason": "Original DexBuilder tests can select portable VM without unifying desktop std into device contracts.",
-      "sha256": "9aa308a1f3f81194337c9055d19d56c87b43f1a9adee2a6d4c9dd16586cf1629"
+      "blob": "fb27f40b65dc79959326a9c01f96771e402f3880"
     },
     {
       "path": "crates/rd-testsupport/src/apkfix.rs",
@@ -840,7 +838,7 @@
       "path": "crates/rd-vm/src/classpath.rs",
       "blob": "68fafc4e0f82c3d79435a1500b06bf97fa0a40e8",
       "reason": "Latest hierarchy/security changes merged with device class loading and supported runtime metadata; class existence is not execution evidence.",
-      "sha256": "8a7a8c384ce1159a7c2249982bb5048916a2c860c5e402ebe3d2b922034724a7"
+      "sha256": "58e76309ee19e7c77780d0cb150207d6b333b6171358d5611908d22b74c8d0f4"
     },
     {
       "path": "crates/rd-vm/src/collections.rs",
@@ -1024,7 +1022,7 @@
       "path": "crates/rd-vm/src/lib.rs",
       "blob": "1eeaef3f3207221f18c389904be8b943ee3f8302",
       "reason": "Target module selection remains explicit; all latest modules retained, host-only originals enumerated and not claimed as device parity.",
-      "sha256": "f1a2456afb2560356ac5a9e6f4fc23928f5f76a26ed70c1101b3b013479493a6"
+      "sha256": "9a001352f872e7c5c14f041c9b34e7fd03fb531282a919b3378851d7454bb450"
     },
     {
       "path": "crates/rd-vm/src/m10/biometrics.rs",
@@ -1853,6 +1851,169 @@
     {
       "path": "xtask/tests/m12_docs_contracts.rs",
       "blob": "54270ec2b18586c2101396513d9bc0f7523e260f"
+    }
+  ],
+  "fork_core_files": [
+    {
+      "path": "crates/rd-vm/src/android_log.rs",
+      "sha256": "b1ce799f0d8d22903c89fa8bccab1a7dd9a552e1ae98d40dce26f6b8d4be1d92",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/android_text.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/collection_values.rs",
+      "sha256": "b234f92be4c9ae1a6c0fe1dcff2b847765f9767d2f9a880bb2f09ee6d22ae554",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/intrinsics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/framework_host.rs",
+      "sha256": "8552514197a4cca0d6435957ab225d352a83898e33428a95ecc7377cf8909add",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/integer_bits.rs",
+      "sha256": "34713658dc6e4d06643fe46a201a17bc910f374179c7143625c51e01e8b12171",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/numerics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/java_format.rs",
+      "sha256": "814dfbd897351d5b44db1ec6ecc019e3a2594766902794277a19959d5dd613cb",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/numerics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/java_values.rs",
+      "sha256": "38aa484a4b753d3042b6691ff208b7a4158114d4d76f860bc3194ee3e644ae47",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/intrinsics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/native_host.rs",
+      "sha256": "199b756c5cc3880efe85f725e0440f95e12a611a461400b520cb4e757a510883",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/atomic.rs",
+      "sha256": "5cf6703a88f205818500412b733720ec2819c2fb60ad3944ada7e4fa573a3bbe",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/atomic_number.rs",
+      "sha256": "95542603ac062f5e74d4de0d1f03eccc1d6e85d2d31ccc253704bb852e28e0e0",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/atomic_reference.rs",
+      "sha256": "a676166c33b877a3bf92ad3f69643540fc60914d3c816b917f52d96c21b24735",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/charset_catalog.rs",
+      "sha256": "17d93625ff81ae1de8bef32febf4e1a802c1153556df414457d5cccdee858bb2",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/classes.rs",
+      "sha256": "3b112ef1f34bdef5a4ca6fced7084260899240793fbc2cc19e3fffda218617eb",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/enums.rs",
+      "sha256": "598e5bf822f15b04205243a103f6e6e61eb563968002b33d9ace149b6894dd55",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/execution.rs",
+      "sha256": "ca0b9b90b27c267a5802da4c1fe0a7281b8be75eef437523f1b95720a83f5714",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/execution_contracts.rs",
+      "sha256": "a065322f525323bb82f140c47722fc9aee690d80be690190f10ab22644870fe8",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/file.rs",
+      "sha256": "293478bcffe279bcde710457e71a502da9bb47e20a4eee3fb00e9e24d6eeef0d",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/format.rs",
+      "sha256": "305ffed51ea28bc0f7d335a297e44bec24af9521d5e315eef818f5c39b722275",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/gc.rs",
+      "sha256": "d205da86dfea9452647e38f25b91bc07d44291360122178e9d5a51611c1ff7cc",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/intrinsics.rs",
+      "sha256": "dd33ac4d613488d7f3fd18c7b50c14d3825a364697d44db8b6fa8b2f08919315",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "sha256": "736cec5e9076e1ef9e3dfc048058f653a880400b18c34f9ebdb2838cb4a33c4c",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/monitor.rs",
+      "sha256": "dd8dc060d2006d2307f0e76dd1cd33b128eddb37f9b169539f6574ac22ab1dba",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/random_access.rs",
+      "sha256": "5b2ae421991f0f64b05583fc5aa7d1de7df147e27f449d1ec0237e8c00463353",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/string_encoding.rs",
+      "sha256": "a8ddf674ea40597f290dc363930203bbb9474aed4991d97320c37ded99ff68d9",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/text_contracts.rs",
+      "sha256": "7d89e755dc3e21eeed35002287fe7a127963cbf2c6b46ca9ddf9ff2b5896f75a",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/throwables.rs",
+      "sha256": "af8bcee569ba59e3346e858efcda06844cdac69e11cb4a3c44025169e4316276",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/primitive_parse.rs",
+      "sha256": "fc0327470665d5abcd61f81afba5e49f4b9a53beee21ef05d27d044e3b337987",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/numerics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/shared_call.rs",
+      "sha256": "45dd64cabf3b113ef01a544e4283b2eb144ed8ba53a0b1b509453020dc7f900c",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-dex/src/budget.rs",
+      "sha256": "cc02d1ce1d4ccfec35d404e2aa2297a5361077f1f3cd8165721d8f93e02dcd37",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-dex/src/sync.rs",
+      "sha256": "340575fa959853de1b4dec1a20758a8323035a01590b53948204005ba252f578",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-apk/src/arsc_identifier.rs",
+      "sha256": "f6ef69dd6239fc824aba28a4ff371ce760556c2b69a9d06dcf0090125580131c",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-apk/src/zip_source.rs",
+      "sha256": "baa7fb70a6996466a0a1bb223d5e2eb790be3e40b6aa6e3a03085d2bb4013bad",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
     }
   ]
 }

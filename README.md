@@ -17,6 +17,8 @@ The latest RustyDroid source is merged at **`3761815`** with its history and
 original tests. The [full source audit](docs/UPSTREAM_PORTING.md) tracks all
 427 upstream files, reviewed adaptations and original VM sources still excluded
 from the device build. **Horizon behavior parity is not yet 1:1 with upstream.**
+The isolated `as-vm` package compiles the original RustyDroid source directly,
+so desktop Cargo features cannot switch the runner to desktop VM state.
 Latest upstream Arrays/BitSet code and lazy parser improvements now share the
 portable path; source synchronization is kept separate from execution evidence.
 
