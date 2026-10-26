@@ -1,0 +1,102 @@
+# Dependabot proposes updates; RD Sentinel gives every proposal a strict,
+# RustyDroid-specific anti-regression trial.  Auto-merge is intentionally not
+# configured here or in the Sentinel publisher.
+#
+# Cooldowns are explicit even though GitHub now has a default: a version must
+# exist long enough for obvious compromised/broken releases to be noticed.
+# Dependabot security updates are not delayed by version-update cooldowns.
+version: 2
+
+updates:
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+    open-pull-requests-limit: 10
+    target-branch: main
+    labels:
+      - dependencies
+      - rust
+      - sentinel:dependency-risk
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    groups:
+      cargo-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      # Major updates are deliberately not grouped: each one gets its own PR,
+      # changelog/MSRV review, deep Sentinel campaign, and approval label.
+
+  - package-ecosystem: cargo
+    directory: /crates/rd-apk/fuzz
+    schedule:
+      interval: monthly
+      time: "06:30"
+      timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+    open-pull-requests-limit: 3
+    target-branch: main
+    labels:
+      - dependencies
+      - fuzz
+      - sentinel:dependency-risk
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+
+  - package-ecosystem: cargo
+    directory: /crates/rd-dex/fuzz
+    schedule:
+      interval: monthly
+      time: "06:45"
+      timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
+    open-pull-requests-limit: 3
+    target-branch: main
+    labels:
+      - dependencies
+      - fuzz
+      - sentinel:dependency-risk
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    target-branch: main
+    labels:
+      - dependencies
+      - github-actions
+      - sentinel:dependency-risk
+    commit-message:
+      prefix: "ci(deps)"
+      include: scope
+    groups:
+      github-actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

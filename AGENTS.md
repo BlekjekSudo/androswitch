@@ -9,7 +9,8 @@ success responses, or proprietary payloads. The initial native ABI is ARM64;
 v0.1 is offline. One application runs at a time.
 
 The repository is a history-preserving fork of RustyDroid at
-`6388281f66d254c8e01a0fdc7a5a9a30239bc762`. Keep upstream attribution and
+`6388281f66d254c8e01a0fdc7a5a9a30239bc762`, synchronized through upstream
+`3761815dc6a2a1427e9fc66b66e8471b78d1b170`. Keep upstream attribution and
 licenses. `README.rustydroid.md`, `RustyDroid.md`, and the original roadmap and
 compatibility documents describe upstream, not verified Switch capabilities.
 AndroSwitch's contracts and status live in `docs/ANDROSWITCH_ROADMAP.md`,
@@ -42,6 +43,12 @@ Use `rg` for searches. Run focused tests first, then relevant workspace checks.
 The Windows host uses Cargo; the Switch C linker/toolchain is available in WSL
 Ubuntu under `/opt/devkitpro`. Keep new toolchains in task-local caches and do
 not change the user's global Rust default.
+
+Run `python -X utf8 scripts/check-upstream-sync.py` after source changes. Review
+any changed adaptation against latest upstream before updating its manifest
+hash; do not bless hashes just to pass the gate. The complete source manifest
+and remaining target exclusions live in `docs/UPSTREAM_PORTING.md`. Source
+sync is not 1:1 device behavior evidence.
 
 Before delivery, run the AndroSwitch tests, formatting and clippy checks, inspect
 the diff, and update the milestone/evidence records with commands and results.

@@ -1,0 +1,394 @@
+# RustyDroid — data/gms.toml
+# Apêndice E da spec: Google Play Services / Firebase (modo "sem GMS" honesto).
+#
+# Fonte executável consumida por rd-framework::fd_gms, `rd gms`,
+# classificação MCP e `cargo xtask gms-report|gms-spec`.
+#
+# MODO HONESTO (validado): mode = "no-gms-honest" e network = "none" em
+# TODOS os serviços. Não há processo GMS, conta Google nem backend real.
+# As APIs existem como shims host com respostas estruturadas,
+# determinísticas e programáveis pelo agente; eventos são capturados
+# localmente, nunca enviados. `supported`/`partial` medem o SHIM, jamais
+# paridade com os servidores do Google.
+#
+# Status: mesma semântica conservadora dos Apêndices C/D.
+schema_version = 1
+source = "RustyDroid.md Appendix E"
+api_floor = 26
+api_ceiling = 36
+mode = "no-gms-honest"
+
+[[category]]
+id = "gms-core"
+name = "GMS core"
+summary = "Disponibilidade, erros e a Tasks API da qual todos os serviços dependem."
+
+[[category]]
+id = "gms-services"
+name = "Play Services"
+summary = "Location, Maps, Billing, Auth, Ads, Fit/Health, Cast/Nearby e Integridade — mocks offline programáveis."
+
+[[category]]
+id = "firebase"
+name = "Firebase"
+summary = "Core, Analytics, Auth, Messaging, Crashlytics e bancos locais (Firestore/RTDB) sem backend."
+
+# ===================== GMS core =====================
+[[service]]
+id = "gms-common"
+name = "GoogleApiAvailability / common"
+category = "gms-core"
+coordinates = "com.google.android.gms:play-services-base"
+prefixes = ["com.google.android.gms.common"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Código de disponibilidade devolvido (SUCCESS/SERVICE_MISSING/...), textos de erro."
+notes = "Shim em crates/rd-vm/src/gms.rs: GoogleApiAvailability.getInstance/isGooglePlayServicesAvailable devolvem o código programado (Engine::gms_set_availability, 0 por defeito), isUserResolvableError e getErrorString seguem a tabela upstream de 22 códigos; Status/ApiException/ConnectionResult cunhados como objetos host. Os diálogos de resolução (getErrorDialog/showErrorNotification) não têm UI — contam-se os pedidos; GoogleApiClient liga instantaneamente sem processo GMS real."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-common"
+key_apis = ["com.google.android.gms.common.GoogleApiAvailability.isGooglePlayServicesAvailable", "com.google.android.gms.common.ConnectionResult"]
+
+[[service]]
+id = "gms-tasks"
+name = "Tasks API"
+category = "gms-core"
+coordinates = "com.google.android.gms:play-services-tasks"
+prefixes = ["com.google.android.gms.tasks"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Resultados/exceções de Tasks de todos os serviços E nascem aqui; listeners disparam deterministicamente."
+notes = "Modelo host completo da Tasks API em gms.rs: Task (isComplete/isSuccessful/isCanceled/getResult/getException), TaskCompletionSource (setResult/trySetResult/setException), listeners sucesso/falha/completo/cancelado disparados deterministicamente (incl. registados depois da conclusão), continuations continueWith/continueWithTask/onSuccessTask, Tasks.whenAll/whenAllSuccess/await. Desvios documentados no preâmbulo do módulo: execução síncrona single-thread, Executors ignorados, sem bloqueio real (await de Task incompleta lança IllegalStateException em vez de bloquear)."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-tasks"
+key_apis = ["com.google.android.gms.tasks.Task.addOnSuccessListener", "com.google.android.gms.tasks.Tasks.forResult"]
+
+# ===================== Play Services =====================
+[[service]]
+id = "gms-location"
+name = "Location (fused)"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-location"
+prefixes = ["com.google.android.gms.location"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Fix GPS (lat/lng/accuracy/tempo) devolvido por getLastLocation/getCurrentLocation; callbacks registrados (MEDIA-05)."
+notes = "FusedLocationProviderClient host: getLastLocation/getCurrentLocation concluem com android.location.Location cunhada do fix programado (Engine::gms_set_location_fix) ou null sem fix; requestLocationUpdates entrega LocationResult ao registar e em cada Engine::gms_push_location; removeLocationUpdates cancela. Sem geofencing nem fusão multi-provider; a ponte para o GPS virtual do M10 (MEDIA-05) fica para pós-merge do PR #201."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-location"
+key_apis = ["com.google.android.gms.location.FusedLocationProviderClient.getLastLocation", "com.google.android.gms.location.LocationServices.getFusedLocationProviderClient"]
+
+[[service]]
+id = "gms-maps"
+name = "Maps"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-maps"
+prefixes = ["com.google.android.gms.maps"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Câmera e marcadores registrados num modelo consultável; sem tiles de rede (UI-07 offline)."
+notes = "Modelo host sem tiles/render: SupportMapFragment/MapView.getMapAsync dispara onMapReady com GoogleMap host; CameraUpdateFactory (newLatLng/newLatLngZoom/zoom), moveCamera/animateCamera, markers (addMarker/remove/clear, MarkerOptions position/title/snippet), UiSettings e LatLng/CameraPosition com estado consultável (Engine::gms_maps_cameras/gms_maps_markers). Nenhum tile é desenbado nem descarregado (UI-07 estático fora desta ronda)."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-maps"
+key_apis = ["com.google.android.gms.maps.SupportMapFragment.getMapAsync", "com.google.android.gms.maps.GoogleMap.addMarker"]
+
+[[service]]
+id = "gms-billing"
+name = "Billing"
+category = "gms-services"
+coordinates = "com.android.billingclient:billing"
+prefixes = ["com.android.billingclient"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Catálogo (produtos/preços), resultado do fluxo de compra, purchases possuídas, erros BillingResponseCode."
+notes = "Fluxo de compra testável completo e offline: catálogo programável (Engine::gms_billing_add_sku) servido por querySkuDetailsAsync (legado) e queryProductDetailsAsync (moderno); startConnection dispara onBillingSetupFinished; launchBillingFlow entrega Purchase/UserCanceled/Erro ao PurchasesUpdatedListener conforme Engine::gms_billing_set_outcome, com tokens determinísticos; queryPurchases(Async), acknowledge/consume com códigos honestos (token desconhecido = DEVELOPER_ERROR). Sem assinaturas reais nem verificação server-side."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-billing"
+key_apis = ["com.android.billingclient.api.BillingClient.startConnection", "com.android.billingclient.api.BillingClient.launchBillingFlow"]
+
+[[service]]
+id = "gms-auth"
+name = "Auth (Google Sign-In)"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-auth"
+prefixes = ["com.google.android.gms.auth"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Conta fake (id/email/nome/token) ou ausência de conta; provedores fake."
+notes = "Google Sign-In honesto: getClient + silentSignIn falham com ApiException(4 SIGN_IN_REQUIRED) até o hospedeiro completar o fluxo fora da VM (Engine::gms_complete_signin / gms_program_google_account); getLastSignedInAccount, conta com id/email/displayName/idToken falsos determinísticos, signOut/revokeAccess. Sem contas Google reais nem tokens verificáveis."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-auth"
+key_apis = ["com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount", "com.google.android.gms.auth.api.signin.GoogleSignIn.getClient"]
+
+[[service]]
+id = "gms-ads"
+name = "Ads"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-ads"
+prefixes = ["com.google.android.gms.ads"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Sucesso/falha de load por formato; eventos estruturados capturados, sem rede nem criativos."
+notes = "Eventos estruturados sem rede: MobileAds.initialize/getInitializationStatus, AdView (loadAd → onAdLoaded ou onAdFailedToLoad com o código programado em Engine::gms_ads_set_failure), InterstitialAd e RewardedAd (load/show com onAdShowed/onUserEarnedReward/onAdDismissed) e registo Engine::gms_ads_events. Sem criativos, sem leilão, sem pedidos a servidores de anúncios."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-ads"
+key_apis = ["com.google.android.gms.ads.MobileAds.initialize", "com.google.android.gms.ads.AdView.loadAd"]
+
+[[service]]
+id = "gms-fit-health"
+name = "Fit/Health"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-fitness"
+prefixes = ["com.google.android.gms.fitness"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Datasets fake (passos, frequência, sessões) devolvidos às leituras; gravações capturadas."
+notes = "Dados falsos programáveis: HistoryClient.readData/readDailyTotal vendem um DataSet com os passos de Engine::gms_fit_set_steps (DataPoint→Value.asInt), RecordingClient subscribe e SessionsClient start/stop concluem Tasks vazias. Superfície intencionalmente fina — sem sensores, sem Health Connect, sem séries temporais."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-fit-health"
+key_apis = ["com.google.android.gms.fitness.Fitness.getHistoryClient"]
+
+[[service]]
+id = "gms-cast"
+name = "Cast"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-cast"
+prefixes = ["com.google.android.gms.cast"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Dispositivos/sessões fake opcionais (NET-08); default: nenhum dispositivo descoberto."
+notes = "Estado de sessão programável: CastContext.getSharedInstance, getCastState segue Engine::gms_cast_connect/disconnect (1=NO_DEVICES, 2=NOT_CONNECTED, 4=CONNECTED), SessionManager.getCurrentCastSession e listeners de estado. Sem descoberta mDNS nem canais de media (NET-08 fica para o runtime de rede)."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-cast"
+key_apis = ["com.google.android.gms.cast.framework.CastContext.getSharedInstance"]
+
+[[service]]
+id = "gms-nearby"
+name = "Nearby"
+category = "gms-services"
+coordinates = "com.google.android.gms:play-services-nearby"
+prefixes = ["com.google.android.gms.nearby"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Endpoints fake programáveis (NET-08); default: descoberta vazia, advertising registrado."
+notes = "Connections: startDiscovery entrega onEndpointFound para cada endpoint programado (Engine::gms_nearby_add_endpoint), startAdvertising/requestConnection/accept/reject concluem Tasks, sendPayload regista só o tamanho; Messages publish/subscribe concluem Tasks. Sem Bluetooth/Wi-Fi Direct reais nem transferência de payloads entre dispositivos."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-nearby"
+key_apis = ["com.google.android.gms.nearby.Nearby.getConnectionsClient"]
+
+[[service]]
+id = "gms-integrity"
+name = "SafetyNet / Play Integrity"
+category = "gms-services"
+coordinates = "com.google.android.play:integrity"
+prefixes = ["com.google.android.gms.safetynet", "com.google.android.play.core.integrity"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Token/veredito determinístico fake, rotulado como shim; nonce registrado. NUNCA atesta um dispositivo real."
+notes = "Respostas determinísticas declaradamente falsas: IntegrityManagerFactory.create + requestIntegrityToken devolve o token de Engine::gms_set_integrity_token ('rustydroid-fake-integrity-token' por defeito) e regista os nonces (Engine::gms_integrity_nonces); SafetyNetClient.attest devolve JWS marcado 'not-a-real-attestation'. Os tokens NÃO passam verificação server-side — por design honesto."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-gms-integrity"
+key_apis = ["com.google.android.gms.safetynet.SafetyNetClient.attest", "com.google.android.play.core.integrity.IntegrityManager.requestIntegrityToken"]
+
+# ===================== Firebase =====================
+[[service]]
+id = "firebase-core"
+name = "Firebase core (FirebaseApp)"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-common"
+prefixes = ["com.google.firebase"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "FirebaseOptions fake (project/app id, api key) do app default; initializeApp registrado."
+notes = "FirebaseApp host: initializeApp/getInstance/getApps/getInstance(name)/delete, FirebaseOptions(+Builder) com getters, valores falsos determinísticos (projeto 'rustydroid-fake-project'). Por defeito getInstance auto-inicializa (desvio documentado no preâmbulo de gms.rs); Engine::gms_firebase_strict_init(true) exige initializeApp como upstream."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-firebase-core"
+key_apis = ["com.google.firebase.FirebaseApp.initializeApp", "com.google.firebase.FirebaseApp.getInstance"]
+
+[[service]]
+id = "firebase-analytics"
+name = "Firebase Analytics"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-analytics"
+prefixes = ["com.google.firebase.analytics"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Nada a programar: eventos/user properties/user id são CAPTURADOS e consultáveis pelo agente."
+notes = "Eventos capturados localmente, nunca enviados: logEvent grava nome + parâmetros achatados do Bundle (Engine::gms_analytics_events), setUserProperty/setUserId consultáveis, setAnalyticsCollectionEnabled(false) larga eventos seguintes, resetAnalyticsData limpa. Sem upload, sem app-instance-id real."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-firebase-analytics"
+key_apis = ["com.google.firebase.analytics.FirebaseAnalytics.logEvent", "com.google.firebase.analytics.FirebaseAnalytics.setUserProperty"]
+
+[[service]]
+id = "firebase-auth"
+name = "Firebase Auth"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-auth"
+prefixes = ["com.google.firebase.auth"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Usuário fake (uid/email), sucesso/falha de sign-in por método, sessão atual."
+notes = "Store local de utilizadores com semântica real de senhas: createUserWithEmailAndPassword (colisão e senha fraca têm exceções próprias), signInWithEmailAndPassword (credencial inválida), utilizadores pré-registados (Engine::gms_program_firebase_user), anónimo, signOut, getCurrentUser, listeners de estado e id-tokens falsos determinísticos. Sem provedores OAuth reais nem verificação de tokens."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-firebase-auth"
+key_apis = ["com.google.firebase.auth.FirebaseAuth.signInAnonymously", "com.google.firebase.auth.FirebaseAuth.getCurrentUser"]
+
+[[service]]
+id = "firebase-messaging"
+name = "Firebase Messaging (FCM)"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-messaging"
+prefixes = ["com.google.firebase.messaging"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Token FCM fake; tópicos inscritos; injeção de RemoteMessage pelo agente (SYS-08)."
+notes = "getToken vende o token de Engine::gms_set_fcm_token ('rustydroid-fcm-token-0001' por defeito), subscribeToTopic/unsubscribeFromTopic rastreados (Engine::gms_fcm_topics), RemoteMessage(+Builder, notification/data) cunhada pelo hospedeiro e entregue às FirebaseMessagingService do APK via Engine::gms_deliver_remote_message (SYS-08). Sem push real nem ligação FCM."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-firebase-messaging"
+key_apis = ["com.google.firebase.messaging.FirebaseMessaging.getToken", "com.google.firebase.messaging.RemoteMessage"]
+
+[[service]]
+id = "firebase-crashlytics"
+name = "Firebase Crashlytics"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-crashlytics"
+prefixes = ["com.google.firebase.crashlytics"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Captura: recordException/log/custom keys + crashes REAIS (exceções não tratadas da VM), nunca upload."
+notes = "recordException/log/setCustomKey/setUserId capturam para estado local consultável (Engine::gms_crashlytics_crash_summaries/gms_crashlytics_log); a coleção desligada larga e conta registos. Crashes reais da VM entram pela ponte Engine::gms_report_uncaught_crash (não há hook no loop do interpretador nesta ronda). Nada é enviado."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-firebase-crashlytics"
+key_apis = ["com.google.firebase.crashlytics.FirebaseCrashlytics.recordException", "com.google.firebase.crashlytics.FirebaseCrashlytics.log"]
+
+[[service]]
+id = "firebase-firestore"
+name = "Cloud Firestore"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-firestore"
+prefixes = ["com.google.firebase.firestore"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Store local record/replay (NET-03): documentos semeados pelo agente; listeners disparam nas escritas locais."
+notes = "Store local de documentos: collection/document, set (com SetOptions.merge)/update (documento ausente falha)/delete/get, queries whereEqualTo+orderBy+limit, add com ids determinísticos, snapshot listeners de documento e query disparados sincronamente, semeia/leitura pelo hospedeiro (Engine::gms_firestore_seed/gms_firestore_doc). Sem transações, sem índices compostos, sem backend (a gravação/replay NET-03 é trabalho do runtime de rede)."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-firebase-firestore"
+key_apis = ["com.google.firebase.firestore.FirebaseFirestore.collection", "com.google.firebase.firestore.DocumentReference.set"]
+
+[[service]]
+id = "firebase-rtdb"
+name = "Realtime Database"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-database"
+prefixes = ["com.google.firebase.database"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "Árvore local record/replay (NET-03): valores semeados; ValueEventListeners disparam nas escritas locais."
+notes = "Store local por caminho: getReference/child/push, setValue substitui subárvores e dispara ValueEventListeners (addValueEventListener/addListenerForSingleValueEvent), DataSnapshot com getValue/child/exists; semeadura por Engine::gms_rtdb_seed. Sem regras de segurança, sem presença nem backend (NET-03 fora desta ronda)."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-firebase-rtdb"
+key_apis = ["com.google.firebase.database.FirebaseDatabase.getReference", "com.google.firebase.database.DatabaseReference.setValue"]
+
+[[service]]
+id = "firebase-remoteconfig"
+name = "Firebase Remote Config (extra além da spec)"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-config"
+prefixes = ["com.google.firebase.remoteconfig"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "(Futuro) mapa chave→valor programável; fetch completa sem rede."
+notes = "Mapa de valores programável (Engine::gms_remoteconfig_program) com semântica fetch→pendentes→activate fiel: fetchAndActivate devolve Boolean de mudança, getString/getLong/getBoolean/getDouble e getValue com source (0 default/1 remote/2 static), setDefaultsAsync. Sem pedidos ao servidor de Remote Config."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-firebase-remoteconfig"
+key_apis = ["com.google.firebase.remoteconfig.FirebaseRemoteConfig.fetchAndActivate"]
+
+[[service]]
+id = "firebase-storage"
+name = "Firebase Storage (extra além da spec)"
+category = "firebase"
+coordinates = "com.google.firebase:firebase-storage"
+prefixes = ["com.google.firebase.storage"]
+status = "partial"
+module = "rd-vm/gms"
+code = ["crates/rd-vm/src/gms.rs"]
+milestone = "appendix-e"
+network = "none"
+programmable = "(Futuro) blobs locais por path; URLs de download fake determinísticas."
+notes = "Mapa de blobs local: StorageReference child/putBytes (UploadTask.TaskSnapshot)/getBytes com limite de tamanho/getDownloadUrl (Uri host)/listAll/delete; blob ausente falha com StorageException, nunca sucesso falso; semeadura/leitura por Engine::gms_storage_seed/gms_storage_bytes. Sem resumable uploads nem URLs assinadas reais."
+evidence = ["docs/appendix-d-e.md", "docs/gms.md", "crates/rd-vm/tests/gms.rs"]
+gap_id = "gap-firebase-storage"
+key_apis = ["com.google.firebase.storage.FirebaseStorage.getReference"]
+
+[[service]]
+id = "mlkit"
+name = "ML Kit (extra além da spec)"
+category = "firebase"
+coordinates = "com.google.mlkit:*:*"
+prefixes = ["com.google.mlkit"]
+status = "not_implemented"
+module = "none"
+code = []
+milestone = "future"
+network = "none"
+programmable = "(Futuro) resultados fake de OCR/barcode programáveis sobre imagens de entrada."
+notes = "Extra: ML Kit (OCR/barcode) aparece em apps reais; sem shim, Tasks de reconhecimento nunca completam via host."
+evidence = ["docs/appendix-d-e.md"]
+gap_id = "gap-mlkit"
+key_apis = ["com.google.mlkit.vision.text.TextRecognition", "com.google.mlkit.vision.barcode.BarcodeScanning"]

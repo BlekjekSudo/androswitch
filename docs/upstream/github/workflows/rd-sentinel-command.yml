@@ -1,0 +1,43 @@
+name: RD Sentinel Command
+
+# Maintainer chat-ops. Runs trusted default-branch code only; commands can
+# dispatch evidence campaigns but cannot approve policy, edit baselines, merge,
+# or push.
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: rd-sentinel-command-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  command:
+    name: command
+    if: contains(github.event.comment.body, '/rd-sentinel')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Validate maintainer association and dispatch campaign
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 tools/rd-sentinel/rd_sentinel.py command \
+            --repo "$GITHUB_WORKSPACE" \
+            --event "$GITHUB_EVENT_PATH" \
+            --repository "$GITHUB_REPOSITORY" \
+            --execute

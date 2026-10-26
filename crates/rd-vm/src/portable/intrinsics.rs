@@ -48,6 +48,12 @@ pub fn call_static_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = crate::arrays::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = crate::jbitset::static_intrinsic(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     if let Some(value) = crate::boxes::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
@@ -82,6 +88,17 @@ pub fn call_instance_intrinsic_mref(
     receiver: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    if let Some(value) = crate::jbitset::instance_intrinsic(
+        vm,
+        receiver_class,
+        declaring_class,
+        name,
+        sig,
+        receiver,
+        args,
+    )? {
+        return Ok(Some(value));
+    }
     if let Some(value) =
         crate::boxes::instance_intrinsic(vm, receiver_class, name, sig, receiver, args)?
     {

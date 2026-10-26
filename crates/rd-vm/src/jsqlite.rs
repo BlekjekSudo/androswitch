@@ -29,14 +29,21 @@
 //! - `Cursor`: the full row-cursor surface with AOSP CursorWindow
 //!   conversions (`getString` on an int, `getLong` on text, …).
 //!
+//! **Persistence:** named databases are serialized to their app-private
+//! VFS path (`jfile`) after committed mutations and deserialized on the next
+//! Engine launch that opens the same path. `:memory:`/`createInMemory`
+//! databases intentionally remain memory-only. The VFS image is a real
+//! SQLite file image when Python's `sqlite3` serialize/deserialize API is
+//! available; older interpreters fall back to a SQL dump image.
+//!
 //! **Deviations:**
-//! - Databases live in memory for the Engine's lifetime. Their file path
-//!   exists in the virtual filesystem (`jfile`), but nothing is persisted
-//!   across app launches.
 //! - SQL errors map to `SQLiteException` subclasses by SQLite error class,
 //!   not exact result code.
+//! - This is still not literal AOSP completeness: WAL/checkpointing, locale
+//!   collation, custom functions/extensions, multi-process locking and every
+//!   overload/result-code nuance remain Appendix C gaps.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
@@ -57,16 +64,37 @@ const SQL_CURSOR: &str = "Landroid/database/sqlite/SQLiteCursor;";
 const DRIVER: &str = "Landroid/database/sqlite/SQLiteDirectCursorDriver;";
 
 const PY: &str = r#"
-import sys, json, sqlite3, base64
+import sys, json, sqlite3, base64, math
 dbs = {}
+DUMP_PREFIX = b"-- RustyDroid SQLite dump\n"
 def enc(v):
     if isinstance(v, (bytes, bytearray, memoryview)):
         return {"b": base64.b64encode(bytes(v)).decode()}
+    if isinstance(v, float) and not math.isfinite(v):
+        if math.isnan(v):
+            return {"f": "nan"}
+        return {"f": "inf" if v > 0 else "-inf"}
     return v
 def dec(v):
     if isinstance(v, dict):
-        return base64.b64decode(v["b"])
+        if "b" in v:
+            return base64.b64decode(v["b"])
+        if "f" in v:
+            return float(v["f"])
     return v
+def load_db(db, data):
+    if not data:
+        return
+    if data.startswith(DUMP_PREFIX):
+        db.executescript(data[len(DUMP_PREFIX):].decode())
+    elif hasattr(db, "deserialize"):
+        db.deserialize(data)
+    else:
+        raise sqlite3.DatabaseError("sqlite3.deserialize is unavailable")
+def dump_db(db):
+    if hasattr(db, "serialize"):
+        return db.serialize()
+    return DUMP_PREFIX + ("\n".join(db.iterdump())).encode()
 for line in sys.stdin:
     r = json.loads(line)
     try:
@@ -78,6 +106,10 @@ for line in sys.stdin:
         op = r["op"]
         if op == "close":
             db.close(); del dbs[name]; out = {}
+        elif op == "load":
+            load_db(db, base64.b64decode(r.get("data", ""))); out = {}
+        elif op == "dump":
+            out = {"data": base64.b64encode(dump_db(db)).decode()}
         else:
             cur = db.execute(r["sql"], [dec(a) for a in r.get("args", [])])
             cols = [d[0] for d in cur.description] if cur.description else []
@@ -88,7 +120,7 @@ for line in sys.stdin:
         out = {"err": str(e), "kind": "constraint"}
     except Exception as e:
         out = {"err": str(e), "kind": type(e).__name__}
-    sys.stdout.write(json.dumps(out) + "\n"); sys.stdout.flush()
+    sys.stdout.write(json.dumps(out, allow_nan=False) + "\n"); sys.stdout.flush()
 "#;
 
 /// A SQL value as SQLite stores it.
@@ -137,6 +169,10 @@ pub struct SqlState {
     /// The backend failed to start: use the m8 subset.
     pub(crate) unavailable: bool,
     dbs: HashMap<ObjRef, String>,
+    /// Persistent DB paths already deserialized into this Engine's backend
+    /// process. A new Engine has an empty set, so reopening a named DB loads
+    /// the VFS image again (the cross-launch persistence boundary).
+    loaded: HashSet<String>,
     txns: HashMap<String, Txn>,
     programs: HashMap<ObjRef, (String, String, Vec<Sv>)>, // obj -> (db, sql, binds)
     cursors: HashMap<ObjRef, Cursor>,
@@ -146,8 +182,24 @@ impl std::fmt::Debug for SqlState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SqlState")
             .field("dbs", &self.dbs.len())
+            .field("programs", &self.programs.len())
             .field("cursors", &self.cursors.len())
             .finish()
+    }
+}
+
+impl SqlState {
+    /// Purge dead heap `ObjRef` keys after mark-sweep GC (#257).
+    pub fn gc_purge(&mut self, mut alive: impl FnMut(ObjRef) -> bool) {
+        self.dbs.retain(|&r, _| alive(r));
+        self.programs.retain(|&r, _| alive(r));
+        self.cursors.retain(|&r, _| alive(r));
+    }
+
+    fn clear_slot(&mut self, r: ObjRef) {
+        self.dbs.remove(&r);
+        self.programs.remove(&r);
+        self.cursors.remove(&r);
     }
 }
 
@@ -203,7 +255,15 @@ fn sv_json(v: &Sv) -> J {
     match v {
         Sv::Null => J::Null,
         Sv::Int(i) => json!(i),
-        Sv::Real(f) => json!(f),
+        Sv::Real(f) => {
+            if f.is_nan() {
+                json!({ "f": "nan" })
+            } else if f.is_infinite() {
+                json!({ "f": if f.is_sign_positive() { "inf" } else { "-inf" } })
+            } else {
+                json!(f)
+            }
+        }
         Sv::Text(s) => json!(s),
         Sv::Blob(b) => json!({ "b": b64(b) }),
     }
@@ -218,12 +278,23 @@ fn json_sv(v: &J) -> Sv {
             .map(Sv::Int)
             .unwrap_or_else(|| Sv::Real(n.as_f64().unwrap_or(0.0))),
         J::String(s) => Sv::Text(s.clone()),
-        J::Object(o) => Sv::Blob(
-            o.get("b")
-                .and_then(J::as_str)
-                .map(unb64)
-                .unwrap_or_default(),
-        ),
+        J::Object(o) => {
+            if let Some(tag) = o.get("f").and_then(J::as_str) {
+                let f = match tag {
+                    "inf" => f64::INFINITY,
+                    "-inf" => f64::NEG_INFINITY,
+                    _ => f64::NAN,
+                };
+                Sv::Real(f)
+            } else {
+                Sv::Blob(
+                    o.get("b")
+                        .and_then(J::as_str)
+                        .map(unb64)
+                        .unwrap_or_default(),
+                )
+            }
+        }
         J::Array(_) => Sv::Null,
     }
 }
@@ -294,8 +365,7 @@ fn sql_trace() -> bool {
     *ON.get_or_init(|| std::env::var("RD_SQL_TRACE").is_ok_and(|v| v != "0"))
 }
 
-fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit> {
-    let req = json!({"op": "exec", "db": db, "sql": sql, "args": args.iter().map(sv_json).collect::<Vec<_>>()});
+fn send(vm: &mut Engine, req: &J) -> Result<J, VmExit> {
     let line = {
         let p =
             vm.fw.m8.sqlx.proc.as_mut().ok_or_else(|| {
@@ -313,8 +383,124 @@ fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit>
         p.stdout.read_line(&mut line).map_err(io)?;
         line
     };
-    let r: J = serde_json::from_str(&line)
-        .map_err(|e| crate::err::vm_error("VM_ERROR", format!("SQLite backend reply: {e}")))?;
+    serde_json::from_str(&line)
+        .map_err(|e| crate::err::vm_error("VM_ERROR", format!("SQLite backend reply: {e}")).into())
+}
+
+fn persistent_db(db: &str) -> bool {
+    !db.is_empty() && db != ":memory:" && !db.starts_with(":memory:")
+}
+
+fn first_keyword(sql: &str) -> String {
+    sql.trim_start()
+        .chars()
+        .take_while(|c| c.is_ascii_alphabetic())
+        .collect::<String>()
+        .to_ascii_uppercase()
+}
+
+fn in_transaction(vm: &Engine, db: &str) -> bool {
+    vm.fw
+        .m8
+        .sqlx
+        .txns
+        .get(db)
+        .map(|t| !t.levels.is_empty())
+        .unwrap_or(false)
+}
+
+fn ensure_loaded(vm: &mut Engine, db: &str) -> Result<(), VmExit> {
+    if !persistent_db(db) || vm.fw.m8.sqlx.loaded.contains(db) {
+        return Ok(());
+    }
+    // Mark first: loading is a backend-process boundary, and a failed load is
+    // a typed corruption error rather than a reason to retry on every SQL op.
+    vm.fw.m8.sqlx.loaded.insert(db.to_string());
+    let Some(bytes) = crate::jfile::read_bytes(db).filter(|b| !b.is_empty()) else {
+        return Ok(());
+    };
+    let r = send(vm, &json!({"op": "load", "db": db, "data": b64(&bytes)}))?;
+    if let Some(e) = r.get("err").and_then(J::as_str) {
+        return Err(Throwable::new(
+            "Landroid/database/sqlite/SQLiteDatabaseCorruptException;",
+            format!("loading persistent database {db}: {e}"),
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn persist_db(vm: &mut Engine, db: &str) -> Result<(), VmExit> {
+    if !persistent_db(db) {
+        return Ok(());
+    }
+    ensure_loaded(vm, db)?;
+    let r = send(vm, &json!({"op": "dump", "db": db}))?;
+    if let Some(e) = r.get("err").and_then(J::as_str) {
+        return Err(sql_exc(
+            r.get("kind").and_then(J::as_str).unwrap_or(""),
+            e,
+            "<serialize database>",
+        ));
+    }
+    let data = r
+        .get("data")
+        .and_then(J::as_str)
+        .map(unb64)
+        .unwrap_or_default();
+    if !data.is_empty() {
+        crate::jfile::write_bytes(db, data);
+    }
+    Ok(())
+}
+
+fn backend_close(vm: &mut Engine, db: &str) {
+    let _ = send(vm, &json!({"op": "close", "db": db}));
+    vm.fw.m8.sqlx.loaded.remove(db);
+    vm.fw.m8.sqlx.txns.remove(db);
+    vm.fw.m8.sqlx.programs.retain(|_, (pdb, _, _)| pdb != db);
+    vm.fw.m8.sqlx.dbs.retain(|_, pdb| pdb != db);
+}
+
+/// Forgets every in-Engine handle for a database path before its file is
+/// deleted (e.g. `Context.deleteDatabase`), so a later mutation through a
+/// stale handle cannot resurrect the deleted image. The legacy subset is
+/// keyed by helper name, so its basename entry is removed too.
+pub(crate) fn forget_database(vm: &mut Engine, path: &str) -> bool {
+    let was_open =
+        vm.fw.m8.sqlx.dbs.values().any(|db| db == path) || vm.fw.m8.sqlx.loaded.contains(path);
+    if was_open {
+        backend_close(vm, path);
+    }
+    let base = path.rsplit('/').next().unwrap_or(path);
+    let subset = vm.fw.m8.databases.remove(base).is_some();
+    vm.fw.m8.db_by_obj.retain(|_, name| name != base);
+    was_open || subset
+}
+
+fn should_persist_after(sql: &str) -> bool {
+    let kw = first_keyword(sql);
+    matches!(
+        kw.as_str(),
+        "INSERT"
+            | "UPDATE"
+            | "DELETE"
+            | "REPLACE"
+            | "CREATE"
+            | "DROP"
+            | "ALTER"
+            | "VACUUM"
+            | "REINDEX"
+            | "ANALYZE"
+            | "COMMIT"
+            | "END"
+    ) || (kw == "PRAGMA" && sql.contains('='))
+}
+
+fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit> {
+    ensure_loaded(vm, db)?;
+    let req = json!({"op": "exec", "db": db, "sql": sql, "args": args.iter().map(sv_json).collect::<Vec<_>>()});
+    let r = send(vm, &req)?;
     if sql_trace() {
         eprintln!(
             "S/RustyDroid: sql {sql} args={} err={}",
@@ -349,12 +535,25 @@ fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit>
                 .collect()
         })
         .unwrap_or_default();
-    Ok(Res {
+    let res = Res {
         cols,
         rows,
         changes: r["changes"].as_i64().unwrap_or(0),
         last: r["last"].as_i64().unwrap_or(0),
-    })
+    };
+    // Durability boundary: flush committed work to the VFS image. Work inside
+    // an explicit transaction is not flushed until COMMIT/END runs, matching
+    // the commit boundary instead of leaking uncommitted rows across launches.
+    let kw = first_keyword(sql);
+    // `changes > 0` also catches mutating CTEs (`WITH ... DELETE ...`),
+    // whose first keyword is not itself a mutation verb.
+    if persistent_db(db)
+        && (should_persist_after(sql) || res.changes > 0)
+        && (!in_transaction(vm, db) || matches!(kw.as_str(), "COMMIT" | "END"))
+    {
+        persist_db(vm, db)?;
+    }
+    Ok(res)
 }
 
 // ── Java <-> SQL values ─────────────────────────────────────────────────
@@ -478,7 +677,33 @@ fn jstring(vm: &mut Engine, s: String) -> Result<Value, VmExit> {
 
 // ── objects ─────────────────────────────────────────────────────────────
 
+fn is_db_class(vm: &Engine, cls: &str) -> bool {
+    cls == DB || cls == CLOSABLE || vm.cp.is_subtype(cls, DB)
+}
+
+fn is_program_class(vm: &Engine, cls: &str) -> bool {
+    matches!(cls, STMT | QUERY | PROGRAM | CLOSABLE) || vm.cp.is_subtype(cls, PROGRAM)
+}
+
+fn is_cursor_class(vm: &Engine, cls: &str) -> bool {
+    matches!(
+        cls,
+        SQL_CURSOR
+            | "Landroid/database/Cursor;"
+            | "Landroid/database/AbstractCursor;"
+            | "Landroid/database/AbstractWindowedCursor;"
+            | "Landroid/database/CrossProcessCursor;"
+            | "Ljava/io/Closeable;"
+            | "Ljava/lang/AutoCloseable;"
+    ) || vm.cp.is_subtype(cls, SQL_CURSOR)
+        || vm.cp.is_subtype(cls, "Landroid/database/Cursor;")
+}
+
 fn db_name(vm: &Engine, recv: ObjRef) -> Option<String> {
+    let cls = vm.heap.class_of(recv).ok()?;
+    if !is_db_class(vm, cls) {
+        return None;
+    }
     vm.fw.m8.sqlx.dbs.get(&recv).cloned()
 }
 
@@ -487,6 +712,7 @@ fn new_db(vm: &mut Engine, path: &str) -> Result<ObjRef, VmExit> {
         .heap
         .alloc_instance(DB.to_string(), Vec::new())
         .map_err(crate::err::oom_throwable)?;
+    vm.fw.m8.sqlx.clear_slot(r);
     vm.fw.m8.sqlx.dbs.insert(r, path.to_string());
     if path.starts_with('/') {
         crate::jfile::touch(path);
@@ -505,6 +731,7 @@ fn new_program(
         .heap
         .alloc_instance(class.to_string(), Vec::new())
         .map_err(crate::err::oom_throwable)?;
+    vm.fw.m8.sqlx.clear_slot(r);
     vm.fw
         .m8
         .sqlx
@@ -518,6 +745,7 @@ fn new_cursor_obj(vm: &mut Engine, res: Res) -> Result<Value, VmExit> {
         .heap
         .alloc_instance(SQL_CURSOR.to_string(), Vec::new())
         .map_err(crate::err::oom_throwable)?;
+    vm.fw.m8.sqlx.clear_slot(r);
     vm.fw.m8.sqlx.cursors.insert(
         r,
         Cursor {
@@ -723,12 +951,15 @@ fn db_intrinsic(
                     match out {
                         Some(c) => c,
                         None => {
-                            let res = run(
-                                vm,
-                                db,
-                                &vm.fw.m8.sqlx.programs[&q].1.clone(),
-                                &vm.fw.m8.sqlx.programs[&q].2.clone(),
-                            )?;
+                            let Some((_, p_sql, p_binds)) = vm.fw.m8.sqlx.programs.get(&q).cloned()
+                            else {
+                                return Err(Throwable::new(
+                                    "Ljava/lang/IllegalStateException;",
+                                    "attempt to re-open an already-closed object".to_string(),
+                                )
+                                .into());
+                            };
+                            let res = run(vm, db, &p_sql, &p_binds)?;
                             new_cursor_obj(vm, res)?
                         }
                     }
@@ -875,20 +1106,12 @@ fn db_intrinsic(
             end(vm, db)?;
             Value::Null
         }
-        "inTransaction" | "isDbLockedByCurrentThread" => Value::Int(
-            vm.fw
-                .m8
-                .sqlx
-                .txns
-                .get(db)
-                .map(|t| !t.levels.is_empty())
-                .unwrap_or(false) as i32,
-        ),
+        "inTransaction" | "isDbLockedByCurrentThread" => Value::Int(in_transaction(vm, db) as i32),
+        "isInMemoryDatabase" => Value::Int((!persistent_db(db)) as i32),
         "yieldIfContendedSafely"
         | "yieldIfContended"
         | "isDbLockedByOtherThreads"
-        | "isReadOnly"
-        | "isInMemoryDatabase" => Value::Int(0),
+        | "isReadOnly" => Value::Int(0),
         "getVersion" => Value::Int(version(vm, db)? as i32),
         "setVersion" => {
             let v = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0);
@@ -912,6 +1135,10 @@ fn db_intrinsic(
         "getPath" => jstring(vm, db.to_string())?,
         "isOpen" => Value::Int(1),
         "close" | "releaseReference" | "acquireReference" | "releaseReferenceFromContainer" => {
+            // Reference-count/close calls are a safe durability point; the
+            // object model stays usable (existing RustyDroid deviation), but
+            // committed named-database state is flushed to the VFS image.
+            persist_db(vm, db)?;
             Value::Null
         }
         "enableWriteAheadLogging" => Value::Int(1),
@@ -954,6 +1181,97 @@ fn db_intrinsic(
     }))
 }
 
+/// Counts SQLite bind parameters (`?`, `?NNN`, `:name`, `@name`, `$name`)
+/// outside string/identifier quotes and SQL comments, mirroring
+/// `sqlite3_bind_parameter_count` (capped at SQLite's `32_766` variable limit).
+fn count_sql_bind_params(sql: &str) -> usize {
+    const MAX_SQLITE_VARS: usize = 32_766;
+    let b = sql.as_bytes();
+    let mut i = 0usize;
+    let mut next_idx = 0usize;
+    let mut max_idx = 0usize;
+    let mut named: Vec<String> = Vec::new();
+    while i < b.len() {
+        match b[i] {
+            b'\'' | b'"' | b'`' => {
+                let q = b[i];
+                i += 1;
+                while i < b.len() {
+                    if b[i] == q {
+                        i += 1;
+                        if i < b.len() && b[i] == q {
+                            i += 1;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        i += 1;
+                    }
+                }
+            }
+            b'[' => {
+                i += 1;
+                while i < b.len() && b[i] != b']' {
+                    i += 1;
+                }
+                if i < b.len() {
+                    i += 1;
+                }
+            }
+            b'-' if i + 1 < b.len() && b[i + 1] == b'-' => {
+                i += 2;
+                while i < b.len() && b[i] != b'\n' {
+                    i += 1;
+                }
+            }
+            b'/' if i + 1 < b.len() && b[i + 1] == b'*' => {
+                i += 2;
+                while i + 1 < b.len() && !(b[i] == b'*' && b[i + 1] == b'/') {
+                    i += 1;
+                }
+                i = (i + 2).min(b.len());
+            }
+            b'?' => {
+                i += 1;
+                let start = i;
+                while i < b.len() && b[i].is_ascii_digit() {
+                    i += 1;
+                }
+                if i > start {
+                    let n = sql[start..i].parse::<usize>().unwrap_or(0);
+                    if (1..=MAX_SQLITE_VARS).contains(&n) {
+                        next_idx = n;
+                        max_idx = max_idx.max(n);
+                    }
+                } else {
+                    next_idx = next_idx.saturating_add(1).min(MAX_SQLITE_VARS);
+                    max_idx = max_idx.max(next_idx);
+                }
+            }
+            b':' | b'@' | b'$'
+                if i + 1 < b.len() && (b[i + 1].is_ascii_alphabetic() || b[i + 1] == b'_') =>
+            {
+                let start = i;
+                i += 1;
+                while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_' || b[i] == b'$')
+                {
+                    i += 1;
+                }
+                let tok = &sql[start..i];
+                if !named.iter().any(|x| x == tok) {
+                    named.push(tok.to_string());
+                    next_idx = next_idx.saturating_add(1).min(MAX_SQLITE_VARS);
+                    max_idx = max_idx.max(next_idx);
+                }
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+    max_idx.min(MAX_SQLITE_VARS)
+}
+
 fn program_intrinsic(
     vm: &mut Engine,
     name: &str,
@@ -961,13 +1279,28 @@ fn program_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    let idx = args
-        .first()
-        .and_then(|v| v.as_int().ok())
-        .unwrap_or(0)
-        .max(1) as usize
-        - 1;
-    let bind = |vm: &mut Engine, v: Sv| {
+    let Some((db, sql, binds)) = vm.fw.m8.sqlx.programs.get(&recv).cloned() else {
+        return Err(Throwable::new(
+            "Ljava/lang/IllegalStateException;",
+            "attempt to re-open an already-closed object".to_string(),
+        )
+        .into());
+    };
+    let num_params = count_sql_bind_params(&sql).max(binds.len()).min(32_766);
+    let raw_index = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0);
+    let check_bind_idx = |raw: i32| -> Result<usize, VmExit> {
+        if raw < 1 || (raw as usize) > num_params {
+            return Err(Throwable::new(
+                "Ljava/lang/IllegalArgumentException;",
+                format!(
+                    "Cannot bind argument at index {raw} because the index is out of range.  The statement has {num_params} parameters."
+                ),
+            )
+            .into());
+        }
+        Ok((raw as usize) - 1)
+    };
+    let bind = |vm: &mut Engine, idx: usize, v: Sv| {
         if let Some(p) = vm.fw.m8.sqlx.programs.get_mut(&recv) {
             if p.2.len() <= idx {
                 p.2.resize(idx + 1, Sv::Null);
@@ -975,31 +1308,34 @@ fn program_intrinsic(
             p.2[idx] = v;
         }
     };
-    let (db, sql, binds) = vm.fw.m8.sqlx.programs[&recv].clone();
     Ok(Some(match name {
         "bindNull" => {
-            bind(vm, Sv::Null);
+            let idx = check_bind_idx(raw_index)?;
+            bind(vm, idx, Sv::Null);
             Value::Null
         }
         "bindLong" => {
+            let idx = check_bind_idx(raw_index)?;
             let v = match args.get(1) {
                 Some(Value::Long(l)) => *l,
                 Some(Value::Int(i)) => *i as i64,
                 _ => 0,
             };
-            bind(vm, Sv::Int(v));
+            bind(vm, idx, Sv::Int(v));
             Value::Null
         }
         "bindDouble" => {
+            let idx = check_bind_idx(raw_index)?;
             let v = match args.get(1) {
                 Some(Value::Double(d)) => *d,
                 Some(Value::Float(f)) => *f as f64,
                 _ => 0.0,
             };
-            bind(vm, Sv::Real(v));
+            bind(vm, idx, Sv::Real(v));
             Value::Null
         }
         "bindString" | "bindBlob" => {
+            let idx = check_bind_idx(raw_index)?;
             match args.get(1) {
                 None | Some(Value::Null) => {
                     return Err(Throwable::new(
@@ -1010,7 +1346,7 @@ fn program_intrinsic(
                 }
                 Some(v) => {
                     let sv = java_to_sv(vm, v);
-                    bind(vm, sv);
+                    bind(vm, idx, sv);
                 }
             }
             Value::Null
@@ -1198,7 +1534,15 @@ fn cursor_intrinsic(
                 )?
             }
         },
-        "close" | "deactivate" => {
+        "close" => {
+            if let Some(c) = vm.fw.m8.sqlx.cursors.get_mut(&recv) {
+                c.closed = true;
+                c.rows = Vec::new();
+                c.pos = -1;
+            }
+            Value::Null
+        }
+        "deactivate" => {
             if let Some(c) = vm.fw.m8.sqlx.cursors.get_mut(&recv) {
                 c.closed = true;
             }
@@ -1233,7 +1577,7 @@ fn cursor_intrinsic(
 
 fn helper_open(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
     if let Ok(Value::Obj(d)) = vm.heap.get_field(recv, "rd_sqlx_db") {
-        if vm.fw.m8.sqlx.dbs.contains_key(&d) {
+        if db_name(vm, d).is_some() {
             return Ok(Value::Obj(d));
         }
     }
@@ -1335,19 +1679,22 @@ pub fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if vm.fw.m8.sqlx.cursors.contains_key(&recv) {
-        return cursor_intrinsic(vm, name, sig, recv, args);
-    }
-    if vm.fw.m8.sqlx.programs.contains_key(&recv) {
-        return program_intrinsic(vm, name, sig, recv, args);
-    }
-    if let Some(db) = db_name(vm, recv) {
-        return db_intrinsic(vm, &db, name, sig, recv, args);
-    }
-    // new SQLiteCursor(driver, editTable, query): execute the bound query.
+    // new SQLiteCursor(driver, editTable, query): execute the bound query
+    // BEFORE checking existing `cursors[&recv]` so a recycled `SQLiteCursor`
+    // slot runs `<init>` cleanly instead of acting like an old cursor (#257).
     if name == "<init>" && (mref_class == SQL_CURSOR || recv_class == SQL_CURSOR) {
+        vm.fw.m8.sqlx.clear_slot(recv);
         let q = args.iter().rev().find_map(|a| match a {
-            Value::Obj(o) if vm.fw.m8.sqlx.programs.contains_key(o) => Some(*o),
+            Value::Obj(o)
+                if vm
+                    .heap
+                    .class_of(*o)
+                    .ok()
+                    .is_some_and(|c| is_program_class(vm, c))
+                    && vm.fw.m8.sqlx.programs.contains_key(o) =>
+            {
+                Some(*o)
+            }
             _ => None,
         });
         if let Some(q) = q {
@@ -1365,6 +1712,24 @@ pub fn instance_intrinsic(
             return Ok(Some(Value::Null));
         }
         return Ok(None);
+    }
+    if vm.fw.m8.sqlx.cursors.contains_key(&recv) {
+        if is_cursor_class(vm, recv_class) {
+            return cursor_intrinsic(vm, name, sig, recv, args);
+        }
+        vm.fw.m8.sqlx.cursors.remove(&recv);
+    }
+    if vm.fw.m8.sqlx.programs.contains_key(&recv) {
+        if is_program_class(vm, recv_class) {
+            return program_intrinsic(vm, name, sig, recv, args);
+        }
+        vm.fw.m8.sqlx.programs.remove(&recv);
+    }
+    if vm.fw.m8.sqlx.dbs.contains_key(&recv) {
+        if let Some(db) = db_name(vm, recv) {
+            return db_intrinsic(vm, &db, name, sig, recv, args);
+        }
+        vm.fw.m8.sqlx.dbs.remove(&recv);
     }
     let helper_call = mref_class == HELPER
         || (vm.cp.is_subtype(recv_class, HELPER)
@@ -1464,20 +1829,12 @@ pub fn static_intrinsic(
         other => jstr(vm, other).unwrap_or_default(),
     };
     if name == "deleteDatabase" {
-        let existed = vm.fw.m8.sqlx.dbs.values().any(|d| *d == path);
-        if existed {
-            let p = vm.fw.m8.sqlx.proc.as_mut().map(|p| {
-                writeln!(p.stdin, "{}", json!({"op":"close","db":path}))
-                    .and_then(|_| p.stdin.flush())
-                    .map(|_| {
-                        let mut l = String::new();
-                        let _ = p.stdout.read_line(&mut l);
-                    })
-            });
-            let _ = p;
-            vm.fw.m8.sqlx.dbs.retain(|_, d| *d != path);
+        let was_open = vm.fw.m8.sqlx.dbs.values().any(|d| *d == path);
+        if was_open || vm.fw.m8.sqlx.loaded.contains(&path) {
+            backend_close(vm, &path);
         }
-        return Ok(Some(Value::Int(existed as i32)));
+        let deleted_file = persistent_db(&path) && crate::jfile::delete_file(&path);
+        return Ok(Some(Value::Int((was_open || deleted_file) as i32)));
     }
     let path =
         if matches!(name, "create" | "createInMemory") || path.is_empty() || path == ":memory:" {
@@ -1497,6 +1854,17 @@ mod tests {
         for s in [&b""[..], b"a", b"ab", b"abc", b"\x00\xff\x10hello"] {
             assert_eq!(unb64(&b64(s)), s);
         }
+    }
+    #[test]
+    fn persistence_classification() {
+        assert!(persistent_db("/data/user/0/app/databases/app.db"));
+        assert!(!persistent_db(":memory:"));
+        assert!(!persistent_db(":memory:3"));
+        assert!(should_persist_after("CREATE TABLE t (x INTEGER)"));
+        assert!(should_persist_after(" insert into t values (1)"));
+        assert!(should_persist_after("PRAGMA user_version = 2"));
+        assert!(!should_persist_after("PRAGMA user_version"));
+        assert!(!should_persist_after("SELECT * FROM t"));
     }
     #[test]
     fn select_builder() {

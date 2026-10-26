@@ -25,6 +25,7 @@ use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::ObjRef;
 use crate::intrinsics;
+use crate::prefs::PrefValue;
 use crate::value::Value;
 
 pub const ACTIVITY: &str = "Landroid/app/Activity;";
@@ -46,6 +47,7 @@ pub const FRAGMENT_CLS: &str = "Landroid/app/Fragment;";
 pub const CONTEXT: &str = "Landroid/content/Context;";
 pub const INTENT: &str = "Landroid/content/Intent;";
 pub const BUNDLE: &str = "Landroid/os/Bundle;";
+pub const PARCEL: &str = "Landroid/os/Parcel;";
 pub const VIEW: &str = "Landroid/view/View;";
 pub(crate) const VIEW_ON_TOUCH_LISTENER: &str = "view:on_touch_listener";
 pub const VIEWGROUP: &str = "Landroid/view/ViewGroup;";
@@ -77,7 +79,7 @@ pub const DENSITY: f32 = 2.0;
 /// issue #40: cap de profundidade para caminhos host na árvore de views
 /// (hit-test/layout/dump) — árvore programática profunda (addView) não pode
 /// estourar a stack Rust e abortar o processo. Mesmo teto do inflate.
-const MAX_VIEW_DEPTH: usize = 512;
+pub(crate) const MAX_VIEW_DEPTH: usize = 512;
 
 /// Virtual vsync period.
 const VSYNC_MS: u64 = 16;
@@ -846,6 +848,14 @@ pub enum HostObj {
     Bundle {
         map: Vec<(String, Value)>,
     },
+    /// `android.os.Parcel`: the byte buffer, read/write cursor and the
+    /// out-of-band object side table used for local strong references that
+    /// have no portable byte representation in a single-Engine transport.
+    Parcel {
+        data: Vec<u8>,
+        pos: usize,
+        objects: Vec<Value>,
+    },
     /// M8: coleções java.util host — Map (HashMap/WeakHashMap) e List
     /// (ArrayList/LinkedList). Estado linear (volumes pequenos); igualdade
     /// de chave/elemento via `intrinsics::values_equal` (String/boxes por
@@ -924,6 +934,11 @@ pub struct HostState {
     /// `jcollections::sublist_*` (write-through semantics).
     pub(crate) sublists: HashMap<ObjRef, (ObjRef, usize, usize)>,
     pub(crate) sublist_order: std::collections::VecDeque<ObjRef>,
+    /// Engine-local Binder handle table for `Parcel.writeStrongBinder`:
+    /// the marshalled int handle is `index + 1` (0 is null). This models
+    /// local Binder transport inside one Engine; it is not a kernel Binder
+    /// handle and does not survive leaving the Engine.
+    pub(crate) binder_refs: Vec<Value>,
     /// clock virtual (ms) — postDelayed/dispatch por ordem de tempo
     pub clock_ms: u64,
     /// Last platform `InputConnection` + its `EditorInfo` opened by
@@ -938,6 +953,8 @@ pub struct HostState {
     pub(crate) traversal_pending: bool,
     /// re-entrancy guard for the traversal run from `advance_clock`
     pub(crate) in_traversal: bool,
+    /// Recursion depth guard for `host_dispatch_draw` and `dispatch_touch` / `host_dispatch_touch`.
+    pub(crate) view_dispatch_depth: usize,
     main_looper: Option<ObjRef>,
     /// M8: thread "main" sintética (VM single-threaded — ver `THREAD`)
     pub(crate) main_thread: Option<ObjRef>,
@@ -987,6 +1004,17 @@ pub struct HostState {
     pub m8: crate::m8::M8State,
     #[cfg(feature = "advanced-components")]
     pub m9: crate::m9::State,
+    #[cfg(feature = "virtual-devices")]
+    pub vdev: crate::m10::State,
+    /// Apêndice D: estado dos shims host AndroidX (`androidx.rs`) —
+    /// lifecycle, livedata, viewmodel, collections, datastore (valores),
+    /// work Data, navegação, startup, biometria, futures. Dentro do
+    /// HostState para ser GC-root automaticamente via Debug (gc.rs).
+    pub androidx: crate::androidx::AndroidxState,
+    /// Estado do Apêndice E (Google Play Services / Firebase, modo "sem
+    /// GMS" honesto): `crates/rd-vm/src/gms.rs`. Enraizado pelo GC via o
+    /// mesmo render Debug que cobre todo o `HostState`.
+    pub gms: crate::gms::GmsState,
 }
 
 /// M8 (31º gap): fragment registrada por um commit de FragmentTransaction.
@@ -1180,6 +1208,15 @@ impl Engine {
             self.fw
                 .objects
                 .insert(r, HostObj::Bundle { map: Vec::new() });
+        } else if class == PARCEL {
+            self.fw.objects.insert(
+                r,
+                HostObj::Parcel {
+                    data: Vec::new(),
+                    pos: 0,
+                    objects: Vec::new(),
+                },
+            );
         } else if self.cp.is_subtype(class, VIEW) {
             let mut v = new_view();
             // TextView/Button têm altura de touch target por default
@@ -1433,13 +1470,21 @@ impl Engine {
         Ok(r)
     }
 
-    /// M8 (44º gap real — SharedPreferences padrão para
-    /// `PreferenceManager.getDefaultSharedPreferences`): objeto canônico
-    /// (classe SharedPreferencesImpl, como no AOSP — a VM não persiste em
-    /// arquivo nesta milestone: prefs começam vazias e vivem nesta VM).
+    /// Default `SharedPreferences` for
+    /// `PreferenceManager.getDefaultSharedPreferences`: the canonical object
+    /// for `<package>_preferences.xml` in app-private storage.
     pub(crate) fn shared_prefs_obj(&mut self) -> Result<ObjRef, VmExit> {
-        if let Some(p) = self.fw.shared_prefs_impl {
-            return Ok(p);
+        let name = prefs_default_name(self);
+        self.shared_prefs_named_obj(&name)
+    }
+
+    /// Canonical object for one named preference file. The store is loaded
+    /// from `shared_prefs/<name>.xml` on first use in this Engine; commits
+    /// and applies write the same AOSP-shaped XML back to the VFS.
+    pub(crate) fn shared_prefs_named_obj(&mut self, name: &str) -> Result<ObjRef, VmExit> {
+        ensure_prefs_loaded(self, name);
+        if let Some(p) = self.fw.m8.prefs_objs.get(name) {
+            return Ok(*p);
         }
         let r = self
             .heap
@@ -1453,7 +1498,11 @@ impl Engine {
                     ),
                 ))
             })?;
-        self.fw.shared_prefs_impl = Some(r);
+        self.fw.m8.prefs_objs.insert(name.to_string(), r);
+        self.fw.m8.prefs_name_by_obj.insert(r, name.to_string());
+        if name == prefs_default_name(self) {
+            self.fw.shared_prefs_impl = Some(r);
+        }
         Ok(r)
     }
 
@@ -2863,18 +2912,23 @@ impl Engine {
     }
 
     pub(crate) fn find_view_by_id(&self, root: ObjRef, id: i32) -> Option<ObjRef> {
-        let (vid, children) = match self.fw.get(root)? {
-            HostObj::View {
-                id: vid, children, ..
-            } => (*vid, children.clone()),
-            _ => return None,
-        };
-        if vid != 0 && vid == id {
-            return Some(root);
-        }
-        for c in children {
-            if let Some(hit) = self.find_view_by_id(c, id) {
-                return Some(hit);
+        let mut stack = vec![(root, 0usize)];
+        let mut seen = std::collections::HashSet::new();
+        while let Some((cur, depth)) = stack.pop() {
+            if depth > MAX_VIEW_DEPTH || !seen.insert(cur) {
+                continue;
+            }
+            let (vid, children) = match self.fw.get(cur) {
+                Some(HostObj::View {
+                    id: vid, children, ..
+                }) => (*vid, children.as_slice()),
+                _ => continue,
+            };
+            if vid != 0 && vid == id {
+                return Some(cur);
+            }
+            for c in children.iter().rev() {
+                stack.push((*c, depth + 1));
             }
         }
         None
@@ -3002,11 +3056,23 @@ fn call_host_static_rooted(
         (SYSTEM_CLOCK, "elapsedRealtimeNanos") => {
             Ok(Some(Value::Long(vm.fw.clock() as i64 * 1_000_000)))
         }
-        // ── M8 (44º gap real — SharedPreferences padrão) ──
-        // getDefaultSharedPreferences: objeto canônico do host (vazio nesta
-        // milestone — não persiste em arquivo; o editor vem quando pedido).
-        (PREFERENCE_MANAGER, "getDefaultSharedPreferences") => {
-            Ok(Some(Value::Obj(vm.shared_prefs_obj()?)))
+        // ── SharedPreferences padrão: canonical per-package file, loaded
+        // from and persisted to app-private `shared_prefs` XML.
+        (PREFERENCE_MANAGER, "getDefaultSharedPreferences")
+        | (PREFERENCE_MANAGER, "getDefaultSharedPreferencesName") => {
+            // Both dereference context.getPackageName().
+            if !matches!(args.first(), Some(Value::Obj(_))) {
+                return Err(VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "PreferenceManager context null",
+                )));
+            }
+            if name == "getDefaultSharedPreferences" {
+                Ok(Some(Value::Obj(vm.shared_prefs_obj()?)))
+            } else {
+                let name = prefs_default_name(vm);
+                Ok(Some(Value::Obj(intrinsics::alloc_string(vm, name)?)))
+            }
         }
         (SYSTEM_CLOCK, "sleep") => {
             // sleep(ms): avança o relógio virtual e drena o Looper
@@ -3256,22 +3322,48 @@ fn call_host_instance_rooted(
         // stub inseguro. Chave null → NPE (AOSP levanta NPE em getStringWithDefault).
         // ── M8 full: SharedPreferences$Editor stateful ──────────────────
         _ if mref_class == "Landroid/content/SharedPreferences$Editor;" => match name {
-            "putString" | "putInt" | "putLong" | "putFloat" | "putBoolean" => {
+            "putString" | "putStringSet" | "putInt" | "putLong" | "putFloat" | "putBoolean" => {
                 let key = match args.first() {
                     Some(Value::Obj(r)) => vm.heap.as_str(*r)?.to_string(),
-                    _ => {
-                        return Err(VmExit::Exception(crate::err::Throwable::new(
-                            "Ljava/lang/NullPointerException;",
-                            "Editor.put com key null",
-                        )))
-                    }
+                    // AOSP stages null keys in the editor's HashMap; the
+                    // host store keys on String, so a null-key edit is
+                    // tolerated but not persisted.
+                    _ => return Ok(Some(Value::Obj(recv))),
+                };
+                let value = match name {
+                    // AOSP EditorImpl treats a null String/Set value as a
+                    // removal marker when the edit is committed.
+                    "putString" => match args.get(1) {
+                        Some(Value::Obj(r)) => {
+                            Some(PrefValue::String(vm.heap.as_str(*r)?.to_string()))
+                        }
+                        _ => None,
+                    },
+                    "putStringSet" => extract_pref_string_set(vm, args.get(1))?,
+                    "putBoolean" => Some(PrefValue::Bool(
+                        args.get(1).map(|v| v.as_int()).transpose()?.unwrap_or(0) != 0,
+                    )),
+                    "putInt" => Some(PrefValue::Int(
+                        args.get(1).map(|v| v.as_int()).transpose()?.unwrap_or(0),
+                    )),
+                    "putLong" => Some(PrefValue::Long(
+                        args.get(1).map(|v| v.as_long()).transpose()?.unwrap_or(0),
+                    )),
+                    "putFloat" => Some(PrefValue::Float(
+                        args.get(1)
+                            .map(|v| v.as_float())
+                            .transpose()?
+                            .unwrap_or(0.0)
+                            .to_bits(),
+                    )),
+                    _ => None,
                 };
                 vm.fw
                     .m8
                     .prefs_editors
                     .entry(recv)
                     .or_default()
-                    .push((key, args.get(1).cloned()));
+                    .push((key, value));
                 Ok(Some(Value::Obj(recv)))
             }
             "remove" => {
@@ -3292,8 +3384,8 @@ fn call_host_instance_rooted(
                 Ok(Some(Value::Obj(recv)))
             }
             "commit" => {
-                apply_prefs_editor(vm, recv)?;
-                Ok(Some(Value::Int(1)))
+                let persisted = apply_prefs_editor(vm, recv)?;
+                Ok(Some(Value::Int(persisted as i32)))
             }
             "apply" => {
                 apply_prefs_editor(vm, recv)?;
@@ -3337,35 +3429,28 @@ fn call_host_instance_rooted(
                 ))?;
                 Ok(Some(Value::Obj(e)))
             }
-            ("getAll", "()Ljava/util/Map;") => Ok(Some(Value::Obj(m8_prefs_get_all(vm)?))),
+            ("getAll", "()Ljava/util/Map;") => Ok(Some(Value::Obj(m8_prefs_get_all(vm, recv)?))),
             ("getString", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;")
             | ("getStringSet", "(Ljava/lang/String;Ljava/util/Set;)Ljava/util/Set;")
             | ("getBoolean", "(Ljava/lang/String;Z)Z")
             | ("getInt", "(Ljava/lang/String;I)I")
             | ("getLong", "(Ljava/lang/String;J)J")
-            | ("getFloat", "(Ljava/lang/String;F)F") => {
-                if let Some(Value::Obj(kr)) = args.first() {
-                    let key = vm.heap.as_str(*kr)?.to_string();
-                    Ok(Some(match vm.fw.m8.prefs.get(&key) {
-                        Some(v) => v.clone(),
-                        None => args.get(1).cloned().unwrap_or(Value::Null),
-                    }))
-                } else {
-                    Err(VmExit::Exception(crate::err::Throwable::new(
-                        "Ljava/lang/NullPointerException;",
-                        format!("SharedPreferences.{name} com key null"),
-                    )))
-                }
-            }
+            | ("getFloat", "(Ljava/lang/String;F)F") => Ok(Some(prefs_get(vm, recv, name, args)?)),
             ("contains", "(Ljava/lang/String;)Z") => {
                 if let Some(Value::Obj(kr)) = args.first() {
                     let key = vm.heap.as_str(*kr)?.to_string();
-                    Ok(Some(Value::Int(vm.fw.m8.prefs.contains_key(&key) as i32)))
+                    let name = prefs_name_for_obj(vm, recv);
+                    ensure_prefs_loaded(vm, &name);
+                    let contains = vm
+                        .fw
+                        .m8
+                        .prefs_stores
+                        .get(&name)
+                        .is_some_and(|store| store.contains_key(&key));
+                    Ok(Some(Value::Int(contains as i32)))
                 } else {
-                    Err(VmExit::Exception(crate::err::Throwable::new(
-                        "Ljava/lang/NullPointerException;",
-                        "SharedPreferences.contains com key null",
-                    )))
+                    // HashMap.containsKey(null) is simply false.
+                    Ok(Some(Value::Int(0)))
                 }
             }
             ("edit", _) => Ok(None),
@@ -3442,11 +3527,26 @@ fn call_host_instance_rooted(
         // aplica SINCRONAMENTE, nunca há fila pendente; resposta honesta é
         // false (AOSP: "nothing was executed"). Nunca NOT_IMPLEMENTED.
         (FRAGMENT_MANAGER, "executePendingTransactions") if sig == "()Z" => Ok(Some(Value::Int(0))),
+        (ACTIVITY, "getPreferences")
+            if sig == "(I)Landroid/content/SharedPreferences;" && is_activity(vm) =>
+        {
+            let name = activity_preference_name(vm, recv);
+            Ok(Some(Value::Obj(vm.shared_prefs_named_obj(&name)?)))
+        }
         (CONTEXT, "getSharedPreferences")
             if sig == "(Ljava/lang/String;I)Landroid/content/SharedPreferences;"
                 && is_activity(vm) =>
         {
-            Ok(Some(Value::Obj(vm.shared_prefs_obj()?)))
+            let name = match args.first() {
+                Some(Value::Obj(r)) => vm.heap.as_str(*r)?.to_string(),
+                _ => {
+                    return Err(VmExit::Exception(crate::err::Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "getSharedPreferences name null",
+                    )))
+                }
+            };
+            Ok(Some(Value::Obj(vm.shared_prefs_named_obj(&name)?)))
         }
         (ACTIVITY, "getPackageName") | (CONTEXT, "getPackageName") if is_activity(vm) => {
             let s = vm.fw.package_name.clone();
@@ -4206,13 +4306,7 @@ fn call_host_instance_rooted(
             Ok(Some(Value::Int(valid as i32)))
         }
         (VIEWGROUP, "addView") | (LINEARLAYOUT, "addView") | (FRAMELAYOUT, "addView") => {
-            let Some(Value::Obj(child)) = args.first() else {
-                return Err(crate::err::vm_error("INVALID_FORMAT", "addView sem view").into());
-            };
-            if let Some(params) = explicit_layout_params(vm, args) {
-                crate::err::put_field_result(vm.heap.put_field(*child, "mLayoutParams", params))?;
-            }
-            add_child(vm, recv, *child)?;
+            host_add_view(vm, recv, sig, args, false)?;
             Ok(Some(Value::Null))
         }
         (VIEWGROUP, "getChildCount")
@@ -4266,7 +4360,7 @@ fn call_host_instance_rooted(
                             .unwrap_or(0)
                             .max(0) as usize;
                         let st = st.min(children.len());
-                        let en = (st + n).min(children.len());
+                        let en = st.saturating_add(n).min(children.len());
                         children.drain(st..en).collect()
                     }
                     "removeView" | "removeViewInLayout" => {
@@ -4475,21 +4569,239 @@ fn call_host_instance_rooted(
 
 // ── helpers da dispatch ──────────────────────────────────────────────────────
 
-/// M8 full: applies an Editor synchronously, then notifies each registered
-/// SharedPreferences listener once per key whose final value actually changed.
-fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) -> Result<(), VmExit> {
-    let mut changed_keys = Vec::new();
-    if vm.fw.m8.prefs_clear.remove(&editor).unwrap_or(false) {
-        let mut removed: Vec<String> = vm.fw.m8.prefs.keys().cloned().collect();
-        removed.sort(); // deterministic callback order for clear()
-        for key in removed {
-            vm.fw.m8.prefs.remove(&key);
-            changed_keys.push(key);
+fn prefs_default_name(vm: &Engine) -> String {
+    crate::prefs::default_name(&vm.fw.package_name)
+}
+
+fn activity_preference_name(vm: &Engine, activity: ObjRef) -> String {
+    let class = vm.heap.class_of(activity).unwrap_or(ACTIVITY);
+    let binary = class
+        .trim_start_matches('L')
+        .trim_end_matches(';')
+        .replace('/', ".");
+    let package = vm.fw.package_name.as_str();
+    if !package.is_empty() {
+        if let Some(local) = binary
+            .strip_prefix(package)
+            .and_then(|rest| rest.strip_prefix('.'))
+        {
+            return local.to_string();
         }
+    }
+    binary
+}
+
+fn ensure_prefs_loaded(vm: &mut Engine, name: &str) {
+    if vm.fw.m8.prefs_loaded.contains(name) {
+        return;
+    }
+    let path = crate::prefs::path(&vm.fw.package_name, name);
+    let store = crate::jfile::read_bytes(&path)
+        .and_then(|bytes| crate::prefs::parse(&bytes))
+        .unwrap_or_default();
+    vm.fw.m8.prefs_stores.insert(name.to_string(), store);
+    vm.fw.m8.prefs_loaded.insert(name.to_string());
+}
+
+fn prefs_name_for_obj(vm: &mut Engine, prefs: ObjRef) -> String {
+    if let Some(name) = vm.fw.m8.prefs_name_by_obj.get(&prefs) {
+        return name.clone();
+    }
+    // A manually allocated legacy SharedPreferencesImpl has no recorded file;
+    // bind it to the default store instead of inventing a second global map.
+    let name = prefs_default_name(vm);
+    vm.fw.m8.prefs_name_by_obj.insert(prefs, name.clone());
+    vm.fw.m8.prefs_objs.entry(name.clone()).or_insert(prefs);
+    name
+}
+
+fn persist_prefs(vm: &Engine, name: &str) -> bool {
+    let bytes = vm
+        .fw
+        .m8
+        .prefs_stores
+        .get(name)
+        .map(crate::prefs::serialize)
+        .unwrap_or_else(|| crate::prefs::serialize(&Default::default()));
+    crate::jfile::write_bytes(&crate::prefs::path(&vm.fw.package_name, name), bytes);
+    true
+}
+
+fn pref_wrong_type(key: &str, expected: &str, actual: &PrefValue) -> VmExit {
+    VmExit::Exception(crate::err::Throwable::new(
+        "Ljava/lang/ClassCastException;",
+        format!(
+            "Key {key} expected {expected} but value was {}",
+            actual.type_name()
+        ),
+    ))
+}
+
+fn pref_string_set_obj(
+    vm: &mut Engine,
+    values: &std::collections::BTreeSet<Option<String>>,
+) -> Result<ObjRef, VmExit> {
+    let set = vm
+        .heap
+        .alloc_instance("Ljava/util/HashSet;".to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    let mut elems = Vec::with_capacity(values.len());
+    for value in values {
+        elems.push(match value {
+            Some(text) => Value::Obj(intrinsics::alloc_string(vm, text.clone())?),
+            None => Value::Null,
+        });
+    }
+    vm.fw.objects.insert(set, HostObj::List { elems });
+    Ok(set)
+}
+
+fn pref_materialize(vm: &mut Engine, value: &PrefValue) -> Result<Value, VmExit> {
+    Ok(match value {
+        PrefValue::String(text) => Value::Obj(intrinsics::alloc_string(vm, text.clone())?),
+        PrefValue::Int(value) => Value::Obj(crate::boxes::box_value(
+            vm,
+            "Ljava/lang/Integer;",
+            Value::Int(*value),
+        )?),
+        PrefValue::Long(value) => Value::Obj(crate::boxes::box_value(
+            vm,
+            "Ljava/lang/Long;",
+            Value::Long(*value),
+        )?),
+        PrefValue::Float(bits) => Value::Obj(crate::boxes::box_value(
+            vm,
+            "Ljava/lang/Float;",
+            Value::Float(f32::from_bits(*bits)),
+        )?),
+        PrefValue::Bool(value) => Value::Obj(crate::boxes::boolean_obj(vm, *value)?),
+        PrefValue::StringSet(values) => Value::Obj(pref_string_set_obj(vm, values)?),
+    })
+}
+
+fn extract_pref_string_set(
+    vm: &mut Engine,
+    value: Option<&Value>,
+) -> Result<Option<PrefValue>, VmExit> {
+    let Some(Value::Obj(set)) = value else {
+        return Ok(None);
+    };
+    let set = *set;
+    let mut raw_values = match vm.fw.objects.get(&set) {
+        Some(HostObj::List { elems }) | Some(HostObj::Iter { elems, .. }) => Some(elems.clone()),
+        _ => None,
+    };
+    if raw_values.is_none() {
+        let iterator = vm.invoke_instance(set, "iterator", "()Ljava/util/Iterator;", &[])?;
+        let Value::Obj(iterator) = iterator else {
+            return Err(crate::err::vm_error(
+                "VM_TYPE_ERROR",
+                "SharedPreferences.putStringSet value has no Iterator",
+            )
+            .into());
+        };
+        let mut values = Vec::new();
+        loop {
+            let has_next = vm.invoke_instance(iterator, "hasNext", "()Z", &[])?;
+            if has_next.as_int()? == 0 {
+                break;
+            }
+            if values.len() >= 1_000_000 {
+                return Err(crate::err::vm_error(
+                    "VM_LIMIT",
+                    "SharedPreferences StringSet exceeds 1000000 values",
+                )
+                .into());
+            }
+            values.push(vm.invoke_instance(iterator, "next", "()Ljava/lang/Object;", &[])?);
+        }
+        raw_values = Some(values);
+    }
+    let mut strings = std::collections::BTreeSet::new();
+    for value in raw_values.unwrap_or_default() {
+        match value {
+            Value::Null => {
+                strings.insert(None);
+            }
+            Value::Obj(text) => {
+                strings.insert(Some(vm.heap.as_str(text)?.to_string()));
+            }
+            _ => {
+                return Err(VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/ClassCastException;",
+                    "SharedPreferences StringSet element is not a String",
+                )))
+            }
+        }
+    }
+    Ok(Some(PrefValue::StringSet(strings)))
+}
+
+fn prefs_get(
+    vm: &mut Engine,
+    prefs: ObjRef,
+    method: &str,
+    args: &[Value],
+) -> Result<Value, VmExit> {
+    let Some(Value::Obj(key_ref)) = args.first() else {
+        // SharedPreferencesImpl looks null keys up in a HashMap: a
+        // miss yields the caller's default, never an NPE.
+        return Ok(args.get(1).cloned().unwrap_or(Value::Null));
+    };
+    let key = vm.heap.as_str(*key_ref)?.to_string();
+    let name = prefs_name_for_obj(vm, prefs);
+    ensure_prefs_loaded(vm, &name);
+    let stored = vm
+        .fw
+        .m8
+        .prefs_stores
+        .get(&name)
+        .and_then(|store| store.get(&key).cloned());
+    let Some(stored) = stored else {
+        return Ok(args.get(1).cloned().unwrap_or(Value::Null));
+    };
+    match (method, stored) {
+        ("getString", PrefValue::String(text)) => {
+            Ok(Value::Obj(intrinsics::alloc_string(vm, text)?))
+        }
+        ("getString", other) => Err(pref_wrong_type(&key, "String", &other)),
+        ("getStringSet", PrefValue::StringSet(values)) => {
+            Ok(Value::Obj(pref_string_set_obj(vm, &values)?))
+        }
+        ("getStringSet", other) => Err(pref_wrong_type(&key, "Set<String>", &other)),
+        ("getBoolean", PrefValue::Bool(value)) => Ok(Value::Int(value as i32)),
+        ("getBoolean", other) => Err(pref_wrong_type(&key, "Boolean", &other)),
+        ("getInt", PrefValue::Int(value)) => Ok(Value::Int(value)),
+        ("getInt", other) => Err(pref_wrong_type(&key, "Integer", &other)),
+        ("getLong", PrefValue::Long(value)) => Ok(Value::Long(value)),
+        ("getLong", other) => Err(pref_wrong_type(&key, "Long", &other)),
+        ("getFloat", PrefValue::Float(bits)) => Ok(Value::Float(f32::from_bits(bits))),
+        ("getFloat", other) => Err(pref_wrong_type(&key, "Float", &other)),
+        _ => Ok(args.get(1).cloned().unwrap_or(Value::Null)),
+    }
+}
+
+/// Applies an Editor to its named store, notifies each registered listener
+/// once per changed key, and persists the resulting XML. The return value is
+/// the disk-write result used by `Editor.commit`; `apply` intentionally
+/// ignores it while still performing the deterministic synchronous write.
+fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) -> Result<bool, VmExit> {
+    let prefs = match vm.heap.get_field(editor, "mSharedPreferences") {
+        Ok(Value::Obj(prefs)) => prefs,
+        _ => vm.shared_prefs_obj()?,
+    };
+    let name = prefs_name_for_obj(vm, prefs);
+    ensure_prefs_loaded(vm, &name);
+
+    let mut changed_keys = Vec::new();
+    let keys_cleared = vm.fw.m8.prefs_clear.remove(&editor).unwrap_or(false);
+    if keys_cleared {
+        let store = vm.fw.m8.prefs_stores.entry(name.clone()).or_default();
+        store.clear();
     }
     if let Some(edits) = vm.fw.m8.prefs_editors.remove(&editor) {
         // Editor.putX/remove are last-write-wins per key before commit/apply.
-        let mut final_edits: Vec<(String, Option<Value>)> = Vec::new();
+        let mut final_edits: Vec<(String, Option<PrefValue>)> = Vec::new();
         for (key, value) in edits {
             if let Some((_, previous)) = final_edits.iter_mut().find(|(k, _)| *k == key) {
                 *previous = value;
@@ -4497,21 +4809,19 @@ fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) -> Result<(), VmExit> {
                 final_edits.push((key, value));
             }
         }
+        let store = vm.fw.m8.prefs_stores.entry(name.clone()).or_default();
         for (key, value) in final_edits {
             let changed = match value.as_ref() {
-                Some(next) => match vm.fw.m8.prefs.get(&key) {
-                    Some(current) => !crate::intrinsics::values_equal(&vm.heap, current, next)?,
-                    None => true,
-                },
-                None => vm.fw.m8.prefs.contains_key(&key),
+                Some(next) => store.get(&key) != Some(next),
+                None => store.contains_key(&key),
             };
             if changed {
                 match value {
                     Some(value) => {
-                        vm.fw.m8.prefs.insert(key.clone(), value);
+                        store.insert(key.clone(), value);
                     }
                     None => {
-                        vm.fw.m8.prefs.remove(&key);
+                        store.remove(&key);
                     }
                 }
                 if !changed_keys.contains(&key) {
@@ -4521,10 +4831,6 @@ fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) -> Result<(), VmExit> {
         }
     }
 
-    let prefs = match vm.heap.get_field(editor, "mSharedPreferences") {
-        Ok(Value::Obj(prefs)) => prefs,
-        _ => vm.shared_prefs_obj()?,
-    };
     let listeners = vm
         .fw
         .m8
@@ -4532,6 +4838,18 @@ fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) -> Result<(), VmExit> {
         .get(&prefs)
         .cloned()
         .unwrap_or_default();
+    // Since targetSdk R, a clear() reports one null-key callback
+    // instead of one per cleared entry.
+    if keys_cleared {
+        for listener in &listeners {
+            vm.invoke_instance(
+                *listener,
+                "onSharedPreferenceChanged",
+                "(Landroid/content/SharedPreferences;Ljava/lang/String;)V",
+                &[Value::Obj(prefs), Value::Null],
+            )?;
+        }
+    }
     for key in changed_keys {
         let key_ref = intrinsics::alloc_string(vm, key)?;
         for listener in &listeners {
@@ -4543,28 +4861,37 @@ fn apply_prefs_editor(vm: &mut Engine, editor: ObjRef) -> Result<(), VmExit> {
             )?;
         }
     }
-    Ok(())
+    Ok(persist_prefs(vm, &name))
 }
 
-/// M8 full: `getAll()` — HashMap host com chaves String reais alocadas.
-fn m8_prefs_get_all(vm: &mut Engine) -> Result<ObjRef, VmExit> {
-    let r = vm
-        .heap
-        .alloc_instance("Ljava/util/HashMap;".to_string(), Vec::new())?;
-    let mut entries = Vec::new();
-    let keys: Vec<(String, Value)> = vm
+/// `getAll()` for one named store — a fresh HashMap with boxed values and a
+/// copy of each string set, matching the guest-visible value types.
+fn m8_prefs_get_all(vm: &mut Engine, prefs: ObjRef) -> Result<ObjRef, VmExit> {
+    let name = prefs_name_for_obj(vm, prefs);
+    ensure_prefs_loaded(vm, &name);
+    let values: Vec<(String, PrefValue)> = vm
         .fw
         .m8
-        .prefs
-        .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect();
-    for (k, v) in keys {
-        let ks = intrinsics::alloc_string(vm, k)?;
-        entries.push((Value::Obj(ks), v));
+        .prefs_stores
+        .get(&name)
+        .map(|store| {
+            store
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let map = vm
+        .heap
+        .alloc_instance("Ljava/util/HashMap;".to_string(), Vec::new())
+        .map_err(crate::err::oom_throwable)?;
+    let mut entries = Vec::with_capacity(values.len());
+    for (key, value) in values {
+        let key = intrinsics::alloc_string(vm, key)?;
+        entries.push((Value::Obj(key), pref_materialize(vm, &value)?));
     }
-    vm.fw.objects.insert(r, HostObj::Map { entries });
-    Ok(r)
+    vm.fw.objects.insert(map, HostObj::Map { entries });
+    Ok(map)
 }
 
 fn not_impl(what: &str) -> VmExit {
@@ -4631,12 +4958,87 @@ pub fn attach_child_public(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Re
 }
 
 pub(crate) fn attach_child(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Result<(), VmExit> {
+    attach_child_at(vm, parent, child, -1)
+}
+
+fn validate_can_attach_child(
+    vm: &Engine,
+    parent: ObjRef,
+    child: ObjRef,
+    index: i32,
+) -> Result<usize, VmExit> {
+    let parent_len = match vm.fw.get(parent) {
+        Some(HostObj::View { children, .. }) => children.len(),
+        _ => return Err(crate::err::vm_error("INVALID_FORMAT", "addView em não-ViewGroup").into()),
+    };
+    let existing_parent = match vm.fw.get(child) {
+        Some(HostObj::View { parent: p, .. }) => *p,
+        _ => {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/IllegalArgumentException;",
+                "Cannot add a non-View child to a ViewGroup",
+            )));
+        }
+    };
+    if let Some(ep) = existing_parent {
+        let live_in_parent = matches!(
+            vm.fw.get(ep),
+            Some(HostObj::View { children, .. }) if children.contains(&child)
+        );
+        if live_in_parent {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/IllegalStateException;",
+                "The specified child already has a parent. You must call removeView() on the child's parent first.",
+            )));
+        }
+    }
+    // Reject self-cycles (`vg.addView(vg)`) and multi-node ancestor cycles
+    // (`a.addView(b); b.addView(a);`), bounded by `MAX_VIEW_DEPTH`.
+    let mut cur = Some(parent);
+    let mut steps = 0usize;
+    while let Some(anc) = cur {
+        if anc == child {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/IllegalArgumentException;",
+                "Cannot add a view as a descendant of itself",
+            )));
+        }
+        if steps >= MAX_VIEW_DEPTH {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/IllegalStateException;",
+                "View hierarchy depth limit exceeded",
+            )));
+        }
+        steps += 1;
+        cur = match vm.fw.get(anc) {
+            Some(HostObj::View { parent: p, .. }) => *p,
+            _ => None,
+        };
+    }
+    if index == -1 {
+        Ok(parent_len)
+    } else if index >= 0 && (index as usize) <= parent_len {
+        Ok(index as usize)
+    } else {
+        Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/IndexOutOfBoundsException;",
+            format!("index={index} count={parent_len}"),
+        )))
+    }
+}
+
+pub(crate) fn attach_child_at(
+    vm: &mut Engine,
+    parent: ObjRef,
+    child: ObjRef,
+    index: i32,
+) -> Result<(), VmExit> {
+    let pos = validate_can_attach_child(vm, parent, child, index)?;
     if let Some(HostObj::View { parent: p, .. }) = vm.fw.objects.get_mut(&child) {
         *p = Some(parent);
     }
-    match vm.fw.objects.get_mut(&parent) {
-        Some(HostObj::View { children, .. }) => children.push(child),
-        _ => return Err(crate::err::vm_error("INVALID_FORMAT", "addView em não-ViewGroup").into()),
+    if let Some(HostObj::View { children, .. }) = vm.fw.objects.get_mut(&parent) {
+        children.insert(pos, child);
     }
     // inserted under an attached parent → attached now (ViewGroup.addViewInner)
     crate::view_attach::on_child_added(vm, parent, child)
@@ -4678,17 +5080,83 @@ fn explicit_layout_params(vm: &Engine, args: &[Value]) -> Option<Value> {
     })
 }
 
-pub(crate) fn add_child(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Result<(), VmExit> {
-    ensure_child_layout_params(vm, parent, child)?;
-    attach_child(vm, parent, child)?;
-    // re-layout do container na sua posição corrente — addView PROGRAMÁTICO
-    // (pós-setContentView): O(N) por chamada, não cumulativo (issue #45)
-    let (px, py, pw) = match vm.fw.get(parent) {
-        Some(HostObj::View { x, y, w, .. }) => (*x, *y, if *w == 0 { WINDOW_W } else { *w }),
-        _ => (0, 0, WINDOW_W),
+pub(crate) fn host_add_view(
+    vm: &mut Engine,
+    parent: ObjRef,
+    sig: &str,
+    args: &[Value],
+    prevent_request_layout: bool,
+) -> Result<(), VmExit> {
+    let child = match args.first() {
+        Some(Value::Obj(c)) => *c,
+        None | Some(Value::Null) | Some(Value::Int(0)) => {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/IllegalArgumentException;",
+                "Cannot add a null child view to a ViewGroup",
+            )));
+        }
+        _ => {
+            return Err(VmExit::Exception(Throwable::new(
+                "Ljava/lang/IllegalArgumentException;",
+                "Cannot add a non-View child to a ViewGroup",
+            )));
+        }
     };
-    vm.layout(parent, px, py, pw);
+    let (index, explicit_params) = match sig {
+        "(Landroid/view/View;)V" => (-1, None),
+        "(Landroid/view/View;I)V" => {
+            let idx = args.get(1).map_or(Ok(-1), |v| v.as_int())?;
+            (idx, None)
+        }
+        "(Landroid/view/View;II)V" => {
+            let w = args.get(1).map_or(Ok(-2), |v| v.as_int())?;
+            let h = args.get(2).map_or(Ok(-2), |v| v.as_int())?;
+            let lp = vm
+                .heap
+                .alloc_instance("Landroid/view/ViewGroup$LayoutParams;".into(), Vec::new())
+                .map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(lp, "width", Value::Int(w)))?;
+            crate::err::put_field_result(vm.heap.put_field(lp, "height", Value::Int(h)))?;
+            (-1, Some(Value::Obj(lp)))
+        }
+        "(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V" => {
+            (-1, explicit_layout_params(vm, args))
+        }
+        "(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)V"
+        | "(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)Z"
+        | "(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;Z)Z" => {
+            let idx = args.get(1).map_or(Ok(-1), |v| v.as_int())?;
+            (idx, explicit_layout_params(vm, args))
+        }
+        _ => (-1, explicit_layout_params(vm, args)),
+    };
+    // Validate tree invariants & insertion index BEFORE mutating child fields.
+    let _ = validate_can_attach_child(vm, parent, child, index)?;
+    if let Some(params) = explicit_params {
+        crate::err::put_field_result(vm.heap.put_field(child, "mLayoutParams", params))?;
+    } else {
+        ensure_child_layout_params(vm, parent, child)?;
+    }
+    attach_child_at(vm, parent, child, index)?;
+    if !prevent_request_layout {
+        let (px, py, pw) = match vm.fw.get(parent) {
+            Some(HostObj::View { x, y, w, .. }) => (*x, *y, if *w == 0 { WINDOW_W } else { *w }),
+            _ => (0, 0, WINDOW_W),
+        };
+        vm.layout(parent, px, py, pw);
+    }
     Ok(())
+}
+
+#[allow(dead_code)]
+pub(crate) fn add_child(vm: &mut Engine, parent: ObjRef, child: ObjRef) -> Result<(), VmExit> {
+    host_add_view(
+        vm,
+        parent,
+        "(Landroid/view/View;)V",
+        &[Value::Obj(child)],
+        false,
+    )
 }
 
 fn enqueue(vm: &mut Engine, handler: ObjRef, runnable: ObjRef, when_ms: u64) -> Result<(), VmExit> {

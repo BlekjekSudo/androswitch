@@ -66,6 +66,13 @@ pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
     STATES.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
+/// Issue #230: esvazia a tabela na fronteira de `Engine` — sem isso um
+/// `Engine` novo na mesma thread herda estados indexados por `ObjRef`s
+/// de um heap morto (os refs reiniciam a cada `Heap::new`).
+pub(crate) fn reset_all() {
+    STATES.with(|m| m.borrow_mut().clear());
+}
+
 pub(crate) fn is_spannable(class: &str) -> bool {
     class == SS || class == SSB
 }

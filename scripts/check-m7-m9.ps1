@@ -30,6 +30,8 @@ try{
     @{id='shared-boxes-fixture';script='crates/rd-vm/tests/fixtures/portable-boxes/build.ps1'},
     @{id='portable-shared-boxes';args=@('test','-p','as-switch-smoke','--features','host-cli,portable-tests','--test','shared_boxes','--locked','--','--test-threads=1')},
     @{id='desktop-shared-boxes';args=@('test','-p','rd-vm','--test','shared_boxes','--locked','--','--test-threads=1')},
+    @{id='portable-upstream-bitset';args=@('test','-p','as-switch-smoke','--features','portable-tests','--test','upstream_bitset','--locked')},
+    @{id='portable-upstream-narrow-arrays';args=@('test','-p','as-switch-smoke','--features','portable-tests','--test','upstream_narrow_arrays','--locked')},
     @{id='portable-shared-android-log';args=@('test','-p','as-switch-smoke','--features','host-cli,portable-tests','--test','shared_android_log','--locked','--','--test-threads=1')},
     @{id='desktop-shared-android-log';args=@('test','-p','rd-vm','--test','shared_android_log','--locked','--','--test-threads=1')},
     @{id='monitor-fixture';script='crates/rd-vm/tests/fixtures/portable-monitor/build.ps1'},

@@ -154,6 +154,162 @@ fn m8_sqlite_crud_cursor() {
     );
 }
 
+fn sqlite_open_helper(e: &mut Engine, name: &str) -> u32 {
+    let helper = obj(e, SQLITE_HELPER);
+    let dbname = s(e, name);
+    call_m8_instance(
+        e,
+        SQLITE_HELPER,
+        "<init>",
+        "(Landroid/content/Context;Ljava/lang/String;Landroid/database/sqlite/SQLiteDatabase$CursorFactory;I)V",
+        helper,
+        &[Value::Null, dbname, Value::Null, Value::Int(1)],
+    )
+    .unwrap();
+    match call_m8_instance(
+        e,
+        SQLITE_HELPER,
+        "getWritableDatabase",
+        "()Landroid/database/sqlite/SQLiteDatabase;",
+        helper,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(db)) => db,
+        other => panic!("db: {other:?}"),
+    }
+}
+
+fn sqlite_exec(e: &mut Engine, db: u32, sql: &str) {
+    let sql = s(e, sql);
+    call_m8_instance(e, SQLITE_DB, "execSQL", "(Ljava/lang/String;)V", db, &[sql]).unwrap();
+}
+
+fn sqlite_first_string(e: &mut Engine, db: u32, sql: &str) -> String {
+    let q = s(e, sql);
+    let cur = match call_m8_instance(
+        e,
+        SQLITE_DB,
+        "rawQuery",
+        "(Ljava/lang/String;[Ljava/lang/String;)Landroid/database/Cursor;",
+        db,
+        &[q, Value::Null],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(c)) => c,
+        other => panic!("cursor: {other:?}"),
+    };
+    assert_eq!(
+        call_m8_instance(e, CURSOR, "moveToNext", "()Z", cur, &[]).unwrap(),
+        Some(Value::Int(1))
+    );
+    match call_m8_instance(
+        e,
+        CURSOR,
+        "getString",
+        "(I)Ljava/lang/String;",
+        cur,
+        &[Value::Int(0)],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(r)) => e.heap.as_str(r).unwrap().to_string(),
+        other => panic!("getString: {other:?}"),
+    }
+}
+
+/// Literal Appendix C Round 1: a named SQLite database is serialized to the
+/// app-private VFS image and reopened by a fresh Engine (the cross-launch
+/// boundary), instead of living only in the first Engine's backend process.
+#[test]
+fn sqlite_named_database_persists_across_engine_launches() {
+    let dbname = format!(
+        "persist-{}-{}.db",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    );
+    {
+        let mut e = engine();
+        let db = sqlite_open_helper(&mut e, &dbname);
+        sqlite_exec(
+            &mut e,
+            db,
+            "CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT)",
+        );
+        sqlite_exec(
+            &mut e,
+            db,
+            "INSERT INTO notes(id, title) VALUES (7, 'persisted')",
+        );
+        call_m8_instance(&mut e, SQLITE_DB, "close", "()V", db, &[]).unwrap();
+    }
+    {
+        let mut e = engine();
+        let db = sqlite_open_helper(&mut e, &dbname);
+        assert_eq!(
+            sqlite_first_string(&mut e, db, "SELECT title FROM notes WHERE id = 7"),
+            "persisted"
+        );
+        sqlite_exec(
+            &mut e,
+            db,
+            "INSERT INTO notes(id, title) VALUES (8, 'again')",
+        );
+    }
+    {
+        let mut e = engine();
+        let db = sqlite_open_helper(&mut e, &dbname);
+        assert_eq!(
+            sqlite_first_string(&mut e, db, "SELECT CAST(count(*) AS TEXT) FROM notes"),
+            "2"
+        );
+        // Context.deleteDatabase must close/forget the open backend handle as
+        // well as remove the VFS image; otherwise the next mutation would
+        // resurrect the deleted database.
+        if e.fw.package_name.is_empty() {
+            e.fw.package_name = "app".into();
+        }
+        let ctx = obj(&mut e, "Landroid/content/Context;");
+        let name = s(&mut e, &dbname);
+        assert_eq!(
+            rd_vm::intrinsics::call_instance_intrinsic(
+                &mut e,
+                "Landroid/content/Context;",
+                "deleteDatabase",
+                "(Ljava/lang/String;)Z",
+                ctx,
+                &[name],
+            )
+            .unwrap(),
+            Some(Value::Int(1))
+        );
+    }
+    {
+        let mut e = engine();
+        let db = sqlite_open_helper(&mut e, &dbname);
+        // Succeeds only if the deleted image was not resurrected.
+        sqlite_exec(
+            &mut e,
+            db,
+            "CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT)",
+        );
+        sqlite_exec(
+            &mut e,
+            db,
+            "INSERT INTO notes(id, title) VALUES (1, 'fresh')",
+        );
+        assert_eq!(
+            sqlite_first_string(&mut e, db, "SELECT title FROM notes WHERE id = 1"),
+            "fresh"
+        );
+    }
+}
+
 // ── OkHttp: canned response determinística + request registrada ─────────
 #[test]
 fn m8_okhttp_execute_and_enqueue() {
@@ -857,6 +1013,330 @@ fn m8_shared_preferences_change_listener_notifies_only_changed_keys() {
     );
 }
 
+fn named_prefs(e: &mut Engine, name: &str) -> u32 {
+    let context = obj(e, "Landroid/app/Activity;");
+    let name = s(e, name);
+    match rd_vm::framework::call_host_instance(
+        e,
+        "Landroid/content/Context;",
+        "getSharedPreferences",
+        "(Ljava/lang/String;I)Landroid/content/SharedPreferences;",
+        context,
+        &[name, Value::Int(0)],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(prefs)) => prefs,
+        other => panic!("getSharedPreferences: {other:?}"),
+    }
+}
+
+fn prefs_editor(e: &mut Engine, prefs: u32) -> u32 {
+    match rd_vm::framework::call_host_instance(
+        e,
+        "Landroid/content/SharedPreferences;",
+        "edit",
+        "()Landroid/content/SharedPreferences$Editor;",
+        prefs,
+        &[],
+    )
+    .unwrap()
+    {
+        Some(Value::Obj(editor)) => editor,
+        other => panic!("edit: {other:?}"),
+    }
+}
+
+fn prefs_put(e: &mut Engine, editor: u32, method: &str, sig: &str, key: &str, value: Value) {
+    let key = s(e, key);
+    rd_vm::framework::call_host_instance(
+        e,
+        "Landroid/content/SharedPreferences$Editor;",
+        method,
+        sig,
+        editor,
+        &[key, value],
+    )
+    .unwrap();
+}
+
+fn prefs_commit(e: &mut Engine, editor: u32) {
+    assert_eq!(
+        rd_vm::framework::call_host_instance(
+            e,
+            "Landroid/content/SharedPreferences$Editor;",
+            "commit",
+            "()Z",
+            editor,
+            &[],
+        )
+        .unwrap(),
+        Some(Value::Int(1))
+    );
+}
+
+fn prefs_get(
+    e: &mut Engine,
+    prefs: u32,
+    method: &str,
+    sig: &str,
+    key: &str,
+    default: Value,
+) -> Value {
+    let key = s(e, key);
+    rd_vm::framework::call_host_instance(
+        e,
+        "Landroid/content/SharedPreferences;",
+        method,
+        sig,
+        prefs,
+        &[key, default],
+    )
+    .unwrap()
+    .unwrap()
+}
+
+fn prefs_get_string(e: &mut Engine, prefs: u32, key: &str) -> String {
+    let default = s(e, "<missing>");
+    match prefs_get(
+        e,
+        prefs,
+        "getString",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        key,
+        default,
+    ) {
+        Value::Obj(text) => e.heap.as_str(text).unwrap().to_string(),
+        other => panic!("getString({key}): {other:?}"),
+    }
+}
+
+#[test]
+fn shared_preferences_named_stores_persist_across_engine_launches() {
+    const MAIN: &str = "literal-round3-main";
+    const OTHER: &str = "literal-round3-other";
+
+    {
+        let mut e = engine();
+        let main = named_prefs(&mut e, MAIN);
+        assert_eq!(named_prefs(&mut e, MAIN), main);
+        let other = named_prefs(&mut e, OTHER);
+        assert_ne!(other, main);
+
+        let editor = prefs_editor(&mut e, main);
+        let user = s(&mut e, "Ana & João");
+        prefs_put(
+            &mut e,
+            editor,
+            "putString",
+            "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;",
+            "user",
+            user,
+        );
+        prefs_put(
+            &mut e,
+            editor,
+            "putInt",
+            "(Ljava/lang/String;I)Landroid/content/SharedPreferences$Editor;",
+            "count",
+            Value::Int(7),
+        );
+        prefs_put(
+            &mut e,
+            editor,
+            "putLong",
+            "(Ljava/lang/String;J)Landroid/content/SharedPreferences$Editor;",
+            "stamp",
+            Value::Long(9_000_000_001),
+        );
+        prefs_put(
+            &mut e,
+            editor,
+            "putFloat",
+            "(Ljava/lang/String;F)Landroid/content/SharedPreferences$Editor;",
+            "ratio",
+            Value::Float(2.5),
+        );
+        prefs_put(
+            &mut e,
+            editor,
+            "putBoolean",
+            "(Ljava/lang/String;Z)Landroid/content/SharedPreferences$Editor;",
+            "enabled",
+            Value::Int(1),
+        );
+        let tags = obj(&mut e, "Ljava/util/HashSet;");
+        let z = s(&mut e, "z");
+        let a = s(&mut e, "a&b");
+        e.fw.objects
+            .insert(tags, rd_vm::framework::HostObj::List { elems: vec![z, a] });
+        prefs_put(
+            &mut e,
+            editor,
+            "putStringSet",
+            "(Ljava/lang/String;Ljava/util/Set;)Landroid/content/SharedPreferences$Editor;",
+            "tags",
+            Value::Obj(tags),
+        );
+        prefs_commit(&mut e, editor);
+
+        let editor = prefs_editor(&mut e, other);
+        let user = s(&mut e, "other-user");
+        prefs_put(
+            &mut e,
+            editor,
+            "putString",
+            "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;",
+            "user",
+            user,
+        );
+        prefs_commit(&mut e, editor);
+    }
+
+    {
+        let mut e = engine();
+        let main = named_prefs(&mut e, MAIN);
+        let other = named_prefs(&mut e, OTHER);
+        assert_eq!(prefs_get_string(&mut e, main, "user"), "Ana & João");
+        assert_eq!(prefs_get_string(&mut e, other, "user"), "other-user");
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                main,
+                "getInt",
+                "(Ljava/lang/String;I)I",
+                "count",
+                Value::Int(-1),
+            ),
+            Value::Int(7)
+        );
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                main,
+                "getLong",
+                "(Ljava/lang/String;J)J",
+                "stamp",
+                Value::Long(-1),
+            ),
+            Value::Long(9_000_000_001)
+        );
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                main,
+                "getFloat",
+                "(Ljava/lang/String;F)F",
+                "ratio",
+                Value::Float(-1.0),
+            ),
+            Value::Float(2.5)
+        );
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                main,
+                "getBoolean",
+                "(Ljava/lang/String;Z)Z",
+                "enabled",
+                Value::Int(0),
+            ),
+            Value::Int(1)
+        );
+        let tags = prefs_get(
+            &mut e,
+            main,
+            "getStringSet",
+            "(Ljava/lang/String;Ljava/util/Set;)Ljava/util/Set;",
+            "tags",
+            Value::Null,
+        );
+        let Value::Obj(tags) = tags else {
+            panic!("getStringSet: {tags:?}");
+        };
+        let Some(rd_vm::framework::HostObj::List { elems }) = e.fw.objects.get(&tags) else {
+            panic!("string set has no host elements");
+        };
+        let mut strings = elems
+            .iter()
+            .map(|value| match value {
+                Value::Obj(text) => e.heap.as_str(*text).unwrap().to_string(),
+                other => panic!("string set element: {other:?}"),
+            })
+            .collect::<Vec<_>>();
+        strings.sort();
+        assert_eq!(strings, ["a&b", "z"]);
+
+        // Named stores are isolated, and typed getters reject wrong types.
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                other,
+                "getInt",
+                "(Ljava/lang/String;I)I",
+                "count",
+                Value::Int(-1),
+            ),
+            Value::Int(-1)
+        );
+        let count = s(&mut e, "count");
+        let default = s(&mut e, "wrong");
+        assert!(rd_vm::framework::call_host_instance(
+            &mut e,
+            "Landroid/content/SharedPreferences;",
+            "getString",
+            "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+            main,
+            &[count, default],
+        )
+        .is_err());
+
+        let editor = prefs_editor(&mut e, main);
+        let user = s(&mut e, "user");
+        rd_vm::framework::call_host_instance(
+            &mut e,
+            "Landroid/content/SharedPreferences$Editor;",
+            "remove",
+            "(Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;",
+            editor,
+            &[user],
+        )
+        .unwrap();
+        prefs_commit(&mut e, editor);
+
+        let editor = prefs_editor(&mut e, other);
+        rd_vm::framework::call_host_instance(
+            &mut e,
+            "Landroid/content/SharedPreferences$Editor;",
+            "clear",
+            "()Landroid/content/SharedPreferences$Editor;",
+            editor,
+            &[],
+        )
+        .unwrap();
+        prefs_commit(&mut e, editor);
+    }
+
+    {
+        let mut e = engine();
+        let main = named_prefs(&mut e, MAIN);
+        let other = named_prefs(&mut e, OTHER);
+        assert_eq!(prefs_get_string(&mut e, main, "user"), "<missing>");
+        assert_eq!(prefs_get_string(&mut e, other, "user"), "<missing>");
+        assert_eq!(
+            prefs_get(
+                &mut e,
+                main,
+                "getInt",
+                "(Ljava/lang/String;I)I",
+                "count",
+                Value::Int(-1),
+            ),
+            Value::Int(7)
+        );
+    }
+}
+
 // ── Room builder over SQLite host ────────────────────────────────────────
 #[test]
 fn m8_room_builder_builds_database() {
@@ -1083,4 +1563,123 @@ fn m8_dex_callbacks_fire() {
             .get(&("LReceiver;".to_string(), "called".to_string())),
         Some(&Value::Int(5))
     );
+}
+
+#[test]
+fn prefs_clear_notifies_null_once_and_null_keys_tolerated() {
+    let mut b = DexBuilder::new();
+    let listener_class = b.class("LPrefsClearListener;", "Ljava/lang/Object;");
+    b.instance_field(listener_class, "changeCount", "I");
+    b.instance_field(listener_class, "nullKeyCount", "I");
+    let count_field = b.field_idx("LPrefsClearListener;", "I", "changeCount");
+    let null_field = b.field_idx("LPrefsClearListener;", "I", "nullKeyCount");
+    b.r#virtual(
+        listener_class,
+        "onSharedPreferenceChanged",
+        "V",
+        vec!["Landroid/content/SharedPreferences;", "Ljava/lang/String;"],
+        ACC_PUBLIC,
+        Some(b.code(6, 3, 0, {
+            // v0/v1 temps; p0=this(v3), p1=prefs(v4), p2=key(v5)
+            let mut code = op22c(0x52, 0, 3, count_field); // iget v0, this, count
+            code.extend(op11n(0x12, 1, 1)); // const/4 v1, 1
+            code.extend(op12x(0xb0, 0, 1)); // add-int/2addr v0, v1
+            code.extend(op22c(0x59, 0, 3, count_field)); // iput v0, this, count
+                                                         // if (key != null) skip: if-eqz -> offset 6 code units ahead
+            code.extend(op21c(0x39, 5, 8)); // if-nez v5, +8 (to return-void)
+            code.extend(op22c(0x52, 0, 3, null_field)); // iget v0, this, nullCount
+            code.extend(op11n(0x12, 1, 1)); // const/4 v1, 1
+            code.extend(op12x(0xb0, 0, 1)); // add-int/2addr
+            code.extend(op22c(0x59, 0, 3, null_field)); // iput
+            code.extend(op10x(0x0e)); // return-void
+            code
+        })),
+    );
+
+    let mut e = engine_of(&b);
+    let prefs = named_prefs(&mut e, "clear-test");
+    let listener = e.new_dex_instance_pub("LPrefsClearListener;").unwrap();
+    e.heap
+        .put_field(listener, "changeCount", Value::Int(0))
+        .unwrap();
+    e.heap
+        .put_field(listener, "nullKeyCount", Value::Int(0))
+        .unwrap();
+    rd_vm::framework::call_host_instance(
+        &mut e,
+        "Landroid/content/SharedPreferences;",
+        "registerOnSharedPreferenceChangeListener",
+        "(Landroid/content/SharedPreferences$OnSharedPreferenceChangeListener;)V",
+        prefs,
+        &[Value::Obj(listener)],
+    )
+    .unwrap();
+
+    let editor = prefs_editor(&mut e, prefs);
+    let value = s(&mut e, "v");
+    prefs_put(
+        &mut e,
+        editor,
+        "putString",
+        "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;",
+        "k1",
+        value.clone(),
+    );
+    prefs_commit(&mut e, editor);
+    assert_eq!(
+        e.heap.get_field(listener, "changeCount").unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(
+        e.heap.get_field(listener, "nullKeyCount").unwrap(),
+        Value::Int(0)
+    );
+
+    // clear() reports exactly one null-key callback (since targetSdk R).
+    let editor = prefs_editor(&mut e, prefs);
+    rd_vm::framework::call_host_instance(
+        &mut e,
+        "Landroid/content/SharedPreferences$Editor;",
+        "clear",
+        "()Landroid/content/SharedPreferences$Editor;",
+        editor,
+        &[],
+    )
+    .unwrap();
+    prefs_commit(&mut e, editor);
+    assert_eq!(
+        e.heap.get_field(listener, "changeCount").unwrap(),
+        Value::Int(2)
+    );
+    assert_eq!(
+        e.heap.get_field(listener, "nullKeyCount").unwrap(),
+        Value::Int(1)
+    );
+    assert_eq!(prefs_get_string(&mut e, prefs, "k1"), "<missing>");
+
+    // Null keys are tolerated: default back, not an NPE.
+    let default = s(&mut e, "d");
+    let default_cmp = default.clone();
+    let got = rd_vm::framework::call_host_instance(
+        &mut e,
+        "Landroid/content/SharedPreferences;",
+        "getString",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        prefs,
+        &[Value::Null, default],
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(got, default_cmp);
+    let contains = rd_vm::framework::call_host_instance(
+        &mut e,
+        "Landroid/content/SharedPreferences;",
+        "contains",
+        "(Ljava/lang/String;)Z",
+        prefs,
+        &[Value::Null],
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(contains, Value::Int(0));
 }

@@ -56,24 +56,45 @@ pub struct Zip {
 }
 
 // ─── leitores little-endian com bounds-check ────────────────────────────────
+//
+// Issue #331 (item 1): offsets ZIP64 são u64 de atacante. `off + N` sem
+// checked_add panica em debug (`attempt to add with overflow`) e WRAP
+// em release — um container de 42 bytes virava T0. Mesmo padrão `ck`
+// que a #245 aplicou em `paged.rs`.
+
+/// `off + k` checado — para sites que somam antes de indexar.
+#[inline]
+fn off_add(off: usize, k: usize) -> RdResult<usize> {
+    off.checked_add(k)
+        .ok_or_else(|| RdError::parse(format!("zip: offset overflow ({off} + {k})")))
+}
+
+/// `u64 -> usize` checado (sem truncar silenciosamente em 32-bit).
+#[inline]
+fn usz(v: u64) -> RdResult<usize> {
+    usize::try_from(v).map_err(|_| RdError::parse(format!("zip: 64-bit value {v} exceeds usize")))
+}
 
 #[inline]
 fn u16_at(d: &[u8], off: usize) -> RdResult<u16> {
-    d.get(off..off + 2)
+    let end = off_add(off, 2)?;
+    d.get(off..end)
         .map(|b| u16::from_le_bytes([b[0], b[1]]))
         .ok_or_else(|| RdError::parse(format!("zip: truncated u16 @ {off}")))
 }
 
 #[inline]
 fn u32_at(d: &[u8], off: usize) -> RdResult<u32> {
-    d.get(off..off + 4)
+    let end = off_add(off, 4)?;
+    d.get(off..end)
         .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
         .ok_or_else(|| RdError::parse(format!("zip: truncated u32 @ {off}")))
 }
 
 #[inline]
 fn u64_at(d: &[u8], off: usize) -> RdResult<u64> {
-    d.get(off..off + 8)
+    let end = off_add(off, 8)?;
+    d.get(off..end)
         .map(|b| {
             let mut a = [0u8; 8];
             a.copy_from_slice(b);
@@ -155,10 +176,11 @@ impl Zip {
         let (eocd_off, entry_count, cd_size, cd_offset) = Self::find_eocd(&data)?;
         let _ = eocd_off; // (usado apenas pela busca; ZIP64 já resolvido abaixo)
 
-        // Bounds do central directory
-        let cd_start = cd_offset as usize;
+        // Bounds do central directory (#331: sem truncar u64 em 32-bit)
+        let cd_start = usz(cd_offset)?;
+        let cd_size_u = usz(cd_size)?;
         let cd_end = cd_start
-            .checked_add(cd_size as usize)
+            .checked_add(cd_size_u)
             .ok_or_else(|| RdError::parse("zip: CD size overflow"))?;
         if cd_end > data.len() {
             return Err(RdError::parse(format!(
@@ -167,17 +189,30 @@ impl Zip {
             )));
         }
 
-        let mut entries = Vec::with_capacity(entry_count.min(100_000));
+        // Pre-alloc limitada pelo que o CD pode conter (espelha paged.rs):
+        // um header ZIP64 minúsculo não pré-aloca 100k entradas.
+        let cap = entry_count.min(cd_size_u / 46).min(100_000);
+        let mut entries = Vec::with_capacity(cap);
         let mut p = cd_start;
         for i in 0..entry_count {
+            // O laço nunca sai do CD: cabeçalho fixo (46 B) inteiro dentro.
+            if off_add(p, 46)? > cd_end {
+                return Err(RdError::parse(format!(
+                    "zip: CD entry #{i} at {p} exceeds central directory end {cd_end}"
+                )));
+            }
             // strides lidos ANTES do parse (nome é bytes crus — lossy muda o len)
-            let name_len = u16_at(&data, p + 28)? as usize;
-            let extra_len = extra_len_of(&data, p + 30)?;
-            let comment_len = comment_len_of(&data, p + 32)?;
+            let name_len = u16_at(&data, off_add(p, 28)?)? as usize;
+            let extra_len = extra_len_of(&data, off_add(p, 30)?)?;
+            let comment_len = comment_len_of(&data, off_add(p, 32)?)?;
             let entry = Self::parse_cd_entry(&data, p)
                 .map_err(|e| e.with_suggestion(format!("parsing central-directory entry #{i}")))?;
             entries.push(entry);
-            p += 46 + name_len + extra_len + comment_len;
+            let stride = off_add(46, name_len + extra_len + comment_len)?;
+            p = off_add(p, stride)?;
+            if p > cd_end {
+                return Err(RdError::parse("zip: entry exceeds central directory"));
+            }
         }
 
         Ok(Self::index(
@@ -188,15 +223,7 @@ impl Zip {
         ))
     }
     fn index(data: Data, entries: Vec<ZipEntry>, cd_offset: u64, max_entry_bytes: u64) -> Self {
-        // issue #84: detecção de nomes repetidos (ordem de aparição).
-        let mut seen = BTreeSet::new();
-        let mut dup_seen = BTreeSet::new();
-        let mut duplicates = Vec::new();
-        for e in &entries {
-            if !seen.insert(e.name.as_str()) && dup_seen.insert(e.name.as_str()) {
-                duplicates.push(e.name.clone());
-            }
-        }
+        let duplicates = Self::compute_duplicates(&entries);
 
         Zip {
             data,
@@ -213,6 +240,37 @@ impl Zip {
         let data = std::fs::read(path)
             .map_err(|e| RdError::io(&e, format!("reading {}", path.display())))?;
         Self::parse(data)
+    }
+
+    /// Abre do disco em modo PAGINADO (ADR 008 Stage 2): só o diretório
+    /// central é materializado; os payloads leem sob demanda com RSS
+    /// travado (cache de 16 MiB do [`PagedZip`]). É a rota de
+    /// `Apk::open` acima de `Apk::MAX_INPUT_BYTES` — o teto efetivo
+    #[cfg(feature = "std")]
+    pub fn open_paged(path: &std::path::Path) -> RdResult<Zip> {
+        let source = Arc::new(crate::paged::PagedZip::open(path)?);
+        Self::from_source(
+            source,
+            ZipLimits {
+                max_input_bytes: 16 << 30,
+                max_entry_bytes: 512 << 20,
+                ..ZipLimits::default()
+            },
+        )
+    }
+
+    /// issue #84: nomes que aparecem mais de uma vez no CD (ordem de
+    /// aparição) — mesma regra nos modos whole e paginado.
+    fn compute_duplicates(entries: &[ZipEntry]) -> Vec<String> {
+        let mut seen = BTreeSet::new();
+        let mut dup_seen = BTreeSet::new();
+        let mut duplicates = Vec::new();
+        for e in entries {
+            if !seen.insert(e.name.as_str()) && dup_seen.insert(e.name.as_str()) {
+                duplicates.push(e.name.clone());
+            }
+        }
+        duplicates
     }
 
     /// Varre o fim do arquivo por EOCD; resolve ZIP64 quando presente.
@@ -251,13 +309,13 @@ impl Zip {
                     "zip: ZIP64 sentinel without locator — corrupt container",
                 ));
             }
-            let z64_off = u64_at(data, loc + 8)? as usize;
+            let z64_off = usz(u64_at(data, off_add(loc, 8)?)?)?;
             if u32_at(data, z64_off)? != ZIP64_EOCD_SIG {
                 return Err(RdError::parse("zip: ZIP64 EOCD signature mismatch"));
             }
-            entry_count = u64_at(data, z64_off + 32)? as usize;
-            cd_size = u64_at(data, z64_off + 40)?;
-            cd_offset = u64_at(data, z64_off + 48)?;
+            entry_count = usz(u64_at(data, off_add(z64_off, 32)?)?)?;
+            cd_size = u64_at(data, off_add(z64_off, 40)?)?;
+            cd_offset = u64_at(data, off_add(z64_off, 48)?)?;
         }
         Ok((eocd, entry_count, cd_size, cd_offset))
     }
@@ -268,25 +326,27 @@ impl Zip {
                 "zip: bad CD entry signature at {off}"
             )));
         }
-        let flags = u16_at(data, off + 8)?;
-        let method = u16_at(data, off + 10)?;
-        let crc = u32_at(data, off + 16)?;
-        let mut csize = u32_at(data, off + 20)? as u64;
-        let mut usize_ = u32_at(data, off + 24)? as u64;
-        let name_len = u16_at(data, off + 28)? as usize;
-        let extra_len = u16_at(data, off + 30)? as usize;
-        let _comment_len = u16_at(data, off + 32)? as usize;
-        let mut lho = u32_at(data, off + 42)? as u64;
+        let flags = u16_at(data, off_add(off, 8)?)?;
+        let method = u16_at(data, off_add(off, 10)?)?;
+        let crc = u32_at(data, off_add(off, 16)?)?;
+        let mut csize = u32_at(data, off_add(off, 20)?)? as u64;
+        let mut usize_ = u32_at(data, off_add(off, 24)?)? as u64;
+        let name_len = u16_at(data, off_add(off, 28)?)? as usize;
+        let extra_len = u16_at(data, off_add(off, 30)?)? as usize;
+        let _comment_len = u16_at(data, off_add(off, 32)?)? as usize;
+        let mut lho = u32_at(data, off_add(off, 42)?)? as u64;
 
+        let var_start = off_add(off, 46)?;
         let name_bytes = data
-            .get(off + 46..off + 46 + name_len)
+            .get(var_start..off_add(var_start, name_len)?)
             .ok_or_else(|| RdError::parse("zip: CD entry name out of bounds"))?;
         let name = String::from_utf8_lossy(name_bytes).into_owned();
 
         // ZIP64 extra field (0x0001) — campos na ordem: usize, csize, lho
         if csize == 0xFFFF_FFFF || usize_ == 0xFFFF_FFFF || lho == 0xFFFF_FFFF {
+            let extra_start = off_add(var_start, name_len)?;
             let extra = data
-                .get(off + 46 + name_len..off + 46 + name_len + extra_len)
+                .get(extra_start..off_add(extra_start, extra_len)?)
                 .ok_or_else(|| RdError::parse("zip: CD extra out of bounds"))?;
             let mut q = 0usize;
             while q + 4 <= extra.len() {
@@ -440,11 +500,11 @@ impl Zip {
             )));
         }
         // usar extra_len do LOCAL header (pode diferir do CD!)
-        let name_len = u16_at(data, off + 26)? as usize;
-        let extra_len = u16_at(data, off + 28)? as usize;
-        let data_start = off + 30 + name_len + extra_len;
+        let name_len = u16_at(data, off_add(off, 26)?)? as usize;
+        let extra_len = u16_at(data, off_add(off, 28)?)? as usize;
+        let data_start = off_add(off_add(off, 30)?, name_len + extra_len)?;
         let data_end = data_start
-            .checked_add(entry.compressed_size as usize)
+            .checked_add(usz(entry.compressed_size)?)
             .ok_or_else(|| RdError::parse("zip: compressed size overflow"))?;
         let compressed = data.get(data_start..data_end).ok_or_else(|| {
             RdError::parse(format!("zip: payload of {:?} out of bounds", entry.name))
@@ -551,14 +611,21 @@ impl Zip {
         self.cd_offset
     }
 
-    /// Bytes brutos do container (uso interno: detecção do bloco de assinatura).
-    pub fn raw_bytes(&self) -> RdResult<&[u8]> {
+    pub fn whole_bytes(&self) -> Option<&[u8]> {
         match &self.data {
-            Data::Memory(data) => Ok(data),
-            Data::Source(_) => Err(RdError::invalid_format(
-                "zip: file-backed container has no resident raw slice",
-            )),
+            Data::Memory(data) => Some(data),
+            Data::Source(_) => None,
         }
+    }
+    pub fn raw_bytes(&self) -> RdResult<&[u8]> {
+        self.whole_bytes()
+            .ok_or_else(|| RdError::invalid_format("zip: source has no resident slice"))
+    }
+    pub fn is_paged(&self) -> bool {
+        self.is_file_backed()
+    }
+    pub fn file_len(&self) -> u64 {
+        self.len()
     }
 
     /// Nomes que casam com um prefixo (ex.: "assets/", "lib/arm64-v8a/").
@@ -1143,5 +1210,213 @@ mod tests {
             handcrafted_zip_deflate(&compressed, content.len() as u32, crc32(&content), "a.bin");
         let zip = Zip::parse(bytes).unwrap();
         assert_eq!(zip.read("a.bin").unwrap(), content);
+    }
+
+    // ─── ADR 008 Stage 2: ZipSource (whole × paginado) ──────────────────
+
+    fn write_temp_zip(
+        tag: &str,
+        write: impl FnOnce(&mut std::fs::File) -> std::io::Result<()>,
+    ) -> std::io::Result<std::path::PathBuf> {
+        let dir = std::env::temp_dir().join(format!("rd-zip-{tag}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join("t.zip");
+        let mut f = std::fs::File::create(&path)?;
+        write(&mut f)?;
+        drop(f);
+        Ok(path)
+    }
+
+    /// Paridade total whole × paginado sobre o mesmo container: entradas,
+    /// duplicatas (#84), leituras STORED e DEFLATE, janelas cruas e os
+    /// sinais de modo (`is_paged`/`raw_bytes`).
+    #[test]
+    fn open_paged_matches_whole_parse() {
+        use std::io::Write as _;
+        let big = [7u8; 1000];
+        let bytes = handcrafted_zip_multi(&[
+            ("classes.dex", b"dex-primeira-ocorrencia"),
+            ("assets/x.bin", &big),
+            ("classes.dex", b"dex-duplicada"),
+        ]);
+        let whole = Zip::parse(bytes.clone()).unwrap();
+        let path = write_temp_zip("parity", |f| f.write_all(&bytes)).unwrap();
+        let paged = Zip::open_paged(&path).unwrap();
+
+        assert!(!whole.is_paged() && whole.whole_bytes().is_some());
+        assert!(paged.is_paged() && paged.whole_bytes().is_none());
+        // contrato estável de `raw_bytes`: inteiro = bytes do arquivo,
+        // paginado = vazio (nunca materializa)
+        assert_eq!(whole.raw_bytes().unwrap().len() as u64, whole.file_len());
+        assert!(paged.raw_bytes().is_err());
+        assert_eq!(paged.entries(), whole.entries());
+        assert_eq!(paged.duplicates(), whole.duplicates());
+        assert_eq!(paged.cd_offset(), whole.cd_offset());
+        assert_eq!(paged.file_len(), bytes.len() as u64);
+        assert_eq!(whole.file_len(), bytes.len() as u64);
+        for name in ["classes.dex", "assets/x.bin"] {
+            assert_eq!(
+                paged.read(name).unwrap(),
+                whole.read(name).unwrap(),
+                "{name}"
+            );
+        }
+        for (off, len) in [(0u64, 32usize), ((bytes.len() - 22) as u64, 22)] {
+            assert_eq!(
+                paged.read_range(off, len).unwrap(),
+                whole.read_range(off, len).unwrap(),
+                "janela [{off}..{})",
+                off + len as u64
+            );
+        }
+
+        // DEFLATE pelos dois caminhos (mesma política de inflate/CRC).
+        let content = b"paged deflate parity ".repeat(50);
+        let compressed = deflate_bytes(&content);
+        let dbytes =
+            handcrafted_zip_deflate(&compressed, content.len() as u32, crc32(&content), "a.bin");
+        let dpath = write_temp_zip("parity-deflate", |f| f.write_all(&dbytes)).unwrap();
+        assert_eq!(
+            Zip::open_paged(&dpath).unwrap().read("a.bin").unwrap(),
+            content
+        );
+
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+        std::fs::remove_dir_all(dpath.parent().unwrap()).ok();
+    }
+
+    /// Arquivo >512 MiB com buraco esparso entre os payloads e o CD: o modo
+    /// paginado abre e lê sem materializar o arquivo (custo de disco ~zero
+    /// no teste — o buraco nunca é lido, só os offsets importam).
+    #[test]
+    fn open_paged_sparse_above_wholefile_cap() {
+        use std::io::{Seek, SeekFrom, Write as _};
+        let bytes = handcrafted_zip_multi(&[
+            ("AndroidManifest.xml", b"<axml/>"),
+            ("classes.dex", b"dex\n035\0fake"),
+        ]);
+        let eocd = bytes.len() - 22;
+        let rd32 = |b: &[u8], o: usize| u32::from_le_bytes(b[o..o + 4].try_into().unwrap());
+        let cd_start = rd32(&bytes, eocd + 16) as usize;
+        let (head, tail) = bytes.split_at(cd_start);
+        let mut tail = tail.to_vec();
+        const TARGET_CD: u64 = 600 * 1024 * 1024;
+        let tail_eocd = tail.len() - 22;
+        tail[tail_eocd + 16..tail_eocd + 20].copy_from_slice(&(TARGET_CD as u32).to_le_bytes());
+
+        let path = write_temp_zip("sparse", |f| {
+            f.write_all(head)?;
+            f.seek(SeekFrom::Start(TARGET_CD))?;
+            f.write_all(&tail)
+        })
+        .unwrap();
+        let z = Zip::open_paged(&path).unwrap();
+        assert!(z.is_paged());
+        assert_eq!(z.file_len(), TARGET_CD + tail.len() as u64);
+        assert!(z.file_len() > 512 * 1024 * 1024, "acima do teto whole-file");
+        assert_eq!(z.cd_offset(), TARGET_CD);
+        assert_eq!(z.entry_count(), 2);
+        assert_eq!(z.read("AndroidManifest.xml").unwrap(), b"<axml/>");
+        assert_eq!(z.read("classes.dex").unwrap(), b"dex\n035\0fake");
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    // ─── #331 (item 1): overflow de offsets ZIP64 no caminho Whole ──────────
+
+    /// Container de 42 bytes: locator ZIP64 com `z64_off = u64::MAX - 1`
+    /// antes de um EOCD com sentinel. Na base, `u32_at(data, z64_off)`
+    /// avaliava `off + 4` e panica (debug) / wrap (release). Fix = Err tipado.
+    #[test]
+    fn issue_331_zip64_locator_offset_overflow_is_typed_error() {
+        let mut v = Vec::new();
+        v.extend(0x0706_4b50u32.to_le_bytes()); // ZIP64_EOCD_LOCATOR_SIG
+        v.extend(0u32.to_le_bytes()); // disk
+        v.extend((u64::MAX - 1).to_le_bytes()); // z64_off (atacante)
+        v.extend(1u32.to_le_bytes()); // total disks
+        v.extend(EOCD_SIG.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(0xFFFFu16.to_le_bytes()); // entries (sentinel)
+        v.extend(0xFFFFu16.to_le_bytes());
+        v.extend(0u32.to_le_bytes()); // cd size
+        v.extend(0u32.to_le_bytes()); // cd offset
+        v.extend(0u16.to_le_bytes());
+        assert_eq!(v.len(), 42);
+        assert!(Zip::parse(v).is_err(), "overflow deve virar erro tipado");
+    }
+
+    /// `local_header_offset = u64::MAX` via extra ZIP64 do CD: o parse
+    /// aceita a entrada, mas `read` deve falhar tipado em vez de panicar
+    /// em `off + 30 + name_len + extra_len`.
+    #[test]
+    fn issue_331_zip64_lho_max_read_is_typed_error() {
+        let name = "a.txt";
+        let content = b"hi";
+        let crc = crc32(content);
+        let mut v = Vec::new();
+        v.extend(LOCAL_HEADER_SIG.to_le_bytes());
+        v.extend(45u16.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(METHOD_STORED.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(crc.to_le_bytes());
+        v.extend((content.len() as u32).to_le_bytes());
+        v.extend((content.len() as u32).to_le_bytes());
+        v.extend((name.len() as u16).to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend_from_slice(name.as_bytes());
+        v.extend_from_slice(content);
+        let cd_start = v.len() as u32;
+        v.extend(CD_ENTRY_SIG.to_le_bytes());
+        v.extend(45u16.to_le_bytes());
+        v.extend(45u16.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(METHOD_STORED.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(crc.to_le_bytes());
+        v.extend((content.len() as u32).to_le_bytes());
+        v.extend((content.len() as u32).to_le_bytes());
+        v.extend((name.len() as u16).to_le_bytes());
+        v.extend(12u16.to_le_bytes()); // extra: id+size+8B
+        v.extend(0u16.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(0u32.to_le_bytes());
+        v.extend(0xFFFF_FFFFu32.to_le_bytes()); // lho sentinel
+        v.extend_from_slice(name.as_bytes());
+        v.extend(0x0001u16.to_le_bytes()); // ZIP64 extra
+        v.extend(8u16.to_le_bytes());
+        v.extend(u64::MAX.to_le_bytes()); // lho real (atacante)
+        let cd_size = v.len() as u32 - cd_start;
+        v.extend(EOCD_SIG.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        v.extend(1u16.to_le_bytes());
+        v.extend(1u16.to_le_bytes());
+        v.extend(cd_size.to_le_bytes());
+        v.extend(cd_start.to_le_bytes());
+        v.extend(0u16.to_le_bytes());
+        let z = Zip::parse(v).unwrap();
+        assert!(
+            z.read(name).is_err(),
+            "read com lho MAX deve ser erro tipado"
+        );
+    }
+
+    /// EOCD declara 2 entradas mas o CD só comporta 1: o laço não pode
+    /// caminhar para além de `cd_end`.
+    #[test]
+    fn issue_331_cd_walk_stays_inside_cd_end() {
+        let mut v = handcrafted_zip(b"data", "x.bin");
+        let eocd = v.len() - 22;
+        v[eocd + 8..eocd + 10].copy_from_slice(&2u16.to_le_bytes());
+        v[eocd + 10..eocd + 12].copy_from_slice(&2u16.to_le_bytes());
+        let err = format!("{:?}", Zip::parse(v).unwrap_err());
+        assert!(
+            err.contains("central directory end") || err.contains("signature"),
+            "deve rejeitar dentro dos bounds do CD: {err}"
+        );
     }
 }

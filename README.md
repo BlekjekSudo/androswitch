@@ -13,6 +13,13 @@ See [credits and provenance](CREDITS.md) and [NOTICE](NOTICE.md).
 
 ## Current status
 
+The latest RustyDroid source is merged at **`3761815`** with its history and
+original tests. The [full source audit](docs/UPSTREAM_PORTING.md) tracks all
+427 upstream files, reviewed adaptations and original VM sources still excluded
+from the device build. **Horizon behavior parity is not yet 1:1 with upstream.**
+Latest upstream Arrays/BitSet code and lazy parser improvements now share the
+portable path; source synchronization is kept separate from execution evidence.
+
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
 219 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,
 inspect results and export JSON from one installation. See [scope and actual
@@ -76,7 +83,7 @@ Actual submitted console framebuffer from the M7 Ryujinx test.
 | Native ARM64 | Program-header ELF loader, dependencies, constructors, supported relocations/TLS and real libnx execution |
 | JNI | Native registration, callbacks/reentry, strings, primitive arrays, exception/reference/GC and pthread callback proof |
 | Ryujinx E2E | DEX semantics, persistent storage, native CPU oracle and mixed Java/Kotlin JNI fixtures; see milestone evidence |
-| Upstream VM regression subset | 227 tests pass; separate from the recorded full-upstream baseline |
+| Merged upstream VM regression | 707 host tests pass on the latest-source merge; device behavior parity remains a separate gate |
 | Android lifecycle/UI | Supported M5 subset; 14 Java/Kotlin UI snapshots pass in Ryujinx |
 | Native graphics/audio | NativeActivity, incremental assets, input queue, EGL/GLES2; Java AudioTrack, AAudio writes and OpenSL ES PCM queue callbacks |
 | Console launcher | Scan/install/update/launch/return/uninstall; persistent saves, named failures and one NRO |
@@ -104,10 +111,10 @@ verify actual workers, native-suspended GC roots, PNG pixels and JVM-matching
 JNI constructor/thread/context results. Independent SDK APKs also verify
 installed package metadata and actual worker ThreadLocal isolation in Horizon.
 The next SDK proofs verify COW snapshots, DEX field reflection and TimeUnit
-conversions on one NRO. Original Candy Crush now requires BaseInputConnection;
-Mekorama now passes Runtime initialization and next requires AbstractCollection
-state in an app-provided subclass.
-Both return to the launcher, and neither game has a first-screen pass yet.
+conversions on one NRO. The most recent pre-sync attempts and exact artifact hashes are recorded in
+[the reuse evidence](reports/m9-upstream-reuse-20261026.json). They are historical
+results for those binaries, not a first-screen pass for the merged source.
+Neither game has a first-screen compatibility pass.
 See [the two-game observations](reports/m9-input-runtime-startup-ryujinx-20261025.json)
 and [the later Runtime/Mekorama run](reports/m9-runtime-resources-horizon-20261025.json).
 Installation is not a compatibility guarantee; see

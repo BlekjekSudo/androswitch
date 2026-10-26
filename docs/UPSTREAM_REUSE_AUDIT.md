@@ -1,13 +1,19 @@
 # RustyDroid reuse audit
 
-Date: 2026-10-26. Scope: source-routing audit of the frozen RustyDroid base
+The [complete latest-source synchronization audit](UPSTREAM_PORTING.md) now
+supersedes the initial inventory below. All upstream paths are tracked in
+`data/rustydroid-upstream.json`; the latest revision has been merged, rather
+than only fetched. The initial family observations below remain useful context,
+but do not establish device parity.
+
+Date: 2026-10-26. Original scope: source-routing audit of the frozen RustyDroid base
 `6388281f66d254c8e01a0fdc7a5a9a30239bc762` and the current AndroSwitch device
 path. This is an initial family inventory, not an Android API coverage count or
 an execution claim.
 
 The latest upstream source was also inspected at
 [`3761815dc6a2a1427e9fc66b66e8471b78d1b170`](https://github.com/nadabgfccvd/RustyDroid/commit/3761815dc6a2a1427e9fc66b66e8471b78d1b170).
-It was fetched for comparison; the frozen fork base is unchanged. Neither that
+It was initially fetched for comparison and is now merged; the original fork point remains in history. Neither that
 revision nor the frozen base implements EnumMap, EnumSet or sigaltstack. The
 latest tree contains one EnumMap comment, which is not an implementation.
 Its much larger framework surface needs the same state/GC/platform audit before

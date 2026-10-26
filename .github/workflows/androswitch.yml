@@ -13,6 +13,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.97.1
@@ -20,6 +22,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Check documentation links
         run: python -X utf8 scripts/check_md_links.py
+      - name: Audit every pinned RustyDroid source and reviewed adaptation
+        run: python -X utf8 scripts/check-upstream-sync.py --report target/upstream-sync.json
+      - name: Verify the upstream omission and drift gate
+        run: python -X utf8 -m unittest discover -s scripts/tests -p test_upstream_sync.py -v
       - run: cargo fmt --all -- --check
       - run: cargo clippy -p as-platform -p as-package -p as-native -p as-runtime -p as-cli --all-targets --locked -- -D warnings
       - run: cargo test -p as-platform -p as-package -p as-native -p as-runtime -p as-cli --locked
@@ -30,6 +36,8 @@ jobs:
       - run: cargo clippy -p rd-apk -p rd-vm --no-default-features --lib --locked -- -D warnings
       - run: cargo test -p as-switch-smoke --locked
       - run: cargo test -p as-switch-smoke --features portable-tests --test portable_core --locked
+      - name: Run original upstream contracts on the portable VM
+        run: cargo test -p as-switch-smoke --features portable-tests --test upstream_bitset --test upstream_narrow_arrays --locked
       - name: Download checksum-pinned real APK
         shell: pwsh
         run: ./scripts/fetch-fixtures.ps1 -ExtractDex

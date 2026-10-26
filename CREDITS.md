@@ -11,6 +11,7 @@ The primary upstream credit belongs to
 | --- | --- |
 | Original repository | [nadabgfccvd/RustyDroid](https://github.com/nadabgfccvd/RustyDroid) |
 | Fork base | [`6388281f66d254c8e01a0fdc7a5a9a30239bc762`](https://github.com/nadabgfccvd/RustyDroid/commit/6388281f66d254c8e01a0fdc7a5a9a30239bc762) |
+| Latest synchronized upstream | [`3761815dc6a2a1427e9fc66b66e8471b78d1b170`](https://github.com/nadabgfccvd/RustyDroid/commit/3761815dc6a2a1427e9fc66b66e8471b78d1b170) |
 | Base commit date | 22 October 2026 |
 | Original copyright | Copyright (c) 2026 RustyDroid contributors |
 | License | [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) |
@@ -26,13 +27,17 @@ not substitute a second demonstration interpreter and present it as the
 original runtime. The Switch-specific feature boundaries and adapters are
 AndroSwitch changes on top of that foundation.
 
-The original documents are preserved from the fork base:
+The original documents are preserved at the latest synchronized revision:
 
 - [RustyDroid README](README.rustydroid.md).
 - [RustyDroid contributing guide](CONTRIBUTING.rustydroid.md).
 - [RustyDroid security policy](SECURITY.rustydroid.md).
 - [RustyDroid specification](RustyDroid.md) and
   [upstream roadmap](docs/ROADMAP.md).
+
+The [complete source manifest and porting audit](docs/UPSTREAM_PORTING.md) track
+latest source integration separately from device behavior. Shared implementations
+remain RustyDroid-derived code with the original authorship and license.
 
 The original logo is retained with the upstream material; it is not presented
 as AndroSwitch branding. The original license files are unchanged. Keep these

@@ -1,5 +1,10 @@
 # AndroSwitch capability inventory
 
+The [latest-source audit](UPSTREAM_PORTING.md) pins upstream `3761815` and tracks
+every upstream path. Source synchronization passes separately from device
+behavior parity, which remains unverified. New source imports do not inherit
+the earlier hardware results.
+
 | Capability | Upstream | AndroSwitch |
 | --- | --- | --- |
 | ZIP/AXML/ARSC/manifest | `rd-apk` implementation/tests | Shared no_std port; Java APK parsed inside the Ryujinx NRO |

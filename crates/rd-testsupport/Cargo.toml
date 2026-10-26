@@ -13,5 +13,9 @@ authors.workspace = true
 workspace = true
 
 [dependencies]
-rd-dex = { workspace = true }
-rd-vm = { path = "../rd-vm" }
+rd-dex = { path = "../rd-dex", default-features = false }
+rd-vm = { path = "../rd-vm", default-features = false }
+
+[features]
+default = ["std"]
+std = ["rd-vm/std", "rd-vm/advanced-components", "rd-dex/std"]

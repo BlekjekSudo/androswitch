@@ -525,3 +525,127 @@ fn existing_native_routes_are_partial_but_registry_adapters_stay_unavailable() {
         rd_engine_registry::RuntimeStatus::NotImplemented
     );
 }
+
+// ── fixes dos gaps documentados pelo APK-Tester (engines reais) ──────────
+
+/// Gap engine-16 (tauri): a build REAL do Tauri v2 mobile (cargo-ndk)
+/// embarca `libtauri_android.so` + `libwry.so` e NÃO carrega
+/// `assets/tauri.conf.json` nem `assets/www/` — a regra antiga nunca casava.
+#[test]
+fn tauri_real_cargo_ndk_build_is_a_signature() {
+    // layout exato reportado pelo APK-Tester: libs em lib/<abi>/, sem assets
+    let r = detect(&[
+        "lib/x86_64/libtauri_android.so",
+        "lib/x86_64/libwry.so",
+        "classes.dex",
+    ]);
+    assert_eq!(state(&r, "tauri"), DetectionState::Signature);
+    // cada lib isolada também basta (any = OU)
+    assert_eq!(
+        state(&detect(&["lib/arm64-v8a/libwry.so"]), "tauri"),
+        DetectionState::Signature
+    );
+    assert_eq!(
+        state(&detect(&["lib/arm64-v8a/libtauri_android.so"]), "tauri"),
+        DetectionState::Signature
+    );
+    // e um .so aleatório continua NÃO disparando tauri
+    assert_eq!(
+        state(&detect(&["lib/arm64-v8a/libapp.so"]), "tauri"),
+        DetectionState::NotDetected
+    );
+}
+
+/// Gap engine-22 (lua-engines/Defold): a build real do Defold produz
+/// `libdmengine.so` (runtime dmengine do bob.jar); o registro esperava
+/// `libdefold.so`, que nunca existiu na build oficial.
+#[test]
+fn defold_real_dmengine_library_is_a_signature() {
+    // layout real reportado: lib/arm64-v8a/libdmengine.so + game.arcd/arci
+    let r = detect(&[
+        "lib/arm64-v8a/libdmengine.so",
+        "assets/game.arcd",
+        "assets/game.arci",
+        "classes.dex",
+    ]);
+    assert_eq!(state(&r, "lua-engines"), DetectionState::Signature);
+    // Solar2D (libcorona) continua casando — regra preservada
+    assert_eq!(
+        state(&detect(&["lib/arm64-v8a/libcorona.so"]), "lua-engines"),
+        DetectionState::Signature
+    );
+    // lib aleatória não é engine Lua
+    assert_eq!(
+        state(&detect(&["lib/arm64-v8a/libengine.so"]), "lua-engines"),
+        DetectionState::NotDetected
+    );
+}
+
+/// Gap engine-32 (twa-pwa): um TWA real declara `asset_statements` como
+/// `<meta-data>` do `<application>` (Digital Asset Links). O rd-apk agora
+/// modela application-level meta-data e o detector a inventaria: a regra
+/// signature ganhou `metadata:asset_statements`.
+#[test]
+fn twa_asset_statements_application_metadata_is_a_signature() {
+    let registry = Registry::embedded().unwrap();
+    let mut a = apk(&[]);
+    a.manifest
+        .application
+        .meta_data
+        .push(rd_apk::manifest::MetaData {
+            name: Some("asset_statements".into()),
+            resource: Some(0x7f_00_00_01),
+            ..Default::default()
+        });
+    assert_eq!(
+        state(&registry.detect(&a).unwrap(), "twa-pwa"),
+        DetectionState::Signature
+    );
+    // metadata de componente continua válida (DEFAULT_URL no launcher)
+    let mut b = apk_with_class(&[], "com.example.Main");
+    b.manifest.application.components[0]
+        .meta_data
+        .push(rd_apk::manifest::MetaData {
+            name: Some("android.support.customtabs.trusted.DEFAULT_URL".into()),
+            value: Some("https://example.invalid/".into()),
+            ..Default::default()
+        });
+    assert_eq!(
+        state(&registry.detect(&b).unwrap(), "twa-pwa"),
+        DetectionState::Signature
+    );
+    // sem marcadores → nada de TWA (ausência não é exclusão, apenas não-identificação)
+    assert_eq!(state(&detect(&[]), "twa-pwa"), DetectionState::NotDetected);
+}
+
+/// Regressão do inventário: metadata de application E de componente são
+/// somadas (nenhuma substitui a outra).
+#[test]
+fn metadata_inventory_merges_application_and_component_levels() {
+    let registry = Registry::embedded().unwrap();
+    let mut a = apk_with_class(&[], "com.example.Main");
+    a.manifest
+        .application
+        .meta_data
+        .push(rd_apk::manifest::MetaData {
+            name: Some("asset_statements".into()),
+            ..Default::default()
+        });
+    a.manifest.application.components[0]
+        .meta_data
+        .push(rd_apk::manifest::MetaData {
+            name: Some("component.only.key".into()),
+            ..Default::default()
+        });
+    let r = registry.detect(&a).unwrap();
+    // ambas as chaves alimentam o mesmo inventário: TWA casa pela do
+    // application; a do componente está lá para regras futuras.
+    assert_eq!(state(&r, "twa-pwa"), DetectionState::Signature);
+    let finding = r.engines.iter().find(|e| e.id == "twa-pwa").unwrap();
+    let predicates: Vec<&str> = finding
+        .evidence
+        .iter()
+        .flat_map(|ev| ev.matches.iter().map(|m| m.predicate.as_str()))
+        .collect();
+    assert!(predicates.contains(&"metadata:asset_statements"));
+}

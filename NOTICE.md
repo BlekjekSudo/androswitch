@@ -38,3 +38,7 @@ libraries, toolchains and emulator binaries are not committed to this repo.
 
 See [CREDITS](CREDITS.md), [LICENSE-MIT](LICENSE-MIT) and
 [LICENSE-APACHE](LICENSE-APACHE).
+
+Latest synchronized RustyDroid source: `3761815dc6a2a1427e9fc66b66e8471b78d1b170`.
+The merge retains upstream commits, authors, runtime source and tests. See
+[CREDITS.md](CREDITS.md) and [the source/porting audit](docs/UPSTREAM_PORTING.md).

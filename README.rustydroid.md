@@ -103,17 +103,17 @@ See [the automation guide](docs/mcp-automation.md) for structured host-view sele
 | **M2** | ✅ **DONE** — minimal Dalvik interpreter: **150/150 golden vectors PASS vs real JVM execution** + real APK pure methods verified |
 | **M3** | ✅ **DONE** — Essential framework: Activity lifecycle, Handler/Looper, LayoutInflater, Resources |
 | **M4** | ✅ **DONE** — software rendering determinístico + UI dump uiautomator-compatible |
-| **M5** | ✅ **DONE** — MCP agent v1 (`rd mcp`, JSON-RPC stdio, **30 tools**: pacote (install/list/remove/clear/launch), input (tap/swipe/type/key), observação (ui_tree/screenshot/logs), wait/wait_for + asserts, permissões, runtime_health, compat_gaps, batch idempotente, sandbox+caps de segurança, `--describe-tools` + docs geradas) |
+| **M5** | ✅ **DONE** — MCP agent v1 (`rd mcp`, JSON-RPC stdio, **30 tools**: pacote (install/list/remove/clear/launch), input (tap/swipe/type/key), observação (ui_tree/screenshot/logs), wait/wait_for + asserts, permissões, runtime_health, compat_gaps, batch idempotente, sandbox+caps de segurança, `--describe-tools` + docs geradas; the live catalog has since grown to **47 tools**) |
 | **M6** | ✅ **DONE** — test executor: `rd test suite.json` (cenários JSON, exit codes, **JUnit XML**), compat matrix gerada do roadmap + suítes |
 | **M7** | 🟡 **IN PROGRESS** — `rd perf` mede startup cold/warm + RSS no perfil moto-e5 com gate de CI sobre o app trivial (números emulados por fator de CPU); budgets da golden suite, medição em device real e gate de release ainda pendentes |
 | **M8** | ✅ **DONE (v0.9.0)** — Real-world compat: RecyclerView (DEX adapter populate), Fragments (legacy+androidx), Dialogs, OkHttp shim (offline deterministic), SQLite/Room (in-memory), Services/broadcasts/deep links, WorkManager, stateful SharedPreferences — `crates/rd-vm/src/m8.rs`, ADR 003 |
 | **M9** | ✅ **DONE (review pending)** — widgets (RemoteViews/AppWidgetProvider), IME (InputConnection/InputMethodService), accessibility, full notifications, shortcuts + NDK: ELF loader (x86_64/AArch64/ARM) and JNI bridge running `.so` code in an isolated Unicorn worker (feature `native`). 5 real F-Droid APKs make JNI method calls from their real DEX, each with a checked result, on x86_64, arm64-v8a and armeabi-v7a (15/15 runs), e.g. zxing-cpp renders a QR code that zbar decodes — [docs/m9.md](docs/m9.md), ADR 004 |
-| **M10** | Virtual devices: camera, GPS, sensors, biometrics — programmable by the agent |
-| **M11** | Engines: Flutter → React Native → Mono → WASM |
+| **M10** | ✅ **DONE** — virtual devices programmable by the agent: camera, GPS, sensors, biometrics and the other M10 surfaces ([docs/m10.md](docs/m10.md), [ADR 011](docs/adr/011-m10-virtual-devices.md), #201) |
+| **M11** | ⬜ **PLANNED** — Engines, in the order accepted by [ADR 013](docs/adr/013-m11-engine-execution-strategy.md): WASM → React Native → Mono → Flutter (one real app each in a golden flow; detection alone never counts) |
 | **M12** | Full GitHub ecosystem: docs site, live compat matrix, releases → **v1.0** |
 
 **Compatibility floor:** `minSdkVersion 26` (Android 8.0 Oreo) · **ceiling:** latest stable (`targetSdk 36`).
-APKs below the floor are inspected fine but refuse to run with a structured `BELOW_FLOOR` error — never a crash.
+APKs below the floor are inspected fine and reported with a structured `BELOW_FLOOR` finding — never a crash. (Known gap, 2026-10-25: `rd app run` does not yet refuse below-floor APKs; the fix is in progress.)
 
 ---
 
@@ -164,15 +164,69 @@ rustydroid/
 │   ├── rd-ndk/        # ELF loader x86_64/AArch64/ARM + isolated worker (M9)
 │   ├── rd-engine-registry/ # Appendix G: 28 records + static detection (not execution)
 │   ├── rd-engine-*/   # language bridges (flutter/rn/mono/wasm…) feature-gated (M11)
-│   ├── rd-framework/  # android.* natively in Rust: fd-permissions ✅, fd-devices ✅, fd-behavior ✅
+│   ├── rd-framework/  # versioned framework data/engines: fd-permissions ✅, fd-devices ✅, fd-behavior ✅, fd-api-coverage ✅, fd-jetpack ✅, fd-gms ✅
 │   ├── rd-render/     # headless / window / web renderers + UI dump     (M4)
 │   ├── rd-agent/      # MCP (JSON-RPC próprio, ADR 001) + suite executor `rd test` (M6) + coverage · 47 tools · screen model, resources, live viewer
-│   └── rd-cli/        # the `rd` binary: inspect / perm / device / behavior / dex / vm / app / mcp / test / perf
-├── data/              # permissions (175), devices (6), behavior-switches (25), engines (28) · API coverage planned
+│   └── rd-cli/        # the `rd` binary: inspect / perm / device / behavior / api-coverage / jetpack / gms / engine / dex / vm / app / mcp / test / perf
+├── data/              # permissions (175), devices (6), behavior-switches (25), engines (28), api-coverage (17 domains, 106 surfaces), jetpack (46 libraries), gms (21 services)
 ├── golden-apks/       # open-source APK test suite (download script, no binaries)
-├── docs/              # ROADMAP.md, compat-matrix.md (generated by xtask), ADRs
-└── xtask/             # cargo xtask compat-report (live compatibility scoreboard)
+├── docs/              # ROADMAP.md, compat-matrix.md + api-coverage.md (generated by xtask), ADRs
+└── xtask/             # cargo xtask compat-report/api-coverage-* (generated scoreboards)
 ```
+
+## 🗂️ Appendix C — Android API surface registry
+
+The `android.*` surface is versioned data in
+[`data/api-coverage.toml`](data/api-coverage.toml): every Appendix C domain maps
+package/class prefixes to the real implementing module and an honest status
+(`supported` subset, `partial`, `stub`, or `not_implemented`). The current
+registry snapshot has **106 surfaces in 17 domains**: 4 supported subsets
+and 102 partial (0 stub, 0 not implemented). `partial` means a documented,
+tested subset is modeled — **no** surface claims that the whole AOSP package
+runs, and this is not execution coverage. The deep-audit series merged on
+2026-10-25 ([#196](https://github.com/nadabgfccvd/RustyDroid/pull/196),
+[#200](https://github.com/nadabgfccvd/RustyDroid/pull/200)) re-checked modeled
+subsets against AOSP source and fixed real ordering/validation divergences.
+
+```sh
+rd api-coverage check --json
+rd api-coverage show android.database.sqlite.SQLiteDatabase --json
+rd api-coverage list --domain view-ui --status partial
+```
+
+MCP `get_api_usage` classifies an installed app's static DEX references against
+the same registry (`api_coverage` in the result); `compat_gaps` includes its
+domain/status summary, while `get_coverage` remains the dynamic execution
+counter. Regenerate the human report and spec table with
+`cargo xtask api-coverage-report`, `cargo xtask api-coverage-spec` and
+`cargo xtask compat-report`; see the [generated API coverage report](docs/api-coverage.md)
+and the [literal completion ledger](docs/appendix-c-literal-completion.md) for
+the merged Rounds 1–10 checkpoints and what still blocks promoting any
+`partial` package.
+
+## 📚 Appendices D + E — Jetpack and Play Services registries
+
+AndroidX/Jetpack libraries and Google Play Services/Firebase are versioned data
+too ([ADR 012](docs/adr/012-appendix-d-e-registries.md)):
+
+- [`data/jetpack.toml`](data/jetpack.toml): **46 libraries** in 6 categories, each
+  with a strategy (`dex-passthrough`, `host-shim`, `host-native`) and an honest
+  status — currently 18 partial, 2 stub, 26 not implemented. Libraries travel
+  in the APK and their DEX runs on the VM; stateful host shims (lifecycle,
+  LiveData, ViewModel, collections, DataStore values, WorkManager `Data`,
+  navigation, startup, biometric, futures) intercept only the listed methods.
+- [`data/gms.toml`](data/gms.toml): **21 Play Services/Firebase services**, all
+  `not_implemented` — an explicit **"no GMS" mode**: calls fail typed
+  (`NOT_IMPLEMENTED`/`NOT_FOUND`) instead of faking success.
+
+```sh
+rd jetpack list --json
+rd gms check --json
+```
+
+Generated reports: [docs/jetpack.md](docs/jetpack.md), [docs/gms.md](docs/gms.md);
+ledger: [docs/appendix-d-e.md](docs/appendix-d-e.md). Regenerate with
+`cargo xtask jetpack-report` and `cargo xtask gms-report`.
 
 ## 🧩 Appendix G — engine registry (detection only)
 
@@ -196,7 +250,8 @@ The catalog works with **no optional features**. Opt-in `lang-01`…`lang-12`
 features select contracts/dependencies, **not runtime implementations**. Existing
 DEX/Compose Android and opt-in three-ABI ELF/JNI routes remain partial; they are
 not the registry adapters or full Android/NDK support. Flutter, React Native,
-Mono, WASM and game-engine adapters remain pending (M11). Existing CLI/agent
+Mono, WASM and game-engine adapters remain pending (M11, execution plan in
+[ADR 013](docs/adr/013-m11-engine-execution-strategy.md)). Existing CLI/agent
 `advanced-components` defaults and opt-in `native`/`jit` features are preserved.
 
 See the [generated registry](docs/engine-registry.md),
@@ -239,7 +294,7 @@ Dual-licensed under [`MIT`](./LICENSE-MIT) OR [`Apache-2.0`](./LICENSE-APACHE) �
 **RustyDroid** é uma "Wine para Android": em vez de emular um sistema Android inteiro
 (lento sem KVM), ele parseia APKs diretamente e executa o bytecode Dalvik numa **VM
 escrita em Rust**, com as APIs `android.*` implementadas nativamente, renderização por
-software e um **modo dedicado a agentes de IA (MCP)** com 31 ferramentas estruturadas.
+software e um **modo dedicado a agentes de IA (MCP)** com 47 ferramentas estruturadas.
 
 - **Piso de performance:** Motorola Moto E5 (Snapdragon 425, 2 GB RAM) — todos os
   budgets de performance são calibrados nele, não em emuladores modernos

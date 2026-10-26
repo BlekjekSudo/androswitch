@@ -173,6 +173,9 @@ pub struct Engine {
     pub(crate) execution_frames: crate::portable::execution::Frames,
     #[cfg(not(feature = "std"))]
     pub(crate) portable: crate::portable::State,
+    /// Active host->host reentrant call depth (`object_to_string`, `obj_equals`, `obj_hash`, etc.).
+    #[cfg(feature = "std")]
+    pub(crate) host_reentrant_depth: usize,
 }
 
 /// Cobertura por classe (AG-09, nível de método).
@@ -198,6 +201,10 @@ pub struct CoverageSnapshot {
 
 impl Engine {
     pub fn new(dexes: Vec<rd_dex::Dex>, config: VmConfig) -> Self {
+        // Issue #230: nasce um Heap novo (ObjRefs reiniciam) — o estado
+        // host thread_local indexado por refs do heap anterior morre aqui.
+        #[cfg(feature = "std")]
+        crate::reset_host_thread_state();
         let budget = config.heap_budget;
         Engine {
             #[cfg(feature = "native")]
@@ -280,6 +287,8 @@ impl Engine {
             execution_frames: Default::default(),
             #[cfg(not(feature = "std"))]
             portable: Default::default(),
+            #[cfg(feature = "std")]
+            host_reentrant_depth: 0,
             #[cfg(feature = "jit")]
             jit: {
                 let mut j = crate::jit::JitState::default();

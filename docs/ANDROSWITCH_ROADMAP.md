@@ -35,6 +35,13 @@ are inferred from scaffolding.
 
 ## Current evidence
 
+The M9 work now includes a complete latest-upstream merge and a source omission
+gate. See [upstream porting](UPSTREAM_PORTING.md). This records every upstream
+file and remaining host-only original VM source. **Full Horizon behavior parity
+remains pending**, independent of source synchronization and older hardware
+feedback. Complete shared-state/adapter porting and inherited contract coverage
+before treating the latest upstream framework as device-compatible.
+
 M7 improvements now use file-backed APKs with a 512 MiB container cap, bounded
 copy/hash/entry reads and lazy native extraction. A 128 MiB original UI APK passes
 host install/launch/asset/save/restart checks. In a later hardware test the user

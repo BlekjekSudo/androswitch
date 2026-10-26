@@ -80,6 +80,7 @@ pub(crate) struct FileState {
 
 #[derive(Default)]
 pub(crate) struct State {
+    pub host_depth: HashMap<u64, usize>,
     pub monitors: monitor::Monitors,
     pub classes: HashMap<String, ObjRef>,
     pub strings: HashMap<String, ObjRef>,

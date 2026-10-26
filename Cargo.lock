@@ -200,6 +200,7 @@ dependencies = [
  "rd-apk",
  "rd-dex",
  "rd-jni",
+ "rd-testsupport",
  "rd-vm",
  "serde",
  "serde_json",
@@ -680,6 +681,7 @@ version = "0.9.0"
 dependencies = [
  "serde",
  "serde_json",
+ "spin",
 ]
 
 [[package]]
@@ -901,6 +903,12 @@ name = "smallvec"
 version = "1.16.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
+
+[[package]]
+name = "spin"
+version = "0.9.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 
 [[package]]
 name = "stable_deref_trait"

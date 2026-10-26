@@ -88,3 +88,55 @@ fn integer_utility_metadata_and_malformed_arguments_are_explicit() {
     )
     .is_err());
 }
+
+#[test]
+fn shared_arrays_match_jvm_and_keep_detached_callback_snapshots_alive() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/portable-boxes-fixture");
+    let dex = rd_dex::Dex::parse(std::fs::read(root.join("dex/classes.dex")).unwrap()).unwrap();
+    let mut vm = Engine::new(vec![dex], VmConfig::default());
+    let oracle = std::fs::read_to_string(root.join("arrays-oracle.tsv")).unwrap();
+    assert_eq!(oracle.lines().count(), 28);
+    for _ in 0..2 {
+        for row in oracle.lines() {
+            let (id, wanted) = row.split_once('\t').unwrap();
+            let value = vm
+                .invoke_static(
+                    "Lorg/androswitch/vm/ArraysFixture;",
+                    "observe",
+                    "(I)I",
+                    &[Value::Int(id.parse().unwrap())],
+                )
+                .unwrap_or_else(|error| panic!("{row}: {error}"));
+            assert_eq!(
+                value.as_int().unwrap(),
+                wanted.parse::<i32>().unwrap(),
+                "{row}"
+            );
+        }
+        vm.gc();
+    }
+    assert_eq!(
+        vm.invoke_static(
+            "Lorg/androswitch/vm/ArraysFixture;",
+            "hashDetached",
+            "()I",
+            &[]
+        )
+        .unwrap()
+        .as_int()
+        .unwrap(),
+        ((31 + 3) * 31 + 1) * 31 + 2
+    );
+    assert!(rd_vm::arrays::method_metadata(
+        "Ljava/util/Arrays;",
+        "fill",
+        "([Ljava/lang/Object;IILjava/lang/Object;)V"
+    )
+    .is_some());
+    assert!(rd_vm::arrays::method_metadata("Ljava/util/Arrays;", "sort", "([Z)V").is_none());
+    assert!(rd_vm::arrays::method_metadata("Ljava/util/Arrays;", "fill", "([I)Z").is_none());
+    assert!(vm
+        .invoke_static("Ljava/util/Arrays;", "fill", "([I)Z", &[Value::Null])
+        .is_err());
+}

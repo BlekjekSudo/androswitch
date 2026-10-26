@@ -50,6 +50,11 @@ pub(crate) fn static_intrinsic(
         return Ok(None);
     }
     Ok(Some(match (name, sig) {
+        ("gc", "()V") => {
+            vm.gc();
+            Value::Null
+        }
+
         ("nanoTime", "()J") => Value::Long((vm.fw.clock() as i64).saturating_mul(1_000_000)),
         ("currentTimeMillis", "()J") => {
             Value::Long(epoch_ms().saturating_add(vm.fw.clock() as i64))

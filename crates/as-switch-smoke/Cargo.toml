@@ -98,3 +98,16 @@ required-features = ["portable-tests", "host-cli"]
 name = "jni_objects"
 path = "tests/jni_objects.rs"
 required-features = ["portable-tests", "host-cli"]
+
+[dev-dependencies]
+rd-testsupport = { path = "../rd-testsupport", default-features = false }
+
+[[test]]
+name = "upstream_bitset"
+path = "../rd-vm/tests/android_bitset.rs"
+required-features = ["portable-tests"]
+
+[[test]]
+name = "upstream_narrow_arrays"
+path = "../rd-vm/tests/narrow_arrays_250.rs"
+required-features = ["portable-tests"]

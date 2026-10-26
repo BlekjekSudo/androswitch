@@ -50,6 +50,8 @@ pub(crate) mod android_display;
 pub(crate) mod android_drawable;
 #[cfg(feature = "std")]
 pub(crate) mod android_env;
+#[cfg(feature = "std")]
+pub(crate) mod android_json;
 pub mod android_log;
 #[cfg(feature = "std")]
 pub(crate) mod android_motion;
@@ -64,13 +66,21 @@ pub(crate) mod android_res;
 #[cfg(feature = "std")]
 pub(crate) mod android_spannable;
 #[cfg(feature = "std")]
+pub(crate) mod android_stub_surfaces;
+#[cfg(feature = "std")]
+pub(crate) mod android_sysservices;
+#[cfg(feature = "std")]
 pub(crate) mod android_text;
 #[cfg(feature = "std")]
 pub(crate) mod android_uri;
 #[cfg(feature = "std")]
 pub(crate) mod android_util;
 #[cfg(feature = "std")]
-pub(crate) mod arrays;
+pub(crate) mod android_velocity;
+/// Apêndice D — shims host AndroidX/Jetpack (data/jetpack.toml).
+#[cfg(feature = "std")]
+pub mod androidx;
+pub mod arrays;
 #[cfg(feature = "std")]
 pub(crate) mod atomics;
 pub mod boxes;
@@ -94,6 +104,8 @@ pub mod gc;
 #[path = "portable/gc.rs"]
 pub mod gc;
 #[cfg(feature = "std")]
+pub mod gms;
+#[cfg(feature = "std")]
 pub mod graphics;
 #[cfg(feature = "std")]
 pub(crate) mod handler_msg;
@@ -109,8 +121,11 @@ pub mod intrinsics;
 pub mod intrinsics;
 #[cfg(feature = "std")]
 pub(crate) mod jannotations;
+mod java_format;
+mod java_values;
 #[cfg(feature = "std")]
 pub(crate) mod jbigdecimal;
+pub mod jbitset;
 #[cfg(feature = "std")]
 pub(crate) mod jbreakiter;
 #[cfg(feature = "std")]
@@ -160,6 +175,8 @@ pub(crate) mod jtime;
 pub(crate) mod juuid;
 #[cfg(feature = "std")]
 pub(crate) mod jxml;
+#[cfg(feature = "virtual-devices")]
+pub mod m10;
 #[cfg(feature = "std")]
 pub mod m8;
 #[cfg(feature = "advanced-components")]
@@ -171,13 +188,18 @@ pub mod native;
 #[cfg(feature = "std")]
 pub(crate) mod numerics;
 #[cfg(feature = "std")]
+pub(crate) mod parcel;
+#[cfg(feature = "std")]
 pub mod perms;
 #[cfg(feature = "std")]
 pub(crate) mod platform_base;
+#[cfg(feature = "std")]
+pub(crate) mod prefs;
 mod primitive_parse;
 #[cfg(feature = "std")]
 pub(crate) mod reflect;
 pub mod repr;
+mod shared_call;
 #[cfg(feature = "std")]
 pub mod threads;
 #[cfg(feature = "std")]
@@ -210,6 +232,43 @@ pub use value::Value;
 pub const MODULE_ID: &str = "rd-vm";
 /// Explicit evidence of the linked VM variant (Cargo features are additive).
 pub const PORTABLE_CORE: bool = !cfg!(feature = "std");
+
+/// Issue #230: fronteira de `Engine` para o estado host que vive em
+/// estado thread-local (macro do std) fora do `Engine`. Esvazia/reinicia as tabelas
+/// indexadas por `ObjRef` (spannable, random, regex, uri, xml,
+/// annotations, io-chars) e o RNG de UUID. Sem isto, um `Engine` novo
+/// na mesma thread (relaunch, próximo cenário de `rd test`) herdava
+/// estado fantasma de um heap morto, porque os `ObjRef`s reiniciam com
+/// o `Heap::new`. O VFS de arquivos NÃO entra aqui: dados persistidos
+/// sobrevivem a relaunch dentro da sessão (comportamento Android);
+/// quem o limpa é `clear_package_data` (clear/remove) e `reset_vfs`
+/// (sessão nova).
+///
+/// Contrato: chamar ao descartar um `Engine` (o MCP faz isso ao matar o
+/// engine ativo) ou antes de construir outro na mesma thread.
+///
+/// Premissa explícita: um `Engine` vivo por vez por thread — o padrão
+/// de todas as superfícies (MCP, CLI, suítes). A migração dessas
+/// tabelas para dentro de `HostState` segue como follow-up da #230.
+#[cfg(feature = "std")]
+pub fn reset_host_thread_state() {
+    android_spannable::reset_all();
+    jrandom::reset_all();
+    jregex::reset_all();
+    android_uri::reset_all();
+    xml_res::reset_all();
+    jannotations::reset_all();
+    jio_chars::reset_all();
+    juuid::reset_all();
+}
+
+/// Issue #230: apaga o armazenamento privado de um pacote no VFS
+/// (`/data/user/0/<pkg>/`) — backend de `package_clear`/`package_remove`.
+#[cfg(feature = "std")]
+pub use jfile::clear_package_data;
+/// Issue #230: zera o VFS inteiro — fronteira de sessão nova.
+#[cfg(feature = "std")]
+pub use jfile::reset_all as reset_vfs;
 
 /// Converte um `EncodedValue` (static_values de class_def) em `Value`,
 /// alocando strings no heap da VM. `None` = tipo não representável no M2

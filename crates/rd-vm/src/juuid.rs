@@ -17,10 +17,23 @@ use crate::value::Value;
 
 const UUID: &str = "Ljava/util/UUID;";
 
+fn initial_seed() -> u64 {
+    std::env::var("RD_UUID_SEED")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0x9E37_79B9_7F4A_7C15)
+}
+
 thread_local! {
-    static RNG: Cell<u64> = Cell::new(
-        std::env::var("RD_UUID_SEED").ok().and_then(|s| s.parse().ok()).unwrap_or(0x9E37_79B9_7F4A_7C15),
-    );
+    static RNG: Cell<u64> = Cell::new(initial_seed());
+}
+
+/// Issue #230: fronteira de `Engine` — a sequência de
+/// `UUID.randomUUID()` volta à semente (`RD_UUID_SEED`), em vez de
+/// depender de quantos UUIDs engines anteriores geraram na thread
+/// (determinismo, PRF-04).
+pub(crate) fn reset_all() {
+    RNG.with(|r| r.set(initial_seed()));
 }
 
 fn next_u64() -> u64 {
@@ -255,5 +268,18 @@ mod tests {
             write!(&mut hex, "{byte:02x}").expect("writing to String cannot fail");
         }
         assert_eq!(hex, "d41d8cd98f00b204e9800998ecf8427e");
+    }
+
+    #[test]
+    fn reset_all_restarts_sequence() {
+        reset_all();
+        let first = next_u64();
+        let _ = next_u64();
+        reset_all();
+        assert_eq!(
+            next_u64(),
+            first,
+            "#230: RNG de UUID reinicia na fronteira de Engine"
+        );
     }
 }

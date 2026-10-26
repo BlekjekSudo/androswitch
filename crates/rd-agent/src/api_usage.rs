@@ -8,11 +8,16 @@
 //!
 //! Escopo honesto (Lei 1 — sem falha silenciosa): isto é análise ESTÁTICA do
 //! DEX ("o que o app referencia"), não coverage de execução — a metade
-//! `get_coverage` do AG-09 exige instrumentação do interpretador e segue
-//! pendente. O resultado registra isso explicitamente.
+//! dinâmica do AG-09 vive em `get_coverage` (instrumentação do interpretador).
+//! Além das referências brutas, cada tipo é classificado contra o registro
+//! executável do Apêndice C (`data/api-coverage.toml`, via
+//! `rd-framework::fd_api_coverage`): domínio funcional, status
+//! supported/partial/stub/not_implemented/unknown e gap explícito. O resultado
+//! registra esse escopo; referência estática nunca é vendida como execução.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use rd_framework::fd_api_coverage::{ApiCoverageSummary, ApiCoverageTable};
 use serde::Serialize;
 
 /// Resultado do scan de uso de APIs android.*.
@@ -28,8 +33,15 @@ pub struct ApiUsage {
     pub android_types: Vec<String>,
     /// Métodos android.* referenciados: FQCN da classe → nomes de método.
     pub android_methods: BTreeMap<String, Vec<String>>,
-    /// Qtde de tipos android.* por domínio (android.app, android.view, …).
+    /// Qtde de tipos android.* por prefixo de pacote de topo
+    /// (android.app, android.view, …). Campo histórico: não é o domínio do
+    /// Apêndice C — para isso veja `api_coverage.by_domain`.
     pub types_by_domain: BTreeMap<String, usize>,
+    /// Classificação Apêndice C dos tipos referenciados: contagens por
+    /// status/domínio funcional, tipos sem linha no registro e gaps.
+    pub api_coverage: ApiCoverageSummary,
+    /// Fonte da classificação de cobertura.
+    pub coverage_source: &'static str,
     /// Escopo da análise (contrato de honestidade — ver docs do módulo).
     pub analysis: &'static str,
 }
@@ -75,7 +87,7 @@ pub fn scan(package: &str, dexes: &[rd_dex::Dex]) -> ApiUsage {
             methods
                 .entry(cls)
                 .or_default()
-                .insert(dex.strings.get_or_empty(m.name_idx).to_string());
+                .insert(dex.string(m.name_idx).to_string());
         }
         // referências de campo implicam o tipo (ex.: android.os.Build.VERSION)
         for f in &dex.field_ids {
@@ -104,6 +116,22 @@ pub fn scan(package: &str, dexes: &[rd_dex::Dex]) -> ApiUsage {
     for t in &types {
         *types_by_domain.entry(domain(t)).or_default() += 1;
     }
+    // Apêndice C: classificar é aditivo ao contrato histórico. Se o registro
+    // embutido estiver inválido (bug de dados — os testes de rd-framework
+    // barram), reportamos registry_error explícito em vez de panicar ou
+    // esconder a falha dentro de um scan estático bem-sucedido.
+    let api_coverage = match ApiCoverageTable::embedded() {
+        Ok(table) => table.summarize_types(types.iter().map(String::as_str)),
+        Err(_) => ApiCoverageSummary {
+            total_types: types.len(),
+            by_status: [(String::from("registry_error"), types.len())]
+                .into_iter()
+                .collect(),
+            by_domain: BTreeMap::new(),
+            unknown_types: types.iter().cloned().collect(),
+            gap_ids: vec!["gap-api-coverage-registry".to_string()],
+        },
+    };
     ApiUsage {
         package: package.to_string(),
         dex_files: dexes.len(),
@@ -114,6 +142,8 @@ pub fn scan(package: &str, dexes: &[rd_dex::Dex]) -> ApiUsage {
             .map(|(k, v)| (k, v.into_iter().collect()))
             .collect(),
         types_by_domain,
+        api_coverage,
+        coverage_source: "data/api-coverage.toml (Appendix C)",
         analysis: "static-dex-references",
     }
 }
@@ -192,6 +222,30 @@ mod tests {
 
         assert_eq!(u.types_by_domain.get("android.app").copied(), Some(1));
         assert_eq!(u.types_by_domain.get("android.os").copied(), Some(1));
+
+        // Apêndice C: Activity é superfície parcial de app-lifecycle;
+        // Build$VERSION cai no override estreito supported de android.os.Build.
+        assert_eq!(u.coverage_source, "data/api-coverage.toml (Appendix C)");
+        assert_eq!(u.api_coverage.total_types, 2);
+        assert_eq!(u.api_coverage.by_status.get("partial").copied(), Some(1));
+        assert_eq!(u.api_coverage.by_status.get("supported").copied(), Some(1));
+        assert_eq!(
+            u.api_coverage
+                .by_domain
+                .get("app-lifecycle")
+                .map(|d| d.total),
+            Some(1)
+        );
+        assert_eq!(
+            u.api_coverage.by_domain.get("os-ipc").map(|d| d.total),
+            Some(1)
+        );
+        assert!(u.api_coverage.unknown_types.is_empty());
+        assert!(u
+            .api_coverage
+            .gap_ids
+            .iter()
+            .any(|g| g == "gap-android-app-partial"));
     }
 
     #[test]
@@ -202,6 +256,7 @@ mod tests {
         let u = scan("com.x", std::slice::from_ref(&dex));
         assert!(u.android_types.is_empty(), "{:?}", u.android_types);
         assert!(u.android_methods.is_empty());
+        assert_eq!(u.api_coverage.total_types, 0);
         assert_eq!(u.defined_classes, 1);
     }
 }

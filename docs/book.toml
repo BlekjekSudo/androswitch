@@ -1,0 +1,16 @@
+[book]
+title = "RustyDroid Documentation"
+description = "Rust-native Android runtime — architecture, MCP tools, compatibility scoreboards, and ADRs"
+authors = ["RustyDroid Contributors"]
+language = "pt-BR"
+src = "."
+
+[build]
+build-dir = "../target/mdbook"
+create-missing = false
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/nadabgfccvd/RustyDroid"
+edit-url-template = "https://github.com/nadabgfccvd/RustyDroid/edit/main/docs/{path}"

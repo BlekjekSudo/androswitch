@@ -43,6 +43,13 @@ pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
     INSTANCES.with(|m| m.borrow_mut().retain(|k| alive(*k)));
 }
 
+/// Issue #230: fronteira de `Engine` — sem isto, um objeto qualquer do
+/// próximo `Engine` que reutilize o mesmo `ObjRef` seria despachado
+/// como se fosse uma instância de anotação do heap anterior.
+pub(crate) fn reset_all() {
+    INSTANCES.with(|m| m.borrow_mut().clear());
+}
+
 /// Runtime annotations of `desc` as (dex index, annotation).
 fn class_annotations(
     vm: &Engine,
@@ -411,4 +418,20 @@ pub fn instance_intrinsic(
             Err(_) => return Ok(None),
         },
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn host_reset_clears_instances_from_previous_engine() {
+        INSTANCES.with(|s| s.borrow_mut().insert(4242));
+        assert!(INSTANCES.with(|s| s.borrow().contains(&4242)));
+        crate::reset_host_thread_state();
+        assert!(
+            !INSTANCES.with(|s| s.borrow().contains(&4242)),
+            "#230: ObjRef de heap morto não pode seguir marcado como instância de anotação"
+        );
+    }
 }

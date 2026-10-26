@@ -486,13 +486,24 @@ pub(crate) fn exec_frame(
                     _ => return bad_kind(insn),
                 };
                 let desc = vm.cp.type_str(dex_idx, type_idx);
+                // issue #250: o ART (interpreter_common.cc, DoFilledNewArray)
+                // só aceita int[] e arrays de referência. long[]/double[]
+                // lançam RuntimeException; os demais primitivos (boolean,
+                // byte, char, short, float) lançam InternalError. Antes os
+                // registradores entravam crus em [B/[Z/[C/[S, fora da faixa.
+                if let Some((class, msg)) = filled_new_array_unsupported(&desc) {
+                    throw_exc!(class, msg);
+                }
                 let Some(elem) = ElemKind::from_array_desc(&desc) else {
                     return Err(err::not_implemented(format!("filled-new-array {desc}")).into());
                 };
                 let r = step!(new_filled_array(vm, elem, count, &desc));
-                let elems = vm.heap.array_elems_mut(r)?;
                 for (i, v) in src.into_iter().enumerate() {
-                    elems[i] = v;
+                    if elem == ElemKind::Obj {
+                        step!(aput(vm, 0x4D, Some(r), i as i32, v));
+                    } else {
+                        vm.heap.array_elems_mut(r)?[i] = v;
+                    }
                 }
                 last_result = Value::Obj(r);
             }
@@ -888,6 +899,14 @@ pub(crate) fn exec_frame(
                         {
                             vm.statics.insert((owner.clone(), fname.clone()), c);
                         } else if let Some(c) =
+                            step!(crate::parcel::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
+                            step!(crate::android_util::host_static(vm, &owner, &fname))
+                        {
+                            vm.statics.insert((owner.clone(), fname.clone()), c);
+                        } else if let Some(c) =
                             step!(crate::platform_base::host_static(vm, &owner, &fname))
                         {
                             vm.statics.insert((owner.clone(), fname.clone()), c);
@@ -898,6 +917,12 @@ pub(crate) fn exec_frame(
                         } else if let Some(c) = step!(crate::jtime::host_static(vm, &owner, &fname))
                         {
                             vm.statics.insert((owner.clone(), fname.clone()), c);
+                        }
+                        #[cfg(feature = "virtual-devices")]
+                        if !vm.statics.contains_key(&(owner.clone(), fname.clone())) {
+                            if let Some(c) = step!(crate::m10::host_static(vm, &owner, &fname)) {
+                                vm.statics.insert((owner.clone(), fname.clone()), c);
+                            }
                         }
                     }
                 }
@@ -1164,6 +1189,33 @@ fn oom_exception(e: crate::heap::OomError) -> VmExit {
             e.requested, e.budget
         ),
     ))
+}
+
+/// `filled-new-array` com componente primitivo diferente de `int`: a exceção
+/// que o ART lança (classe, mensagem). `None` para `[I` e arrays de
+/// referência, que são os únicos casos suportados.
+fn filled_new_array_unsupported(desc: &str) -> Option<(&'static str, String)> {
+    let pretty = match desc {
+        "[Z" => "boolean",
+        "[B" => "byte",
+        "[C" => "char",
+        "[S" => "short",
+        "[F" => "float",
+        "[J" => "long",
+        "[D" => "double",
+        _ => return None,
+    };
+    Some(if matches!(desc, "[J" | "[D") {
+        (
+            "Ljava/lang/RuntimeException;",
+            format!("Bad filled array request for type {pretty}"),
+        )
+    } else {
+        (
+            "Ljava/lang/InternalError;",
+            format!("Found type {pretty}; filled-new-array not implemented for anything but 'int'"),
+        )
+    })
 }
 
 fn new_filled_array(
@@ -1450,7 +1502,8 @@ fn aput(
         // 0x4c aput-wide, 0x4d aput-object, 0x4e aput-boolean, 0x4f byte,
         // 0x50 char, 0x51 short — o match antigo tratava 0x4d como float e
         // 0x4e como double (bug latente descoberto pelo store check)
-        0x4C => Value::Long(v.as_long()?),             // aput-wide
+        0x4C => Value::Long(v.as_long()?), // aput-wide
+        0x4D if matches!(v, Value::Int(0)) => Value::Null,
         0x4E => Value::Int((v.as_int()? != 0) as i32), // aput-boolean
         0x4F => Value::Int(v.as_int()? as i8 as i32),  // aput-byte
         0x50 => Value::Int(v.as_int()? as u16 as i32), // aput-char
@@ -1506,11 +1559,12 @@ fn fill_array(
         // issue #48: [C é SEM sinal — decodificar u16. O desc real do array
         // vem do elem_class guardado no HeapObj (class_of devolve "[I"
         // genérico para todos os integrais primitivos)
-        let is_char_array = match vm.heap.get(arr)? {
-            crate::heap::HeapObj::Array { elem_class, .. } => {
-                elem_class == "C" || elem_class == "[C"
-            }
-            _ => false,
+        let (is_char_array, is_bool_array) = match vm.heap.get(arr)? {
+            crate::heap::HeapObj::Array { elem_class, .. } => (
+                elem_class == "C" || elem_class == "[C",
+                elem_class == "Z" || elem_class == "[Z",
+            ),
+            _ => (false, false),
         };
         let mut values = Vec::with_capacity(count as usize);
         for i in 0..count as usize {
@@ -1531,6 +1585,10 @@ fn fill_array(
                     slice.try_into().unwrap_or([0; 8]),
                 ))),
                 _ => match width {
+                    // issue #250: boolean[] guarda 0|1, a mesma invariante do
+                    // aput-boolean (`!= 0`). Com extensão de sinal, um payload
+                    // 0xFF virava −1 num [Z.
+                    1 if is_bool_array => Value::Int((slice[0] != 0) as i32),
                     1 => Value::Int(slice[0] as i8 as i32),
                     // issue #48: char[] decodifica SEM sinal (u16 — payload
                     // 0xFFFD é U+FFFD/65533, não −3); short[] continua i16
@@ -1615,6 +1673,10 @@ fn do_invoke(
         if let Some(v) = crate::m9::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
             return Ok(v);
         }
+        #[cfg(feature = "virtual-devices")]
+        if let Some(v) = crate::m10::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
+            return Ok(v);
+        }
         if let Some(v) =
             intrinsics::call_static_intrinsic(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
@@ -1624,6 +1686,21 @@ fn do_invoke(
         #[cfg(feature = "std")]
         if let Some(v) = crate::m8::call_m8_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
+            return Ok(v);
+        }
+        // Apêndice D: shims host AndroidX (FileProvider, AppInitializer,
+        // DataStore keys, MultiDex.install…) — `None` mantém o DEX real.
+        #[cfg(feature = "std")]
+        if let Some(v) =
+            crate::androidx::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
+        {
+            return Ok(v);
+        }
+        // Apêndice E (Google Play Services / Firebase, modo "sem GMS"
+        // honesto): só responde por classes GMS/Firebase/Billing, antes do
+        // host `Landroid` genérico — `None` continua para DEX.
+        #[cfg(feature = "std")]
+        if let Some(v) = crate::gms::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
             return Ok(v);
         }
         // M3: classes android/* são HOST (framework.rs) — nunca estão no DEX
@@ -1785,6 +1862,13 @@ fn do_invoke(
         return Ok(v);
     }
 
+    #[cfg(feature = "virtual-devices")]
+    if let Some(v) =
+        crate::m10::call_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+    {
+        return Ok(v);
+    }
+
     // M8: compat real — host sequestra só os métodos listados em m8.rs;
     // `None` cai para o DEX real da biblioteca (androidx/okhttp no APK).
     #[cfg(feature = "std")]
@@ -1812,6 +1896,30 @@ fn do_invoke(
             {
                 return Ok(value);
             }
+        }
+    }
+    #[cfg(feature = "std")]
+    {
+        // Apêndice D: shims host AndroidX por módulo (lifecycle, livedata,
+        // viewmodel, collection, datastore valores, work Data, navigation,
+        // startup, biometria, futures) — `None` mantém o DEX real da lib.
+        if let Some(v) = crate::androidx::call_instance(
+            vm,
+            &mref.class,
+            &mref.name,
+            &mref.proto,
+            recv,
+            &slots[1..],
+        )? {
+            return Ok(v);
+        }
+        // Apêndice E: objetos seguidos pelo shim GMS/Firebase e classes
+        // `Lcom/google/android/gms/`, `Lcom/google/firebase/`,
+        // `Lcom/android/billingclient/` — `None` continua para o host/DEX.
+        if let Some(v) =
+            crate::gms::call_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+        {
+            return Ok(v);
         }
     }
 
@@ -1931,6 +2039,10 @@ pub(crate) fn inherited_android_host(
             property_fallback_class.get_or_insert_with(|| ancestor.clone());
             #[cfg(feature = "advanced-components")]
             if let Some(value) = crate::m9::call_instance(vm, &ancestor, name, sig, recv, args)? {
+                return Ok(Some(value));
+            }
+            #[cfg(feature = "virtual-devices")]
+            if let Some(value) = crate::m10::call_instance(vm, &ancestor, name, sig, recv, args)? {
                 return Ok(Some(value));
             }
             if let Some(value) = crate::m8::call_m8_instance(vm, &ancestor, name, sig, recv, args)?

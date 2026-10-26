@@ -36,7 +36,8 @@ default = ["std", "advanced-components"]
 # Explicit host contract harness; never enabled by the device runtime build.
 portable-test-support = []
 std = ["serde/std", "dep:serde_json", "rd-dex/std", "rd-apk/std", "dep:regex", "dep:fancy-regex"]
-advanced-components = ["std"]
+advanced-components = ["std", "virtual-devices"]
+virtual-devices = ["std"]
 native = ["std", "dep:rd-ndk", "dep:rd-jni", "rd-ndk/native"]
 
 jit = ["std", "dep:rd-jni", "rd-jni/jit"]

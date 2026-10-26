@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "recorded_from_commit": "d216add85ef6cb13b58001244674ef0fc68b933f",
+  "recorded_at": "2026-10-22",
+  "contracts": {
+    "rust_version": "1.76",
+    "cargo_lock_version": 3,
+    "floor_min_sdk": 26,
+    "mcp_tool_count": 47,
+    "golden_vector_count": 150,
+    "fuzz_target_count": 5,
+    "minimum_static_test_attributes": 699,
+    "startup_budget_emulated_ms_max": 1500.0
+  },
+  "release_binary": {
+    "max_bytes_without_ab_review": 18874368,
+    "reference_bytes": 17143432,
+    "reference_note": "Re-recorded 2026-10-25 from the Sentinel all-features release build of main@71cc791 (measured on docs-only PR #212: 17143432 bytes). Previous reference 11722168 (ADR 009 work, 2026-10-22). Growth came from merged feature PRs (Appendix C surfaces, M10 virtual devices, engine registry), each within the per-PR A/B ratio gate; the ceiling keeps ~10% headroom. A/B ratio remains the primary gate."
+  },
+  "corpus": [
+    {
+      "id": "primftpd-71",
+      "package": "org.primftpd",
+      "path": "golden-apks/cache/org.primftpd_71.apk",
+      "sha256": "d36566e774e2d0446dcbb41438d22e62d198688aac2711ba7afaa6ea2fdd577d",
+      "expected": "launchable",
+      "cold_snapshot": true,
+      "perf": true,
+      "determinism": true
+    },
+    {
+      "id": "F-Droid-client",
+      "package": "org.fdroid.fdroid",
+      "path": "golden-apks/org.fdroid.fdroid.apk",
+      "sha256": null,
+      "expected": "below_floor_or_structured_result",
+      "cold_snapshot": false,
+      "perf": false,
+      "determinism": true,
+      "note": "The public fetch is a moving latest build, so Sentinel checks structured behavior and determinism but does not pretend this file is pinned."
+    },
+    {
+      "id": "heavy-100mb-plus",
+      "package": null,
+      "path_env": "RD_SENTINEL_HEAVY_APK",
+      "sha256": null,
+      "expected": "launchable",
+      "cold_snapshot": true,
+      "perf": false,
+      "determinism": false,
+      "optional_on_github_hosted": true,
+      "note": "Set on a self-hosted runner or manual campaign. A missing 100 MB+ corpus is reported as incomplete evidence, never as a pass."
+    }
+  ]
+}

@@ -27,6 +27,13 @@ pub(crate) struct FrameState {
     /// (callback, due virtual ms)
     pub callbacks: Vec<(ObjRef, u64)>,
     pub frames_run: u64,
+    /// The single main-thread `android.animation.AnimationHandler` host
+    /// object. The VM has one deterministic virtual UI thread, so unlike
+    /// AOSP there is no per-thread handler map.
+    pub animation_handler: Option<ObjRef>,
+    /// AnimationFrameCallbacks registered with the handler, with an
+    /// optional delayed start time in virtual milliseconds.
+    pub animation_callbacks: Vec<(ObjRef, Option<u64>)>,
 }
 
 fn instance(vm: &mut Engine) -> Result<ObjRef, VmExit> {
@@ -120,6 +127,16 @@ pub(crate) fn run_frame(vm: &mut Engine) -> Result<usize, VmExit> {
                 &m,
                 vec![Value::Obj(*cb), Value::Long(nanos), Value::WideHi],
             )?;
+        } else if class == "Landroid/transition/TransitionManager$MultiListener;" {
+            // TransitionManager schedules its pre-draw work on the next
+            // deterministic frame, matching ViewRootImpl's traversal point.
+            vm.invoke_instance(*cb, "onPreDraw", "()Z", &[])?;
+        } else if class == "Landroid/animation/AnimationHandler;" {
+            // The host AnimationHandler is itself posted as the frame
+            // callback (AOSP uses an anonymous FrameCallback field). Its
+            // intrinsic consumes the current virtual millisecond clock and
+            // re-posts itself while animations remain registered.
+            vm.invoke_instance(*cb, "doFrame", "(J)V", &[Value::Long(nanos)])?;
         }
     }
     Ok(due.len())

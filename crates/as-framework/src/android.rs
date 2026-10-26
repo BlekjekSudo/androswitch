@@ -1508,6 +1508,8 @@ impl FrameworkHost for Android {
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
         rd_vm::boxes::method_metadata(class, name, sig)
+            .or_else(|| rd_vm::arrays::method_metadata(class, name, sig))
+            .or_else(|| rd_vm::jbitset::method_metadata(class, name, sig))
             .or_else(|| services::Services::method_metadata(class, name, sig))
     }
     fn static_field_metadata(&self, class: &str, name: &str, descriptor: &str) -> bool {

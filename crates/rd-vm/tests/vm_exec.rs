@@ -7788,12 +7788,17 @@ fn preference_manager_prefs_padrao_comecam_vazias_devolvem_default() {
     const SP_IMPL: &str = "Landroid/content/SharedPreferencesImpl;";
     let b = DexBuilder::new();
     let mut e = engine_of(&b);
+    let ctx = rd_vm::value::Value::Obj(
+        e.heap
+            .alloc_instance("Landroid/app/Activity;".to_string(), Vec::new())
+            .unwrap(),
+    );
     let c1 = call_host_static(
         &mut e,
         PM,
         "getDefaultSharedPreferences",
         "(Landroid/content/Context;)Landroid/content/SharedPreferences;",
-        &[rd_vm::value::Value::Null],
+        std::slice::from_ref(&ctx),
     )
     .expect("arm")
     .expect("prefs objeto");
@@ -7806,7 +7811,7 @@ fn preference_manager_prefs_padrao_comecam_vazias_devolvem_default() {
         PM,
         "getDefaultSharedPreferences",
         "(Landroid/content/Context;)Landroid/content/SharedPreferences;",
-        &[rd_vm::value::Value::Null],
+        std::slice::from_ref(&ctx),
     )
     .expect("arm");
     assert_eq!(
@@ -7835,7 +7840,7 @@ fn preference_manager_prefs_padrao_comecam_vazias_devolvem_default() {
     )
     .expect("getString")
     .expect("valor");
-    assert_eq!(got, def, "prefs vazias → default");
+    assert_eq!(got, def.clone(), "prefs vazias → default");
 
     // getBoolean com default true → true (prefs vazias) — regra do próprio
     // default (o app espera enabled=true como no state inicial); getInt 41.
@@ -7872,18 +7877,32 @@ fn preference_manager_prefs_padrao_comecam_vazias_devolvem_default() {
     .expect("contains");
     assert_eq!(ct, Some(rd_vm::value::Value::Int(0)), "contains false");
 
-    // key null → NPE (AOSP)
-    let npe = call_host_instance(
+    // Deep audit (cycle 6): SharedPreferencesImpl has no null-key checks —
+    // a null key misses in the HashMap and yields the caller's default.
+    let null_key = call_host_instance(
         &mut e,
         SP,
         "getString",
         "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
         pr,
-        &[rd_vm::value::Value::Null, rd_vm::value::Value::Null],
+        &[rd_vm::value::Value::Null, def.clone()],
+    );
+    assert_eq!(
+        null_key.expect("null-key get").expect("value"),
+        def,
+        "key null → default (sem NPE)"
+    );
+    // Context null, por outro lado, é dereferenciado → NPE.
+    let null_ctx = call_host_static(
+        &mut e,
+        PM,
+        "getDefaultSharedPreferences",
+        "(Landroid/content/Context;)Landroid/content/SharedPreferences;",
+        &[rd_vm::value::Value::Null],
     );
     assert!(
-        matches!(npe, Err(rd_vm::VmExit::Exception(ref t)) if t.class == "Ljava/lang/NullPointerException;"),
-        "key null → NPE"
+        matches!(null_ctx, Err(rd_vm::VmExit::Exception(ref t)) if t.class == "Ljava/lang/NullPointerException;"),
+        "context null → NPE"
     );
 }
 

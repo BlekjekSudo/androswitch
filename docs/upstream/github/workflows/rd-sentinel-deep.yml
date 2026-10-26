@@ -1,0 +1,518 @@
+name: RD Sentinel Deep
+
+# Scheduled campaigns for work ordinary PR CI cannot afford or cannot see:
+# differential behavior, repeated determinism, actual fuzz execution, real-APK
+# endurance/soak, future toolchains, and dependency-update trials.
+on:
+  schedule:
+    # Nightly Monday-Saturday; Sunday is the longer weekly campaign.
+    - cron: '17 6 * * 1-6'
+    - cron: '43 4 * * 0'
+  workflow_dispatch:
+    inputs:
+      campaign:
+        description: Campaign type
+        required: true
+        default: nightly
+        type: choice
+        options: [nightly, weekly, manual]
+      profile:
+        description: Sentinel profile
+        required: true
+        default: nightly
+        type: choice
+        options: [auto, nightly, weekly, deep, perf, fuzz, deps, determinism, mutants, soak]
+      Fuzz_SECONDS:
+        description: Optional fuzz seconds per target (max practical hosted campaign is < 6h)
+        required: false
+        type: string
+      mutation_minutes:
+        description: Optional changed-code mutation budget in minutes (1-240)
+        required: false
+        type: string
+      baseline_proposal:
+        description: Produce baseline evidence without editing baseline
+        required: false
+        default: "false"
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: rd-sentinel-deep-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      campaign: ${{ steps.ctx.outputs.campaign }}
+      profile: ${{ steps.ctx.outputs.profile }}
+      base_sha: ${{ steps.ctx.outputs.base_sha }}
+      head_sha: ${{ steps.ctx.outputs.head_sha }}
+      Fuzz_SECONDS: ${{ steps.ctx.outputs.Fuzz_SECONDS }}
+      mutation_minutes: ${{ steps.ctx.outputs.mutation_minutes }}
+      baseline_proposal: ${{ steps.ctx.outputs.baseline_proposal }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve campaign
+        id: ctx
+        env:
+          INPUT_CAMPAIGN: ${{ inputs.campaign || '' }}
+          INPUT_PROFILE: ${{ inputs.profile || '' }}
+          INPUT_FUZZ_SECONDS: ${{ inputs.Fuzz_SECONDS || '' }}
+          INPUT_MUTATION_MINUTES: ${{ inputs.mutation_minutes || '' }}
+          INPUT_BASELINE_PROPOSAL: ${{ inputs.baseline_proposal || 'false' }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          set -euo pipefail
+          campaign="$INPUT_CAMPAIGN"
+          profile="$INPUT_PROFILE"
+          fuzz="$INPUT_FUZZ_SECONDS"
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+            if [ "$SCHEDULE" = "43 4 * * 0" ]; then
+              campaign=weekly; profile=weekly; fuzz=${fuzz:-7200}
+            else
+              campaign=nightly; profile=nightly; fuzz=${fuzz:-900}
+            fi
+          fi
+          campaign=${campaign:-nightly}
+          profile=${profile:-$campaign}
+          if [ "$profile" = "manual" ] || [ "$profile" = "auto" ]; then profile=nightly; fi
+          fuzz=${fuzz:-900}
+          mutation_minutes="$INPUT_MUTATION_MINUTES"
+          if ! [[ "$mutation_minutes" =~ ^[0-9]+$ ]] || [ "$mutation_minutes" -lt 1 ] || [ "$mutation_minutes" -gt 240 ]; then
+            mutation_minutes=45
+          fi
+          head=$(git rev-parse HEAD)
+          base=$(git rev-parse HEAD^ 2>/dev/null || echo "$head")
+          {
+            echo "campaign=$campaign"
+            echo "profile=$profile"
+            echo "Fuzz_SECONDS=$fuzz"
+            echo "mutation_minutes=$mutation_minutes"
+            echo "baseline_proposal=$INPUT_BASELINE_PROPOSAL"
+            echo "head_sha=$head"
+            echo "base_sha=$base"
+          } >> "$GITHUB_OUTPUT"
+
+  core:
+    name: core-future-deps
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.prepare.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install current, beta, and MSRV Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup toolchain install beta --profile minimal
+          rustup toolchain install 1.76.0 --profile minimal
+          rustup default stable
+          cargo install cargo-audit@0.22.2 --locked
+          cargo install cargo-deny@0.20.2 --locked
+          cargo install cargo-machete@0.9.2 --locked
+      # issue #193: the core/determinism components run
+      # `cargo test --workspace --all-features`, which enables the rd-ndk
+      # native tests. Those tests need the golden/native three-ABI
+      # fixtures (built from source, never committed) and the Unicorn
+      # worker — this job had neither, so the nightly failed 3 tests 5/5.
+      - name: Install native fixture prerequisites and build fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+          python -m pip install unicorn==2.1.4
+          bash golden/native/build.sh
+      - name: Fetch pinned Primftpd corpus for determinism probes
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p golden-apks/cache
+          file=golden-apks/cache/org.primftpd_71.apk
+          expected=d36566e774e2d0446dcbb41438d22e62d198688aac2711ba7afaa6ea2fdd577d
+          if [ ! -f "$file" ] || ! echo "$expected  $file" | sha256sum -c --quiet -; then
+            curl -fsSL -o "$file" https://f-droid.org/repo/org.primftpd_71.apk || \
+              curl -fsSL -o "$file" https://f-droid.org/archive/org.primftpd_71.apk
+          fi
+          echo "$expected  $file" | sha256sum -c -
+      - name: Run deep core/features/determinism/deps/future partial
+        run: |
+          mkdir -p sentinel-core
+          args=(
+            audit --repo "$GITHUB_WORKSPACE"
+            --base "${{ needs.prepare.outputs.base_sha }}"
+            --head "${{ needs.prepare.outputs.head_sha }}"
+            --profile "${{ needs.prepare.outputs.profile }}"
+            --campaign "${{ needs.prepare.outputs.campaign }}"
+            --event-name "$GITHUB_EVENT_NAME"
+            --repository "$GITHUB_REPOSITORY"
+            --component static --component core --component features
+            --component determinism --component deps --component future
+            --execute --strict-skips --allow-network
+            --output-dir "$GITHUB_WORKSPACE/sentinel-core"
+            --json-out "$GITHUB_WORKSPACE/sentinel-core/rd-sentinel-report.json"
+            --markdown-out "$GITHUB_WORKSPACE/sentinel-core/rd-sentinel-report.md"
+          )
+          if [ "${{ needs.prepare.outputs.campaign }}" = "weekly" ] || [ "${{ needs.prepare.outputs.profile }}" = "weekly" ] || [ "${{ needs.prepare.outputs.profile }}" = "deps" ]; then
+            args+=(--component dep-trial)
+          fi
+          if [ "${{ needs.prepare.outputs.baseline_proposal }}" = "true" ]; then
+            args+=(--baseline-proposal)
+          fi
+          python3 tools/rd-sentinel/rd_sentinel.py "${args[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: rd-sentinel-partial-core
+          path: |
+            sentinel-core/rd-sentinel-report.*
+            sentinel-core/sbom.cyclonedx.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  real-apk:
+    name: perf-real-apk-ab
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.prepare.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install Rust and native worker dependency
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup default stable
+          python -m pip install unicorn==2.1.4
+      - name: Fetch pinned Primftpd corpus
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p golden-apks/cache
+          file=golden-apks/cache/org.primftpd_71.apk
+          expected=d36566e774e2d0446dcbb41438d22e62d198688aac2711ba7afaa6ea2fdd577d
+          if [ ! -f "$file" ] || ! echo "$expected  $file" | sha256sum -c --quiet -; then
+            curl -fsSL -o "$file" https://f-droid.org/repo/org.primftpd_71.apk || \
+              curl -fsSL -o "$file" https://f-droid.org/archive/org.primftpd_71.apk
+          fi
+          echo "$expected  $file" | sha256sum -c -
+      - name: Run perf/real-APK/A-B partial
+        run: |
+          mkdir -p sentinel-real
+          args=(
+            audit --repo "$GITHUB_WORKSPACE"
+            --base "${{ needs.prepare.outputs.base_sha }}"
+            --head "${{ needs.prepare.outputs.head_sha }}"
+            --profile "${{ needs.prepare.outputs.profile }}"
+            --campaign "${{ needs.prepare.outputs.campaign }}"
+            --event-name "$GITHUB_EVENT_NAME"
+            --repository "$GITHUB_REPOSITORY"
+            --component static --component perf --component real-apk
+            --execute --strict-skips --allow-network
+            --output-dir "$GITHUB_WORKSPACE/sentinel-real"
+            --json-out "$GITHUB_WORKSPACE/sentinel-real/rd-sentinel-report.json"
+            --markdown-out "$GITHUB_WORKSPACE/sentinel-real/rd-sentinel-report.md"
+          )
+          if [ "${{ needs.prepare.outputs.campaign }}" = "weekly" ] || [ "${{ needs.prepare.outputs.profile }}" = "weekly" ] || [ "${{ needs.prepare.outputs.profile }}" = "deep" ] || [ "${{ needs.prepare.outputs.profile }}" = "perf" ]; then
+            args+=(--component compare)
+          fi
+          set +e
+          python3 tools/rd-sentinel/rd_sentinel.py "${args[@]}"
+          code=$?
+          set -e
+          rm -rf sentinel-real/bin sentinel-real/snapshots
+          find sentinel-real -name '*.png' -delete || true
+          exit "$code"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: rd-sentinel-partial-real-apk
+          path: sentinel-real/rd-sentinel-report.*
+          if-no-files-found: warn
+          retention-days: 30
+
+  fuzz:
+    name: fuzz-execute
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.prepare.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install nightly Rust and cargo-fuzz
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup toolchain install nightly --profile minimal
+          rustup default stable
+          cargo install cargo-fuzz@0.13.2 --locked
+      - name: Fetch seed APK
+        continue-on-error: true
+        run: bash golden-apks/fetch.sh
+      - name: Execute bounded fuzz campaign
+        run: |
+          mkdir -p sentinel-fuzz
+          python3 tools/rd-sentinel/rd_sentinel.py audit \
+            --repo "$GITHUB_WORKSPACE" \
+            --base "${{ needs.prepare.outputs.base_sha }}" \
+            --head "${{ needs.prepare.outputs.head_sha }}" \
+            --profile "${{ needs.prepare.outputs.profile }}" \
+            --campaign "${{ needs.prepare.outputs.campaign }}" \
+            --event-name "$GITHUB_EVENT_NAME" \
+            --repository "$GITHUB_REPOSITORY" \
+            --component static --component fuzz \
+            --Fuzz_SECONDS "${{ needs.prepare.outputs.Fuzz_SECONDS }}" \
+            --execute --strict-skips --allow-network \
+            --output-dir "$GITHUB_WORKSPACE/sentinel-fuzz" \
+            --json-out "$GITHUB_WORKSPACE/sentinel-fuzz/rd-sentinel-report.json" \
+            --markdown-out "$GITHUB_WORKSPACE/sentinel-fuzz/rd-sentinel-report.md"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: rd-sentinel-partial-fuzz
+          path: |
+            sentinel-fuzz/rd-sentinel-report.*
+            crates/*/fuzz/artifacts/**
+            fuzz-logs/**
+          if-no-files-found: warn
+          retention-days: 90
+
+  mutation:
+    name: mutation-in-diff
+    needs: prepare
+    if: needs.prepare.outputs.campaign == 'weekly' || needs.prepare.outputs.profile == 'weekly' || needs.prepare.outputs.profile == 'deep' || needs.prepare.outputs.profile == 'mutants'
+    runs-on: ubuntu-latest
+    timeout-minutes: 270
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.prepare.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Install stable Rust and cargo-mutants
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup default stable
+          cargo install cargo-mutants@27.1.0 --locked
+      - name: Test whether tests catch injected changed-code faults
+        run: |
+          mkdir -p sentinel-mutants
+          python3 tools/rd-sentinel/rd_sentinel.py audit \
+            --repo "$GITHUB_WORKSPACE" \
+            --base "${{ needs.prepare.outputs.base_sha }}" \
+            --head "${{ needs.prepare.outputs.head_sha }}" \
+            --profile "${{ needs.prepare.outputs.profile }}" \
+            --campaign "${{ needs.prepare.outputs.campaign }}" \
+            --event-name "$GITHUB_EVENT_NAME" \
+            --repository "$GITHUB_REPOSITORY" \
+            --component static --component mutation \
+            --mutation-minutes "${{ needs.prepare.outputs.mutation_minutes }}" \
+            --execute --strict-skips \
+            --output-dir "$GITHUB_WORKSPACE/sentinel-mutants" \
+            --json-out "$GITHUB_WORKSPACE/sentinel-mutants/rd-sentinel-report.json" \
+            --markdown-out "$GITHUB_WORKSPACE/sentinel-mutants/rd-sentinel-report.md" \
+            --sarif-out "$GITHUB_WORKSPACE/sentinel-mutants/rd-sentinel-report.sarif"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: rd-sentinel-partial-mutants
+          path: |
+            sentinel-mutants/rd-sentinel-report.*
+            sentinel-mutants/mutation/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  soak:
+    name: native-mcp-soak
+    needs: prepare
+    if: needs.prepare.outputs.campaign == 'weekly' || needs.prepare.outputs.profile == 'weekly' || needs.prepare.outputs.profile == 'soak'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.prepare.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/native-language-sdk
+          key: native-languages-sdk-r27c-platform26-r8-8.5.35-v1
+      - name: Install Rust Android targets and packaging prerequisites
+        run: |
+          rustup toolchain install stable --profile minimal --target x86_64-linux-android --target aarch64-linux-android --target armv7-linux-androideabi
+          rustup default stable
+          sudo apt-get update -qq
+          sudo apt-get install -y aapt apksigner zipalign unzip
+          python -m pip install unicorn==2.1.4
+      - name: Run weekly native-language MCP soak
+        run: |
+          mkdir -p sentinel-soak
+          python3 tools/rd-sentinel/rd_sentinel.py audit \
+            --repo "$GITHUB_WORKSPACE" \
+            --base "${{ needs.prepare.outputs.base_sha }}" \
+            --head "${{ needs.prepare.outputs.head_sha }}" \
+            --profile "${{ needs.prepare.outputs.profile }}" \
+            --campaign "${{ needs.prepare.outputs.campaign }}" \
+            --event-name "$GITHUB_EVENT_NAME" \
+            --repository "$GITHUB_REPOSITORY" \
+            --component static --component soak \
+            --execute --strict-skips --allow-network \
+            --output-dir "$GITHUB_WORKSPACE/sentinel-soak" \
+            --json-out "$GITHUB_WORKSPACE/sentinel-soak/rd-sentinel-report.json" \
+            --markdown-out "$GITHUB_WORKSPACE/sentinel-soak/rd-sentinel-report.md"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: rd-sentinel-partial-soak
+          path: |
+            sentinel-soak/rd-sentinel-report.*
+            sentinel-soak/mcp-soak/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  golden:
+    name: golden-repeated
+    needs: prepare
+    if: needs.prepare.outputs.campaign == 'weekly' || needs.prepare.outputs.profile == 'weekly'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.prepare.outputs.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install stable Rust and build JVM golden harness
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          bash golden/vm/test-gate.sh
+          bash golden/vm/fetch-tools.sh
+          bash golden/vm/build.sh
+      - name: Repeat JVM golden comparison
+        run: |
+          mkdir -p sentinel-golden
+          python3 tools/rd-sentinel/rd_sentinel.py audit \
+            --repo "$GITHUB_WORKSPACE" \
+            --base "${{ needs.prepare.outputs.base_sha }}" \
+            --head "${{ needs.prepare.outputs.head_sha }}" \
+            --profile "${{ needs.prepare.outputs.profile }}" \
+            --campaign "${{ needs.prepare.outputs.campaign }}" \
+            --event-name "$GITHUB_EVENT_NAME" \
+            --repository "$GITHUB_REPOSITORY" \
+            --component static --component golden \
+            --repeat 3 \
+            --execute --strict-skips \
+            --output-dir "$GITHUB_WORKSPACE/sentinel-golden" \
+            --json-out "$GITHUB_WORKSPACE/sentinel-golden/rd-sentinel-report.json" \
+            --markdown-out "$GITHUB_WORKSPACE/sentinel-golden/rd-sentinel-report.md"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: rd-sentinel-partial-golden
+          path: sentinel-golden/rd-sentinel-report.*
+          if-no-files-found: warn
+          retention-days: 30
+
+  report:
+    name: merge-report
+    needs: [prepare, core, real-apk, fuzz, mutation, soak, golden]
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.prepare.outputs.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: rd-sentinel-partial-*
+          path: partials
+          merge-multiple: false
+      - name: Merge partial reports (fail closed)
+        run: |
+          set -euo pipefail
+          expected=(core real-apk fuzz)
+          if [ "${{ needs.prepare.outputs.campaign }}" = "weekly" ] || [ "${{ needs.prepare.outputs.profile }}" = "weekly" ] || [ "${{ needs.prepare.outputs.profile }}" = "soak" ]; then
+            expected+=(soak)
+          fi
+          if [ "${{ needs.prepare.outputs.campaign }}" = "weekly" ] || [ "${{ needs.prepare.outputs.profile }}" = "weekly" ]; then
+            expected+=(golden)
+          fi
+          if [ "${{ needs.prepare.outputs.campaign }}" = "weekly" ] || [ "${{ needs.prepare.outputs.profile }}" = "weekly" ] || [ "${{ needs.prepare.outputs.profile }}" = "deep" ] || [ "${{ needs.prepare.outputs.profile }}" = "mutants" ]; then
+            expected+=(mutants)
+          fi
+          for name in "${expected[@]}"; do
+            if ! find "partials/rd-sentinel-partial-$name" -name 'rd-sentinel-report.json' 2>/dev/null | grep -q .; then
+              echo "Missing required partial RD Sentinel report: $name" >&2
+              find partials -type f -print >&2 || true
+              exit 1
+            fi
+          done
+          python3 tools/rd-sentinel/rd_sentinel.py merge partials \
+            --repo "$GITHUB_WORKSPACE" \
+            --out "$GITHUB_WORKSPACE/rd-sentinel-report.json" \
+            --markdown-out "$GITHUB_WORKSPACE/rd-sentinel-report.md" \
+            --sarif-out "$GITHUB_WORKSPACE/rd-sentinel-report.sarif"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: rd-sentinel-report
+          path: |
+            rd-sentinel-report.json
+            rd-sentinel-report.md
+            rd-sentinel-report.sarif
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Enforce merged verdict
+        if: always()
+        run: |
+          test -f rd-sentinel-report.json
+          python3 tools/rd-sentinel/rd_sentinel.py validate --report rd-sentinel-report.json --require-pass

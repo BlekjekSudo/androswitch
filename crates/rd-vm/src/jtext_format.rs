@@ -123,6 +123,22 @@ pub(crate) struct Pat {
     pub multiplier: i32,
 }
 
+/// JDK `DecimalFormat.DOUBLE_INTEGER_DIGITS` / `DOUBLE_FRACTION_DIGITS`:
+/// tetos que `set{Minimum,Maximum}{Integer,Fraction}Digits` aplicam
+/// silenciosamente. Sem eles, `setMinimumIntegerDigits(MAX_VALUE)`
+/// fazia `format` tentar montar uma String de ~2,1e9 dígitos —
+/// hang O(N²) + OOM no host, fora do `heap_budget` (issue #295).
+const MAX_INT_DIGITS: i32 = 309;
+const MAX_FRAC_DIGITS: i32 = 340;
+
+fn clamp_int_digits(n: i32) -> i32 {
+    n.clamp(0, MAX_INT_DIGITS)
+}
+
+fn clamp_frac_digits(n: i32) -> i32 {
+    n.clamp(0, MAX_FRAC_DIGITS)
+}
+
 fn split_affixes(p: &str) -> (String, String, String) {
     // (prefix, number part, suffix); quotes make literal text.
     let chars: Vec<char> = p.chars().collect();
@@ -265,19 +281,40 @@ pub(crate) fn format_number(f: &Fmt, x: f64) -> String {
     }
     let s = round(v, f.pat.max_frac, &f.rounding);
     let (ip, fp) = s.split_once('.').unwrap_or((&s, ""));
+    assemble_number(f, neg, ip, fp)
+}
+
+/// Núcleo EXATO de `NumberFormat.format(long)` (issue #295 item 2):
+/// `l as f64` corrompe `|l| > 2^53` (`Long.MAX_VALUE` virava
+/// `…808`). O produto `long × multiplier` é inteiro (`i128`), logo
+/// os dígitos são exatos e a fração é só zeros (aparados até
+/// `min_frac` em `assemble_number`, como no caminho `double`).
+pub(crate) fn format_long_exact(f: &Fmt, x: i64) -> String {
+    let v = x as i128 * f.pat.multiplier as i128;
+    let neg = v < 0;
+    let ip = v.unsigned_abs().to_string();
+    let fp = "0".repeat(f.pat.max_frac.max(0) as usize);
+    assemble_number(f, neg, &ip, &fp)
+}
+
+/// Monta `afixos + parte inteira (pad/agrupamento) + fração` a
+/// partir de dígitos crus — compartilhado pelos caminhos `f64`
+/// (`format_number`, já arredondado) e `long` (`format_long_exact`).
+fn assemble_number(f: &Fmt, neg: bool, ip: &str, fp: &str) -> String {
     let mut fp = fp.to_string();
     while fp.len() as i32 > f.pat.min_frac && fp.ends_with('0') {
         fp.pop();
     }
     let mut ip = ip.trim_start_matches('0').to_string();
-    while (ip.len() as i32)
-        < f.pat.min_int.max(if fp.is_empty() && f.pat.min_int == 0 {
-            1
-        } else {
-            0
-        })
-    {
-        ip.insert(0, '0');
+    // Padding linear (`"0".repeat`): o laço anterior com `insert(0, …)`
+    // deslocava a String inteira a cada dígito — O(N²) (issue #295).
+    let min_int = f.pat.min_int.max(if fp.is_empty() && f.pat.min_int == 0 {
+        1
+    } else {
+        0
+    });
+    if (ip.len() as i32) < min_int {
+        ip = format!("{}{ip}", "0".repeat(min_int as usize - ip.len()));
     }
     if ip.is_empty() && fp.is_empty() {
         ip.push('0');
@@ -315,6 +352,43 @@ pub(crate) fn format_number(f: &Fmt, x: f64) -> String {
     } else {
         format!("{}{body}{}", f.pat.pos_prefix, f.pat.pos_suffix)
     }
+}
+
+/// Núcleo puro do `DecimalFormat.parse` (issue #295): reconhece os
+/// afixos NEGATIVOS efetivos — os mesmos que `format_number` emite
+/// (`neg_prefix ?? "-{pos_prefix}"`, `neg_suffix ?? pos_suffix`) —
+/// além dos positivos. Sem isso, `parse("(1.5)")` (subpattern
+/// negativo) e `parse("-$9.90")` (moeda) falhavam no round-trip.
+fn parse_number(f: &Fmt, s: &str) -> Option<f64> {
+    let t = s.trim();
+    let neg_pre = f
+        .pat
+        .neg_prefix
+        .clone()
+        .unwrap_or_else(|| format!("-{}", f.pat.pos_prefix));
+    let neg_suf = f
+        .pat
+        .neg_suffix
+        .clone()
+        .unwrap_or_else(|| f.pat.pos_suffix.clone());
+    let (t, neg) = if !neg_pre.is_empty() && t.starts_with(neg_pre.as_str()) {
+        let t = t.strip_prefix(neg_pre.as_str()).unwrap_or(t);
+        let t = t.strip_suffix(neg_suf.as_str()).unwrap_or(t);
+        (t, true)
+    } else {
+        let t = t.strip_prefix(f.pat.pos_prefix.as_str()).unwrap_or(t);
+        let t = t.strip_suffix(f.pat.pos_suffix.as_str()).unwrap_or(t);
+        (t, false)
+    };
+    let num: String = t
+        .chars()
+        .filter(|c| *c != f.group)
+        .map(|c| if c == f.dec { '.' } else { c })
+        .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
+        .collect();
+    let x: f64 = num.parse().ok()?;
+    let x = if neg { -x.abs() } else { x };
+    Some(x / f.pat.multiplier as f64)
 }
 
 fn locale_tag(vm: &mut Engine, v: Option<&Value>) -> String {
@@ -374,9 +448,12 @@ fn new_df(vm: &mut Engine, pattern: &str, tag: &str) -> Result<Value, VmExit> {
 fn fmt_of(vm: &Engine, r: ObjRef) -> Fmt {
     let mut pat =
         parse_pattern(&field_str(vm, r, "rd_pattern").unwrap_or_else(|| "#,##0.###".into()));
-    pat.min_frac = field_int(vm, r, "rd_min_frac", pat.min_frac);
-    pat.max_frac = field_int(vm, r, "rd_max_frac", pat.max_frac).max(pat.min_frac);
-    pat.min_int = field_int(vm, r, "rd_min_int", pat.min_int);
+    // Defesa em profundidade (issue #295): mesmo que um campo tenha
+    // sido gravado por um caminho antigo, os tetos do JDK valem aqui.
+    pat.min_frac = clamp_frac_digits(field_int(vm, r, "rd_min_frac", pat.min_frac));
+    pat.max_frac =
+        clamp_frac_digits(field_int(vm, r, "rd_max_frac", pat.max_frac)).max(pat.min_frac);
+    pat.min_int = clamp_int_digits(field_int(vm, r, "rd_min_int", pat.min_int));
     let (dec, group) = match vm.heap.get_field(r, "rd_symbols") {
         Ok(Value::Obj(s)) => (
             char::from_u32(field_int(vm, s, "rd_dec", '.' as i32) as u32).unwrap_or('.'),
@@ -393,34 +470,48 @@ fn fmt_of(vm: &Engine, r: ObjRef) -> Fmt {
     }
 }
 
-fn number_of(vm: &mut Engine, v: Option<&Value>) -> Result<f64, VmExit> {
+/// O argumento numérico de `format`, PRESERVANDO a distinção do
+/// JDK entre `format(long)` (exato) e `format(double)` — issue
+/// #295 item 2: converter `Long` para `f64` corrompia `|l| > 2^53`.
+enum NumVal {
+    Long(i64),
+    Double(f64),
+}
+
+fn number_of(vm: &mut Engine, v: Option<&Value>) -> Result<NumVal, VmExit> {
+    let not_a_number = || {
+        exc(
+            "Ljava/lang/IllegalArgumentException;",
+            "Cannot format given Object as a Number",
+        )
+    };
     Ok(match v {
-        Some(Value::Int(i)) => *i as f64,
-        Some(Value::Long(l)) => *l as f64,
-        Some(Value::Float(f)) => *f as f64,
-        Some(Value::Double(d)) => *d,
+        Some(Value::Int(i)) => NumVal::Long(*i as i64),
+        Some(Value::Long(l)) => NumVal::Long(*l),
+        Some(Value::Float(f)) => NumVal::Double(*f as f64),
+        Some(Value::Double(d)) => NumVal::Double(*d),
         Some(Value::Obj(r)) => match vm.heap.get_field(*r, "value") {
-            Ok(Value::Int(i)) => i as f64,
-            Ok(Value::Long(l)) => l as f64,
-            Ok(Value::Float(f)) => f as f64,
-            Ok(Value::Double(d)) => d,
+            Ok(Value::Int(i)) => NumVal::Long(i as i64),
+            Ok(Value::Long(l)) => NumVal::Long(l),
+            Ok(Value::Float(f)) => NumVal::Double(f as f64),
+            Ok(Value::Double(d)) => NumVal::Double(d),
             _ => {
+                // JDK: `format(Object)` exige `Number` — uma String
+                // "123" NÃO é formatável (issue #295 item 2), mesmo
+                // que o seu toString parseie como número.
+                let is_number = vm
+                    .heap
+                    .class_of(*r)
+                    .is_ok_and(|cls| vm.cp.is_subtype(cls, "Ljava/lang/Number;"));
+                if !is_number {
+                    return Err(not_a_number());
+                }
                 // BigDecimal/BigInteger and other Numbers: via toString.
                 let s = crate::intrinsics::object_to_string(vm, *r)?;
-                s.trim().parse::<f64>().map_err(|_| {
-                    exc(
-                        "Ljava/lang/IllegalArgumentException;",
-                        "Cannot format given Object as a Number",
-                    )
-                })?
+                NumVal::Double(s.trim().parse::<f64>().map_err(|_| not_a_number())?)
             }
         },
-        _ => {
-            return Err(exc(
-                "Ljava/lang/IllegalArgumentException;",
-                "Cannot format given Object as a Number",
-            ))
-        }
+        _ => return Err(not_a_number()),
     })
 }
 
@@ -479,7 +570,9 @@ pub fn static_intrinsic(
         }
         (CHARSET, "defaultCharset") => Ok(Some(charset_obj(vm, "UTF-8")?)),
         (CHARSET, "isSupported") => {
-            let n = sval(vm, args.first()).unwrap_or_default();
+            // JDK: `Charset.isSupported(null)` é IAE (issue #295).
+            let n = sval(vm, args.first())
+                .ok_or_else(|| exc("Ljava/lang/IllegalArgumentException;", "Null charset name"))?;
             Ok(Some(Value::Int(canonical_charset(&n).is_some() as i32)))
         }
         (CN, "unflattenFromString") => {
@@ -595,20 +688,29 @@ fn decimal_format(
     let n = args.first().and_then(|v| v.as_int().ok()).unwrap_or(0);
     Ok(Some(match name {
         "<init>" => {
-            let pattern = sval(vm, args.first()).unwrap_or_else(|| "#,##0.###".into());
+            // JDK: `new DecimalFormat((String) null)` é NPE; o ctor
+            // sem argumentos usa o padrão default (issue #295). Sem
+            // ler ambiente do host (determinismo): default "en_US",
+            // como em `NumberFormat.getInstance()`.
+            let pattern = if sig.contains("Ljava/lang/String;") {
+                sval(vm, args.first())
+                    .ok_or_else(|| exc("Ljava/lang/NullPointerException;", "pattern"))?
+            } else {
+                "#,##0.###".into()
+            };
             let symbols = match args.get(1) {
                 Some(Value::Obj(s)) => *s,
-                _ => {
-                    let tag = std::env::var("RD_LOCALE").unwrap_or_else(|_| "en_US".into());
-                    new_symbols(vm, &tag)?
-                }
+                _ => new_symbols(vm, "en_US")?,
             };
             init_df(vm, recv, &pattern, symbols)?;
             Value::Null
         }
         "format" => {
-            let x = number_of(vm, args.first())?;
-            let s = format_number(&fmt_of(vm, recv), x);
+            let f = fmt_of(vm, recv);
+            let s = match number_of(vm, args.first())? {
+                NumVal::Long(l) => format_long_exact(&f, l),
+                NumVal::Double(d) => format_number(&f, d),
+            };
             if sig.contains("StringBuffer") {
                 // format(Object|double|long, StringBuffer, FieldPosition)
                 if let Some(Value::Obj(sb)) = args.get(1) {
@@ -625,27 +727,16 @@ fn decimal_format(
             jstr(vm, s)?
         }
         "parse" => {
-            let s = sval(vm, args.first()).unwrap_or_default();
+            // JDK: `parse(null)` é NullPointerException (issue #295).
+            let s = sval(vm, args.first())
+                .ok_or_else(|| exc("Ljava/lang/NullPointerException;", "source"))?;
             let f = fmt_of(vm, recv);
-            let t: String = s
-                .trim()
-                .trim_start_matches(f.pat.pos_prefix.as_str())
-                .trim_end_matches(f.pat.pos_suffix.as_str())
-                .chars()
-                .filter(|c| *c != f.group)
-                .map(|c| if c == f.dec { '.' } else { c })
-                .collect();
-            let num: String = t
-                .chars()
-                .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
-                .collect();
-            let Ok(mut x) = num.parse::<f64>() else {
+            let Some(x) = parse_number(&f, &s) else {
                 return Err(exc(
                     "Ljava/text/ParseException;",
                     format!("Unparseable number: \"{s}\""),
                 ));
             };
-            x /= f.pat.multiplier as f64;
             if x.fract() == 0.0 && x.abs() < 9.2e18 {
                 Value::Obj(crate::boxes::box_value(
                     vm,
@@ -661,7 +752,9 @@ fn decimal_format(
             }
         }
         "applyPattern" | "applyLocalizedPattern" => {
-            let p = sval(vm, args.first()).unwrap_or_default();
+            // JDK: `applyPattern(null)` é NullPointerException (issue #295).
+            let p = sval(vm, args.first())
+                .ok_or_else(|| exc("Ljava/lang/NullPointerException;", "pattern"))?;
             let s = match vm.heap.get_field(recv, "rd_symbols") {
                 Ok(Value::Obj(s)) => s,
                 _ => new_symbols(vm, "en_US")?,
@@ -674,21 +767,23 @@ fn decimal_format(
             jstr(vm, p)?
         }
         "setMaximumFractionDigits" => {
-            put(vm, recv, "rd_max_frac", Value::Int(n.max(0)))?;
+            let n = clamp_frac_digits(n);
+            put(vm, recv, "rd_max_frac", Value::Int(n))?;
             if field_int(vm, recv, "rd_min_frac", 0) > n {
-                put(vm, recv, "rd_min_frac", Value::Int(n.max(0)))?;
+                put(vm, recv, "rd_min_frac", Value::Int(n))?;
             }
             Value::Null
         }
         "setMinimumFractionDigits" => {
-            put(vm, recv, "rd_min_frac", Value::Int(n.max(0)))?;
+            let n = clamp_frac_digits(n);
+            put(vm, recv, "rd_min_frac", Value::Int(n))?;
             if field_int(vm, recv, "rd_max_frac", 3) < n {
                 put(vm, recv, "rd_max_frac", Value::Int(n))?;
             }
             Value::Null
         }
         "setMinimumIntegerDigits" => {
-            put(vm, recv, "rd_min_int", Value::Int(n.max(0)))?;
+            put(vm, recv, "rd_min_int", Value::Int(clamp_int_digits(n)))?;
             Value::Null
         }
         "setMaximumIntegerDigits"
@@ -768,6 +863,15 @@ fn component(
     };
     Ok(Some(match name {
         "<init>" => {
+            // AOSP: pkg/Context null em `ComponentName.<init>` é NPE —
+            // só o caso Context (objeto não-String) cai no pacote da
+            // sessão (issue #295).
+            if matches!(args.first(), None | Some(Value::Null)) {
+                return Err(exc(
+                    "Ljava/lang/NullPointerException;",
+                    "package name is null",
+                ));
+            }
             let p = match args.first() {
                 Some(Value::Obj(o)) if vm.heap.as_str(*o).is_ok() => {
                     sval(vm, args.first()).unwrap_or_default()
@@ -866,5 +970,64 @@ mod tests {
         assert_eq!(format_number(&f("#,##0%", '.', ','), 0.256), "26%");
         assert_eq!(format_number(&f("00.0", '.', ','), 3.04159), "03.0");
         assert_eq!(format_number(&f("#.##;(#.##)", '.', ','), -1.5), "(1.5)");
+    }
+    #[test]
+    fn digit_clamps_are_jdk_bounds() {
+        // Issue #295: DOUBLE_INTEGER_DIGITS / DOUBLE_FRACTION_DIGITS.
+        assert_eq!(clamp_int_digits(i32::MAX), 309);
+        assert_eq!(clamp_int_digits(-1), 0);
+        assert_eq!(clamp_int_digits(42), 42);
+        assert_eq!(clamp_frac_digits(i32::MAX), 340);
+        assert_eq!(clamp_frac_digits(-1), 0);
+    }
+    #[test]
+    fn integer_padding_is_linear_and_exact() {
+        // min_int no teto do JDK: o padding antigo (insert(0) em laço)
+        // era quadrático; o novo é uma repetição só, exata.
+        let mut fmt = f("0", '.', ',');
+        fmt.pat.min_int = MAX_INT_DIGITS;
+        let s = format_number(&fmt, 7.0);
+        assert_eq!(s.len(), 309);
+        assert!(s.ends_with('7'));
+        assert!(s[..308].chars().all(|c| c == '0'));
+    }
+    #[test]
+    fn parse_round_trips_negatives_and_currency() {
+        // Issue #295 (item 3): parse ignorava os afixos negativos.
+        let paren = f("#.##;(#.##)", '.', ',');
+        assert_eq!(format_number(&paren, -1.5), "(1.5)");
+        assert_eq!(parse_number(&paren, "(1.5)"), Some(-1.5));
+        assert_eq!(parse_number(&paren, "1.5"), Some(1.5));
+        let money = f("$#,##0.00", '.', ',');
+        assert_eq!(format_number(&money, -9.9), "-$9.90");
+        assert_eq!(parse_number(&money, "-$9.90"), Some(-9.9));
+        assert_eq!(parse_number(&money, "$9.90"), Some(9.9));
+        assert_eq!(parse_number(&money, "xyz"), None);
+    }
+    #[test]
+    fn long_format_is_exact_beyond_2pow53() {
+        // Issue #295 (item 2): via f64, Long.MAX_VALUE virava …808.
+        let grouped = f("#,##0", '.', ',');
+        assert_eq!(
+            format_long_exact(&grouped, i64::MAX),
+            "9,223,372,036,854,775,807"
+        );
+        assert_eq!(
+            format_long_exact(&grouped, (1i64 << 53) + 1),
+            "9,007,199,254,740,993"
+        );
+        assert_eq!(
+            format_long_exact(&grouped, i64::MIN),
+            "-9,223,372,036,854,775,808"
+        );
+        // Fração mínima e multiplier (%) comportam-se como no double.
+        assert_eq!(format_long_exact(&f("#,##0.00", '.', ','), 5), "5.00");
+        assert_eq!(format_long_exact(&f("#,##0%", '.', ','), 1), "100%");
+        assert_eq!(format_long_exact(&grouped, 0), "0");
+        // Consistência com o caminho f64 onde ele é exato (|x| <= 2^53).
+        assert_eq!(
+            format_long_exact(&f("#,##0.##", '.', ','), -1234567),
+            format_number(&f("#,##0.##", '.', ','), -1234567.0)
+        );
     }
 }

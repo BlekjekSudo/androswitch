@@ -83,7 +83,7 @@ pub fn estimate(data: &[u8], raw_capacity: usize, h: &Header, limit: usize) -> R
     }
     for i in 0..h.string_ids_size as usize {
         let offset = read::u32_at(data, h.string_ids_off as usize + i * 4)? as usize;
-        let encoded = strings::encoded_string_data(data, offset)?;
+        let encoded = strings::read_string_slice(data, offset)?;
         // Lossy MUTF-8 can expand malformed bytes by three; String growth can
         // round capacity again. Six times input plus a small minimum safely
         // covers the decoder's current allocation strategy.
@@ -102,7 +102,7 @@ pub fn estimate(data: &[u8], raw_capacity: usize, h: &Header, limit: usize) -> R
         let offset = read::u32_at(data, h.string_ids_off as usize + string as usize * 4)?;
         add(
             &mut total,
-            strings::encoded_string_data(data, offset as usize)?.len() * 4,
+            strings::read_string_slice(data, offset as usize)?.len() * 4,
             limit,
         )?;
     }
