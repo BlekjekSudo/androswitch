@@ -82,6 +82,20 @@ unhandled call must not switch to another independent object store.
 | Classes/enums/metadata | Upstream lookup algorithms, type facts and static caches | Portable canonical Class cache, loader/enum and JNI metadata adapters | Reconcile all identities and exact overload declarations; type discovery never grants a method |
 | Device/build/native services | Upstream reference device profile and optional native/JIT oracles | Actual Horizon observations, Bionic/JNI/native ARM64 backend | Use measured/profile-declared platform values and tested ABI replacements; no fictitious physical service |
 
+The first post-std integration slice extracts the immutable Collections
+factory overloads and three `EMPTY_*` fields from the original dispatcher into
+`collection_factories`. Both reference and product dispatch use that source.
+Its collection adapter creates/snapshots values in the active backend's existing
+store; a bound framework cannot fall back to `HostState`. Nine factory overloads
+are exposed to the device. The two inherited sorted factories return plain
+Set/Map marker types, so they remain reference-only until the sorted-container
+contract is integrated. `singletonMap`, other Collections utilities and the
+remaining collection constructors, bulk operations, sorted containers and
+iterators are still integration work.
+The inherited unmodifiable wrappers are snapshots, not live Android views;
+that semantic gap remains explicit. The product does not inherit the desktop
+`synchronized*` identity/no-op substitution.
+
 Compilation of both stores is not completion of any row. The default runner
 stays on its verified subset until the replacement can run the complete
 inherited and product corpus without selecting disconnected state. Native/JIT

@@ -114,6 +114,7 @@ pub(crate) mod bundle;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod choreographer;
 pub mod classpath;
+pub mod collection_factories;
 pub mod collection_values;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod collections;

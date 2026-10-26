@@ -430,6 +430,9 @@ fn call_static_intrinsic_rooted(
         return Ok(Some(v));
     }
     // java.util.Collections extras (collections.rs)
+    if let Some(v) = crate::collection_factories::call_static(vm, class, name, sig, args)? {
+        return Ok(Some(v));
+    }
     if let Some(v) = crate::collections::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(v));
     }
@@ -809,143 +812,6 @@ fn call_static_intrinsic_rooted(
                     "Collections.synchronized* com coleção null",
                 )));
             };
-            Ok(Some(Value::Obj(r)))
-        }
-        // M8 (40º gap real): Collections.unmodifiableMap — pedido pelo
-        // launch real (PftpdApp.onCreate → LogController.<clinit>). View de
-        // leitura em classe-marcadora host: leituras delegam ao estado
-        // (SNAPSHOT das entradas na criação — desvio de view documentado
-        // como o de synchronized*); mutações pela view → UOE (JDK). null →
-        // NPE; coleção sem estado host → VM_TYPE_ERROR tipado.
-        (
-            "Ljava/util/Collections;",
-            "unmodifiableMap",
-            "(Ljava/util/Map;)Ljava/util/Map;",
-        ) => {
-            let Some(Value::Obj(src)) = args.first() else {
-                return Err(VmExit::Exception(Throwable::new(
-                    "Ljava/lang/NullPointerException;",
-                    "Collections.unmodifiableMap com coleção null",
-                )));
-            };
-            let entries = match vm.fw.objects.get(src) {
-                Some(crate::framework::HostObj::Map { entries }) => entries.clone(),
-                _ => {
-                    return Err(crate::err::vm_error(
-                        "VM_TYPE_ERROR",
-                        "unmodifiableMap sobre coleção sem estado host (Map)",
-                    )
-                    .into())
-                }
-            };
-            let r = vm
-                .heap
-                .alloc_instance(UNMODIFIABLE_MAP.to_string(), vec![])?;
-            vm.fw
-                .objects
-                .insert(r, crate::framework::HostObj::Map { entries });
-            Ok(Some(Value::Obj(r)))
-        }
-        // M8 (41º gap real): Collections.singletonList — pedido pelo launch
-        // real (LogController.readPrefs): lista host imutável de 1 elemento
-        // em classe-marcadora; mutações pela view → UOE (JDK). Elemento
-        // null é aceito (JDK não valida) — a lista contém literalmente null.
-        (
-            "Ljava/util/Collections;",
-            "singletonList",
-            "(Ljava/lang/Object;)Ljava/util/List;",
-        ) => {
-            let v = args
-                .first()
-                .cloned()
-                .unwrap_or(Value::Null);
-            let r = vm
-                .heap
-                .alloc_instance(SINGLETON_LIST.to_string(), vec![])?;
-            vm.fw
-                .objects
-                .insert(r, crate::framework::HostObj::List { elems: vec![v] });
-            Ok(Some(Value::Obj(r)))
-        }
-        // Collections immutable factories: singleton/emptyX and list/collection
-        // views reuse the immutable marker classes (mutations → UOE). Views
-        // are snapshots of host state, like unmodifiableSet; a source without
-        // host state (DEX collection) is returned as-is.
-        ("Ljava/util/Collections;", "singleton", "(Ljava/lang/Object;)Ljava/util/Set;")
-        | ("Ljava/util/Collections;", "emptySet", "()Ljava/util/Set;")
-        | ("Ljava/util/Collections;", "emptyList", "()Ljava/util/List;")
-        | ("Ljava/util/Collections;", "emptyMap", "()Ljava/util/Map;")
-        | ("Ljava/util/Collections;", "emptySortedSet", "()Ljava/util/SortedSet;")
-        | ("Ljava/util/Collections;", "emptySortedMap", "()Ljava/util/SortedMap;") => {
-            let (class, state) = match name {
-                "singleton" => (
-                    UNMODIFIABLE_SET,
-                    crate::framework::HostObj::List {
-                        elems: vec![args.first().cloned().unwrap_or(Value::Null)],
-                    },
-                ),
-                "emptySet" | "emptySortedSet" => {
-                    (UNMODIFIABLE_SET, crate::framework::HostObj::List { elems: vec![] })
-                }
-                "emptyList" => (SINGLETON_LIST, crate::framework::HostObj::List { elems: vec![] }),
-                _ => (UNMODIFIABLE_MAP, crate::framework::HostObj::Map { entries: vec![] }),
-            };
-            let r = vm.heap.alloc_instance(class.to_string(), vec![])?;
-            vm.fw.objects.insert(r, state);
-            Ok(Some(Value::Obj(r)))
-        }
-        ("Ljava/util/Collections;", "unmodifiableList", "(Ljava/util/List;)Ljava/util/List;")
-        | (
-            "Ljava/util/Collections;",
-            "unmodifiableCollection",
-            "(Ljava/util/Collection;)Ljava/util/Collection;",
-        ) => {
-            let Some(Value::Obj(src)) = args.first() else {
-                return Err(VmExit::Exception(Throwable::new(
-                    "Ljava/lang/NullPointerException;",
-                    format!("Collections.{name} com coleção null"),
-                )));
-            };
-            let elems = match vm.fw.objects.get(src) {
-                Some(crate::framework::HostObj::List { elems }) => elems.clone(),
-                _ => return Ok(Some(Value::Obj(*src))),
-            };
-            let r = vm.heap.alloc_instance(SINGLETON_LIST.to_string(), vec![])?;
-            vm.fw.objects.insert(r, crate::framework::HostObj::List { elems });
-            Ok(Some(Value::Obj(r)))
-        }
-        // M8 (43º gap real): Collections.unmodifiableSet — pedido pelo
-        // launch real (LogController.readPrefs): view dedup de leitura em
-        // classe-marcadora (snapshot; desvio de view documentado —
-        // mesmo regime de unmodifiableMap); mutações → UOE; null → NPE;
-        // sem estado host → VM_TYPE_ERROR tipado.
-        (
-            "Ljava/util/Collections;",
-            "unmodifiableSet",
-            "(Ljava/util/Set;)Ljava/util/Set;",
-        ) => {
-            let Some(Value::Obj(src)) = args.first() else {
-                return Err(VmExit::Exception(Throwable::new(
-                    "Ljava/lang/NullPointerException;",
-                    "Collections.unmodifiableSet com coleção null",
-                )));
-            };
-            let elems = match vm.fw.objects.get(src) {
-                Some(crate::framework::HostObj::List { elems }) => elems.clone(),
-                _ => {
-                    return Err(crate::err::vm_error(
-                        "VM_TYPE_ERROR",
-                        "unmodifiableSet sobre coleção sem estado host (Set)",
-                    )
-                    .into())
-                }
-            };
-            let r = vm
-                .heap
-                .alloc_instance(UNMODIFIABLE_SET.to_string(), vec![])?;
-            vm.fw
-                .objects
-                .insert(r, crate::framework::HostObj::List { elems });
             Ok(Some(Value::Obj(r)))
         }
         // M8 (24º gap real, elevado a descoberta real no 45º gap): providers

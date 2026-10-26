@@ -22,17 +22,19 @@ integration; merging generated service surfaces does not establish behavior.
 ## Why an implemented upstream class can still fail on Switch
 
 The shared interpreter, classpath, heap, DEX reader and APK readers are inherited
-from RustyDroid. However, `rd-vm/src/lib.rs` selects different intrinsic dispatch
-modules using `cfg(feature = "std")`: the inherited `intrinsics.rs` for desktop,
-and `portable/intrinsics.rs` for the device. Many inherited Java/Android modules
-and `Engine::fw` are also behind `std`. The device binds `FrameworkHost` to
+from RustyDroid. The original split used the `std` feature for both Rust library
+support and desktop dispatch. The std migration has separated those concerns:
+`desktop-runtime` selects the inherited dispatcher, while `upstream-runtime`
+compiles its reference closure independently of the embedded execution backend.
+The device binds `FrameworkHost` to
 `as-framework`, whereas the inherited modules use `framework::HostState` and
 `HostObj` directly. See [ADR 012](adr/012-portable-interpreter.md) and
 [ADR 015](adr/015-portable-framework-and-session-boundary.md).
 
 Consequently, an unresolved descriptor can be a **porting/integration gap** even
-when its upstream implementation is present in the checkout. `no_std` requires
-separating OS dependencies; it does not require recreating every Java class.
+when its upstream implementation is present in the checkout. Real Horizon std
+now removes the library-profile restriction; shared state and platform bindings
+still require integration. Neither build profile requires recreating Java classes.
 The separate path helped establish the initial device build, but also left
 reusable upstream behavior outside that build. Adding isolated replacements
 without first inspecting upstream creates avoidable duplication.

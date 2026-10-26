@@ -1514,12 +1514,14 @@ impl FrameworkHost for Android {
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
         rd_vm::boxes::method_metadata(class, name, sig)
+            .or_else(|| rd_vm::collection_factories::method_metadata(class, name, sig))
             .or_else(|| rd_vm::arrays::method_metadata(class, name, sig))
             .or_else(|| rd_vm::jbitset::method_metadata(class, name, sig))
             .or_else(|| services::Services::method_metadata(class, name, sig))
     }
     fn static_field_metadata(&self, class: &str, name: &str, descriptor: &str) -> bool {
         rd_vm::boxes::static_field_descriptor(class, name) == Some(descriptor)
+            || rd_vm::collection_factories::static_field_descriptor(class, name) == Some(descriptor)
             || services::Services::static_field_metadata(class, name, descriptor)
     }
     fn thread_attached(&self, owner: u64, name: Option<&str>) -> Result<()> {
@@ -1535,7 +1537,25 @@ impl FrameworkHost for Android {
         name: &str,
         descriptor: &str,
     ) -> Result<Option<Value>> {
+        if rd_vm::collection_factories::static_field_descriptor(class, name) == Some(descriptor) {
+            return rd_vm::collection_factories::static_field(vm, class, name);
+        }
         self.services.static_field(vm, class, name, descriptor)
+    }
+    fn collection_snapshot(
+        &self,
+        vm: &Engine,
+        object: ObjRef,
+    ) -> Result<Option<rd_vm::collection_factories::Contents>> {
+        self.services.collection_snapshot(vm, object)
+    }
+    fn collection_create(
+        &self,
+        vm: &mut Engine,
+        class: &str,
+        contents: rd_vm::collection_factories::Contents,
+    ) -> Result<ObjRef> {
+        self.services.collection_create(vm, class, contents)
     }
     fn asset_open(&self, name: &str) -> Result<u64> {
         if name.is_empty()

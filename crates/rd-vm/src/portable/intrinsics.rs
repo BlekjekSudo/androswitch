@@ -59,6 +59,9 @@ pub fn call_static_intrinsic(
     if let Some(value) = crate::arrays::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = crate::collection_factories::call_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     if let Some(value) = crate::jbitset::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }

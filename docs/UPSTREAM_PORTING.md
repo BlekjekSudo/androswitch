@@ -104,7 +104,8 @@ The inherited behavior is preserved and its limitations stay visible.
 
 The [complete port plan](UPSTREAM_PARITY_PLAN.md) supersedes an APK-driven
 approach to missing APIs. `as-vm/upstream-runtime` compiles the original framework
-dependency closure on the freestanding Horizon target using `core + alloc`.
+dependency closure on the pinned Horizon std target. The earlier `core + alloc`
+compile proof remains historical evidence.
 Its original dispatcher and GC are shared; 13 module tables in eight original
 modules now belong to the Engine. All 50 original integration suites use their
 original source paths and builders, with an isolated host renderer. CI executes

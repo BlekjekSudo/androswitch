@@ -52,6 +52,9 @@ pub(crate) fn host_static(
     if class != "Ljava/util/Collections;" {
         return Ok(None);
     }
+    if crate::collection_factories::static_field_descriptor(class, name).is_some() {
+        return crate::collection_factories::static_field(vm, class, name);
+    }
     let (class, state) = match name {
         "EMPTY_LIST" => (
             "Ljava/util/Collections$SingletonList;",

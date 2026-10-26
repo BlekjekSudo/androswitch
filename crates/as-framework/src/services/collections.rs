@@ -61,6 +61,48 @@ pub(super) fn equals(vm: &mut Engine, left: &Value, right: &Value) -> Result<boo
         != 0)
 }
 impl Collections {
+    pub(super) fn snapshot(
+        &self,
+        vm: &Engine,
+        object: ObjRef,
+    ) -> Result<Option<rd_vm::collection_factories::Contents>> {
+        use rd_vm::collection_factories::Contents;
+        if let Some(values) = self.cow_items(object) {
+            return Ok(Some(Contents::List(values)));
+        }
+        if vm.heap.class_of(object)? == "Ljava/util/Arrays$ArrayList;" {
+            let array = obj(&vm.heap.get_field(object, "backingArray")?)?;
+            return Ok(Some(Contents::List(
+                vm.heap.as_array_elems(array)?.0.to_vec(),
+            )));
+        }
+        Ok(match self.objects.borrow().get(&object) {
+            Some(Container::List(values)) => Some(Contents::List(values.clone())),
+            Some(Container::Set(values)) => Some(Contents::Set(values.clone())),
+            Some(Container::Map(values)) => Some(Contents::Map(values.clone())),
+            _ => None,
+        })
+    }
+    pub(super) fn create(
+        &self,
+        vm: &mut Engine,
+        class: &str,
+        contents: rd_vm::collection_factories::Contents,
+    ) -> Result<ObjRef> {
+        use rd_vm::collection_factories::{Contents, LIST, MAP, SET};
+        let (slots, container) = match (class, contents) {
+            (LIST, Contents::List(values)) => (values.len(), Container::List(values)),
+            (SET, Contents::Set(values)) => (values.len(), Container::Set(values)),
+            (MAP, Contents::Map(values)) => {
+                (values.len().saturating_mul(2), Container::Map(values))
+            }
+            _ => return Err(error("INVALID_COLLECTION_FACTORY", class)),
+        };
+        self.budget(slots)?;
+        let object = vm.heap.alloc_instance(class.into(), vec![])?;
+        self.objects.borrow_mut().insert(object, container);
+        Ok(object)
+    }
     pub(super) fn metadata(
         class: &str,
         name: &str,
@@ -213,6 +255,13 @@ impl Collections {
             return Ok(Some(value));
         }
         let actual = vm.heap.class_of(r)?.to_string();
+        if rd_vm::collection_factories::rejects_mutation(&actual, name, sig) {
+            return Err(Throwable::new(
+                "Ljava/lang/UnsupportedOperationException;",
+                "immutable Collections factory result",
+            )
+            .into());
+        }
         if vm.cp.is_subtype(&actual, "Ljava/util/EnumMap;") {
             return self.enum_map_call(vm, name, sig, r, args);
         }

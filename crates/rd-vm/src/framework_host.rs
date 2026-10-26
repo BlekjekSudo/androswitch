@@ -10,6 +10,24 @@ pub enum HostMethodKind {
     Constructor,
 }
 pub trait FrameworkHost {
+    fn collection_snapshot(
+        &self,
+        _vm: &Engine,
+        _object: ObjRef,
+    ) -> Result<Option<crate::collection_factories::Contents>, VmExit> {
+        Ok(None)
+    }
+    fn collection_create(
+        &self,
+        _vm: &mut Engine,
+        _class: &str,
+        _contents: crate::collection_factories::Contents,
+    ) -> Result<ObjRef, VmExit> {
+        Err(
+            crate::err::vm_error("API_UNAVAILABLE", "collection owner has no factory adapter")
+                .into(),
+        )
+    }
     fn monotonic_micros(&self) -> Option<u64> {
         None
     }

@@ -887,8 +887,8 @@
     {
       "path": "crates/rd-vm/src/collections.rs",
       "blob": "67067871ce56283df6f0e6bdad2eb62758b290cb",
-      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
-      "sha256": "0bb3de095b71e57349c9af976fd03c83bb9eb9940821700b248c0244518b3668"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md.",
+      "sha256": "c756c22d7bfb33c2b7728ec181d4ffa02c0b8c21bc36f52a503bb83991b5f212"
     },
     {
       "path": "crates/rd-vm/src/content.rs",
@@ -959,8 +959,8 @@
     {
       "path": "crates/rd-vm/src/intrinsics.rs",
       "blob": "82c29016a7deca96ce2cf00ae8678093c1c9f104",
-      "reason": "Reuse the original rooted dispatcher on the no_std reference path; per-Engine output, common object-value helpers and a private shared Throwable detail-message slot replace desktop globals/duplicated state. Keep runtime items before test modules for strict clippy; PrintStream output shares one implementation across reference variants. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md.",
-      "sha256": "01246e3320c933bd51ac40d01e1648073d2a74b75abb2d6064a04691013c8219"
+      "reason": "Reuse the original rooted dispatcher on the no_std reference path; per-Engine output, common object-value helpers and a private shared Throwable detail-message slot replace desktop globals/duplicated state. Keep runtime items before test modules for strict clippy; PrintStream output shares one implementation across reference variants. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md.",
+      "sha256": "5be49a7e223f76d8fc035eaea61cb0493d44bb43581451a98024743576ab4ed4"
     },
     {
       "path": "crates/rd-vm/src/jannotations.rs",
@@ -1125,8 +1125,8 @@
     {
       "path": "crates/rd-vm/src/lib.rs",
       "blob": "1eeaef3f3207221f18c389904be8b943ee3f8302",
-      "reason": "Register the entire original framework dependency closure behind explicit experimental features, keep desktop native/JIT backends separate, share original intrinsics/GC plus core/alloc helpers, and retain default portable dispatch until state integration is complete. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Embedded VM ordered-index policy is preserved independently of std; std activation must not replace every small VM index with randomized TLS-seeded maps. Only the two map-module cfg guards and their policy comment change; original container algorithms remain shared.",
-      "sha256": "cc5716db69e69317090191bd90e9238e1fa80990e8ef4dbed78c5b150f361c2d"
+      "reason": "Register the entire original framework dependency closure behind explicit experimental features, keep desktop native/JIT backends separate, share original intrinsics/GC plus core/alloc helpers, and retain default portable dispatch until state integration is complete. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Embedded VM ordered-index policy is preserved independently of std; std activation must not replace every small VM index with randomized TLS-seeded maps. Only the two map-module cfg guards and their policy comment change; original container algorithms remain shared. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md.",
+      "sha256": "238c271d87b76979cc5a91dcd09c1d48f88e8ff5e0872502080a83a2cf950998"
     },
     {
       "path": "crates/rd-vm/src/m10/biometrics.rs",
@@ -2037,9 +2037,9 @@
     },
     {
       "path": "crates/rd-vm/src/framework_host.rs",
-      "sha256": "a49f824573ac898e8388355a0a8878240d6a6df96c2289a502ea7f834493700c",
+      "sha256": "a7f65c86c683eaa1d87088d50e6a660b26e3cf3d3d5b046ccee8f2d6f198e8a7",
       "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim.",
-      "reason": " Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md."
+      "reason": " Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md."
     },
     {
       "path": "crates/rd-vm/src/integer_bits.rs",
@@ -2121,8 +2121,9 @@
     },
     {
       "path": "crates/rd-vm/src/portable/intrinsics.rs",
-      "sha256": "83205989953aa1eaee3b51f0d260d2e2ea956970d1dec309c037f9e65c3f4f36",
-      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
+      "sha256": "dcb5e7c8d37c0d0a6f6ae15674c7a8b10110a2d6f2d91313ebbe4beb7d19e6e3",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim.",
+      "reason": " Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md."
     },
     {
       "path": "crates/rd-vm/src/portable/mod.rs",
@@ -2241,6 +2242,12 @@
       "scope": "One private Throwable detail-message slot shared by interpreted/host/JNI exception paths. Not a device behavior parity claim.",
       "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation",
       "reason": " Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md."
+    },
+    {
+      "path": "crates/rd-vm/src/collection_factories.rs",
+      "sha256": "0c353e8842565f7d23673a264569ff6fc7da8c3f4861e9b9d0f2c2c5d55baf66",
+      "derived_from": "crates/rd-vm/src/intrinsics.rs immutable Collections factory dispatch and collections.rs EMPTY_* fields at upstream 3761815dc6a2a1427e9fc66b66e8471b78d1b170",
+      "scope": "Shared factory algorithms with explicit active-owner transport; snapshot limitations and sorted reference-only behavior retained. Not complete device API parity."
     }
   ]
 }

@@ -41,6 +41,21 @@ pub(super) struct Services {
     fs: Rc<dyn as_platform::fs::FileSystem>,
 }
 impl Services {
+    pub(super) fn collection_snapshot(
+        &self,
+        vm: &Engine,
+        object: ObjRef,
+    ) -> Result<Option<rd_vm::collection_factories::Contents>> {
+        self.collections.snapshot(vm, object)
+    }
+    pub(super) fn collection_create(
+        &self,
+        vm: &mut Engine,
+        class: &str,
+        contents: rd_vm::collection_factories::Contents,
+    ) -> Result<ObjRef> {
+        self.collections.create(vm, class, contents)
+    }
     pub(super) fn write_log(&self, text: &str) -> Result<usize> {
         let directory = "logs/android";
         as_platform::fs::mkdirs(self.fs.as_ref(), directory).map_err(storage_error)?;
