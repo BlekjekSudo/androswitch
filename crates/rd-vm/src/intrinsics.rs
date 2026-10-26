@@ -4008,9 +4008,7 @@ fn instance_intrinsic_dispatch(
     if let Some(v) = crate::juuid::instance_intrinsic(vm, recv_class, name, recv, args)? {
         return Ok(Some(v));
     }
-    if let Some(v) =
-        crate::jio_chars::instance_intrinsic(vm, recv_class, mref_class, name, sig, recv, args)?
-    {
+    if let Some(v) = crate::java_io::call(vm, recv_class, mref_class, name, sig, recv, args)? {
         return Ok(Some(v));
     }
     if let Some(v) = crate::jtext_format::instance_intrinsic(vm, recv_class, name, sig, recv, args)?

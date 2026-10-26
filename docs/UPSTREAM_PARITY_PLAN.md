@@ -96,6 +96,16 @@ implementation boundary without certifying complete API parity.
 | Java collections/text/regex | Original collection algorithms, heap builder text and Matcher tables | Active collection provider, shared heap `buf`, Engine-owned regex state | Shared modules now connected; remaining collection families, metadata/semantic and platform verification still gate parity |
 | Device/build/native services | Upstream reference device profile and optional native/JIT oracles | Actual Horizon observations, Bionic/JNI/native ARM64 backend | Use measured/profile-declared platform values and tested ABI replacements; no fictitious physical service |
 
+The [shared I/O checkpoint](UPSTREAM_SHARED_IO.md) moves original File, file-stream,
+AtomicFile and character/byte-stream algorithms onto the common storage/object
+graph. `jio_chars` is now selected by the shipping std profile. File values and
+stream/channel owners are heap objects; character stream state is Engine-owned
+and traced through typed GC edges. The old product File/stream implementation is
+removed. This is scoped integration: native descriptors/locks, complete OS/file
+attributes, aggregate stream-memory pressure, preferences and SQL ownership
+remain open. The enlarged SDK catalog contains 274 cases and 148 actual JVM
+oracle rows; older binary/corpus evidence is not transferred.
+
 The first post-std integration slice extracts the immutable Collections
 factory overloads and three `EMPTY_*` fields from the original dispatcher into
 `collection_factories`. Both reference and product dispatch use that source.

@@ -14,7 +14,7 @@ public final class MainActivity extends Activity implements View.OnClickListener
   private int order;
   private static final String[] GROUPS = {"All", "DEX", "Text", "Collections", "TimeUnit",
       "Exceptions", "Reflection", "Threads", "Math", "Numbers", "CPU", "Horizon",
-      "Android identity", "Clock", "Display", "Package", "Storage", "Preferences", "Bundle", "UI",
+      "Android identity", "Clock", "Display", "Package", "Storage", "I/O", "Preferences", "Bundle", "UI",
       "Input", "SQLite", "Audio", "Lifecycle", "JNI", "Native", "OpenGL ES", "Vulkan"};
   @Override
   public void onCreate(Bundle b) {

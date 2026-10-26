@@ -87,6 +87,9 @@ pub fn call_static_intrinsic(
     if let Some(value) = crate::portable::file::call_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = crate::java_file::call_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     #[cfg(feature = "std")]
     if let Some(value) = crate::shared_text::call_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
@@ -210,11 +213,33 @@ pub fn call_instance_intrinsic_mref(
     } else {
         declaring_class
     };
+    #[cfg(feature = "std")]
+    if let Some(value) = crate::shared_text::call(vm, value_class, name, sig, receiver, args)? {
+        return Ok(Some(value));
+    }
     if let Some(value) = crate::portable::file::call(vm, value_class, name, sig, receiver, args)? {
         return Ok(Some(value));
     }
-    #[cfg(feature = "std")]
-    if let Some(value) = crate::shared_text::call(vm, value_class, name, sig, receiver, args)? {
+    if let Some(value) = crate::java_file::call(vm, value_class, name, sig, receiver, args)? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = crate::java_stream::call(vm, value_class, name, sig, receiver, args)? {
+        return Ok(Some(value));
+    }
+    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    if let Some(value) = crate::atomic_file::call(vm, value_class, name, sig, receiver, args)? {
+        return Ok(Some(value));
+    }
+    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    if let Some(value) = crate::java_io::call(
+        vm,
+        receiver_class,
+        declaring_class,
+        name,
+        sig,
+        receiver,
+        args,
+    )? {
         return Ok(Some(value));
     }
     Ok(None)

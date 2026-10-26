@@ -81,6 +81,33 @@ impl HostFileSystem {
     }
 }
 impl FileSystem for HostFileSystem {
+    fn rename_replace(&self, a: &str, b: &str) -> Result<(), PlatformError> {
+        disk::rename(self.path(a)?, self.path(b)?).map_err(|e| io("rename_replace", a, e))
+    }
+    fn create_file_new(&self, p: &str) -> Result<bool, PlatformError> {
+        match disk::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(self.path(p)?)
+        {
+            Ok(file) => {
+                file.sync_all().map_err(|e| io("create_file_new", p, e))?;
+                Ok(true)
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
+            Err(e) => Err(io("create_file_new", p, e)),
+        }
+    }
+    fn modified_millis(&self, p: &str) -> Result<u64, PlatformError> {
+        let time = disk::metadata(self.path(p)?)
+            .and_then(|m| m.modified())
+            .map_err(|e| io("modified_millis", p, e))?;
+        Ok(time
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|e| fs::error("IO_ERROR", "modified_millis", e.to_string()))?
+            .as_millis()
+            .min(u64::MAX as u128) as u64)
+    }
     fn sync_file(&self, p: &str) -> Result<(), PlatformError> {
         let meta = self
             .stat(p)?

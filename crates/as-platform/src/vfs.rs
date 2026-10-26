@@ -37,6 +37,23 @@ pub fn normalize(path: &str) -> Result<String, PlatformError> {
     Ok(format!("/{}", parts.join("/")))
 }
 pub trait GuestFileSystem {
+    /// Rename with the platform's replacement semantics. A backend that only
+    /// supports publication to absent names must report existing targets.
+    fn rename_replace(&self, source: &str, destination: &str) -> Result<(), PlatformError> {
+        if self.stat(destination)?.is_some() {
+            return Err(fs::error("API_UNAVAILABLE", "rename_replace", destination));
+        }
+        self.rename_new(source, destination)
+    }
+    fn create_file_new(&self, path: &str) -> Result<bool, PlatformError> {
+        Err(fs::error("API_UNAVAILABLE", "create_file_new", path))
+    }
+    fn create_dir(&self, path: &str) -> Result<bool, PlatformError> {
+        Err(fs::error("API_UNAVAILABLE", "create_dir", path))
+    }
+    fn modified_millis(&self, path: &str) -> Result<u64, PlatformError> {
+        Err(fs::error("API_UNAVAILABLE", "modified_millis", path))
+    }
     fn sync_file(&self, path: &str) -> Result<(), PlatformError> {
         Err(fs::error("API_UNAVAILABLE", "sync_file", path))
     }
@@ -111,6 +128,32 @@ impl<F: FileSystem> Vfs<F> {
     }
 }
 impl<F: FileSystem> GuestFileSystem for Vfs<F> {
+    fn rename_replace(&self, source: &str, destination: &str) -> Result<(), PlatformError> {
+        self.writable(source)?;
+        self.writable(destination)?;
+        let source = self.resolve(source)?;
+        let destination = self.resolve(destination)?;
+        let private = format!("userdata/{}", self.package);
+        if source.is_empty()
+            || destination.is_empty()
+            || source == private
+            || destination == private
+        {
+            return Err(fs::error("ACCESS_DENIED", "rename_replace", source));
+        }
+        self.fs.rename_replace(&source, &destination)
+    }
+    fn create_file_new(&self, path: &str) -> Result<bool, PlatformError> {
+        self.writable(path)?;
+        self.fs.create_file_new(&self.resolve(path)?)
+    }
+    fn create_dir(&self, path: &str) -> Result<bool, PlatformError> {
+        self.writable(path)?;
+        self.fs.create_dir(&self.resolve(path)?, true)
+    }
+    fn modified_millis(&self, path: &str) -> Result<u64, PlatformError> {
+        self.fs.modified_millis(&self.resolve(path)?)
+    }
     fn sync_file(&self, path: &str) -> Result<(), PlatformError> {
         self.fs.sync_file(&self.resolve(path)?)
     }

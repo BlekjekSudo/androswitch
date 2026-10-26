@@ -544,6 +544,38 @@ public final class AndroidCases {
       case 88: {
         return "NOT_RUN:asynchronous Handler verification is scheduled separately";
       }
+      case 89: {
+        java.io.File f = new java.io.File(a.getFilesDir(), "io-exclusive"); f.delete();
+        check(f.createNewFile() && !f.createNewFile(), "exclusive create preserves existing file");
+        check(f.isFile() && f.getParentFile().equals(a.getFilesDir()), "heap File path and parent");
+        f.delete(); return "exclusive and parent";
+      }
+      case 90: {
+        java.io.File f = new java.io.File(a.getFilesDir(), "io-characters");
+        java.io.BufferedWriter w = new java.io.BufferedWriter(new java.io.FileWriter(f));
+        System.gc(); w.write("hello \uD83D\uDE42\nsecond"); w.close();
+        java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader(f));
+        System.gc(); check("hello \uD83D\uDE42".equals(r.readLine()), "Unicode first line");
+        check("second".equals(r.readLine()) && r.readLine() == null, "remaining line and EOF");
+        r.close(); return "persistent character stream";
+      }
+      case 91: {
+        java.io.File f = new java.io.File(a.getFilesDir(), "io-channel");
+        java.io.FileOutputStream w = new java.io.FileOutputStream(f);
+        java.nio.channels.FileChannel c = w.getChannel(); w.write(42);
+        check(c.position() == 1 && c.size() == 1, "channel shares stream position");
+        c.force(true); c.close(); check(!c.isOpen(), "closed channel");
+        try { w.write(7); throw new IllegalStateException("stream remained open"); }
+        catch (java.io.IOException expected) { return "shared channel owner"; }
+      }
+      case 92: {
+        java.io.File f = new java.io.File(a.getFilesDir(), "io-atomic/base");
+        android.util.AtomicFile af = new android.util.AtomicFile(f);
+        java.io.FileOutputStream w = af.startWrite(); w.write(65); af.finishWrite(w);
+        w = af.startWrite(); w.write(66); af.failWrite(w);
+        byte[] data = af.readFully(); check(data.length == 1 && data[0] == 65, "rollback to committed data");
+        af.delete(); return "durable atomic backup";
+      }
       default:
         throw new IllegalArgumentException("unknown Android case");
     }

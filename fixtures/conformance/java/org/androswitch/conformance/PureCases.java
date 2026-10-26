@@ -1,5 +1,24 @@
 package org.androswitch.conformance;
 public final class PureCases {
+  private static final class ProxyWriter extends java.io.Writer {
+    final java.io.StringWriter sink = new java.io.StringWriter();
+    public void write(char[] c, int off, int n) { sink.write(c, off, n); }
+    public void flush() {}
+    public void close() {}
+  }
+  private static final class ProxyReader extends java.io.Reader {
+    private final String text;
+    private int pos;
+    ProxyReader(String value) { text = value; }
+    public int read(char[] c, int off, int n) {
+      if (n == 0) return 0;
+      if (pos == text.length()) return -1;
+      int copied = 0;
+      while (copied < n && pos < text.length()) c[off + copied++] = text.charAt(pos++);
+      return copied;
+    }
+    public void close() {}
+  }
   private static final class ReadList extends java.util.AbstractList<String> {
     public int size() { return 3; }
     public String get(int index) {
@@ -663,11 +682,80 @@ public final class PureCases {
         a.clear(); b.clear();
         return caught + ":" + a.equals(b) + ":" + a.hashCode();
       }
+      case 135: {
+        java.io.BufferedReader r = new java.io.BufferedReader(new java.io.StringReader("a\r\nb\rc\n"));
+        return r.readLine() + ":" + r.readLine() + ":" + r.readLine() + ":" + r.readLine();
+      }
+      case 136: {
+        java.io.StringReader r = new java.io.StringReader("abcd");
+        r.read(); r.mark(20); long n = r.skip(2); r.reset();
+        return n + ":" + r.read() + ":" + r.ready();
+      }
+      case 137: {
+        java.io.StringReader r = new java.io.StringReader("text"); r.close();
+        try { r.read(); return "not closed"; }
+        catch (java.io.IOException expected) { return "closed:" + r.markSupported(); }
+      }
+      case 138: {
+        java.io.StringWriter w = new java.io.StringWriter();
+        w.write(0xD83D); w.write(0xDE42); return w.toString();
+      }
+      case 139: {
+        java.io.StringWriter s = new java.io.StringWriter();
+        java.io.BufferedWriter w = new java.io.BufferedWriter(s);
+        w.write("hello", 1, 3); w.flush(); w.close(); return s.toString();
+      }
+      case 140: {
+        java.io.StringWriter w = new java.io.StringWriter();
+        w.append('a').append("bcde", 1, 3).append((CharSequence)null); return w.toString();
+      }
+      case 141: {
+        java.io.ByteArrayOutputStream w = new java.io.ByteArrayOutputStream();
+        w.write(new byte[]{0, 65, 66, 0}, 1, 2);
+        String first = w.toString("UTF-8"); w.reset(); w.write(67);
+        return first + ":" + w.size() + ":" + w.toString("UTF-8");
+      }
+      case 142: {
+        java.io.ByteArrayInputStream r = new java.io.ByteArrayInputStream(new byte[]{10,20,30,40});
+        r.read(); r.mark(10); long n = r.skip(2); r.reset();
+        return n + ":" + r.read() + ":" + r.available();
+      }
+      case 143: {
+        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+        java.io.OutputStreamWriter w = new java.io.OutputStreamWriter(b, "UTF-8");
+        w.write(0xD83D); w.flush(); w.write(0xDE42); w.close();
+        return new String(b.toByteArray(), "UTF-8");
+      }
+      case 144: {
+        ProxyWriter w = new ProxyWriter(); w.write('A'); w.append('B');
+        w.write("CDE", 1, 2); return w.sink.toString();
+      }
+      case 145: {
+        ProxyReader r = new ProxyReader("abc"); char[] c = new char[2];
+        int first = r.read(); int n = r.read(c);
+        return first + ":" + n + ":" + new String(c);
+      }
+      case 146: {
+        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
+        java.io.OutputStreamWriter w = new java.io.OutputStreamWriter(b, "UTF-8");
+        System.gc(); w.write("state"); System.gc(); w.flush();
+        return b.toString("UTF-8");
+      }
+      case 147: {
+        ProxyWriter p = new ProxyWriter();
+        java.io.BufferedWriter w = new java.io.BufferedWriter(p);
+        w.write(0xD83D); w.flush(); p.sink.write(0xDE42); return p.sink.toString();
+      }
       default:
         throw new IllegalArgumentException("unknown pure case");
     }
   }
   public static void main(String[] args) throws Exception {
-    for (int i = 0; i < 135; i++) System.out.println(i + "\t" + run(i));
+    // Write the oracle as UTF-8 bytes, independently of a Windows console's
+    // legacy encoding. A surrogate/Unicode test must preserve its real value.
+    java.io.PrintWriter out = args.length == 0 ? new java.io.PrintWriter(System.out) :
+        new java.io.PrintWriter(new java.io.OutputStreamWriter(new java.io.FileOutputStream(args[0]), "UTF-8"));
+    for (int i = 0; i < 148; i++) out.println(i + "\t" + run(i));
+    out.flush(); if (args.length != 0) out.close();
   }
 }

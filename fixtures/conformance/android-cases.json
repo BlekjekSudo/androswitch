@@ -443,5 +443,21 @@
     "id": "activity.handler-order",
     "group": "Lifecycle",
     "kind": "integration"
+  },
+  {
+    "id": "storage.file-exclusive",
+    "group": "I/O"
+  },
+  {
+    "id": "storage.character-stream",
+    "group": "I/O"
+  },
+  {
+    "id": "storage.channel-owner",
+    "group": "I/O"
+  },
+  {
+    "id": "storage.atomic-file",
+    "group": "I/O"
   }
 ]

@@ -538,5 +538,57 @@
   {
     "id": "collections.cycle-equals-hash-unwind",
     "group": "Collections"
+  },
+  {
+    "id": "io.reader-line-endings",
+    "group": "I/O"
+  },
+  {
+    "id": "io.reader-mark-reset",
+    "group": "I/O"
+  },
+  {
+    "id": "io.reader-closed",
+    "group": "I/O"
+  },
+  {
+    "id": "io.writer-surrogates",
+    "group": "I/O"
+  },
+  {
+    "id": "io.writer-buffered-chain",
+    "group": "I/O"
+  },
+  {
+    "id": "io.writer-append",
+    "group": "I/O"
+  },
+  {
+    "id": "io.byte-output-reset",
+    "group": "I/O"
+  },
+  {
+    "id": "io.byte-input-mark",
+    "group": "I/O"
+  },
+  {
+    "id": "io.writer-encoding-split",
+    "group": "I/O"
+  },
+  {
+    "id": "io.writer-dex-template",
+    "group": "I/O"
+  },
+  {
+    "id": "io.reader-dex-template",
+    "group": "I/O"
+  },
+  {
+    "id": "io.side-state-gc",
+    "group": "I/O"
+  },
+  {
+    "id": "io.writer-dex-raw-utf16",
+    "group": "I/O"
   }
 ]

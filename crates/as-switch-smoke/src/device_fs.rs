@@ -15,6 +15,12 @@ use as_platform::{
 };
 #[allow(unsafe_code)]
 extern "C" {
+    fn as_storage_rename_replace(
+        source: *const core::ffi::c_char,
+        destination: *const core::ffi::c_char,
+    ) -> i32;
+    fn as_storage_create_file_new(path: *const core::ffi::c_char) -> i32;
+    fn as_storage_modified_millis(path: *const core::ffi::c_char, millis: *mut u64) -> i32;
     fn as_storage_sync_file(path: *const core::ffi::c_char) -> i32;
     fn as_storage_writer_open(path: *const core::ffi::c_char) -> u64;
     fn as_storage_writer_write(handle: u64, bytes: *const u8, length: usize) -> i64;
@@ -83,6 +89,41 @@ impl LibnxFileSystem {
     }
 }
 impl FileSystem for LibnxFileSystem {
+    fn rename_replace(&self, a: &str, b: &str) -> Result<(), PlatformError> {
+        let source = self.path(a)?;
+        let destination = self.path(b)?;
+        // SAFETY: both terminated paths remain alive for this synchronous call.
+        #[allow(unsafe_code)]
+        let rc = unsafe { as_storage_rename_replace(source.as_ptr(), destination.as_ptr()) };
+        if rc < 0 {
+            Err(error("rename_replace", i64::from(rc)))
+        } else {
+            Ok(())
+        }
+    }
+    fn create_file_new(&self, p: &str) -> Result<bool, PlatformError> {
+        let path = self.path(p)?;
+        // SAFETY: terminated path remains alive for the synchronous adapter.
+        #[allow(unsafe_code)]
+        let rc = unsafe { as_storage_create_file_new(path.as_ptr()) };
+        match rc {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(error("create_file_new", i64::from(rc))),
+        }
+    }
+    fn modified_millis(&self, p: &str) -> Result<u64, PlatformError> {
+        let path = self.path(p)?;
+        let mut millis = 0;
+        // SAFETY: terminated path and writable scalar outlive this call.
+        #[allow(unsafe_code)]
+        let rc = unsafe { as_storage_modified_millis(path.as_ptr(), &mut millis) };
+        if rc < 0 {
+            Err(error("modified_millis", i64::from(rc)))
+        } else {
+            Ok(millis)
+        }
+    }
     fn sync_file(&self, p: &str) -> Result<(), PlatformError> {
         let meta = self
             .stat(p)?

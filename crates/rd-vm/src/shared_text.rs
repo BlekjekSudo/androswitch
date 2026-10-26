@@ -189,6 +189,13 @@ pub(crate) fn call(
     roots.extend_from_slice(args);
     crate::shared_call::with_values(vm, &roots, |vm| {
         if class == "Ljava/lang/String;" {
+            // Keep the API26 ICU alias, BOM and pre-reservation/OOM contract
+            // already verified by the device/JVM encoding corpus. The
+            // inherited general text path must not regress that adapter when
+            // its constructors are selected before the portable fallback.
+            if name == "getBytes" && matches!(sig, "()[B" | "(Ljava/lang/String;)[B") {
+                return crate::portable::file::call(vm, class, name, sig, recv, args);
+            }
             crate::jlstring::instance_intrinsic(vm, class, name, sig, recv, args)
         } else if matches!(
             class,

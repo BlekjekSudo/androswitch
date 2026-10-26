@@ -96,6 +96,60 @@ fn app() -> (App, Rc<Identity>) {
     (app, native)
 }
 #[test]
+fn shared_io_jni_metadata_resolves_only_exact_methods_and_constructor_declarations() {
+    let (mut app, _) = app();
+    for (class, name, sig) in [
+        ("Ljava/io/File;", "<init>", "(Ljava/lang/String;)V"),
+        ("Ljava/io/File;", "listFiles", "()[Ljava/io/File;"),
+        ("Ljava/io/FileOutputStream;", "write", "([BII)V"),
+        (
+            "Ljava/io/BufferedReader;",
+            "readLine",
+            "()Ljava/lang/String;",
+        ),
+        ("Ljava/io/Writer;", "write", "([C)V"),
+        (
+            "Landroid/util/AtomicFile;",
+            "finishWrite",
+            "(Ljava/io/FileOutputStream;)V",
+        ),
+    ] {
+        assert_eq!(
+            method_owner(&mut app.vm, class, name, sig, false).unwrap(),
+            class
+        );
+        assert!(method_owner(&mut app.vm, class, name, sig, true).is_err());
+    }
+    assert!(method_owner(&mut app.vm, "Ljava/io/File;", "createNewFile", "()V", false).is_err());
+    assert!(method_owner(
+        &mut app.vm,
+        "Ljava/io/ByteArrayInputStream;",
+        "write",
+        "(I)V",
+        false
+    )
+    .is_err());
+    assert!(method_owner(
+        &mut app.vm,
+        "Ljava/io/BufferedReader;",
+        "<init>",
+        "()V",
+        false
+    )
+    .is_err());
+    assert_eq!(
+        method_owner(
+            &mut app.vm,
+            "Ljava/io/File;",
+            "createTempFile",
+            "(Ljava/lang/String;Ljava/lang/String;)Ljava/io/File;",
+            true
+        )
+        .unwrap(),
+        "Ljava/io/File;"
+    );
+}
+#[test]
 fn upstream_wrappers_share_real_jni_constructor_method_and_static_field_metadata() {
     let (mut app, native) = app();
     let class = "Ljava/lang/Integer;";

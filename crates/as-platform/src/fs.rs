@@ -26,6 +26,19 @@ pub struct Entry {
     pub directory: bool,
 }
 pub trait FileSystem {
+    fn rename_replace(&self, source: &str, destination: &str) -> Result<(), PlatformError> {
+        if self.stat(destination)?.is_some() {
+            return Err(error("API_UNAVAILABLE", "rename_replace", destination));
+        }
+        self.rename_new(source, destination)
+    }
+    /// Create an empty file only if absent, without truncating an existing file.
+    fn create_file_new(&self, path: &str) -> Result<bool, PlatformError> {
+        Err(error("API_UNAVAILABLE", "create_file_new", path))
+    }
+    fn modified_millis(&self, path: &str) -> Result<u64, PlatformError> {
+        Err(error("API_UNAVAILABLE", "modified_millis", path))
+    }
     /// Commit a regular file's data and metadata to the backing store.
     /// Backends without a durability operation must report that explicitly.
     fn sync_file(&self, path: &str) -> Result<(), PlatformError> {
@@ -57,6 +70,15 @@ pub trait FileSystem {
     fn remove(&self, path: &str, recursive: bool) -> Result<(), PlatformError>;
 }
 impl<T: FileSystem + ?Sized> FileSystem for alloc::rc::Rc<T> {
+    fn rename_replace(&self, a: &str, b: &str) -> Result<(), PlatformError> {
+        (**self).rename_replace(a, b)
+    }
+    fn create_file_new(&self, p: &str) -> Result<bool, PlatformError> {
+        (**self).create_file_new(p)
+    }
+    fn modified_millis(&self, p: &str) -> Result<u64, PlatformError> {
+        (**self).modified_millis(p)
+    }
     fn sync_file(&self, path: &str) -> Result<(), PlatformError> {
         (**self).sync_file(path)
     }

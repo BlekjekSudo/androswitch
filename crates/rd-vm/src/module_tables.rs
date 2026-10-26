@@ -1,6 +1,6 @@
 //! Module-local tables belong to one Engine and cannot leak across relaunches.
 pub(crate) use crate::local_table::Local;
-use crate::{android_spannable, android_uri, jio_chars, juuid, xml_res};
+use crate::{android_spannable, android_uri, juuid, xml_res};
 use crate::{
     heap::ObjRef,
     maps::{HashMap, HashSet},
@@ -12,9 +12,6 @@ pub(crate) struct ModuleTables {
     pub(crate) android_spannable_states: Local<RefCell<HashMap<ObjRef, android_spannable::State>>>,
     pub(crate) android_uri_builders: Local<RefCell<HashMap<ObjRef, android_uri::B>>>,
     pub(crate) jannotations_instances: Local<RefCell<HashSet<ObjRef>>>,
-    pub(crate) jio_chars_writers_st: Local<RefCell<HashMap<ObjRef, jio_chars::WState>>>,
-    pub(crate) jio_chars_readers_st: Local<RefCell<HashMap<ObjRef, jio_chars::RState>>>,
-    pub(crate) jio_chars_bytes_st: Local<RefCell<HashMap<ObjRef, jio_chars::BState>>>,
     pub(crate) jrandom_seeds: Local<RefCell<HashMap<ObjRef, u64>>>,
     pub(crate) jrandom_uniq: Local<RefCell<u64>>,
     pub(crate) juuid_rng: Local<Cell<u64>>,
@@ -28,9 +25,6 @@ impl Default for ModuleTables {
             android_spannable_states: Local::new(RefCell::new(HashMap::new())),
             android_uri_builders: Local::new(RefCell::new(HashMap::new())),
             jannotations_instances: Local::new(RefCell::new(HashSet::new())),
-            jio_chars_writers_st: Local::new(RefCell::new(HashMap::new())),
-            jio_chars_readers_st: Local::new(RefCell::new(HashMap::new())),
-            jio_chars_bytes_st: Local::new(RefCell::new(HashMap::new())),
             jrandom_seeds: Local::new(RefCell::new(HashMap::new())),
             jrandom_uniq: Local::new(RefCell::new(0)),
             juuid_rng: Local::new(Cell::new(juuid::initial_seed())),

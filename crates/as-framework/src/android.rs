@@ -1518,6 +1518,10 @@ impl FrameworkHost for Android {
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
         rd_vm::boxes::method_metadata(class, name, sig)
+            .or_else(|| rd_vm::java_file::method_metadata(class, name, sig))
+            .or_else(|| rd_vm::atomic_file::method_metadata(class, name, sig))
+            .or_else(|| rd_vm::java_stream::method_metadata(class, name, sig))
+            .or_else(|| rd_vm::java_io::method_metadata(class, name, sig))
             .or_else(|| rd_vm::shared_text::method_metadata(class, name, sig))
             .or_else(|| rd_vm::collection_factories::method_metadata(class, name, sig))
             .or_else(|| rd_vm::collections::method_metadata(class, name, sig))

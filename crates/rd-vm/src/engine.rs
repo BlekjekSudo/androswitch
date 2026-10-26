@@ -57,8 +57,11 @@ impl Default for VmConfig {
 /// (`Engine::gc` / `maybe_gc`, ver `gc.rs`) e descartado quando o Engine cai.
 pub struct Engine {
     pub(crate) value_recursion: HashMap<u64, Vec<crate::value_recursion::Key>>,
+    pub(crate) file_temp_sequence: u64,
     #[cfg(any(feature = "std", feature = "upstream-runtime"))]
     pub(crate) regex_tables: crate::jregex::Tables,
+    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    pub(crate) io_tables: crate::jio_chars::Tables,
     pub(crate) collection_views: crate::jcollections::Views,
     pub(crate) output: alloc::rc::Rc<crate::app_output::Output>,
     #[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
@@ -217,8 +220,11 @@ impl Engine {
         let budget = config.heap_budget;
         Engine {
             value_recursion: HashMap::new(),
+            file_temp_sequence: 0,
             #[cfg(any(feature = "std", feature = "upstream-runtime"))]
             regex_tables: Default::default(),
+            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            io_tables: Default::default(),
             output: Default::default(),
             #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             module_tables: Default::default(),

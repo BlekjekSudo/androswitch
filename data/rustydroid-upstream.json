@@ -12,8 +12,8 @@
     {
       "path": ".gitattributes",
       "blob": "b09e4443db294b69a2ce100c3ebffbea0113f108",
-      "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained. Reviewed narrow raw-evidence rule for reports/collections-text-20261026: preserve byte hashes through Git checkout and exempt original log whitespace, without changing source policies. Reviewed the same narrow immutable-evidence byte policy for reports/gc-pressure-20261027; source normalization is unchanged. Reviewed the same narrow raw-evidence policy for reports/gc-shared-20261027; runtime source normalization stays unchanged.",
-      "sha256": "d630e34d8abeaaef426f28840b38a8a06119f70eede3cd289620fc6879e62959"
+      "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained. Reviewed narrow raw-evidence rule for reports/collections-text-20261026: preserve byte hashes through Git checkout and exempt original log whitespace, without changing source policies. Reviewed the same narrow immutable-evidence byte policy for reports/gc-pressure-20261027; source normalization is unchanged. Reviewed the same narrow raw-evidence policy for reports/gc-shared-20261027; runtime source normalization stays unchanged. Reviewed against pinned RustyDroid and previous adaptation: Narrow raw-byte evidence policy for reports/shared-io-20261027, matching the prior immutable checkpoint rules; source normalization and source whitespace policies remain unchanged. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim.",
+      "sha256": "5d50ff49370089039e0a989d4487aa622e4a35d3941fc5060dead9d106464052"
     },
     {
       "path": ".github/CODEOWNERS",
@@ -803,7 +803,7 @@
     {
       "path": "crates/rd-vm/src/android_spannable.rs",
       "blob": "6f7d747f7c63427ed474d0ddb254bb513113620d",
-      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine\u2019s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
       "sha256": "36d10de5771a2dadca1c2ab2db903b8440d622b792ac53dd27d133d23e41dc1a"
     },
     {
@@ -827,7 +827,7 @@
     {
       "path": "crates/rd-vm/src/android_uri.rs",
       "blob": "8634a78f5537e28e7fcf20070c2e569fa9992e86",
-      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine\u2019s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
       "sha256": "2e08b12dc00ef7f99efdfb0eb8fa63a301057c5ca2e14464a503aacccf8db304"
     },
     {
@@ -899,8 +899,8 @@
     {
       "path": "crates/rd-vm/src/engine.rs",
       "blob": "12c30c00f65aa42ba948034b12ece34e522cc35e",
-      "reason": "Compile original framework/GC fields in the experimental no_std reference path, own module/output/reference-VFS tables per Engine, preserve real execution-owner scopes, and use one private Throwable detail-message slot. Default shipping framework integration remains pending. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained.",
-      "sha256": "e45be989d7650a5f61cd23f16dbeef79fa396242260d1e02311239bf95b01b6d"
+      "reason": "Compile original framework/GC fields in the experimental no_std reference path, own module/output/reference-VFS tables per Engine, preserve real execution-owner scopes, and use one private Throwable detail-message slot. Default shipping framework integration remains pending. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: Engine-owned character/byte-stream tables and a session temp-file sequence; original VM, heap and execution-owner state retained. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim.",
+      "sha256": "53e2a4755d7fa50471b074a30d24b654e149eb7093dcf657da263314a39a63da"
     },
     {
       "path": "crates/rd-vm/src/err.rs",
@@ -917,8 +917,8 @@
     {
       "path": "crates/rd-vm/src/gc.rs",
       "blob": "d97e30c0509970d7ad11519dd1294c112d9e4758",
-      "reason": "Port original collector to core/alloc; add actual execution-owner, canonical cache, framework/native roots and platform collection hooks. Preserve inherited conservative side-state scanning; exclude an exactly default reference-free framework from scalar-ID false roots. Clock availability is explicit. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. GC pressure integration: extract the pinned upstream byte/slot adaptive pressure calculation into gc_policy, consumed by both collectors; preserve actual execution-owner roots and host temporary cutoffs. A pressure watermark collected with active frames is rechecked once with a full collection after the callback unwinds; real live heaps retain backoff. Added before/after pressure and unpinned-boundary regression contracts. Reviewed gc.rs against upstream 3761815 plus prior adaptation; full collector state integration remains open. Shared collector integration: shipping std/core and reference profiles now compile the same original gc.rs mark/sweep, generational barriers, weak-reference clearing/queue and adaptive collection algorithms. Framework/native roots and exact product regex edges use the active platform owner; reference-only HostState/graphics scanners remain profile adapters. Old platform side-state owners are conservatively revisited during minor GC until exact dirty-owner keys exist. Removed the separate product collector. Five original heap/DEX/weak scenarios are extracted without body changes into shared test helpers and exercised on the shipping profile; original suite routes and scenarios remain. Source selection and these focused tests do not establish complete upstream API parity; full host/NRO qualification remains required.",
-      "sha256": "2b7766f83e77e103889832d4b64b67fa45f2a77adb52815f8c28148aeb8eedc6"
+      "reason": "Port original collector to core/alloc; add actual execution-owner, canonical cache, framework/native roots and platform collection hooks. Preserve inherited conservative side-state scanning; exclude an exactly default reference-free framework from scalar-ID false roots. Clock availability is explicit. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. GC pressure integration: extract the pinned upstream byte/slot adaptive pressure calculation into gc_policy, consumed by both collectors; preserve actual execution-owner roots and host temporary cutoffs. A pressure watermark collected with active frames is rechecked once with a full collection after the callback unwinds; real live heaps retain backoff. Added before/after pressure and unpinned-boundary regression contracts. Reviewed gc.rs against upstream 3761815 plus prior adaptation; full collector state integration remains open. Shared collector integration: shipping std/core and reference profiles now compile the same original gc.rs mark/sweep, generational barriers, weak-reference clearing/queue and adaptive collection algorithms. Framework/native roots and exact product regex edges use the active platform owner; reference-only HostState/graphics scanners remain profile adapters. Old platform side-state owners are conservatively revisited during minor GC until exact dirty-owner keys exist. Removed the separate product collector. Five original heap/DEX/weak scenarios are extracted without body changes into shared test helpers and exercised on the shipping profile; original suite routes and scenarios remain. Source selection and these focused tests do not establish complete upstream API parity; full host/NRO qualification remains required. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: include original character-stream keys on std, trace typed Reader/Writer sink/source ephemerons on both profiles, and purge dead keys. Existing original collector/generations and platform roots retained. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim.",
+      "sha256": "e37c5c709e11b03b4794d469dcf31a9578aebb88d5a46fa28ec45b2b66f3ead3"
     },
     {
       "path": "crates/rd-vm/src/gms.rs",
@@ -959,13 +959,13 @@
     {
       "path": "crates/rd-vm/src/intrinsics.rs",
       "blob": "82c29016a7deca96ce2cf00ae8678093c1c9f104",
-      "reason": "Reuse the original rooted dispatcher on the no_std reference path; per-Engine output, common object-value helpers and a private shared Throwable detail-message slot replace desktop globals/duplicated state. Keep runtime items before test modules for strict clippy; PrintStream output shares one implementation across reference variants. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity.",
-      "sha256": "b1333595210dddb191b9f0aa4448c3d84d5a452ec35cf3f0c0252dfeaa2cc1a1"
+      "reason": "Reuse the original rooted dispatcher on the no_std reference path; per-Engine output, common object-value helpers and a private shared Throwable detail-message slot replace desktop globals/duplicated state. Keep runtime items before test modules for strict clippy; PrintStream output shares one implementation across reference variants. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: reference dispatch also calls the common java_io scope/template adapter around original jio_chars; DEX subclass constructors remain declared-class calls. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim.",
+      "sha256": "64514822bd21108efd062fd3968b45433e25f7a0b89299a77fd0becf5e08ce6c"
     },
     {
       "path": "crates/rd-vm/src/jannotations.rs",
       "blob": "45c88692ab46b67639e9e25721d795b8fb5bccf1",
-      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine\u2019s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
       "sha256": "f2e8a42bc6b264243c3c4190604d4bd8bfd90906f5602486dec7941680cb81d5"
     },
     {
@@ -995,14 +995,14 @@
     {
       "path": "crates/rd-vm/src/jfile.rs",
       "blob": "316a72330f5c1b14b28a584e436cd0de0daa10ba",
-      "reason": "Keep original filesystem/API algorithms, passing explicit Engine context on the no_std reference path instead of TLS. The scoped in-memory VFS is an oracle only and is not a substitute for the product persistent GuestFileSystem. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md.",
-      "sha256": "63d7f996857cb06be890c26e6e1bb21aa48949e838d68f100fc2a29bcf36c269"
+      "reason": "Keep original filesystem/API algorithms, passing explicit Engine context on the no_std reference path instead of TLS. The scoped in-memory VFS is an oracle only and is not a substitute for the product persistent GuestFileSystem. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: move original File/path, stream and AtomicFile algorithms to java_file/java_stream/atomic_file, called by reference and product dispatch. Explicit ReferenceIo retains original memory VFS/OS APIs and quotas only for the unbound oracle. Unit-only directory helpers retained; bound product state cannot fall back to it. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim.",
+      "sha256": "7bf45573a3bc7e3a873ef1358b2bbebf0677d1e81be897eb7af49be797834816"
     },
     {
       "path": "crates/rd-vm/src/jio_chars.rs",
       "blob": "1bd846fbaee6caf088aac90657fefddd8a3d8a10",
-      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
-      "sha256": "05533ea1121928071ad4220322d9e3e6a6f55cc196957e0f599184a281d71128"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine\u2019s object state. Horizon service/state integration remains unverified; compilation is not behavior parity. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: same Reader/Writer/byte algorithms and limits with Engine.io_tables on std, common stream constructors, typed GC edges and shared float formatting. Correct incomplete encoding input across flush and forward raw UTF-16 char arrays to Writer callbacks; JVM/DEX cases expose these general defects. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim.",
+      "sha256": "374b57db3b6e8006ceefc1d4bdd92d0242f6e198fb034e590ecad6a606d6b619"
     },
     {
       "path": "crates/rd-vm/src/jit.rs",
@@ -1053,13 +1053,13 @@
     {
       "path": "crates/rd-vm/src/jrandom.rs",
       "blob": "8877a32e7cb99bf998c74a2f5edf1d8dfea06611",
-      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine\u2019s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
       "sha256": "2574f1f25bfcda3a2425c167624768d42b0f99be3952f4be183f60c06e682c5e"
     },
     {
       "path": "crates/rd-vm/src/jregex.rs",
       "blob": "d70c3c78eda9e13a7f0d27d85e1697b524b21bb3",
-      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Shared collector integration: shipping std/core and reference profiles now compile the same original gc.rs mark/sweep, generational barriers, weak-reference clearing/queue and adaptive collection algorithms. Framework/native roots and exact product regex edges use the active platform owner; reference-only HostState/graphics scanners remain profile adapters. Old platform side-state owners are conservatively revisited during minor GC until exact dirty-owner keys exist. Removed the separate product collector. Five original heap/DEX/weak scenarios are extracted without body changes into shared test helpers and exercised on the shipping profile; original suite routes and scenarios remain. Source selection and these focused tests do not establish complete upstream API parity; full host/NRO qualification remains required.",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine\u2019s object state. Horizon service/state integration remains unverified; compilation is not behavior parity. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Shared collector integration: shipping std/core and reference profiles now compile the same original gc.rs mark/sweep, generational barriers, weak-reference clearing/queue and adaptive collection algorithms. Framework/native roots and exact product regex edges use the active platform owner; reference-only HostState/graphics scanners remain profile adapters. Old platform side-state owners are conservatively revisited during minor GC until exact dirty-owner keys exist. Removed the separate product collector. Five original heap/DEX/weak scenarios are extracted without body changes into shared test helpers and exercised on the shipping profile; original suite routes and scenarios remain. Source selection and these focused tests do not establish complete upstream API parity; full host/NRO qualification remains required.",
       "sha256": "0c4aec4f1690a19b3296128e6ebba39da5bce8d94c2c2d18a485e1ad0bea3523"
     },
     {
@@ -1113,7 +1113,7 @@
     {
       "path": "crates/rd-vm/src/juuid.rs",
       "blob": "f7f5e5536c2e82b662fc224ef4fb357e278967ef",
-      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine\u2019s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
       "sha256": "76df73a791743572c690706ad7fbfc3c570a6ef69ea5e0980baee4e9f3052fd3"
     },
     {
@@ -1125,8 +1125,8 @@
     {
       "path": "crates/rd-vm/src/lib.rs",
       "blob": "1eeaef3f3207221f18c389904be8b943ee3f8302",
-      "reason": "Register the entire original framework dependency closure behind explicit experimental features, keep desktop native/JIT backends separate, share original intrinsics/GC plus core/alloc helpers, and retain default portable dispatch until state integration is complete. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Embedded VM ordered-index policy is preserved independently of std; std activation must not replace every small VM index with randomized TLS-seeded maps. Only the two map-module cfg guards and their policy comment change; original container algorithms remain shared. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained. GC pressure integration: extract the pinned upstream byte/slot adaptive pressure calculation into gc_policy, consumed by both collectors; preserve actual execution-owner roots and host temporary cutoffs. A pressure watermark collected with active frames is rechecked once with a full collection after the callback unwinds; real live heaps retain backoff. Added before/after pressure and unpinned-boundary regression contracts. Reviewed gc.rs against upstream 3761815 plus prior adaptation; full collector state integration remains open. Shared collector integration: shipping std/core and reference profiles now compile the same original gc.rs mark/sweep, generational barriers, weak-reference clearing/queue and adaptive collection algorithms. Framework/native roots and exact product regex edges use the active platform owner; reference-only HostState/graphics scanners remain profile adapters. Old platform side-state owners are conservatively revisited during minor GC until exact dirty-owner keys exist. Removed the separate product collector. Five original heap/DEX/weak scenarios are extracted without body changes into shared test helpers and exercised on the shipping profile; original suite routes and scenarios remain. Source selection and these focused tests do not establish complete upstream API parity; full host/NRO qualification remains required.",
-      "sha256": "6b31f684f94512f53ae45d055827370b6874c34569d74f250140cc68a26a45e8"
+      "reason": "Register the entire original framework dependency closure behind explicit experimental features, keep desktop native/JIT backends separate, share original intrinsics/GC plus core/alloc helpers, and retain default portable dispatch until state integration is complete. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Embedded VM ordered-index policy is preserved independently of std; std activation must not replace every small VM index with randomized TLS-seeded maps. Only the two map-module cfg guards and their policy comment change; original container algorithms remain shared. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained. GC pressure integration: extract the pinned upstream byte/slot adaptive pressure calculation into gc_policy, consumed by both collectors; preserve actual execution-owner roots and host temporary cutoffs. A pressure watermark collected with active frames is rechecked once with a full collection after the callback unwinds; real live heaps retain backoff. Added before/after pressure and unpinned-boundary regression contracts. Reviewed gc.rs against upstream 3761815 plus prior adaptation; full collector state integration remains open. Shared collector integration: shipping std/core and reference profiles now compile the same original gc.rs mark/sweep, generational barriers, weak-reference clearing/queue and adaptive collection algorithms. Framework/native roots and exact product regex edges use the active platform owner; reference-only HostState/graphics scanners remain profile adapters. Old platform side-state owners are conservatively revisited during minor GC until exact dirty-owner keys exist. Removed the separate product collector. Five original heap/DEX/weak scenarios are extracted without body changes into shared test helpers and exercised on the shipping profile; original suite routes and scenarios remain. Source selection and these focused tests do not establish complete upstream API parity; full host/NRO qualification remains required. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: select original jio_chars on the shipping std profile and declare extracted common File/stream/AtomicFile/metadata adapters. Full reference runtime remains opt-in. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim.",
+      "sha256": "152536f75c94229c4fe4b289fe9eb68c824ad51f38568ba97407f5340c2ad177"
     },
     {
       "path": "crates/rd-vm/src/m10/biometrics.rs",
@@ -1321,7 +1321,7 @@
     {
       "path": "crates/rd-vm/src/xml_res.rs",
       "blob": "3b89aa610cc28d47e59cc376b073dab6ab0afa90",
-      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine\u2019s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
       "sha256": "95014a6487eddb03c37c481153ac12d3882765561ffec5100ea2be4f3ecaa62e"
     },
     {
@@ -2027,11 +2027,57 @@
   ],
   "fork_core_files": [
     {
+      "path": "crates/rd-apk/src/arsc_identifier.rs",
+      "sha256": "f6ef69dd6239fc824aba28a4ff371ce760556c2b69a9d06dcf0090125580131c",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-apk/src/zip_source.rs",
+      "sha256": "baa7fb70a6996466a0a1bb223d5e2eb790be3e40b6aa6e3a03085d2bb4013bad",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-dex/src/budget.rs",
+      "sha256": "cc02d1ce1d4ccfec35d404e2aa2297a5361077f1f3cd8165721d8f93e02dcd37",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-dex/src/sync.rs",
+      "sha256": "340575fa959853de1b4dec1a20758a8323035a01590b53948204005ba252f578",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
       "path": "crates/rd-vm/src/android_log.rs",
       "sha256": "b74045f577c5ed72a0ee98dc325f7dca7f131656ff52ff4e124e3d31ce09d520",
       "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
       "derived_from": "crates/rd-vm/src/android_text.rs",
       "reason": " Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md."
+    },
+    {
+      "path": "crates/rd-vm/src/app_output.rs",
+      "sha256": "e8fbb1c8350e3cec6066a5a77fb02c16b25378daf7935d360a438bf55d370a67",
+      "scope": "Per-Engine output transport with explicit platform log sink or bounded inspectable reference records. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation",
+      "reason": " Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md."
+    },
+    {
+      "path": "crates/rd-vm/src/atomic_file.rs",
+      "sha256": "681e5005db264543bf17e6b1aa81fbc59b16a4d2c5317d50d73e02b1da55120b",
+      "scope": "RustyDroid jfile AtomicFile backup protocol with real persistent transport and durable finish before deleting the committed backup. Not a complete device behavior parity claim.",
+      "derived_from": "RustyDroid 3761815dc6a2a1427e9fc66b66e8471b78d1b170"
+    },
+    {
+      "path": "crates/rd-vm/src/collection_clock.rs",
+      "sha256": "61215802449df9e64875792bb44f12c436d10e26b7843d3ba5c35deacb6c80d3",
+      "scope": "Platform monotonic GC measurements with explicit availability; virtual guest time is separate. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/collection_factories.rs",
+      "sha256": "e0e2003904fce3d9acb9d638b5f5fcaaf8b4569a36932c7ff5283eef7f89123e",
+      "derived_from": "crates/rd-vm/src/intrinsics.rs immutable Collections factory dispatch and collections.rs EMPTY_* fields at upstream 3761815dc6a2a1427e9fc66b66e8471b78d1b170",
+      "scope": "Shared factory algorithms with explicit active-owner transport; snapshot limitations and sorted reference-only behavior retained. Not complete device API parity.",
+      "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity."
     },
     {
       "path": "crates/rd-vm/src/collection_values.rs",
@@ -2046,16 +2092,41 @@
       "reason": " Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity."
     },
     {
+      "path": "crates/rd-vm/src/gc_policy.rs",
+      "sha256": "86c8603249605f8a34a40c06fc9a9bce9a82bfc50bda4d53bfb8bfe0169b01e9",
+      "derived_from": "RustyDroid gc.rs at 3761815dc6a2a1427e9fc66b66e8471b78d1b170; common pressure calculation extracted without changing the original adaptive arithmetic.",
+      "scope": "Shared allocation-pressure policy for reference and product collectors, plus one full watermark recheck after pinned callback frames unwind. Does not unify the remaining tracing/state graphs or establish complete GC/API parity."
+    },
+    {
       "path": "crates/rd-vm/src/integer_bits.rs",
       "sha256": "34713658dc6e4d06643fe46a201a17bc910f374179c7143625c51e01e8b12171",
       "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
       "derived_from": "crates/rd-vm/src/numerics.rs"
     },
     {
+      "path": "crates/rd-vm/src/java_file.rs",
+      "sha256": "6bb17c1a9079bfb71c950a8ae580913014cc6c2d0328e09d5d6f37082507c12f",
+      "scope": "RustyDroid jfile File/path algorithms, adapted to the selected common storage transport and exact method metadata. Not a complete device behavior parity claim.",
+      "derived_from": "RustyDroid 3761815dc6a2a1427e9fc66b66e8471b78d1b170"
+    },
+    {
       "path": "crates/rd-vm/src/java_format.rs",
       "sha256": "814dfbd897351d5b44db1ec6ecc019e3a2594766902794277a19959d5dd613cb",
       "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
       "derived_from": "crates/rd-vm/src/numerics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/java_io.rs",
+      "sha256": "33f65b1655424e8b7a5ab04c94626943a204b347016a566d1ec5b3971dd314a2",
+      "scope": "Scope, declared-constructor/inherited-template and exact descriptor adapters around original RustyDroid jio_chars; no second stream implementation. Not a complete device behavior parity claim.",
+      "derived_from": "RustyDroid 3761815dc6a2a1427e9fc66b66e8471b78d1b170"
+    },
+    {
+      "path": "crates/rd-vm/src/java_stream.rs",
+      "sha256": "0d963f3053512a295823c47a5d3eaa804b93d7fdfc5b3bd8ddac4746b7613923",
+      "scope": "RustyDroid jfile stream algorithms, adapted to positional transport and actual heap channel/stream ownership; unavailable native descriptor/locks remain explicit. Not a complete device behavior parity claim.",
+      "derived_from": "RustyDroid 3761815dc6a2a1427e9fc66b66e8471b78d1b170",
+      "reason": " Reviewed against pinned RustyDroid and previous adaptation: Shared I/O review: exact descriptor dispatch rejects unsupported overloads; native descriptor/lock surfaces remain explicit reference-only APIs on the product. Preserve the original non-truncating FileDescriptor constructor on the reference profile and propagate parent-stat errors. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim."
     },
     {
       "path": "crates/rd-vm/src/java_values.rs",
@@ -2065,9 +2136,41 @@
       "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained."
     },
     {
+      "path": "crates/rd-vm/src/local_table.rs",
+      "sha256": "761340ffa5c5a58514df8e0191c93c3dd48b453d61899898a97245702993a3f5",
+      "derived_from": "RustyDroid module_tables.rs, jlstring.rs, jsb.rs and jregex.rs at 3761815dc6a2a1427e9fc66b66e8471b78d1b170; AndroSwitch owner/platform adaptation",
+      "scope": "Engine-owned cloneable table handle extracted from module_tables; no global object registry. Not a device behavior parity claim."
+    },
+    {
+      "path": "crates/rd-vm/src/module_tables.rs",
+      "sha256": "4ceb43839676120593d9b794736d98c945d8ca3c9e60d9a8dffbd7be06a08bb2",
+      "scope": "Engine-owned reference module side tables, replacing process/TLS lifetime coupling. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation",
+      "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: relocate the original three character/byte tables to Engine.io_tables, shared by std and reference; remove former duplicate declarations/defaults. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim."
+    },
+    {
       "path": "crates/rd-vm/src/native_host.rs",
       "sha256": "199b756c5cc3880efe85f725e0440f95e12a611a461400b520cb4e757a510883",
       "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/port_env.rs",
+      "sha256": "d9f9893da2cc87350c57bade99cf4363fff29443f65e24935745788b5709be68",
+      "scope": "Desktop environment adapter and explicitly absent diagnostic overrides on the freestanding reference path. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/port_float.rs",
+      "sha256": "2510afadf6ef6be568445b5dc81b1991c16309b40dbc8b72eb3e597d37b19af1",
+      "scope": "Freestanding libm float operations and explicit UFCS host-oracle tests, including composition, extreme integer exponents and IEEE special values. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/port_prelude.rs",
+      "sha256": "86ce8c7248136018f15b194f9757c4809ca3c1c1a3ff177ce7a5b0c5b52b31c8",
+      "scope": "Core/alloc imports for the complete inherited framework dependency closure. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation",
+      "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity."
     },
     {
       "path": "crates/rd-vm/src/portable/atomic.rs",
@@ -2112,8 +2215,9 @@
     },
     {
       "path": "crates/rd-vm/src/portable/file.rs",
-      "sha256": "293478bcffe279bcde710457e71a502da9bb47e20a4eee3fb00e9e24d6eeef0d",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+      "sha256": "6f713de255966f3eff5a6fb2e5705cd1b5d5061f9f5c4c10f1ef0421fe91566e",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "reason": " Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: remove duplicate product File and file-stream implementation/state. Retain RandomAccessFile, scalar/String fallbacks and property helpers; File arguments read their actual shared heap path. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim."
     },
     {
       "path": "crates/rd-vm/src/portable/format.rs",
@@ -2128,14 +2232,15 @@
     },
     {
       "path": "crates/rd-vm/src/portable/intrinsics.rs",
-      "sha256": "a987c9fbf83e233966e9949d7ab32aa93ca30dfc2ed9f21ed2dc96d080ca0356",
+      "sha256": "7a0afcafb762e44e9c47aa765a01d4398060c4c6a1e4d6944d07a4d552aa464a",
       "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim.",
-      "reason": " Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Reviewed final text-class virtual dispatch: StringBuilder/StringBuffer interface calls select their shared heap implementation, preserving final-class identity and StringBuffer monitor admission; TextUtils regression compared with existing JVM fixture."
+      "reason": " Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Reviewed final text-class virtual dispatch: StringBuilder/StringBuffer interface calls select their shared heap implementation, preserving final-class identity and StringBuffer monitor admission; TextUtils regression compared with existing JVM fixture. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: route common File, stream, AtomicFile and character/byte APIs; select the already-shared String implementation before the old fallback so byte/charset constructors are not intercepted. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim."
     },
     {
       "path": "crates/rd-vm/src/portable/mod.rs",
-      "sha256": "9f61c2751d8620ee1d035ca014000d2030135dd99464d64df5ef7e5ba935323f",
-      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
+      "sha256": "a0df04cecebb5541957633ac58a9d5e6f87bc9bf93e699593461d31a3e59f51a",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim.",
+      "reason": " Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: admit implemented heap-backed streams/AtomicFile and Writer/Reader base state during real class traversal. No secondary framework store. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim."
     },
     {
       "path": "crates/rd-vm/src/portable/monitor.rs",
@@ -2169,71 +2274,6 @@
       "derived_from": "crates/rd-vm/src/numerics.rs"
     },
     {
-      "path": "crates/rd-vm/src/shared_call.rs",
-      "sha256": "53ea7db2779b0acd36ebe2bf98b16488cb6bca068764fc494efa0f54aae19cb0",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
-      "reason": " Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md."
-    },
-    {
-      "path": "crates/rd-dex/src/budget.rs",
-      "sha256": "cc02d1ce1d4ccfec35d404e2aa2297a5361077f1f3cd8165721d8f93e02dcd37",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
-    },
-    {
-      "path": "crates/rd-dex/src/sync.rs",
-      "sha256": "340575fa959853de1b4dec1a20758a8323035a01590b53948204005ba252f578",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
-    },
-    {
-      "path": "crates/rd-apk/src/arsc_identifier.rs",
-      "sha256": "f6ef69dd6239fc824aba28a4ff371ce760556c2b69a9d06dcf0090125580131c",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
-    },
-    {
-      "path": "crates/rd-apk/src/zip_source.rs",
-      "sha256": "baa7fb70a6996466a0a1bb223d5e2eb790be3e40b6aa6e3a03085d2bb4013bad",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
-    },
-    {
-      "path": "crates/rd-vm/src/app_output.rs",
-      "sha256": "e8fbb1c8350e3cec6066a5a77fb02c16b25378daf7935d360a438bf55d370a67",
-      "scope": "Per-Engine output transport with explicit platform log sink or bounded inspectable reference records. Not a device behavior parity claim.",
-      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation",
-      "reason": " Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md."
-    },
-    {
-      "path": "crates/rd-vm/src/collection_clock.rs",
-      "sha256": "61215802449df9e64875792bb44f12c436d10e26b7843d3ba5c35deacb6c80d3",
-      "scope": "Platform monotonic GC measurements with explicit availability; virtual guest time is separate. Not a device behavior parity claim.",
-      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
-    },
-    {
-      "path": "crates/rd-vm/src/module_tables.rs",
-      "sha256": "68be58528c2d09112dc6a04fb215d2191191d99ccf2748869410b4469b0ecace",
-      "scope": "Engine-owned reference module side tables, replacing process/TLS lifetime coupling. Not a device behavior parity claim.",
-      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation",
-      "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity."
-    },
-    {
-      "path": "crates/rd-vm/src/port_env.rs",
-      "sha256": "d9f9893da2cc87350c57bade99cf4363fff29443f65e24935745788b5709be68",
-      "scope": "Desktop environment adapter and explicitly absent diagnostic overrides on the freestanding reference path. Not a device behavior parity claim.",
-      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
-    },
-    {
-      "path": "crates/rd-vm/src/port_float.rs",
-      "sha256": "2510afadf6ef6be568445b5dc81b1991c16309b40dbc8b72eb3e597d37b19af1",
-      "scope": "Freestanding libm float operations and explicit UFCS host-oracle tests, including composition, extreme integer exponents and IEEE special values. Not a device behavior parity claim.",
-      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
-    },
-    {
-      "path": "crates/rd-vm/src/port_prelude.rs",
-      "sha256": "86ce8c7248136018f15b194f9757c4809ca3c1c1a3ff177ce7a5b0c5b52b31c8",
-      "scope": "Core/alloc imports for the complete inherited framework dependency closure. Not a device behavior parity claim.",
-      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation",
-      "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity."
-    },
-    {
       "path": "crates/rd-vm/src/reference_filesystem.rs",
       "sha256": "2c52d75fc5ba5385dfd0b3bd472a6ed9b1a8475b67f8f1bef53c7b0306a8983c",
       "scope": "Explicit session-scoped in-memory reference filesystem; rejects replacing a bound device VFS. Not a device behavior parity claim.",
@@ -2246,6 +2286,19 @@
       "derived_from": "Android SDK API 35 public declaration metadata; data/android-sdk-types.json pins input SHA-256 and generator; no SDK method bodies."
     },
     {
+      "path": "crates/rd-vm/src/shared_call.rs",
+      "sha256": "53ea7db2779b0acd36ebe2bf98b16488cb6bca068764fc494efa0f54aae19cb0",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "reason": " Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md."
+    },
+    {
+      "path": "crates/rd-vm/src/shared_text.rs",
+      "sha256": "9b0470103f8b593d9b6a71beb5682865cd5e424dc1b3ec90ff15af4cccc114c6",
+      "derived_from": "RustyDroid module_tables.rs, jlstring.rs, jsb.rs and jregex.rs at 3761815dc6a2a1427e9fc66b66e8471b78d1b170; AndroSwitch owner/platform adaptation",
+      "scope": "Exact implemented String/regex/builder overload metadata and product callback/monitor scopes; original algorithms remain in inherited modules. Not a device behavior parity claim.",
+      "reason": " Reviewed against pinned RustyDroid and previous adaptation: Shared I/O review: select inherited String constructors before the fallback while preserving the existing API26 ICU alias/BOM/unknown-charset and output allocation/OOM adapter for named/default getBytes. The broader portable_encoding regression exposed shadowing by the inherited weaker encoder. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim."
+    },
+    {
       "path": "crates/rd-vm/src/throwable_message.rs",
       "sha256": "4e036ab15414ac9c0537aa77127944bd341c113ef7600543f46809f3df2e68f0",
       "scope": "One private Throwable detail-message slot shared by interpreted/host/JNI exception paths. Not a device behavior parity claim.",
@@ -2253,35 +2306,10 @@
       "reason": " Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md."
     },
     {
-      "path": "crates/rd-vm/src/collection_factories.rs",
-      "sha256": "e0e2003904fce3d9acb9d638b5f5fcaaf8b4569a36932c7ff5283eef7f89123e",
-      "derived_from": "crates/rd-vm/src/intrinsics.rs immutable Collections factory dispatch and collections.rs EMPTY_* fields at upstream 3761815dc6a2a1427e9fc66b66e8471b78d1b170",
-      "scope": "Shared factory algorithms with explicit active-owner transport; snapshot limitations and sorted reference-only behavior retained. Not complete device API parity.",
-      "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity."
-    },
-    {
-      "path": "crates/rd-vm/src/local_table.rs",
-      "sha256": "761340ffa5c5a58514df8e0191c93c3dd48b453d61899898a97245702993a3f5",
-      "derived_from": "RustyDroid module_tables.rs, jlstring.rs, jsb.rs and jregex.rs at 3761815dc6a2a1427e9fc66b66e8471b78d1b170; AndroSwitch owner/platform adaptation",
-      "scope": "Engine-owned cloneable table handle extracted from module_tables; no global object registry. Not a device behavior parity claim."
-    },
-    {
-      "path": "crates/rd-vm/src/shared_text.rs",
-      "sha256": "798500199f5f2807ec2245747a3ef93ac478ed4b698bfbed5eadbe52b04f9ac8",
-      "derived_from": "RustyDroid module_tables.rs, jlstring.rs, jsb.rs and jregex.rs at 3761815dc6a2a1427e9fc66b66e8471b78d1b170; AndroSwitch owner/platform adaptation",
-      "scope": "Exact implemented String/regex/builder overload metadata and product callback/monitor scopes; original algorithms remain in inherited modules. Not a device behavior parity claim."
-    },
-    {
       "path": "crates/rd-vm/src/value_recursion.rs",
       "sha256": "3cd9d404d8aaf0851ea768f069f3dfe9b11cee83de444957f39c653412f89515",
       "derived_from": "RustyDroid arrays.rs host reentry/issue_303 value recursion contract; AndroSwitch execution-owner adaptation",
       "scope": "Scoped built-in collection callback cycle detection; guest overrides preserve finite reentry; no application identity checks. Not a full API parity claim."
-    },
-    {
-      "path": "crates/rd-vm/src/gc_policy.rs",
-      "sha256": "86c8603249605f8a34a40c06fc9a9bce9a82bfc50bda4d53bfb8bfe0169b01e9",
-      "derived_from": "RustyDroid gc.rs at 3761815dc6a2a1427e9fc66b66e8471b78d1b170; common pressure calculation extracted without changing the original adaptive arithmetic.",
-      "scope": "Shared allocation-pressure policy for reference and product collectors, plus one full watermark recheck after pinned callback frames unwind. Does not unify the remaining tracing/state graphs or establish complete GC/API parity."
     }
   ]
 }

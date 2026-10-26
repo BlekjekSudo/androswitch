@@ -110,6 +110,8 @@ pub(crate) mod android_velocity;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod androidx;
 pub mod arrays;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+pub mod atomic_file;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod atomics;
 pub mod boxes;
@@ -146,7 +148,11 @@ pub mod intrinsics;
 pub mod intrinsics;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jannotations;
+pub mod java_file;
 mod java_format;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+pub mod java_io;
+pub mod java_stream;
 mod java_values;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jbigdecimal;
@@ -156,7 +162,7 @@ pub(crate) mod jbreakiter;
 pub mod jcollections;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jfile;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jio_chars;
 #[cfg(feature = "jit")]
 #[cfg(feature = "desktop-runtime")]

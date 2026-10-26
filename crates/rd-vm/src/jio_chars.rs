@@ -36,6 +36,31 @@ use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::{ElemKind, ObjRef};
 use crate::value::Value;
+use crate::{local_table::Local, maps::HashMap};
+use core::cell::RefCell;
+
+pub(crate) struct Tables {
+    writers: Local<RefCell<HashMap<ObjRef, WState>>>,
+    readers: Local<RefCell<HashMap<ObjRef, RState>>>,
+    bytes: Local<RefCell<HashMap<ObjRef, BState>>>,
+}
+impl Default for Tables {
+    fn default() -> Self {
+        Self {
+            writers: Local::new(RefCell::new(HashMap::new())),
+            readers: Local::new(RefCell::new(HashMap::new())),
+            bytes: Local::new(RefCell::new(HashMap::new())),
+        }
+    }
+}
+pub(crate) fn supports(class: &str) -> bool {
+    WRITERS.contains(&class)
+        || READERS.contains(&class)
+        || matches!(
+            class,
+            WRITER | READER | BAOS | BAIS | OUTPUT_STREAM | INPUT_STREAM | FILTER_OS | BOS
+        )
+}
 
 const WRITER: &str = "Ljava/io/Writer;";
 const READER: &str = "Ljava/io/Reader;";
@@ -105,46 +130,54 @@ pub(crate) struct BState {
 /// GC: objects that have state here (marking consults `gc_entry` only
 /// for these).
 pub(crate) fn gc_keys(vm: &Engine, out: &mut Vec<ObjRef>) {
-    vm.module_tables
-        .jio_chars_writers_st
+    vm.io_tables
+        .writers
         .clone()
         .with(|m| out.extend(m.borrow().keys().copied()));
-    vm.module_tables
-        .jio_chars_readers_st
+    vm.io_tables
+        .readers
         .clone()
         .with(|m| out.extend(m.borrow().keys().copied()));
-    vm.module_tables
-        .jio_chars_bytes_st
+    vm.io_tables
+        .bytes
         .clone()
         .with(|m| out.extend(m.borrow().keys().copied()));
 }
 
-/// GC ephemeron: state of a reachable object (holds heap refs).
-pub(crate) fn gc_entry(vm: &Engine, r: ObjRef, out: &mut impl core::fmt::Write) {
-    vm.module_tables.jio_chars_writers_st.clone().with(|m| {
-        if let Some(v) = m.borrow().get(&r) {
-            let _ = write!(out, "|{:?}", v.sink);
+/// Typed ephemeron edges; charset digits and stream bytes are never roots.
+pub(crate) fn references(vm: &Engine, r: ObjRef) -> Vec<ObjRef> {
+    let mut out = Vec::new();
+    vm.io_tables.writers.with(|m| {
+        if let Some(state) = m.borrow().get(&r) {
+            match state.sink {
+                Sink::Writer(o) | Sink::Stream(o, _) => out.push(o),
+                Sink::Buffer => {}
+            }
         }
     });
-    vm.module_tables.jio_chars_readers_st.clone().with(|m| {
-        if let Some(v) = m.borrow().get(&r) {
-            let _ = write!(out, "|{:?}", v.source);
+    vm.io_tables.readers.with(|m| {
+        if let Some(state) = m.borrow().get(&r) {
+            match state.source {
+                Source::Reader(o) | Source::Stream(o, _) => out.push(o),
+                Source::Text => {}
+            }
         }
     });
+    out
 }
 
 /// GC: drop state of collected objects (slots are reused).
 pub(crate) fn gc_purge(vm: &Engine, alive: &dyn Fn(ObjRef) -> bool) {
-    vm.module_tables
-        .jio_chars_writers_st
+    vm.io_tables
+        .writers
         .clone()
         .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
-    vm.module_tables
-        .jio_chars_readers_st
+    vm.io_tables
+        .readers
         .clone()
         .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
-    vm.module_tables
-        .jio_chars_bytes_st
+    vm.io_tables
+        .bytes
         .clone()
         .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
@@ -292,10 +325,10 @@ fn print_units(vm: &mut Engine, sig: &str, v: Option<&Value>) -> Result<Vec<u16>
         ("C", Some(v)) => vec![(v.as_int().unwrap_or(0) as u32 & 0xffff) as u16],
         ("I", Some(v)) => v.as_int().unwrap_or(0).to_string().encode_utf16().collect(),
         ("J", Some(Value::Long(l))) => l.to_string().encode_utf16().collect(),
-        ("F", Some(Value::Float(f))) => crate::numerics::java_double_to_string(*f as f64, true)
+        ("F", Some(Value::Float(f))) => crate::java_format::java_double_to_string(*f as f64, true)
             .encode_utf16()
             .collect(),
-        ("D", Some(Value::Double(d))) => crate::numerics::java_double_to_string(*d, false)
+        ("D", Some(Value::Double(d))) => crate::java_format::java_double_to_string(*d, false)
             .encode_utf16()
             .collect(),
         ("[C", v) => require_char_array(vm, v)?,
@@ -307,14 +340,14 @@ fn print_units(vm: &mut Engine, sig: &str, v: Option<&Value>) -> Result<Vec<u16>
 // ── writers ─────────────────────────────────────────────────────────────
 
 fn wget(vm: &Engine, r: ObjRef) -> Option<WState> {
-    vm.module_tables
-        .jio_chars_writers_st
+    vm.io_tables
+        .writers
         .clone()
         .with(|m| m.borrow().get(&r).cloned())
 }
 fn wput(vm: &Engine, r: ObjRef, st: WState) {
-    vm.module_tables
-        .jio_chars_writers_st
+    vm.io_tables
+        .writers
         .clone()
         .with(|m| m.borrow_mut().insert(r, st));
 }
@@ -344,7 +377,6 @@ fn flush_writer(
     } else {
         core::mem::take(&mut st.pending)
     };
-    let data = String::from_utf16_lossy(&units);
     if close {
         st.closed = true;
     }
@@ -352,13 +384,32 @@ fn flush_writer(
     match &st.sink {
         Sink::Buffer => {}
         Sink::Writer(w) => {
-            if !data.is_empty() {
-                let s = jstr(vm, data)?;
-                vm.invoke_instance(*w, "write", "(Ljava/lang/String;)V", &[s])?;
+            if !units.is_empty() {
+                // Forward Java char units directly. Converting to a Rust
+                // String here would replace an isolated surrogate before the
+                // next Writer/DEX callback can combine it with its pair.
+                let array = vm
+                    .heap
+                    .alloc_array_zeroed(ElemKind::Int, units.len(), "[C")
+                    .map_err(crate::err::oom_throwable)?;
+                for (slot, unit) in vm.heap.array_elems_mut(array)?.iter_mut().zip(&units) {
+                    *slot = Value::Int(i32::from(*unit));
+                }
+                vm.invoke_instance(
+                    *w,
+                    "write",
+                    "([CII)V",
+                    &[
+                        Value::Obj(array),
+                        Value::Int(0),
+                        Value::Int(units.len() as i32),
+                    ],
+                )?;
             }
             vm.invoke_instance(*w, if close { "close" } else { "flush" }, "()V", &[])?;
         }
         Sink::Stream(os, cs) => {
+            let data = String::from_utf16_lossy(&units);
             if !data.is_empty() {
                 let b = crate::jlstring::byte_array(vm, &crate::jlstring::encode(&data, cs))?;
                 vm.invoke_instance(*os, "write", "([B)V", &[b])?;
@@ -413,7 +464,7 @@ fn sink_for(vm: &mut Engine, class: &str, args: &[Value], sig: &str) -> Result<S
             } else {
                 "(Ljava/lang/String;Z)V"
             };
-            crate::jfile::instance_intrinsic(
+            crate::java_stream::call(
                 vm,
                 "Ljava/io/FileOutputStream;",
                 "<init>",
@@ -445,7 +496,7 @@ fn sink_for(vm: &mut Engine, class: &str, args: &[Value], sig: &str) -> Result<S
                 } else {
                     "(Ljava/lang/String;)V"
                 };
-                crate::jfile::instance_intrinsic(
+                crate::java_stream::call(
                     vm,
                     "Ljava/io/FileOutputStream;",
                     "<init>",
@@ -606,7 +657,10 @@ fn writer(
             Value::Null
         }
         "flush" => {
-            flush_writer(vm, recv, false, false)?;
+            // An encoding Writer retains a final high surrogate across flush;
+            // close is the boundary that finally replaces incomplete input.
+            let encoding = wget(vm, recv).is_some_and(|w| matches!(w.sink, Sink::Stream(_, _)));
+            flush_writer(vm, recv, false, encoding)?;
             Value::Null
         }
         "close" => {
@@ -672,14 +726,14 @@ fn writer(
 // ── readers ─────────────────────────────────────────────────────────────
 
 fn rget(vm: &Engine, r: ObjRef) -> Option<RState> {
-    vm.module_tables
-        .jio_chars_readers_st
+    vm.io_tables
+        .readers
         .clone()
         .with(|m| m.borrow().get(&r).cloned())
 }
 fn rput(vm: &Engine, r: ObjRef, st: RState) {
-    vm.module_tables
-        .jio_chars_readers_st
+    vm.io_tables
+        .readers
         .clone()
         .with(|m| m.borrow_mut().insert(r, st));
 }
@@ -816,7 +870,7 @@ fn reader(
                 } else {
                     "(Ljava/lang/String;)V"
                 };
-                crate::jfile::instance_intrinsic(
+                crate::java_stream::call(
                     vm,
                     "Ljava/io/FileInputStream;",
                     "<init>",
@@ -1002,9 +1056,10 @@ fn reader(
 // ── byte array streams ──────────────────────────────────────────────────
 
 /// A host `ByteArrayInputStream` over `bytes` (raw resources, assets).
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) fn new_byte_input_stream(vm: &mut Engine, bytes: Vec<u8>) -> Result<Value, VmExit> {
     let r = vm.heap.alloc_instance(BAIS.to_string(), Vec::new())?;
-    vm.module_tables.jio_chars_bytes_st.clone().with(|m| {
+    vm.io_tables.bytes.clone().with(|m| {
         m.borrow_mut().insert(
             r,
             BState {
@@ -1025,7 +1080,7 @@ fn bytes_stream(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    let byte_states = vm.module_tables.jio_chars_bytes_st.clone();
+    let byte_states = vm.io_tables.bytes.clone();
     let get = || byte_states.with(|m| m.borrow().get(&recv).cloned());
     let set = |st: BState| byte_states.with(|m| m.borrow_mut().insert(recv, st));
     if name == "<init>" {
@@ -1284,8 +1339,8 @@ fn buffered_output_stream(
             ));
         }
         let _ = vm.heap.put_field(recv, "rd_buf_size", Value::Int(size));
-        vm.module_tables
-            .jio_chars_bytes_st
+        vm.io_tables
+            .bytes
             .clone()
             .with(|m| m.borrow_mut().insert(recv, BState::default()));
         return Ok(Some(Value::Null));
@@ -1295,7 +1350,7 @@ fn buffered_output_stream(
         _ => None,
     };
     let flush_buffer = |vm: &mut Engine| -> Result<(), VmExit> {
-        let pending = vm.module_tables.jio_chars_bytes_st.clone().with(|m| {
+        let pending = vm.io_tables.bytes.clone().with(|m| {
             let mut map = m.borrow_mut();
             let st = map.entry(recv).or_default();
             core::mem::take(&mut st.bytes)
@@ -1318,15 +1373,15 @@ fn buffered_output_stream(
                     slice(&all, int(args, 1), int(args, 2))?
                 }
             };
-            vm.module_tables
-                .jio_chars_bytes_st
+            vm.io_tables
+                .bytes
                 .clone()
                 .with(|m| m.borrow_mut().entry(recv).or_default().bytes.extend(data));
             let cap = match vm.heap.get_field(recv, "rd_buf_size") {
                 Ok(Value::Int(v)) => v.max(1) as usize,
                 _ => 8192,
             };
-            let over = vm.module_tables.jio_chars_bytes_st.clone().with(|m| {
+            let over = vm.io_tables.bytes.clone().with(|m| {
                 m.borrow()
                     .get(&recv)
                     .map(|st| st.bytes.len() >= cap)

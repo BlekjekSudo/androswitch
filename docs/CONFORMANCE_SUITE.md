@@ -1,7 +1,7 @@
 # Unified Android conformance catalog
 
-The API26 development suite consolidates **257 cases in one APK**: 135 Java/DEX,
-89 Android/platform and 33 JNI/native/graphics. It excludes sensors. Its
+The API26 development suite consolidates **274 cases in one APK**: 148 Java/DEX,
+93 Android/platform and 33 JNI/native/graphics. It excludes sensors. Its
 manifest, Activity, Application, Java and NDK code use public Android contracts.
 It is not CTS, CTS Verifier, complete Android coverage or Android certification.
 It does not replace unmodified independent APKs as the M9 integration gate.
@@ -26,7 +26,7 @@ They are never converted into passes or inferred from other clock sources.
 
 ## Runtime acceptance target
 
-All **257 declared cases are runtime repair targets**. Producing an APK, visiting
+All **274 declared cases are runtime repair targets**. Producing an APK, visiting
 every case or collecting a complete journal does not satisfy this target. Every
 `FAIL`, `ERROR`, `INTERRUPTED`, `UNSUPPORTED`, `BLOCKED` and `NOT_RUN` remains open;
 explicit emulator exclusions do not count as coverage. The collector records

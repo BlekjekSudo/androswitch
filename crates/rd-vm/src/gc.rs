@@ -348,7 +348,7 @@ impl Engine {
         crate::jregex::gc_keys(self, &mut module_keys);
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::android_spannable::gc_keys(self, &mut module_keys);
-        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
         crate::jio_chars::gc_keys(self, &mut module_keys);
         #[cfg(not(any(feature = "std", feature = "upstream-runtime")))]
         let module_keys: Vec<ObjRef> = Vec::new();
@@ -398,6 +398,10 @@ impl Engine {
                 not(any(feature = "desktop-runtime", feature = "upstream-runtime"))
             ))]
             cand.extend(crate::jregex::references(self, r));
+            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            if has_side[r as usize] & 2 != 0 {
+                cand.extend(crate::jio_chars::references(self, r));
+            }
             traced_objects += 1;
             match self.heap.get(r) {
                 Ok(HeapObj::Instance { class, fields }) => {
@@ -492,7 +496,6 @@ impl Engine {
                 let mut scanner = RefScanner::new(n, |x| cand.push(x));
                 crate::jregex::gc_entry(self, r, &mut scanner);
                 crate::android_spannable::gc_entry(self, r, &mut scanner);
-                crate::jio_chars::gc_entry(self, r, &mut scanner);
                 scanner.finish();
             }
             #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
@@ -599,7 +602,7 @@ impl Engine {
         let _ = alive_ref;
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::android_spannable::gc_purge(self, &alive_ref);
-        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
         crate::jio_chars::gc_purge(self, &alive_ref);
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::xml_res::gc_purge(self, &alive_ref);

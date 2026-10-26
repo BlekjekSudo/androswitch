@@ -21,7 +21,7 @@ disconnected Android environment inside the Switch runner.
 in the upstream Git tree, rather than selected class families. Each entry has
 the original Git blob ID. A changed file also records its reviewed adaptation
 reason and canonical SHA-256. Text canonicalization only normalizes CRLF to LF.
-The 45 added core files, including extracted shared helpers, have their own
+The 49 added core files, including extracted shared helpers, have their own
 reviewed hashes and provenance where applicable. Missing files, duplicate
 entries, an incomplete manifest, an unreviewed change,
 or drift after review fail the gate.
@@ -129,6 +129,13 @@ implementations. The original GC side-state scan remains conservative; owner
 roots and platform references are added without claiming a fully precise scan.
 
 ## Remaining parity work
+
+The [shared I/O checkpoint](UPSTREAM_SHARED_IO.md) selects original `jio_chars`
+on the product std profile and extracts File/file-stream/AtomicFile code from
+`jfile` for both dispatchers. The source audit now lists 83 excluded original
+VM paths; this count includes reference/backend surfaces and is not an API
+coverage percentage. Native descriptor ownership and the other platform/state
+boundaries below still need integration and behavior evidence.
 
 The machine inventory is the authoritative exhaustive file list. The work is
 organized by common state and dependency boundaries, rather than the next APK

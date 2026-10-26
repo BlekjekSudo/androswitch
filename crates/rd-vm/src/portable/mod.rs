@@ -122,6 +122,13 @@ impl Engine {
         if crate::boxes::kind(class).is_some() {
             return Ok(());
         }
+        if crate::java_stream::supports(class) {
+            return Ok(());
+        }
+        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+        if class == crate::atomic_file::CLASS {
+            return Ok(());
+        }
         if let Some(host) = self.framework_host() {
             if host.attach(self, class, _object)? {
                 return Ok(());
@@ -140,6 +147,10 @@ impl Engine {
         }
         let mut visited = crate::maps::HashSet::new();
         while visited.insert(current.clone()) {
+            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            if crate::java_io::supports(&current) {
+                return Ok(());
+            }
             if atomic_number::supports(&current) {
                 return atomic_number::attach(self, &current, _object);
             }

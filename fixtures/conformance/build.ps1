@@ -16,7 +16,7 @@ New-Item -ItemType Directory -Force "$output/classes","$output/oracle-classes","
 $pure=Join-Path $PSScriptRoot 'java/org/androswitch/conformance/PureCases.java'
 & javac --release 8 -g:none -d "$output/oracle-classes" $pure
 if($LASTEXITCODE){throw 'JVM case compilation failed'}
-& java -cp "$output/oracle-classes" org.androswitch.conformance.PureCases | Set-Content "$output/jvm-oracle.tsv" -Encoding utf8NoBOM
+& java -cp "$output/oracle-classes" org.androswitch.conformance.PureCases "$output/jvm-oracle.tsv"
 if($LASTEXITCODE){throw 'JVM reference execution failed'}
 & python "$PSScriptRoot/catalog.py" --output $output
 if($LASTEXITCODE){throw 'Catalog generation failed'}

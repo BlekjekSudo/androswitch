@@ -1,6 +1,7 @@
 /* AndroSwitch root-relative storage adapter, MIT OR Apache-2.0. */
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +36,20 @@ int as_storage_stat(const char *path, uint64_t *length, uint32_t *directory) {
   }
   *length = (uint64_t)st.st_size;
   *directory = S_ISDIR(st.st_mode);
+  return 0;
+}
+int as_storage_create_file_new(const char *path) {
+  int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666);
+  if (fd < 0) return errno == EEXIST ? 0 : -errno;
+  if (close(fd)) return -errno;
+  if (R_FAILED(fsdevCommitDevice("sdmc"))) return -EIO;
+  return 1;
+}
+int as_storage_modified_millis(const char *path, uint64_t *millis) {
+  struct stat st;
+  if (stat(path, &st)) return -errno;
+  if (st.st_mtime < 0) return -ERANGE;
+  *millis = (uint64_t)st.st_mtime * 1000;
   return 0;
 }
 int64_t as_storage_read(const char *path, uint64_t offset, uint8_t *output,
@@ -150,6 +165,12 @@ int as_storage_rename(const char *source, const char *destination) {
   }
   return -EINPROGRESS; /* Publication outcome is indeterminate; caller must
                           reload. */
+}
+int as_storage_rename_replace(const char *source, const char *destination) {
+  if (rename(source, destination)) return -errno;
+  /* Replacement cannot be rolled back after a failed durability commit.
+   * Report the indeterminate outcome instead of claiming durable success. */
+  return R_FAILED(fsdevCommitDevice("sdmc")) ? -EINPROGRESS : 0;
 }
 int as_storage_remove(const char *path, uint32_t recursive) {
   struct stat st;

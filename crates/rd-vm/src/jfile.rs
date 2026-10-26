@@ -26,8 +26,6 @@ use crate::err::VmExit;
 use crate::heap::{ElemKind, ObjRef};
 use crate::value::Value;
 
-const FILE: &str = "Ljava/io/File;";
-const ATOMIC_FILE: &str = "Landroid/util/AtomicFile;";
 const MAX_VFS_FILE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_VFS_TOTAL_BYTES: usize = 128 * 1024 * 1024;
 
@@ -81,32 +79,8 @@ macro_rules! vfs {
     }};
 }
 
-fn normalize(p: &str) -> String {
-    if p == "." {
-        return ".".to_string();
-    }
-    let abs = p.starts_with('/');
-    let mut parts: Vec<&str> = Vec::new();
-    for seg in p.split('/') {
-        match seg {
-            "" | "." => {}
-            ".." => {
-                if abs || parts.last().is_some_and(|last| *last != "..") {
-                    parts.pop();
-                } else {
-                    parts.push("..");
-                }
-            }
-            s => parts.push(s),
-        }
-    }
-    let joined = parts.join("/");
-    if abs {
-        format!("/{joined}")
-    } else {
-        joined
-    }
-}
+pub(crate) use crate::java_file::new_file;
+use crate::java_file::{normalize, parent_of, path_of};
 
 fn absolute(p: &str) -> String {
     if p.starts_with('/') {
@@ -123,19 +97,6 @@ fn vfs_used_excluding(vfs: &Vfs, exclude: &str) -> usize {
         .fold(0usize, |acc, (_, b)| acc.saturating_add(b.len()))
 }
 
-fn parent_of(p: &str) -> Option<String> {
-    let i = p.rfind('/')?;
-    if i == 0 {
-        if p.len() > 1 {
-            Some("/".into())
-        } else {
-            None
-        }
-    } else {
-        Some(p[..i].to_string())
-    }
-}
-
 fn mkdirs(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) {
     let p = absolute(p);
     vfs!(vm).with(|v| {
@@ -149,6 +110,7 @@ fn mkdirs(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) {
     });
 }
 
+#[cfg(test)]
 fn is_dir(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) -> bool {
     if p.is_empty() {
         return false;
@@ -156,24 +118,13 @@ fn is_dir(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) -> bool
     let p = absolute(p);
     p == "/" || vfs!(vm).with(|v| v.borrow().dirs.contains(&p))
 }
+#[cfg(test)]
 fn is_file(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine, p: &str) -> bool {
     if p.is_empty() {
         return false;
     }
     let p = absolute(p);
     vfs!(vm).with(|v| v.borrow().files.contains_key(&p))
-}
-
-pub(crate) fn new_file(vm: &mut Engine, path: &str) -> Result<Value, VmExit> {
-    let s = crate::intrinsics::alloc_string(vm, normalize(path))?;
-    let r = vm
-        .heap
-        .alloc_instance(
-            FILE.to_string(),
-            vec![("rd_path".to_string(), Value::Obj(s))],
-        )
-        .map_err(crate::err::oom_throwable)?;
-    Ok(Value::Obj(r))
 }
 
 /// Android's deterministic emulated shared-storage root, held only in the
@@ -185,13 +136,6 @@ pub(crate) fn external_storage_path(vm: &mut Engine, path: &str) -> Result<Value
         "/storage/emulated/0",
     );
     new_file(vm, path)
-}
-
-fn path_of(vm: &Engine, r: ObjRef) -> String {
-    match vm.heap.get_field(r, "rd_path") {
-        Ok(Value::Obj(s)) => vm.heap.as_str(s).map(str::to_string).unwrap_or_default(),
-        _ => String::new(),
-    }
 }
 
 fn str_arg(vm: &Engine, v: Option<&Value>) -> Option<String> {
@@ -389,322 +333,12 @@ pub fn static_intrinsic(
     name: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if class != FILE {
-        return Ok(None);
-    }
-    Ok(Some(match name {
-        "createTempFile" => {
-            let Some(Value::Obj(pre_ref)) = args.first() else {
-                return Err(atomic_throw(
-                    "Ljava/lang/NullPointerException;",
-                    "prefix == null",
-                ));
-            };
-            let pre = vm
-                .heap
-                .as_str(*pre_ref)
-                .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?
-                .to_string();
-            let suf = str_arg(vm, args.get(1)).unwrap_or_else(|| ".tmp".into());
-            let dir = match args.get(2) {
-                Some(Value::Obj(d)) => path_of(vm, *d),
-                _ => "/data/local/tmp".into(),
-            };
-            mkdirs(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &dir,
-            );
-            let n = vfs!(vm).with(|v| v.borrow().files.len());
-            let p = format!("{dir}/{pre}{n}{suf}");
-            vfs!(vm).with(|v| v.borrow_mut().files.insert(absolute(&p), Vec::new()));
-            new_file(vm, &p)?
-        }
+    let sig = match args.len() {
+        2 => "(Ljava/lang/String;Ljava/lang/String;)Ljava/io/File;",
+        3 => "(Ljava/lang/String;Ljava/lang/String;Ljava/io/File;)Ljava/io/File;",
         _ => return Ok(None),
-    }))
-}
-
-fn atomic_throw(class: &str, message: impl Into<String>) -> VmExit {
-    crate::err::Throwable::new(class, message.into()).into()
-}
-
-fn atomic_file_ref(vm: &Engine, recv: ObjRef, field: &str) -> Result<ObjRef, VmExit> {
-    match vm.heap.get_field(recv, field) {
-        Ok(Value::Obj(file)) => Ok(file),
-        _ => Err(atomic_throw(
-            "Ljava/lang/NullPointerException;",
-            format!("{field} == null"),
-        )),
-    }
-}
-
-fn atomic_paths(vm: &Engine, recv: ObjRef) -> Result<(String, String), VmExit> {
-    let base = atomic_file_ref(vm, recv, "mBaseFile")?;
-    let backup = atomic_file_ref(vm, recv, "mBackupFile")?;
-    Ok((absolute(&path_of(vm, base)), absolute(&path_of(vm, backup))))
-}
-
-fn atomic_rename(
-    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
-    from: &str,
-    to: &str,
-) -> bool {
-    vfs!(vm).with(|v| {
-        let mut v = v.borrow_mut();
-        let Some(bytes) = v.files.remove(from) else {
-            return false;
-        };
-        v.files.insert(to.to_string(), bytes);
-        true
-    })
-}
-
-fn atomic_create_stream(vm: &mut Engine, class: &str, path: &str) -> Result<Value, VmExit> {
-    let stream = vm
-        .heap
-        .alloc_instance(class.to_string(), Vec::new())
-        .map_err(crate::err::oom_throwable)?;
-    let path_ref = crate::intrinsics::alloc_string(vm, path.to_string())?;
-    if stream_intrinsic(
-        vm,
-        class,
-        "<init>",
-        "(Ljava/lang/String;)V",
-        stream,
-        &[Value::Obj(path_ref)],
-    )?
-    .is_none()
-    {
-        return Err(crate::err::vm_error(
-            "VM_TYPE_ERROR",
-            format!("{class} constructor was not handled"),
-        )
-        .into());
-    }
-    Ok(Value::Obj(stream))
-}
-
-fn atomic_close_stream(vm: &mut Engine, args: &[Value]) {
-    if let Some(Value::Obj(stream)) = args.first() {
-        // FileOutputStream.close() also makes the host VFS state final; the
-        // AOSP implementation ignores IOException from this cleanup path.
-        let _ = vm.invoke_instance(*stream, "close", "()V", &[]);
-    }
-}
-
-fn atomic_restore_backup(
-    #[cfg(not(feature = "desktop-runtime"))] vm: &Engine,
-    base: &str,
-    backup: &str,
-) {
-    if is_file(
-        #[cfg(not(feature = "desktop-runtime"))]
-        vm,
-        backup,
-    ) {
-        delete_file(
-            #[cfg(not(feature = "desktop-runtime"))]
-            vm,
-            base,
-        );
-        atomic_rename(
-            #[cfg(not(feature = "desktop-runtime"))]
-            vm,
-            backup,
-            base,
-        );
-    }
-}
-
-fn atomic_open_read(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
-    let (base, backup) = atomic_paths(vm, recv)?;
-    atomic_restore_backup(
-        #[cfg(not(feature = "desktop-runtime"))]
-        vm,
-        &base,
-        &backup,
-    );
-    atomic_create_stream(vm, FIS, &base)
-}
-
-fn atomic_file_intrinsic(
-    vm: &mut Engine,
-    name: &str,
-    sig: &str,
-    recv: ObjRef,
-    args: &[Value],
-) -> Result<Option<Value>, VmExit> {
-    match (name, sig) {
-        ("<init>", "(Ljava/io/File;)V") => {
-            let Some(base @ Value::Obj(base_ref)) = args.first() else {
-                return Err(atomic_throw(
-                    "Ljava/lang/NullPointerException;",
-                    "baseFile == null",
-                ));
-            };
-            let base_path = path_of(vm, *base_ref);
-            let backup = new_file(vm, &format!("{base_path}.bak"))?;
-            crate::err::put_field_result(vm.heap.put_field(recv, "mBaseFile", base.clone()))?;
-            crate::err::put_field_result(vm.heap.put_field(recv, "mBackupFile", backup))?;
-            Ok(Some(Value::Null))
-        }
-        ("getBaseFile", "()Ljava/io/File;") => {
-            Ok(Some(Value::Obj(atomic_file_ref(vm, recv, "mBaseFile")?)))
-        }
-        ("startWrite", "()Ljava/io/FileOutputStream;") => {
-            let (base, backup) = atomic_paths(vm, recv)?;
-            if is_file(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &base,
-            ) || is_dir(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &base,
-            ) {
-                if !is_file(
-                    #[cfg(not(feature = "desktop-runtime"))]
-                    vm,
-                    &backup,
-                ) && !is_dir(
-                    #[cfg(not(feature = "desktop-runtime"))]
-                    vm,
-                    &backup,
-                ) {
-                    if !is_file(
-                        #[cfg(not(feature = "desktop-runtime"))]
-                        vm,
-                        &base,
-                    ) || !atomic_rename(
-                        #[cfg(not(feature = "desktop-runtime"))]
-                        vm,
-                        &base,
-                        &backup,
-                    ) {
-                        return Err(atomic_throw(
-                            "Ljava/io/IOException;",
-                            format!("Couldn't rename file {base} to backup file {backup}"),
-                        ));
-                    }
-                } else {
-                    // A pre-existing backup is the older committed state;
-                    // the current base is an interrupted replacement.
-                    delete_file(
-                        #[cfg(not(feature = "desktop-runtime"))]
-                        vm,
-                        &base,
-                    );
-                }
-            }
-            match atomic_create_stream(vm, FOS, &base) {
-                Ok(stream) => Ok(Some(stream)),
-                Err(error) => {
-                    let Some(parent) = parent_of(&base) else {
-                        return Err(error);
-                    };
-                    mkdirs(
-                        #[cfg(not(feature = "desktop-runtime"))]
-                        vm,
-                        &parent,
-                    );
-                    if !is_dir(
-                        #[cfg(not(feature = "desktop-runtime"))]
-                        vm,
-                        &parent,
-                    ) {
-                        return Err(error);
-                    }
-                    Ok(Some(atomic_create_stream(vm, FOS, &base)?))
-                }
-            }
-        }
-        ("finishWrite", "(Ljava/io/FileOutputStream;)V") => {
-            atomic_close_stream(vm, args);
-            let (_, backup) = atomic_paths(vm, recv)?;
-            delete_file(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &backup,
-            );
-            Ok(Some(Value::Null))
-        }
-        ("failWrite", "(Ljava/io/FileOutputStream;)V") => {
-            atomic_close_stream(vm, args);
-            let (base, backup) = atomic_paths(vm, recv)?;
-            delete_file(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &base,
-            );
-            if is_file(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &backup,
-            ) {
-                atomic_rename(
-                    #[cfg(not(feature = "desktop-runtime"))]
-                    vm,
-                    &backup,
-                    &base,
-                );
-            }
-            Ok(Some(Value::Null))
-        }
-        ("openRead", "()Ljava/io/FileInputStream;") => Ok(Some(atomic_open_read(vm, recv)?)),
-        ("readFully", "()[B") => {
-            let Value::Obj(stream) = atomic_open_read(vm, recv)? else {
-                return Err(atomic_throw(
-                    "Ljava/io/IOException;",
-                    "openRead returned null",
-                ));
-            };
-            let scratch = crate::jlstring::byte_array(vm, &[0; 8192])?;
-            let Value::Obj(scratch_ref) = scratch else {
-                return Err(atomic_throw("Ljava/io/IOException;", "scratch buffer"));
-            };
-            let mut contents = Vec::new();
-            loop {
-                let count = vm
-                    .invoke_instance(
-                        stream,
-                        "read",
-                        "([BII)I",
-                        &[scratch.clone(), Value::Int(0), Value::Int(8192)],
-                    )?
-                    .as_int()
-                    .unwrap_or(-1);
-                if count < 0 {
-                    break;
-                }
-                if count == 0 {
-                    continue;
-                }
-                let bytes = vm.heap.as_array_elems(scratch_ref)?.0;
-                contents.extend(
-                    bytes[..(count as usize).min(bytes.len())]
-                        .iter()
-                        .map(|value| value.as_int().unwrap_or(0) as u8),
-                );
-            }
-            let _ = vm.invoke_instance(stream, "close", "()V", &[]);
-            Ok(Some(crate::jlstring::byte_array(vm, &contents)?))
-        }
-        ("delete", "()V") => {
-            let (base, backup) = atomic_paths(vm, recv)?;
-            delete_file(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &base,
-            );
-            delete_file(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &backup,
-            );
-            Ok(Some(Value::Null))
-        }
-        _ => Ok(None),
-    }
+    };
+    crate::java_file::call_static(vm, class, name, sig, args)
 }
 
 pub fn instance_intrinsic(
@@ -715,387 +349,17 @@ pub fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if STREAMS.contains(&recv_class) {
+    if crate::java_stream::supports(recv_class) {
         return stream_intrinsic(vm, recv_class, name, sig, recv, args);
     }
-    if recv_class == ATOMIC_FILE {
-        return atomic_file_intrinsic(vm, name, sig, recv, args);
+    if let Some(value) = crate::atomic_file::call(vm, recv_class, name, sig, recv, args)? {
+        return Ok(Some(value));
     }
-    if recv_class != FILE {
-        return Ok(None);
-    }
-    if name == "<init>" {
-        let path = match sig {
-            "(Ljava/lang/String;)V" => {
-                let Some(Value::Obj(r)) = args.first() else {
-                    return Err(atomic_throw(
-                        "Ljava/lang/NullPointerException;",
-                        "pathname == null",
-                    ));
-                };
-                vm.heap
-                    .as_str(*r)
-                    .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?
-                    .to_string()
-            }
-            "(Ljava/io/File;Ljava/lang/String;)V" | "(Ljava/lang/String;Ljava/lang/String;)V" => {
-                let Some(Value::Obj(child_ref)) = args.get(1) else {
-                    return Err(atomic_throw(
-                        "Ljava/lang/NullPointerException;",
-                        "child == null",
-                    ));
-                };
-                let child = vm
-                    .heap
-                    .as_str(*child_ref)
-                    .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?
-                    .to_string();
-                let parent = match args.first() {
-                    None | Some(Value::Null) => None,
-                    Some(Value::Obj(p)) if sig.starts_with("(Ljava/io/File;") => {
-                        Some(path_of(vm, *p))
-                    }
-                    Some(Value::Obj(p)) => Some(
-                        vm.heap
-                            .as_str(*p)
-                            .map_err(|e| crate::err::vm_error("VM_TYPE_ERROR", e))?
-                            .to_string(),
-                    ),
-                    _ => None,
-                };
-                match parent {
-                    Some(p) if p.is_empty() => format!("/{child}"),
-                    Some(p) => format!("{p}/{child}"),
-                    None => child,
-                }
-            }
-            _ => return Ok(None),
-        };
-        let v = crate::intrinsics::alloc_string(vm, normalize(&path))?;
-        crate::err::put_field_result(vm.heap.put_field(recv, "rd_path", Value::Obj(v)))?;
-        return Ok(Some(Value::Null));
-    }
-    let p = path_of(vm, recv);
-    let abs = absolute(&p);
-    let b = |x: bool| Value::Int(x as i32);
-    Ok(Some(match name {
-        "getPath" | "toString" => s(vm, p)?,
-        "getAbsolutePath" | "getCanonicalPath" => s(vm, abs)?,
-        "getAbsoluteFile" | "getCanonicalFile" => new_file(vm, &abs)?,
-        "getName" => {
-            let n = p.rsplit('/').next().unwrap_or("").to_string();
-            s(vm, n)?
-        }
-        "getParent" => match parent_of(&p) {
-            Some(x) => s(vm, x)?,
-            None => Value::Null,
-        },
-        "getParentFile" => match parent_of(&p) {
-            Some(x) => new_file(vm, &x)?,
-            None => Value::Null,
-        },
-        "exists" => b(is_dir(
-            #[cfg(not(feature = "desktop-runtime"))]
-            vm,
-            &p,
-        ) || is_file(
-            #[cfg(not(feature = "desktop-runtime"))]
-            vm,
-            &p,
-        )),
-        "isDirectory" => b(is_dir(
-            #[cfg(not(feature = "desktop-runtime"))]
-            vm,
-            &p,
-        )),
-        "isFile" => b(is_file(
-            #[cfg(not(feature = "desktop-runtime"))]
-            vm,
-            &p,
-        )),
-        "isAbsolute" => b(p.starts_with('/')),
-        "isHidden" => b(!p.is_empty()
-            && p != "."
-            && p != ".."
-            && p.rsplit('/').next().is_some_and(|n| n.starts_with('.'))),
-        "canRead" | "canWrite" | "canExecute" => b(is_dir(
-            #[cfg(not(feature = "desktop-runtime"))]
-            vm,
-            &p,
-        ) || is_file(
-            #[cfg(not(feature = "desktop-runtime"))]
-            vm,
-            &p,
-        )),
-        "length" => Value::Long(if p.is_empty() {
-            0
-        } else {
-            vfs!(vm).with(|v| {
-                v.borrow()
-                    .files
-                    .get(&abs)
-                    .map(|f| f.len() as i64)
-                    .unwrap_or(0)
-            })
-        }),
-        "lastModified" => Value::Long(
-            if is_dir(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &p,
-            ) || is_file(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &p,
-            ) {
-                crate::jlsystem::epoch_ms()
-            } else {
-                0
-            },
-        ),
-        "mkdir" => {
-            let ok = !p.is_empty()
-                && !is_dir(
-                    #[cfg(not(feature = "desktop-runtime"))]
-                    vm,
-                    &p,
-                )
-                && !is_file(
-                    #[cfg(not(feature = "desktop-runtime"))]
-                    vm,
-                    &p,
-                )
-                && parent_of(&abs).is_some_and(|x| {
-                    is_dir(
-                        #[cfg(not(feature = "desktop-runtime"))]
-                        vm,
-                        &x,
-                    )
-                });
-            if ok {
-                vfs!(vm).with(|v| v.borrow_mut().dirs.insert(abs.clone()));
-            }
-            b(ok)
-        }
-        "mkdirs" => {
-            let ok = !p.is_empty()
-                && !is_dir(
-                    #[cfg(not(feature = "desktop-runtime"))]
-                    vm,
-                    &p,
-                )
-                && !is_file(
-                    #[cfg(not(feature = "desktop-runtime"))]
-                    vm,
-                    &p,
-                );
-            if ok {
-                mkdirs(
-                    #[cfg(not(feature = "desktop-runtime"))]
-                    vm,
-                    &abs,
-                );
-            }
-            b(ok)
-        }
-        "createNewFile" => {
-            if p.is_empty() {
-                return Err(atomic_throw(
-                    "Ljava/io/IOException;",
-                    "No such file or directory",
-                ));
-            }
-            let ok = !is_dir(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &p,
-            ) && !is_file(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &p,
-            );
-            if ok {
-                if let Some(par) = parent_of(&abs) {
-                    if !is_dir(
-                        #[cfg(not(feature = "desktop-runtime"))]
-                        vm,
-                        &par,
-                    ) {
-                        return Err(crate::err::Throwable::new(
-                            "Ljava/io/IOException;",
-                            "No such file or directory".to_string(),
-                        )
-                        .into());
-                    }
-                }
-                vfs!(vm).with(|v| v.borrow_mut().files.insert(abs.clone(), Vec::new()));
-            }
-            b(ok)
-        }
-        "delete" => {
-            if p.is_empty() {
-                return Ok(Some(b(false)));
-            }
-            let ok = vfs!(vm).with(|v| {
-                let mut v = v.borrow_mut();
-                if v.files.remove(&abs).is_some() {
-                    v.meta.remove(&abs);
-                    return true;
-                }
-                let prefix = format!("{abs}/");
-                let empty = !v.dirs.iter().any(|d| d.starts_with(&prefix))
-                    && !v.files.keys().any(|f| f.starts_with(&prefix));
-                if empty && v.dirs.remove(&abs) {
-                    v.meta.remove(&abs);
-                    true
-                } else {
-                    false
-                }
-            });
-            b(ok)
-        }
-        "deleteOnExit" | "setLastModified" | "setReadable" | "setWritable" | "setExecutable"
-        | "setReadOnly" => {
-            if sig.ends_with('V') {
-                Value::Null
-            } else {
-                b(true)
-            }
-        }
-        "renameTo" => {
-            let Some(Value::Obj(d)) = args.first() else {
-                return Err(atomic_throw(
-                    "Ljava/lang/NullPointerException;",
-                    "dest == null",
-                ));
-            };
-            let dst_raw = path_of(vm, *d);
-            if p.is_empty() || dst_raw.is_empty() {
-                return Ok(Some(b(false)));
-            }
-            let dst = absolute(&dst_raw);
-            b(os_rename(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &abs,
-                &dst,
-            )
-            .is_ok())
-        }
-        "list" | "listFiles" if sig.starts_with("()") => {
-            if !is_dir(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &p,
-            ) {
-                return Ok(Some(Value::Null));
-            }
-            let prefix = if abs == "/" {
-                "/".to_string()
-            } else {
-                format!("{abs}/")
-            };
-            let names: Vec<String> = vfs!(vm).with(|v| {
-                let v = v.borrow();
-                v.dirs
-                    .iter()
-                    .chain(v.files.keys())
-                    .filter_map(|k| k.strip_prefix(&prefix))
-                    .filter(|k| !k.is_empty() && !k.contains('/'))
-                    .map(str::to_string)
-                    .collect()
-            });
-            let mut vals = Vec::new();
-            for n in names {
-                vals.push(if name == "list" {
-                    s(vm, n)?
-                } else {
-                    new_file(vm, &format!("{prefix}{n}"))?
-                });
-            }
-            let desc = if name == "list" {
-                "[Ljava/lang/String;"
-            } else {
-                "[Ljava/io/File;"
-            };
-            crate::arrays::new_array(vm, desc, ElemKind::Obj, vals)?
-        }
-        "equals" => {
-            let o = match args.first() {
-                Some(Value::Obj(o)) if vm.heap.class_of(*o).map(|c| c == FILE).unwrap_or(false) => {
-                    path_of(vm, *o)
-                }
-                _ => return Ok(Some(b(false))),
-            };
-            b(o == p)
-        }
-        "hashCode" => {
-            let h = p
-                .encode_utf16()
-                .fold(0i32, |h, c| h.wrapping_mul(31).wrapping_add(c as i32));
-            Value::Int(h ^ 1234321)
-        }
-        "compareTo" => {
-            let Some(Value::Obj(o)) = args.first() else {
-                return Err(atomic_throw(
-                    "Ljava/lang/NullPointerException;",
-                    "pathname == null",
-                ));
-            };
-            let o = path_of(vm, *o);
-            Value::Int(p.cmp(&o) as i32)
-        }
-        "getFreeSpace" | "getUsableSpace" => Value::Long(4 << 30),
-        "getTotalSpace" => Value::Long(8 << 30),
-        _ => return Ok(None),
-    }))
+    crate::java_file::call(vm, recv_class, name, sig, recv, args)
 }
 
 const FOS: &str = "Ljava/io/FileOutputStream;";
 const FIS: &str = "Ljava/io/FileInputStream;";
-const CHANNEL: &str = "Ljava/nio/channels/FileChannel;";
-const FLOCK: &str = "Ljava/nio/channels/FileLock;";
-const FD: &str = "Ljava/io/FileDescriptor;";
-const STREAMS: [&str; 5] = [FOS, FIS, CHANNEL, FLOCK, FD];
-
-fn with_path(vm: &mut Engine, class: &str, path: &str) -> Result<Value, VmExit> {
-    let sv = crate::intrinsics::alloc_string(vm, path.to_string())?;
-    let r = vm
-        .heap
-        .alloc_instance(
-            class.to_string(),
-            vec![("rd_path".to_string(), Value::Obj(sv))],
-        )
-        .map_err(crate::err::oom_throwable)?;
-    Ok(Value::Obj(r))
-}
-
-fn bytes_of(vm: &Engine, v: Option<&Value>) -> Vec<u8> {
-    match v {
-        Some(Value::Obj(a)) => vm
-            .heap
-            .as_array_elems(*a)
-            .map(|(e, _)| {
-                e.iter()
-                    .map(|x| match x {
-                        Value::Int(i) => *i as u8,
-                        _ => 0,
-                    })
-                    .collect()
-            })
-            .unwrap_or_default(),
-        _ => Vec::new(),
-    }
-}
-
-fn int_arg(args: &[Value], i: usize) -> i64 {
-    match args.get(i) {
-        Some(Value::Int(v)) => *v as i64,
-        Some(Value::Long(v)) => *v,
-        _ => 0,
-    }
-}
-
 fn stream_intrinsic(
     vm: &mut Engine,
     class: &str,
@@ -1104,263 +368,7 @@ fn stream_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    let fnf = |p: &str| -> VmExit {
-        crate::err::Throwable::new(
-            "Ljava/io/FileNotFoundException;",
-            format!("{p}: open failed: ENOENT (No such file or directory)"),
-        )
-        .into()
-    };
-    if name == "<init>" {
-        let path = match args.first() {
-            Some(Value::Obj(o)) => {
-                let c = vm.heap.class_of(*o).map(str::to_string).unwrap_or_default();
-                if c == FILE || c == FD {
-                    path_of(vm, *o)
-                } else {
-                    vm.heap.as_str(*o).map(str::to_string).unwrap_or_default()
-                }
-            }
-            _ => {
-                return Err(crate::err::Throwable::new(
-                    "Ljava/lang/NullPointerException;",
-                    "file".to_string(),
-                )
-                .into())
-            }
-        };
-        let abs = absolute(&path);
-        if class == FOS {
-            let append = matches!(args.get(1), Some(Value::Int(1)));
-            if parent_of(&abs).is_some_and(|p| {
-                !is_dir(
-                    #[cfg(not(feature = "desktop-runtime"))]
-                    vm,
-                    &p,
-                )
-            }) || is_dir(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &abs,
-            ) {
-                return Err(fnf(&abs));
-            }
-            vfs!(vm).with(|v| {
-                let mut v = v.borrow_mut();
-                let e = v.files.entry(abs.clone()).or_default();
-                if !append && !sig.contains("FileDescriptor") {
-                    e.clear();
-                }
-            });
-        } else if class == FIS
-            && !is_file(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                &abs,
-            )
-        {
-            return Err(fnf(&abs));
-        }
-        let sv = crate::intrinsics::alloc_string(vm, abs)?;
-        crate::err::put_field_result(vm.heap.put_field(recv, "rd_path", Value::Obj(sv)))?;
-        return Ok(Some(Value::Null));
-    }
-    let p = path_of(vm, recv);
-    let pos = match vm.heap.get_field(recv, "rd_pos") {
-        Ok(Value::Long(x)) => x as usize,
-        _ => 0,
-    };
-    let set_pos = |vm: &mut Engine, x: usize| {
-        crate::err::put_field_result(vm.heap.put_field(recv, "rd_pos", Value::Long(x as i64)))
-    };
-    let len = vfs!(vm).with(|v| v.borrow().files.get(&p).map(Vec::len).unwrap_or(0));
-    Ok(Some(match (class, name) {
-        (FOS, "write") => {
-            let data = match sig {
-                "(I)V" => vec![int_arg(args, 0) as u8],
-                "([B)V" => {
-                    let Some(Value::Obj(_)) = args.first() else {
-                        return Err(atomic_throw(
-                            "Ljava/lang/NullPointerException;",
-                            "b == null",
-                        ));
-                    };
-                    bytes_of(vm, args.first())
-                }
-                _ => {
-                    let Some(Value::Obj(_)) = args.first() else {
-                        return Err(atomic_throw(
-                            "Ljava/lang/NullPointerException;",
-                            "b == null",
-                        ));
-                    };
-                    let all = bytes_of(vm, args.first());
-                    let cap = all.len();
-                    let off_i = int_arg(args, 1);
-                    let len_i = int_arg(args, 2);
-                    if off_i < 0 || len_i < 0 {
-                        return Err(atomic_throw(
-                            "Ljava/lang/IndexOutOfBoundsException;",
-                            format!("offset={off_i}, count={len_i}, length={cap}"),
-                        ));
-                    }
-                    let (off, n) = (off_i as usize, len_i as usize);
-                    if off > cap || n > cap - off {
-                        return Err(atomic_throw(
-                            "Ljava/lang/IndexOutOfBoundsException;",
-                            format!("offset={off_i}, count={len_i}, length={cap}"),
-                        ));
-                    }
-                    all[off..off + n].to_vec()
-                }
-            };
-            let new_len = vfs!(vm).with(|v| -> Result<usize, VmExit> {
-                let mut vfs = v.borrow_mut();
-                let cur_len = vfs.files.get(&p).map_or(0, Vec::len);
-                let target_len = cur_len
-                    .checked_add(data.len())
-                    .ok_or_else(|| atomic_throw("Ljava/io/IOException;", "File too large"))?;
-                if target_len > MAX_VFS_FILE_BYTES {
-                    return Err(atomic_throw("Ljava/io/IOException;", "File too large"));
-                }
-                let other = vfs_used_excluding(&vfs, &p);
-                if other.saturating_add(target_len) > MAX_VFS_TOTAL_BYTES {
-                    return Err(atomic_throw(
-                        "Ljava/io/IOException;",
-                        "No space left on device",
-                    ));
-                }
-                let entry = vfs.files.entry(p.clone()).or_default();
-                entry.extend_from_slice(&data);
-                Ok(entry.len())
-            })?;
-            set_pos(vm, new_len)?;
-            Value::Null
-        }
-        (FOS | FIS, "flush" | "close")
-        | (CHANNEL, "close" | "force")
-        | (FLOCK, "release" | "close") => Value::Null,
-        (FOS | FIS, "getChannel") => with_path(vm, CHANNEL, &p)?,
-        (FOS | FIS, "getFD") => {
-            let value = with_path(vm, FD, &p)?;
-            if let Value::Obj(fd_obj) = value {
-                let flags = if class == FOS {
-                    OS_O_WRONLY | OS_O_APPEND
-                } else {
-                    OS_O_RDONLY
-                };
-                if let Some(fd) = os_register_path(
-                    #[cfg(not(feature = "desktop-runtime"))]
-                    vm,
-                    &p,
-                    flags,
-                    pos as u64,
-                ) {
-                    crate::err::put_field_result(vm.heap.put_field(
-                        fd_obj,
-                        "descriptor",
-                        Value::Int(fd),
-                    ))?;
-                }
-                Value::Obj(fd_obj)
-            } else {
-                value
-            }
-        }
-        (FD, "valid") => match vm.heap.get_field(recv, "descriptor") {
-            Ok(Value::Int(fd)) => Value::Int(os_fd_valid(
-                #[cfg(not(feature = "desktop-runtime"))]
-                vm,
-                fd,
-            ) as i32),
-            _ => Value::Int(1),
-        },
-        (FD, "sync") => Value::Null,
-        (FIS, "available") => Value::Int(len.saturating_sub(pos) as i32),
-        (FIS, "skip") => {
-            let n = (int_arg(args, 0).max(0) as usize).min(len.saturating_sub(pos));
-            set_pos(vm, pos + n)?;
-            Value::Long(n as i64)
-        }
-        (FIS, "read") => {
-            if sig == "()I" {
-                let b =
-                    vfs!(vm).with(|v| v.borrow().files.get(&p).and_then(|f| f.get(pos).copied()));
-                match b {
-                    Some(b) => {
-                        set_pos(vm, pos + 1)?;
-                        Value::Int(b as i32)
-                    }
-                    None => Value::Int(-1),
-                }
-            } else {
-                let Some(Value::Obj(arr)) = args.first().cloned() else {
-                    return Err(atomic_throw(
-                        "Ljava/lang/NullPointerException;",
-                        "b == null",
-                    ));
-                };
-                let cap = vm
-                    .heap
-                    .as_array_elems(arr)
-                    .map_err(|e| VmExit::from(crate::err::vm_error("INVALID_STATE", e)))?
-                    .0
-                    .len();
-                let (off, want) = if sig == "([B)I" {
-                    (0usize, cap)
-                } else {
-                    let off_i = int_arg(args, 1);
-                    let len_i = int_arg(args, 2);
-                    if off_i < 0 || len_i < 0 {
-                        return Err(atomic_throw(
-                            "Ljava/lang/IndexOutOfBoundsException;",
-                            format!("offset={off_i}, count={len_i}, length={cap}"),
-                        ));
-                    }
-                    let (o, w) = (off_i as usize, len_i as usize);
-                    if o > cap || w > cap - o {
-                        return Err(atomic_throw(
-                            "Ljava/lang/IndexOutOfBoundsException;",
-                            format!("offset={off_i}, count={len_i}, length={cap}"),
-                        ));
-                    }
-                    (o, w)
-                };
-                if want == 0 {
-                    return Ok(Some(Value::Int(0)));
-                }
-                let chunk: Vec<u8> = vfs!(vm).with(|v| {
-                    let v = v.borrow();
-                    let Some(f) = v.files.get(&p) else {
-                        return Vec::new();
-                    };
-                    if pos >= f.len() {
-                        return Vec::new();
-                    }
-                    let end = pos.saturating_add(want).min(f.len());
-                    f[pos..end].to_vec()
-                });
-                if chunk.is_empty() {
-                    return Ok(Some(Value::Int(-1)));
-                }
-                let elems = vm
-                    .heap
-                    .array_elems_mut(arr)
-                    .map_err(|e| VmExit::from(crate::err::vm_error("INVALID_STATE", e)))?;
-                for (i, b) in chunk.iter().enumerate() {
-                    elems[off + i] = Value::Int(*b as i8 as i32);
-                }
-                set_pos(vm, pos + chunk.len())?;
-                Value::Int(chunk.len() as i32)
-            }
-        }
-        (CHANNEL, "lock" | "tryLock") => with_path(vm, FLOCK, &p)?,
-        (CHANNEL, "size") => Value::Long(len as i64),
-        (CHANNEL, "position") if sig.starts_with("()") => Value::Long(pos as i64),
-        (CHANNEL, "isOpen") | (FLOCK, "isValid") => Value::Int(1),
-        (FLOCK, "isShared") => Value::Int(0),
-        _ => return Ok(None),
-    }))
+    crate::java_stream::call(vm, class, name, sig, recv, args)
 }
 
 /// Creates `p`'s parent directories (public entry for other host modules).
@@ -1471,6 +479,34 @@ pub fn reset_all(#[cfg(not(feature = "desktop-runtime"))] vm: &Engine) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn descriptor_stream_constructor_keeps_existing_reference_bytes() {
+        let mut vm = crate::Engine::new(vec![], Default::default());
+        let path = Value::Obj(
+            vm.heap
+                .alloc_string("/fd-constructor-preserve".into())
+                .unwrap(),
+        );
+        let out = vm.heap.alloc_instance(FOS.into(), vec![]).unwrap();
+        vm.invoke_instance(out, "<init>", "(Ljava/lang/String;)V", &[path])
+            .unwrap();
+        vm.invoke_instance(out, "write", "(I)V", &[Value::Int(65)])
+            .unwrap();
+        let fd = vm
+            .invoke_instance(out, "getFD", "()Ljava/io/FileDescriptor;", &[])
+            .unwrap();
+        let next = vm.heap.alloc_instance(FOS.into(), vec![]).unwrap();
+        vm.invoke_instance(next, "<init>", "(Ljava/io/FileDescriptor;)V", &[fd])
+            .unwrap();
+        assert_eq!(
+            read_bytes(
+                #[cfg(not(feature = "desktop-runtime"))]
+                &vm,
+                "/fd-constructor-preserve"
+            ),
+            Some(vec![65])
+        );
+    }
     #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
     #[allow(unused_imports)]
     use crate::port_prelude::*;
@@ -2596,4 +1632,202 @@ pub(crate) fn os_realpath(
         path,
     )?;
     Ok(os_abs(path))
+}
+
+/// Explicit memory transport for the original semantic oracle. The shared
+/// File algorithms select it only when no product framework/storage is bound.
+pub(crate) struct ReferenceIo<'a> {
+    #[allow(dead_code)] // Desktop VFS is session thread-local; embedded is Engine-owned.
+    vm: &'a Engine,
+}
+impl<'a> ReferenceIo<'a> {
+    pub(crate) fn new(vm: &'a Engine) -> Self {
+        Self { vm }
+    }
+}
+fn reference_error(op: &'static str, errno: i32) -> as_platform::PlatformError {
+    as_platform::fs::error(
+        match errno {
+            OS_ENOENT => "NOT_FOUND",
+            OS_EEXIST => "ALREADY_EXISTS",
+            OS_EACCES | OS_EPERM => "ACCESS_DENIED",
+            _ => "IO_ERROR",
+        },
+        op,
+        format!("reference VFS errno {errno}"),
+    )
+}
+impl as_platform::vfs::GuestFileSystem for ReferenceIo<'_> {
+    fn resolve(&self, p: &str) -> Result<String, as_platform::PlatformError> {
+        Ok(absolute(p))
+    }
+    fn stat(
+        &self,
+        p: &str,
+    ) -> Result<Option<as_platform::fs::Metadata>, as_platform::PlatformError> {
+        let p = absolute(p);
+        Ok(vfs!(self.vm).with(|v| {
+            let v = v.borrow();
+            if p == "/" || v.dirs.contains(&p) {
+                Some(as_platform::fs::Metadata {
+                    directory: true,
+                    length: 0,
+                })
+            } else {
+                v.files.get(&p).map(|b| as_platform::fs::Metadata {
+                    directory: false,
+                    length: b.len() as u64,
+                })
+            }
+        }))
+    }
+    fn modified_millis(&self, _p: &str) -> Result<u64, as_platform::PlatformError> {
+        Ok(crate::jlsystem::epoch_ms().max(0) as u64)
+    }
+    fn create_file_new(&self, p: &str) -> Result<bool, as_platform::PlatformError> {
+        let p = absolute(p);
+        vfs!(self.vm).with(|v| {
+            let mut v = v.borrow_mut();
+            if v.files.contains_key(&p) || v.dirs.contains(&p) || p == "/" {
+                return Ok(false);
+            }
+            os_parent_status(&v, &p).map_err(|e| reference_error("create_file_new", e))?;
+            v.files.insert(p, Vec::new());
+            Ok(true)
+        })
+    }
+    fn create_dir(&self, p: &str) -> Result<bool, as_platform::PlatformError> {
+        match os_mkdir(
+            #[cfg(not(feature = "desktop-runtime"))]
+            self.vm,
+            p,
+            0o777,
+        ) {
+            Ok(()) => Ok(true),
+            Err(OS_EEXIST) => Ok(false),
+            Err(e) => Err(reference_error("mkdir", e)),
+        }
+    }
+    fn mkdirs(&self, p: &str) -> Result<(), as_platform::PlatformError> {
+        mkdirs(
+            #[cfg(not(feature = "desktop-runtime"))]
+            self.vm,
+            p,
+        );
+        Ok(())
+    }
+    fn list(&self, p: &str) -> Result<Vec<as_platform::fs::Entry>, as_platform::PlatformError> {
+        let p = absolute(p);
+        let prefix = if p == "/" { p } else { format!("{p}/") };
+        Ok(vfs!(self.vm).with(|v| {
+            let v = v.borrow();
+            v.dirs
+                .iter()
+                .map(|k| (k, true))
+                .chain(v.files.keys().map(|k| (k, false)))
+                .filter_map(|(k, directory)| {
+                    k.strip_prefix(&prefix)
+                        .filter(|k| !k.is_empty() && !k.contains('/'))
+                        .map(|name| as_platform::fs::Entry {
+                            name: name.to_string(),
+                            directory,
+                        })
+                })
+                .collect()
+        }))
+    }
+    fn remove(&self, p: &str) -> Result<(), as_platform::PlatformError> {
+        os_remove(
+            #[cfg(not(feature = "desktop-runtime"))]
+            self.vm,
+            p,
+        )
+        .map_err(|e| reference_error("remove", e))
+    }
+    fn rename_new(
+        &self,
+        source: &str,
+        destination: &str,
+    ) -> Result<(), as_platform::PlatformError> {
+        if self.stat(destination)?.is_some() {
+            return Err(reference_error("rename", OS_EEXIST));
+        }
+        self.rename_replace(source, destination)
+    }
+    fn rename_replace(
+        &self,
+        source: &str,
+        destination: &str,
+    ) -> Result<(), as_platform::PlatformError> {
+        os_rename(
+            #[cfg(not(feature = "desktop-runtime"))]
+            self.vm,
+            source,
+            destination,
+        )
+        .map_err(|e| reference_error("rename", e))
+    }
+    fn sync_file(&self, p: &str) -> Result<(), as_platform::PlatformError> {
+        if self.stat(p)?.is_some_and(|m| !m.directory) {
+            Ok(())
+        } else {
+            Err(reference_error("sync_file", OS_ENOENT))
+        }
+    }
+    fn read_at(
+        &self,
+        p: &str,
+        o: u64,
+        out: &mut [u8],
+    ) -> Result<usize, as_platform::PlatformError> {
+        vfs!(self.vm).with(|v| {
+            let v = v.borrow();
+            let bytes = v
+                .files
+                .get(p)
+                .ok_or_else(|| reference_error("read", OS_ENOENT))?;
+            let o = usize::try_from(o).unwrap_or(usize::MAX).min(bytes.len());
+            let n = out.len().min(bytes.len() - o);
+            out[..n].copy_from_slice(&bytes[o..o + n]);
+            Ok(n)
+        })
+    }
+    fn write_at(
+        &self,
+        p: &str,
+        o: u64,
+        input: &[u8],
+        truncate: bool,
+    ) -> Result<usize, as_platform::PlatformError> {
+        vfs!(self.vm).with(|v| {
+            let mut v = v.borrow_mut();
+            let o = usize::try_from(o).map_err(|_| reference_error("write", OS_EFBIG))?;
+            let end = o
+                .checked_add(input.len())
+                .filter(|n| *n <= MAX_VFS_FILE_BYTES)
+                .ok_or_else(|| reference_error("write", OS_EFBIG))?;
+            let old = if truncate {
+                0
+            } else {
+                v.files.get(p).map_or(0, Vec::len)
+            };
+            let size = if input.is_empty() { old } else { old.max(end) };
+            if vfs_used_excluding(&v, p).saturating_add(size) > MAX_VFS_TOTAL_BYTES {
+                return Err(reference_error("write", OS_ENOSPC));
+            }
+            os_parent_status(&v, p).map_err(|e| reference_error("write", e))?;
+            if v.dirs.contains(p) {
+                return Err(reference_error("write", OS_EISDIR));
+            }
+            let bytes = v.files.entry(p.to_string()).or_default();
+            if truncate {
+                bytes.clear();
+            }
+            bytes.resize(size, 0);
+            if !input.is_empty() {
+                bytes[o..end].copy_from_slice(input);
+            }
+            Ok(input.len())
+        })
+    }
 }
