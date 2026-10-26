@@ -29,7 +29,7 @@ fn main() {
         "cargo:rerun-if-changed={}",
         root.join("platform/sqlite/memory_vfs.c").display()
     );
-    if env::var("TARGET").unwrap().contains("nintendo-switch") {
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("horizon") {
         // Switch objects are compiled/linked with libnx by the product Makefile.
         return;
     }
