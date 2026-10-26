@@ -18,13 +18,16 @@
 #include "bionic_auxv.h"
 #include "cpu_time.h"
 #include "sdk_futex.h"
-int __real_clock_gettime(clockid_t, struct timespec *);
-int __wrap_clock_gettime(clockid_t clock, struct timespec *out) {
+#include "../horizon-std/support.h"
+/* These names are imported only by the SDK's GNU/Linux Rust objects.
+ * CLOCK_REALTIME is 0 there but 1 in newlib. Never wrap the process-global
+ * clock_gettime: that would turn Horizon std's wall clock into uptime. */
+int as_mesa_clock_gettime(clockid_t clock, struct timespec *out) {
   if (!out) {
     errno = EFAULT;
     return -1;
   }
-  if (clock == 0) return __real_clock_gettime(clock, out);
+  if (clock == 0) return clock_gettime(CLOCK_REALTIME, out);
   uint64_t ns;
   if (clock == 1 || clock == 4)
     ns = armTicksToNs(armGetSystemTick());
@@ -45,10 +48,10 @@ int __wrap_clock_gettime(clockid_t clock, struct timespec *out) {
 uint64_t as_sdk_now_ns(int realtime) {
   if (!realtime) return armTicksToNs(armGetSystemTick());
   struct timespec t;
-  if (__real_clock_gettime(0, &t) || t.tv_sec < 0) return UINT64_MAX;
+  if (clock_gettime(CLOCK_REALTIME, &t) || t.tv_sec < 0) return UINT64_MAX;
   return (uint64_t)t.tv_sec * 1000000000 + (uint64_t)t.tv_nsec;
 }
-int __wrap_clock_getres(clockid_t clock, struct timespec *out) {
+int as_mesa_clock_getres(clockid_t clock, struct timespec *out) {
   if ((uint64_t)clock > 4) {
     errno = EINVAL;
     return -1;
@@ -64,6 +67,12 @@ int __wrap_clock_getres(clockid_t clock, struct timespec *out) {
     out->tv_nsec = ns % 1000000000;
   }
   return 0;
+}
+long as_mesa_sysconf(int name) {
+  /* GNU/Linux constants from the compiler-matched libc ABI, not newlib's. */
+  if(name==30) return 0x1000;
+  if(name==83 || name==84) return as_std_process_core_count();
+  errno=EINVAL;return -1;
 }
 long __wrap_syscall(long number, ...) {
   if (number != 98) {

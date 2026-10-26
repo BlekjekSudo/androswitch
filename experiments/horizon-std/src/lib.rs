@@ -319,6 +319,7 @@ const CASES: &[Probe] = &[
             for _ in 0..32 {
                 let done = done.clone();
                 let w = thread::Builder::new()
+                    .stack_size(256 * 1024)
                     .spawn(move || {
                         SENTINEL.with(|_| ());
                         thread::sleep(Duration::from_millis(2));

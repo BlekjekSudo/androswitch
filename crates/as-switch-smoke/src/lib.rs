@@ -14,6 +14,27 @@ pub extern "C" fn as_runtime_rust_std_enabled() -> u32 {
     u32::from(cfg!(feature = "std") && rd_vm::RUST_STD_ENABLED)
 }
 
+#[cfg(feature = "std")]
+#[allow(unsafe_code)] // Scalar C ABI observation of actual std time.
+#[no_mangle]
+pub extern "C" fn as_runtime_std_unix_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| i64::try_from(duration.as_millis()).ok())
+        .unwrap_or(-1)
+}
+
+#[cfg(feature = "std")]
+#[allow(unsafe_code)] // Scalar C ABI observation of actual std parallelism.
+#[no_mangle]
+pub extern "C" fn as_runtime_std_parallelism() -> i32 {
+    std::thread::available_parallelism()
+        .ok()
+        .and_then(|count| i32::try_from(count.get()).ok())
+        .unwrap_or(-1)
+}
+
 #[cfg(target_os = "horizon")]
 mod application;
 #[cfg(target_os = "horizon")]

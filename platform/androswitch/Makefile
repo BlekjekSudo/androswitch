@@ -11,7 +11,7 @@ ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 MESA_SDK ?=
 ifneq ($(strip $(MESA_SDK)),)
 MESA_OBJECTS := $(OUTPUT_DIR)/sdk_futex.o $(OUTPUT_DIR)/sdk_compat.o
-MESA_WRAPPERS := -Wl,--wrap=syscall,--wrap=clock_gettime,--wrap=clock_getres,--wrap=getauxval,--wrap=posix_memalign,--wrap=__xpg_strerror_r,--wrap=open64,--wrap=fstat64,--wrap=stat64,--wrap=mmap64,--wrap=munmap,--wrap=dl_iterate_phdr,--wrap=writev,--wrap=vk_drm_syncobj_copy_payloads
+MESA_WRAPPERS := -Wl,--wrap=syscall,--wrap=getauxval,--wrap=posix_memalign,--wrap=__xpg_strerror_r,--wrap=open64,--wrap=fstat64,--wrap=stat64,--wrap=mmap64,--wrap=munmap,--wrap=dl_iterate_phdr,--wrap=writev,--wrap=vk_drm_syncobj_copy_payloads
 MESA_RUST_LINK := @$(OUTPUT_DIR)/mesa-rust-libs.rsp
 MESA_CFLAGS := -I$(MESA_SDK)/include -DANDROSWITCH_MESA_UNIFIED
 MESA_LINK_LIB ?= $(MESA_SDK)/lib

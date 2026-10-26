@@ -29,7 +29,7 @@ Copy-Item -LiteralPath $Nro -Destination "$run/androswitch.nro"
 $hash=(Get-FileHash "$run/androswitch.nro").Hash.ToLowerInvariant()
 if((Get-FileHash $Nro).Hash.ToLowerInvariant() -cne $hash){throw 'NRO changed during freeze'}
 Copy-Item -LiteralPath $Apk -Destination "$run/app.apk"
-$receipt=[ordered]@{schema_version=1;session_id=$id;status='prepared';nro_sha256=$hash;apk_sha256=(Get-FileHash "$run/app.apk").Hash.ToLowerInvariant();asctl_sha256=(Get-FileHash $Asctl).Hash.ToLowerInvariant();emulator_sha256=(Get-FileHash $emulator).Hash.ToLowerInvariant();backend='pinned Ryujinx headless; direct product request';physical_device='not_run';sd_restore='not_modified'}
+$receipt=[ordered]@{schema_version=1;session_id=$id;status='prepared';nro_sha256=$hash;apk_sha256=(Get-FileHash "$run/app.apk").Hash.ToLowerInvariant();asctl_sha256=(Get-FileHash $Asctl).Hash.ToLowerInvariant();emulator_sha256=(Get-FileHash $emulator).Hash.ToLowerInvariant();backend='pinned Ryujinx headless; direct product request';physical_device='not_run';sd_restore='not_modified';sd_result=$saved;sd_backup=$backup}
 $process=$null;$owned=@{};$moved=$false;$staged=$false;$lock=$null
 function Save-Receipt {$receipt|ConvertTo-Json -Depth 12|Set-Content "$run/verification.json" -Encoding utf8NoBOM}
 function Update-Owned {
@@ -55,6 +55,7 @@ try {
     New-Item -ItemType Directory -Force $switchRoot|Out-Null
     if((Get-Item $switchRoot -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Linked switch root forbidden'}
     $lock=[IO.File]::Open($lockPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+    if(Test-Path -LiteralPath $backup){throw 'Backup destination already exists'}
     if(Test-Path $sd){Move-Item -LiteralPath $sd -Destination $backup;$moved=$true}
     New-Item -ItemType Directory -Path $sd|Out-Null;$staged=$true
     $installation=& $Asctl install "$run/app.apk" --root $sd --json
@@ -86,14 +87,20 @@ try {
     $proof=Get-Content "$sd/userdata/$($package.package)/files/media.json" -Raw|ConvertFrom-Json
     if($proof.frames -lt 31 -or $proof.input -lt 2 -or $proof.audio_frames -ne 12000 -or $proof.gl_ok -ne 1 -or $proof.readback_ok -ne 1 -or $proof.tls -ne 73){throw 'Graphics/audio/input/TLS proof mismatch'}
     if((Get-Content "$sd/rust-build-profile.txt" -Raw) -cne "std=1`nbackend=horizon`n"){throw 'Runner is not the std Horizon profile'}
-    $receipt.status='passed';$receipt.proof=$proof;$receipt.std_shutdown=0;$receipt.guest_os_exit_observed=$true
+    $platform=Get-Content "$sd/logs/rust-std-platform.json" -Raw|ConvertFrom-Json
+    if($platform.passed -ne $true -or $platform.std_unix_ms -lt 1600000000000 -or [Math]::Abs($platform.std_unix_ms-$platform.native_unix_ms) -ge 1000 -or $platform.std_cores -le 0 -or $platform.std_cores -ne $platform.native_cores){throw 'Product std clock/core observations differ from native Horizon'}
+    $receipt.status='passed';$receipt.proof=$proof;$receipt.std_platform=$platform;$receipt.std_shutdown=0;$receipt.guest_os_exit_observed=$true
 }catch{$receipt.status='failed';$receipt.error=$_.Exception.Message;throw}finally{
     try {
         Stop-Owned
         Assert-SdChild $sd;Assert-SdChild $backup
+        $outputRoot=[IO.Path]::GetFullPath((Join-Path $repo 'local-artifacts/horizon-std/product-exit-runs'))
+        if(-not [IO.Path]::GetFullPath($saved).StartsWith($outputRoot+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or (Test-Path -LiteralPath $saved)){throw 'Result destination escaped the designated fresh output directory'}
         if($staged -and (Test-Path $sd)){Move-Item -LiteralPath $sd -Destination $saved}
         if($moved){Move-Item -LiteralPath $backup -Destination $sd}
         $receipt.sd_restore=if($staged -or $moved){'restored'}else{'not_modified'}
+    }catch{
+        $receipt.sd_restore='manual_recovery_required';$receipt.restore_error=$_.Exception.Message;throw
     }finally{
         Save-Receipt
         if($lock){$lock.Dispose();Remove-Item -LiteralPath $lockPath}

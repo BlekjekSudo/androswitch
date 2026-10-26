@@ -13,6 +13,66 @@ import subprocess
 import shutil
 import tempfile
 
+PERSONALITY = {"rust_eh_personality": "as_mesa_rust_eh_personality",
+               "DW.ref.rust_eh_personality": "DW.ref.as_mesa_rust_eh_personality"}
+LINUX_ABI = {"clock_gettime": "as_mesa_clock_gettime",
+             "clock_getres": "as_mesa_clock_getres", "sysconf": "as_mesa_sysconf"}
+
+
+def rewrite_object(objcopy, source, target, mapping):
+    flags = [arg for old, new in mapping.items() for arg in ("--redefine-sym", old + "=" + new)]
+    subprocess.run([str(objcopy), *flags, str(source), str(target)], check=True)
+
+
+def rewrite_public_archive(source, target, objcopy, scratch):
+    """Keep Horizon C's newlib clock ABI separate from GNU/Linux Rust objects.
+
+    Public Mesa archives merge C objects and Rust .rcgu.o objects. Preserve
+    their names/order without extracting Meson paths; regenerate the archive
+    index after object sizes change. Both 32/64-bit GNU indices are replaced.
+    """
+    raw = source.read_bytes()
+    if not raw.startswith(b"!<arch>\n"):
+        raise ValueError("Expected a full public SDK archive, not a thin archive")
+    position, names, members, changed = 8, b"", [], 0
+    while position < len(raw):
+        header = raw[position:position + 60]
+        if len(header) != 60 or header[58:] != b"`\n":
+            raise ValueError("Malformed SDK archive header")
+        size = int(header[48:58])
+        payload = raw[position + 60:position + 60 + size]
+        if len(payload) != size:
+            raise ValueError("Truncated SDK archive member")
+        token = header[:16].decode("ascii").strip()
+        position += 60 + size + size % 2
+        if token in ("/", "/SYM64/"):
+            continue
+        prefix = b""
+        if token == "//":
+            names = payload
+            name = token
+        elif token.startswith("#1/"):
+            length = int(token[3:])
+            prefix, payload = payload[:length], payload[length:]
+            name = prefix.rstrip(b"\0").decode("utf-8")
+        elif token.startswith("/") and token[1:].isdigit():
+            name = names[int(token[1:]):].split(b"/\n", 1)[0].decode("utf-8")
+        else:
+            name = token.rstrip("/")
+        if name.endswith(".rcgu.o"):
+            original, adapted = scratch / "object.o", scratch / "adapted.o"
+            original.write_bytes(payload)
+            rewrite_object(objcopy, original, adapted, LINUX_ABI)
+            payload = adapted.read_bytes()
+            changed += 1
+        payload = prefix + payload
+        members.append(header[:48] + f"{len(payload):<10}".encode() + header[58:] + payload
+                       + (b"\n" if len(payload) % 2 else b""))
+    target.write_bytes(b"!<arch>\n" + b"".join(members))
+    ar = objcopy.with_name("llvm-ar" + objcopy.suffix)
+    subprocess.run([str(ar), "s", str(target)], check=True)
+    return changed
+
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -50,18 +110,23 @@ def main():
         # on Windows. Keep only this owned intermediate directory short.
         with tempfile.TemporaryDirectory(prefix="as-mesa-") as scratch:
             temporary = Path(scratch) / "lib.a"
-            subprocess.run([str(args.objcopy),
-                            "--redefine-sym", "rust_eh_personality=as_mesa_rust_eh_personality",
-                            "--redefine-sym", "DW.ref.rust_eh_personality=DW.ref.as_mesa_rust_eh_personality",
-                            str(source), str(temporary)], check=True, cwd=scratch)
+            changed = None
+            if source.suffix == ".rlib":
+                rewrite_object(args.objcopy, source, temporary, {**PERSONALITY, **LINUX_ABI})
+            else:
+                personality = Path(scratch) / "personality.a"
+                rewrite_object(args.objcopy, source, personality, PERSONALITY)
+                changed = rewrite_public_archive(personality, temporary, args.objcopy, Path(scratch))
             shutil.copyfile(temporary, target)
         if digest(source) != original:
             raise SystemExit("Mesa SDK changed during adaptation")
         records.append({"source": str(source), "source_sha256": original,
-                        "output": str(target), "output_sha256": digest(target)})
+                        "output": str(target), "output_sha256": digest(target),
+                        "linux_rust_objects": changed if changed is not None else "compiler-matched Rust runtime archive"})
     (output / "link-adaptation.json").write_text(json.dumps({
         "schema_version": 1,
-        "policy": "separate Mesa personality; no shared Rust ABI or ignored duplicate symbols",
+        "policy": "separate Mesa Rust personality/Linux clock/sysconf ABI; Horizon C and AndroSwitch std keep newlib ABI",
+        "personality_symbols": PERSONALITY, "linux_rust_symbols": LINUX_ABI,
         "archives": records,
     }, indent=2) + "\n", encoding="utf-8")
 

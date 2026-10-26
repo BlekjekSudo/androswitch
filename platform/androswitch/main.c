@@ -14,8 +14,26 @@
 #include <stdlib.h>
 #include <string.h>
 #include <switch.h>
+#include <sys/stat.h>
+#include <sys/time.h>
 #include "../horizon-std/support.h"
 extern unsigned as_runtime_rust_std_enabled(void);
+extern int64_t as_runtime_std_unix_ms(void);
+extern int32_t as_runtime_std_parallelism(void);
+
+static int verify_std_platform(void) {
+  struct timeval native_time;
+  int64_t rust_ms=as_runtime_std_unix_ms();
+  int cores=as_runtime_std_parallelism();
+  long native_cores=as_std_process_core_count();
+  int rc=gettimeofday(&native_time,NULL);
+  int64_t native_ms=rc ? -1 : (int64_t)native_time.tv_sec*1000+native_time.tv_usec/1000;
+  bool valid=rust_ms>0 && native_ms>0 && llabs(rust_ms-native_ms)<1000 && cores>0 && cores==native_cores;
+  (void)mkdir("sdmc:/switch/androswitch/logs",0777);
+  FILE *f=fopen("sdmc:/switch/androswitch/logs/rust-std-platform.json","w");
+  if(f){fprintf(f,"{\"passed\":%s,\"std_unix_ms\":%" PRId64 ",\"native_unix_ms\":%" PRId64 ",\"std_cores\":%d,\"native_cores\":%ld}\n",valid ? "true":"false",rust_ms,native_ms,cores,native_cores);fclose(f);}
+  return valid ? 0 : 122;
+}
 
 static void close_rust_std(void) {
   int result=as_horizon_std_shutdown(5000);
@@ -285,6 +303,7 @@ int main(int argc, char **argv) {
   (void)argv;
   if(as_horizon_std_init() || !as_runtime_rust_std_enabled()) return 120;
   if(atexit(close_rust_std)) return 121;
+  if(verify_std_platform()) return 122;
   FILE *profile=fopen("sdmc:/switch/androswitch/rust-build-profile.txt","w");
   if(profile){fputs("std=1\nbackend=horizon\n",profile);fclose(profile);}
   (void)as_cpu_time_init(); // Missing accounting stays an explicit clock error.
