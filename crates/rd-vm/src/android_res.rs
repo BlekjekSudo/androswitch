@@ -51,6 +51,9 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 use rd_apk::arsc::ResolvedValue;
 use rd_apk::axml::ComplexUnit;
@@ -91,7 +94,7 @@ const CONFIG_FIELDS: &[&str] = &[
 ];
 
 fn env_u32(k: &str, d: u32) -> u32 {
-    std::env::var(k)
+    crate::port_env::var(k)
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(d)
@@ -256,7 +259,7 @@ fn configuration(vm: &mut Engine) -> Result<ObjRef, VmExit> {
             "orientation",
             Value::Int(if d.h >= d.w { 1 } else { 2 }),
         )?;
-        let night = std::env::var("RD_NIGHT_MODE")
+        let night = crate::port_env::var("RD_NIGHT_MODE")
             .map(|v| v == "1")
             .unwrap_or(false);
         put(
@@ -311,7 +314,7 @@ fn default_locale(vm: &mut Engine) -> Result<ObjRef, VmExit> {
     if let Some(Value::Obj(r)) = vm.statics.get(&k) {
         return Ok(*r);
     }
-    let tag = std::env::var("RD_LOCALE").unwrap_or_else(|_| "en-US".into());
+    let tag = crate::port_env::var("RD_LOCALE").unwrap_or_else(|_| "en-US".into());
     let (l, c) = parse_tag(&tag);
     let r = new_locale(vm, &l, &c, "")?;
     vm.statics.insert(k, Value::Obj(r));
@@ -1246,6 +1249,9 @@ pub(crate) fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::parse_tag;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn tags() {

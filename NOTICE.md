@@ -42,3 +42,10 @@ See [CREDITS](CREDITS.md), [LICENSE-MIT](LICENSE-MIT) and
 Latest synchronized RustyDroid source: `3761815dc6a2a1427e9fc66b66e8471b78d1b170`.
 The merge retains upstream commits, authors, runtime source and tests. See
 [CREDITS.md](CREDITS.md) and [the source/porting audit](docs/UPSTREAM_PORTING.md).
+
+Supplemental Android type metadata is generated from the Android SDK API 35
+public declarations, credited to the Android Open Source Project and Android
+contributors. Only declaration facts are embedded, without executable SDK
+method bodies or the SDK JAR. The pinned input and regeneration instructions
+are recorded in `data/android-sdk-types.json` and `CREDITS.md`. This does not
+establish Android API implementation or change the API 26 reference profile.

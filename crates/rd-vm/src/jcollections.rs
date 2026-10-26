@@ -35,6 +35,9 @@ use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const ACC_ABSTRACT: u32 = 0x0400;
@@ -634,7 +637,7 @@ pub(crate) fn instance_intrinsic(
                     recv,
                     "add",
                     "(Ljava/lang/Object;)Z",
-                    std::slice::from_ref(&e),
+                    core::slice::from_ref(&e),
                 )? {
                     Some(v) => changed |= v.as_int().unwrap_or(0) != 0,
                     None => match guest_call(vm, recv, "size", "()I", &[])? {

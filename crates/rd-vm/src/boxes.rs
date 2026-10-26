@@ -569,6 +569,9 @@ pub fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn float_double_semantics_match_jdk() {

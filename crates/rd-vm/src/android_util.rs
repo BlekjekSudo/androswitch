@@ -12,8 +12,11 @@ use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
 
 const SPARSE: &[&str] = &[
     "Landroid/util/SparseArray;",
@@ -212,7 +215,7 @@ fn array_equal(vm: &mut Engine, needle: &Value, candidate: &Value) -> Result<boo
         *recv,
         "equals",
         "(Ljava/lang/Object;)Z",
-        std::slice::from_ref(candidate),
+        core::slice::from_ref(candidate),
     )? {
         Some(value) => Ok(value.as_int().unwrap_or(0) != 0),
         None => Ok(false),
@@ -276,7 +279,7 @@ fn array_map_put_into(
 ) -> Result<Value, VmExit> {
     let keys: Vec<Value> = entries.iter().map(|(k, _)| k.clone()).collect();
     match array_find_in(vm, &keys, &key)? {
-        Ok(index) => Ok(std::mem::replace(&mut entries[index].1, value)),
+        Ok(index) => Ok(core::mem::replace(&mut entries[index].1, value)),
         Err(index) => {
             entries.insert(index, (key, value));
             Ok(Value::Null)
@@ -466,7 +469,7 @@ fn array_map(
         "replace" => match array_find_in(vm, &keys_snapshot, &arg(0))? {
             Ok(index) => {
                 let mut entries = entries_snapshot;
-                let old = std::mem::replace(&mut entries[index].1, arg(1));
+                let old = core::mem::replace(&mut entries[index].1, arg(1));
                 array_map_store(vm, recv, entries);
                 old
             }
@@ -526,7 +529,7 @@ fn array_map(
                 return Err(oob(index as i64));
             }
             let mut entries = entries_snapshot;
-            let old = std::mem::replace(&mut entries[index_usize].1, arg(1));
+            let old = core::mem::replace(&mut entries[index_usize].1, arg(1));
             array_map_store(vm, recv, entries);
             old
         }
@@ -1593,7 +1596,7 @@ fn lru_create(vm: &mut Engine, recv: ObjRef, key: &Value) -> Result<Value, VmExi
         recv,
         "create",
         "(Ljava/lang/Object;)Ljava/lang/Object;",
-        std::slice::from_ref(key),
+        core::slice::from_ref(key),
     )?
     .unwrap_or(Value::Null))
 }
@@ -2185,7 +2188,7 @@ fn compare(vm: &mut Engine, a: &Value, b: &Value) -> Result<i32, VmExit> {
             *r,
             "compareTo",
             "(Ljava/lang/Object;)I",
-            std::slice::from_ref(b),
+            core::slice::from_ref(b),
         )? {
             Some(Value::Int(i)) => Ok(i),
             _ => Ok(0),
@@ -2197,6 +2200,9 @@ fn compare(vm: &mut Engine, a: &Value, b: &Value) -> Result<i32, VmExit> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn android_base64_flags_and_wrapping_match_aosp() {
@@ -2405,7 +2411,7 @@ mod tests {
                 &mut vm,
                 "indexOfKey",
                 "(Ljava/lang/Object;)I",
-                std::slice::from_ref(&bb),
+                core::slice::from_ref(&bb),
             ),
             Value::Int(5)
         );
@@ -2413,7 +2419,7 @@ mod tests {
             &mut vm,
             "get",
             "(Ljava/lang/Object;)Ljava/lang/Object;",
-            std::slice::from_ref(&bb),
+            core::slice::from_ref(&bb),
         );
         let Value::Obj(bb_value) = bb_value else {
             panic!("BB value was not a String");
@@ -2437,7 +2443,7 @@ mod tests {
                     &mut vm,
                     "add",
                     "(Ljava/lang/Object;)Z",
-                    std::slice::from_ref(&boxed_value),
+                    core::slice::from_ref(&boxed_value),
                 ),
                 Value::Int(1)
             );
@@ -2448,7 +2454,7 @@ mod tests {
                 &mut vm,
                 "add",
                 "(Ljava/lang/Object;)Z",
-                std::slice::from_ref(&duplicate),
+                core::slice::from_ref(&duplicate),
             ),
             Value::Int(0)
         );
@@ -2509,7 +2515,7 @@ mod tests {
                 &mut vm,
                 "add",
                 "(Ljava/lang/Object;)Z",
-                std::slice::from_ref(&v),
+                core::slice::from_ref(&v),
             );
         }
         // hashCode is the sum of element hashes (Integer hash is itself).
@@ -2578,7 +2584,7 @@ mod tests {
                 source,
                 "add",
                 "(Ljava/lang/Object;)Z",
-                std::slice::from_ref(&boxed_value),
+                core::slice::from_ref(&boxed_value),
             )
             .unwrap();
         }
@@ -2649,7 +2655,7 @@ mod tests {
                 &mut vm,
                 "add",
                 "(Ljava/lang/Object;)Z",
-                std::slice::from_ref(&element),
+                core::slice::from_ref(&element),
             );
         }
 
@@ -2664,7 +2670,7 @@ mod tests {
             &mut vm,
             "toArray",
             "([Ljava/lang/Object;)[Ljava/lang/Object;",
-            std::slice::from_ref(&large),
+            core::slice::from_ref(&large),
         );
         assert_eq!(reused, large);
         let Value::Obj(large_ref) = large else {
@@ -2696,7 +2702,7 @@ mod tests {
             &mut vm,
             "toArray",
             "([Ljava/lang/Object;)[Ljava/lang/Object;",
-            std::slice::from_ref(&small),
+            core::slice::from_ref(&small),
         );
         assert_ne!(replaced, small);
         let Value::Obj(replaced_ref) = replaced else {

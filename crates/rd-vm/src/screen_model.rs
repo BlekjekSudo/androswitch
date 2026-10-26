@@ -108,7 +108,7 @@ impl ScreenModel {
     /// Compact plain-text rendering: one line per visual text row, with the
     /// row's y and every run's x, plus targets. Designed for LLM context.
     pub fn to_text(&self) -> String {
-        use std::fmt::Write;
+        use core::fmt::Write;
         let mut out = String::new();
         let mut rows: Vec<(i32, Vec<&ScreenItem>)> = Vec::new();
         for t in &self.texts {
@@ -340,7 +340,7 @@ fn contains_b(o: &[i32; 4], i: &[i32; 4]) -> bool {
 }
 
 fn build_model(walk: ScreenWalk) -> ScreenModel {
-    use std::hash::{Hash, Hasher};
+    use core::hash::{Hash, Hasher};
     let (w, h) = (walk.w as i32, walk.h as i32);
     let screen_area = w as i64 * h as i64;
     let mut texts: Vec<ScreenItem> = Vec::new();
@@ -451,7 +451,10 @@ fn build_model(walk: ScreenWalk) -> ScreenModel {
             })
         })
     });
+    #[cfg(feature = "std")]
     let mut hs = std::collections::hash_map::DefaultHasher::new();
+    #[cfg(not(feature = "std"))]
+    let mut hs = siphasher::sip::SipHasher13::new();
     for t in &texts {
         t.text.hash(&mut hs);
         t.bounds.hash(&mut hs);
@@ -478,6 +481,9 @@ fn build_model(walk: ScreenWalk) -> ScreenModel {
 
 #[cfg(test)]
 mod screen_model_tests {
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     use super::*;
 
     fn item(kind: ScreenKind, text: &str, b: [i32; 4], size: f32) -> ScreenItem {

@@ -5,6 +5,9 @@
 //! hardware access, zero thread-local storage, and GC-friendly heap payloads for
 //! transient value objects.
 
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 pub mod biometrics;
 pub mod camera;
 pub mod connectivity;
@@ -16,7 +19,8 @@ pub mod sysconfig;
 use crate::framework::HostObj;
 use crate::heap::ElemKind;
 use crate::{Engine, ObjRef, Throwable, Value, VmExit};
-use std::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeMap;
+use alloc::collections::BTreeSet;
 
 pub use biometrics::{ActiveBiometricPrompt, BiometricOutcome, BiometricState};
 pub use camera::{CameraFrameSpec, CameraSessionState, ImageReaderState, VirtualCamera};
@@ -209,8 +213,8 @@ impl State {
     }
 }
 
-impl std::fmt::Debug for State {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for State {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         // `gc.rs` scans `Debug` output of `Engine.fw` conservatively for `ObjRef`
         // integers; emit only genuine `ObjRef` roots so scalar config values
         // (sensor types, screen dimensions, battery level) never pin heap slots.

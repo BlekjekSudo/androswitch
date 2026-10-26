@@ -1498,6 +1498,12 @@ impl Android {
 }
 
 impl FrameworkHost for Android {
+    fn monotonic_micros(&self) -> Option<u64> {
+        Some(self.clock.monotonic_micros())
+    }
+    fn write_log(&self, _fd: i32, text: &str) -> Result<usize> {
+        self.services.write_log(text)
+    }
     fn system_property(&self, key: &str) -> Result<Option<String>> {
         self.services.runtime.system_property(key)
     }

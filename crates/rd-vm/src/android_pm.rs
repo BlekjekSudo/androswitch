@@ -22,6 +22,9 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const PM: &str = "Landroid/content/pm/PackageManager;";
@@ -333,6 +336,9 @@ pub fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::FEATURES;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn phone_profile_excludes_tv() {
         assert!(FEATURES.contains(&"android.hardware.camera.any"));

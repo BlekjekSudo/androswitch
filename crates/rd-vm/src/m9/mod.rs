@@ -1,4 +1,7 @@
 //! M9 advanced platform components. One state model for app calls and agent APIs.
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 mod accessibility;
 mod ime;
 mod notifications;
@@ -7,10 +10,11 @@ mod widgets;
 use crate::framework::HostObj;
 use crate::{Engine, ObjRef, Throwable, Value, VmExit};
 pub use accessibility::{AccessibilityEvent, AccessibleNode};
+use alloc::collections::BTreeMap;
+use alloc::collections::BTreeSet;
 pub use ime::Editor;
 pub use notifications::{Action, Channel, Notification};
 pub use shortcuts::Shortcut;
-use std::collections::{BTreeMap, BTreeSet};
 pub use widgets::{RemoteOp, RemoteViews, Widget};
 #[derive(Debug)]
 pub struct State {

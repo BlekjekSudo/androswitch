@@ -30,8 +30,11 @@
 //!   ephemeron, or purged at sweep, so a recycled slot inherits no state.
 use crate::framework::HostObj;
 use crate::heap::{HeapObj, ObjRef};
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)]
+use crate::port_prelude::*;
 use crate::{Engine, Value};
-use std::fmt::Write as _;
+use core::fmt::Write as _;
 
 /// Class descriptor of a collected slot.
 pub const FREED_CLASS: &str = "Lrd/gc/Freed;";
@@ -51,6 +54,7 @@ pub struct GcStats {
     pub last_used_before: usize,
     pub last_used_after: usize,
     pub last_pause_ms: f64,
+    pub last_pause_measured: bool,
     /// WeakReference/PhantomReference referents cleared in the last cycle.
     pub last_cleared_weak: usize,
     /// WeakHashMap entries removed because their keys became unreachable.
@@ -113,8 +117,8 @@ impl<F: FnMut(ObjRef)> RefScanner<F> {
     }
 }
 
-impl<F: FnMut(ObjRef)> std::fmt::Write for RefScanner<F> {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+impl<F: FnMut(ObjRef)> core::fmt::Write for RefScanner<F> {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.bytes = self.bytes.saturating_add(s.len());
         let bytes = s.as_bytes();
         let mut i = 0;
@@ -156,6 +160,37 @@ impl<F: FnMut(ObjRef)> std::fmt::Write for RefScanner<F> {
     }
 }
 
+// A freshly constructed framework contains no Java references: Default has no
+// heap from which to obtain them. Its device constants/counters must not retain
+// objects whose arena ids merely coincide with those numbers. Compare the exact
+// formatter stream (no hashes and no large temporary copy); any change falls
+// back to the inherited conservative trace. Host-object ephemerons and the APK
+// are removed by the caller and are traced separately.
+#[cfg(not(feature = "std"))]
+fn framework_is_default(state: &crate::framework::HostState) -> bool {
+    static DEFAULT: rd_dex::sync::OnceLock<String> = rd_dex::sync::OnceLock::new();
+    struct Compare<'a> {
+        expected: &'a [u8],
+        at: usize,
+    }
+    impl core::fmt::Write for Compare<'_> {
+        fn write_str(&mut self, text: &str) -> core::fmt::Result {
+            let end = self.at.checked_add(text.len()).ok_or(core::fmt::Error)?;
+            if self.expected.get(self.at..end) != Some(text.as_bytes()) {
+                return Err(core::fmt::Error);
+            }
+            self.at = end;
+            Ok(())
+        }
+    }
+    let expected = DEFAULT.get_or_init(|| format!("{:?}", crate::framework::HostState::default()));
+    let mut comparison = Compare {
+        expected: expected.as_bytes(),
+        at: 0,
+    };
+    write!(&mut comparison, "{state:?}").is_ok() && comparison.at == expected.len()
+}
+
 struct Marker {
     marked: Vec<bool>,
     stack: Vec<ObjRef>,
@@ -175,14 +210,20 @@ impl Engine {
     /// Conservative root rendering: every engine structure outside the heap,
     /// except the weak host-object table (traced per reachable key). A generic
     /// sink lets collection scan the identical Debug text without allocating it.
-    fn write_gc_roots(&mut self, s: &mut impl std::fmt::Write) {
+    fn write_gc_roots(&mut self, s: &mut impl core::fmt::Write) {
         for object in self.boxed_cache.values() {
             let _ = write!(s, "|{object}");
         }
         // the parsed APK (zip, arsc, layouts) holds no heap refs: skip it
-        let objects = std::mem::take(&mut self.fw.objects);
+        let objects = core::mem::take(&mut self.fw.objects);
         let resources = self.fw.resources.take();
-        let _ = write!(s, "{:?}", self.fw);
+        #[cfg(feature = "std")]
+        let scan_framework = true;
+        #[cfg(not(feature = "std"))]
+        let scan_framework = !framework_is_default(&self.fw);
+        if scan_framework {
+            let _ = write!(s, "{:?}", self.fw);
+        }
         self.fw.objects = objects;
         self.fw.resources = resources;
         let _ = write!(
@@ -232,7 +273,7 @@ impl Engine {
     }
 
     fn collect_generation(&mut self, minor: bool) -> GcStats {
-        let t0 = std::time::Instant::now();
+        let t0 = crate::collection_clock::Stamp::start(self);
         let n = self.heap.len();
         let used_before = self.heap.used();
         let mut m = Marker {
@@ -256,21 +297,44 @@ impl Engine {
         {
             m.push(r);
         }
+        #[cfg(not(feature = "std"))]
+        {
+            for r in self
+                .execution_frames
+                .roots()
+                .chain(self.portable.strings.values().copied())
+                .chain(self.portable.classes.values().copied())
+                .chain(self.portable.monitors.roots())
+            {
+                m.push(r);
+            }
+            if let Some(host) = self.framework_host() {
+                for r in host.roots() {
+                    m.push(r);
+                }
+            }
+            if let Some(native) = self.native_host() {
+                for r in native.roots() {
+                    m.push(r);
+                }
+            }
+        }
         let mut cand = Vec::new();
-        let root_len = {
+        let _root_len = {
             let mut scanner = RefScanner::new(n, |r| m.push(r));
             self.write_gc_roots(&mut scanner);
             scanner.finish()
         };
         // Root phase now includes tokenization, rather than only formatting.
+        #[cfg(feature = "std")]
         let t_roots = t0.elapsed();
         // objects with side state (host half, gfx object, module tables):
         // one bitmap built per cycle instead of ~5 hash lookups per object
         let mut side_keys: Vec<ObjRef> = Vec::new();
         let mut module_keys: Vec<ObjRef> = Vec::new();
-        crate::jregex::gc_keys(&mut module_keys);
-        crate::android_spannable::gc_keys(&mut module_keys);
-        crate::jio_chars::gc_keys(&mut module_keys);
+        crate::jregex::gc_keys(self, &mut module_keys);
+        crate::android_spannable::gc_keys(self, &mut module_keys);
+        crate::jio_chars::gc_keys(self, &mut module_keys);
         side_keys.extend(self.fw.objects.keys().copied());
         side_keys.extend(self.gfx.objs.keys().copied());
         let mut has_side = vec![0u8; n + 1];
@@ -300,8 +364,12 @@ impl Engine {
         let mut weak: Vec<(ObjRef, ObjRef)> = Vec::new();
         // Heap/class metadata is immutable throughout marking. Borrow the class
         // descriptor rather than allocating its clone for every reference.
-        let mut is_weak_class: std::collections::HashMap<&str, bool> = Default::default();
+        let mut is_weak_class: crate::maps::HashMap<&str, bool> = Default::default();
         while let Some(r) = m.stack.pop() {
+            #[cfg(not(feature = "std"))]
+            if let Some(host) = self.framework_host() {
+                cand.extend(host.references(r));
+            }
             traced_objects += 1;
             match self.heap.get(r) {
                 Ok(HeapObj::Instance { class, fields }) => {
@@ -392,9 +460,9 @@ impl Engine {
             // module side tables keyed by object (Matcher, Spannable, Reader…)
             if side & 2 != 0 {
                 let mut scanner = RefScanner::new(n, |x| cand.push(x));
-                crate::jregex::gc_entry(r, &mut scanner);
-                crate::android_spannable::gc_entry(r, &mut scanner);
-                crate::jio_chars::gc_entry(r, &mut scanner);
+                crate::jregex::gc_entry(self, r, &mut scanner);
+                crate::android_spannable::gc_entry(self, r, &mut scanner);
+                crate::jio_chars::gc_entry(self, r, &mut scanner);
                 scanner.finish();
             }
             if let Some(g) = self.gfx.objs.get(&r) {
@@ -452,6 +520,7 @@ impl Engine {
                 cleared_weak_keys += before - entries.len();
             }
         }
+        #[cfg(feature = "std")]
         let t_mark = t0.elapsed();
         // sweep
         let mut freed = 0usize;
@@ -467,6 +536,15 @@ impl Engine {
                 freed_bytes += b;
             }
         }
+        #[cfg(not(feature = "std"))]
+        {
+            if let Some(host) = self.framework_host() {
+                host.collect(&m.marked);
+            }
+            self.portable
+                .files
+                .retain(|r, _| m.marked.get(*r as usize).copied().unwrap_or(false));
+        }
         // purge weak side tables of freed keys
         let marked = &m.marked;
         let alive = |r: &ObjRef| marked.get(*r as usize).copied().unwrap_or(true);
@@ -475,18 +553,19 @@ impl Engine {
         self.bignums.retain(|r, _| alive(r));
         self.break_iters.retain(|r, _| alive(r));
         let alive_ref = |r: ObjRef| alive(&r);
-        crate::jregex::gc_purge(&alive_ref);
-        crate::android_spannable::gc_purge(&alive_ref);
-        crate::jio_chars::gc_purge(&alive_ref);
-        crate::xml_res::gc_purge(&alive_ref);
-        crate::jrandom::gc_purge(&alive_ref);
-        crate::android_uri::gc_purge(&alive_ref);
-        crate::jannotations::gc_purge(&alive_ref);
-        if std::env::var_os("RD_GC_TRACE").is_some() {
+        crate::jregex::gc_purge(self, &alive_ref);
+        crate::android_spannable::gc_purge(self, &alive_ref);
+        crate::jio_chars::gc_purge(self, &alive_ref);
+        crate::xml_res::gc_purge(self, &alive_ref);
+        crate::jrandom::gc_purge(self, &alive_ref);
+        crate::android_uri::gc_purge(self, &alive_ref);
+        crate::jannotations::gc_purge(self, &alive_ref);
+        #[cfg(feature = "std")]
+        if crate::port_env::var("RD_GC_TRACE").is_ok() {
             eprintln!(
                 "[rd gc] roots {:?} ({} B text, {} candidates) mark {:?} total {:?}",
                 t_roots,
-                root_len,
+                _root_len,
                 m.marked.iter().filter(|x| **x).count(),
                 t_mark,
                 t0.elapsed()
@@ -507,6 +586,7 @@ impl Engine {
             last_used_before: used_before,
             last_used_after: self.heap.used(),
             last_pause_ms: t0.elapsed().as_secs_f64() * 1000.0,
+            last_pause_measured: t0.measured(),
             last_cleared_weak: cleared_weak,
             last_cleared_weak_keys: cleared_weak_keys,
             total_freed_objects: prev.total_freed_objects + freed as u64,
@@ -521,7 +601,7 @@ impl Engine {
     /// next tool call always has >= 50 % headroom before its safe point).
     /// `RD_GC=off` disables automatic collection. Safe point required.
     pub fn maybe_gc(&mut self) -> Option<GcStats> {
-        if std::env::var("RD_GC")
+        if crate::port_env::var("RD_GC")
             .map(|v| v == "off" || v == "0")
             .unwrap_or(false)
         {
@@ -542,18 +622,29 @@ impl Engine {
         Some(stats)
     }
 
+    fn has_gc_frames(&self) -> bool {
+        #[cfg(feature = "std")]
+        {
+            !self.gc_frames.is_empty()
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            !self.gc_frames.is_empty() || !self.execution_frames.is_empty()
+        }
+    }
+
     pub(crate) fn gc_due(&self) -> bool {
         let slots = self.heap.len() - self.heap.free_slots();
         // A live/pinned heap may remain above a pressure watermark. Never
         // collect every interpreter instruction when the previous GC could
         // not reclaim it: require growth and use remaining-slot headroom.
-        if !self.gc_frames.is_empty()
+        if self.has_gc_frames()
             && self.heap.used() <= self.gc_stats.last_used_after
             && slots <= self.gc_slots_after
         {
             return false;
         }
-        let slot_limit = if self.gc_frames.is_empty() {
+        let slot_limit = if !self.has_gc_frames() {
             crate::heap::MAX_OBJECTS * 3 / 4
         } else {
             (crate::heap::MAX_OBJECTS * 3 / 4).max(
@@ -572,7 +663,7 @@ impl Engine {
             .max(base.saturating_add(16 << 20))
             .min(cap);
         (self.heap.used() >= threshold || slots >= slot_limit)
-            && !std::env::var("RD_GC")
+            && !crate::port_env::var("RD_GC")
                 .map(|v| v == "off" || v == "0")
                 .unwrap_or(false)
     }
@@ -593,11 +684,17 @@ impl Engine {
         result: &Value,
         exception: Option<ObjRef>,
     ) {
-        if let Some(roots) = self.gc_frames.last_mut() {
+        #[cfg(feature = "std")]
+        let roots = self.gc_frames.last_mut();
+        #[cfg(not(feature = "std"))]
+        let roots = self
+            .execution_frames
+            .current_roots(self.heap.execution_owner());
+        if let Some(roots) = roots {
             roots.clear();
             roots.extend(
                 regs.iter()
-                    .chain(std::iter::once(result))
+                    .chain(core::iter::once(result))
                     .filter_map(|v| match v {
                         Value::Obj(r) => Some(*r),
                         _ => None,
@@ -616,6 +713,9 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn streaming_collector_matches_legacy_root_and_graph_oracle_across_seeded_heaps() {
         for seed in 1..=64u64 {
@@ -821,7 +921,7 @@ mod tests {
                     *byte = ALPHABET[encoding % ALPHABET.len()];
                     encoding /= ALPHABET.len();
                 }
-                let text = std::str::from_utf8(&bytes).unwrap();
+                let text = core::str::from_utf8(&bytes).unwrap();
                 for n in [0, 1, 9, 99, crate::heap::MAX_OBJECTS] {
                     let expected: Vec<ObjRef> = text
                         .split('|')

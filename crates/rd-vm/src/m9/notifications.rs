@@ -1,4 +1,7 @@
 use super::*;
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use serde::{Deserialize, Serialize};
 const MANAGER: &str = "Landroid/app/NotificationManager;";
 const CHANNEL: &str = "Landroid/app/NotificationChannel;";

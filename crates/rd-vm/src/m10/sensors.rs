@@ -4,8 +4,11 @@ use super::{
     alloc_with, array_len, array_list, call_dex, float_arg, float_array, get_int_field, illegal,
     int_arg, obj_arg, str_val,
 };
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use crate::{Engine, ObjRef, Value, VmExit};
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
 
 const SENSOR_MANAGER: &str = "Landroid/hardware/SensorManager;";
 const SENSOR: &str = "Landroid/hardware/Sensor;";

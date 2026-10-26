@@ -13,6 +13,9 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 pub(crate) use crate::java_format::java_double_to_string;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 pub(crate) use crate::primitive_parse::parse_float;
 use crate::primitive_parse::{parse_float32, parse_radix};
 use crate::value::Value;
@@ -36,7 +39,7 @@ fn to_radix(mut v: i128, radix: u32) -> String {
     let mut out = Vec::new();
     while v != 0 {
         let d = (v % radix as i128).unsigned_abs() as u32;
-        out.push(std::char::from_digit(d, radix).unwrap_or('0'));
+        out.push(core::char::from_digit(d, radix).unwrap_or('0'));
         v /= radix as i128;
     }
     if neg {
@@ -88,7 +91,7 @@ fn java_whitespace(c: char) -> bool {
 }
 
 fn java_identifier_start(c: char) -> bool {
-    use std::sync::OnceLock;
+    use rd_dex::sync::OnceLock;
     static CATEGORIES: OnceLock<regex::Regex> = OnceLock::new();
     CATEGORIES
         .get_or_init(|| {
@@ -99,7 +102,7 @@ fn java_identifier_start(c: char) -> bool {
 }
 
 fn java_identifier_ignorable(c: char) -> bool {
-    use std::sync::OnceLock;
+    use rd_dex::sync::OnceLock;
     static FORMAT: OnceLock<regex::Regex> = OnceLock::new();
     let code = c as u32;
     matches!(code, 0x0000..=0x0008 | 0x000E..=0x001B | 0x007F..=0x009F)
@@ -109,7 +112,7 @@ fn java_identifier_ignorable(c: char) -> bool {
 }
 
 fn java_identifier_part(c: char) -> bool {
-    use std::sync::OnceLock;
+    use rd_dex::sync::OnceLock;
     static CATEGORIES: OnceLock<regex::Regex> = OnceLock::new();
     java_identifier_start(c)
         || java_identifier_ignorable(c)
@@ -594,6 +597,9 @@ fn char_type(c: Option<char>) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn java_double_formatting() {

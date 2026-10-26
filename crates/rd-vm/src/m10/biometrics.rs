@@ -2,6 +2,9 @@
 //! and `android.hardware.fingerprint.FingerprintManager`).
 
 use super::{alloc, alloc_with, call_dex, get_field, illegal, obj_arg, put_field, str_val};
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use crate::{Engine, ObjRef, Value, VmExit};
 
 const FW_BM_MANAGER: &str = "Landroid/hardware/biometrics/BiometricManager;";

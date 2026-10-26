@@ -23,6 +23,9 @@ use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const FORMATTER: &str = "Landroid/text/format/Formatter;";
@@ -110,9 +113,24 @@ pub(crate) fn farg(args: &[Value], i: usize) -> f32 {
     args.get(i).and_then(|v| v.as_float().ok()).unwrap_or(0.0)
 }
 pub(crate) fn put(vm: &mut Engine, r: ObjRef, f: &str, v: Value) -> Result<(), VmExit> {
+    if f == "message"
+        && vm
+            .cp
+            .is_subtype(vm.heap.class_of(r)?, "Ljava/lang/Throwable;")
+    {
+        return crate::throwable_message::set(vm, r, v);
+    }
     crate::err::put_field_result(vm.heap.put_field(r, f, v))
 }
 pub(crate) fn get(vm: &Engine, r: ObjRef, f: &str) -> Value {
+    if f == "message"
+        && vm
+            .heap
+            .class_of(r)
+            .is_ok_and(|class| vm.cp.is_subtype(class, "Ljava/lang/Throwable;"))
+    {
+        return crate::throwable_message::stored(vm, r).unwrap_or(Value::Null);
+    }
     vm.heap.get_field(r, f).unwrap_or(Value::Null)
 }
 pub(crate) fn field_str(vm: &Engine, r: ObjRef, f: &str) -> Option<String> {
@@ -133,8 +151,15 @@ pub(crate) fn put_opt_str(
 pub(crate) fn alloc_obj(
     vm: &mut Engine,
     class: &str,
-    fields: Vec<(String, Value)>,
+    mut fields: Vec<(String, Value)>,
 ) -> Result<ObjRef, VmExit> {
+    if vm.cp.is_subtype(class, "Ljava/lang/Throwable;") {
+        for (name, _) in &mut fields {
+            if name == "message" {
+                *name = crate::throwable_message::SLOT.to_string();
+            }
+        }
+    }
     vm.heap
         .alloc_instance(class.to_string(), fields)
         .map_err(crate::err::oom_throwable)
@@ -1234,7 +1259,7 @@ fn interpolator_instance(
         }
         "Landroid/view/animation/AccelerateDecelerateInterpolator;" => {
             // AOSP computes (input + 1) in float before widening.
-            (f64::from(input + 1.0) * std::f64::consts::PI).cos() as f32 / 2.0 + 0.5
+            (f64::from(input + 1.0) * core::f64::consts::PI).cos() as f32 / 2.0 + 0.5
         }
         "Landroid/view/animation/AnticipateInterpolator;" => {
             let tension = ffield(vm, recv, "mTension", 2.0);
@@ -1271,7 +1296,7 @@ fn interpolator_instance(
         }
         "Landroid/view/animation/CycleInterpolator;" => {
             let cycles = ffield(vm, recv, "mCycles", 1.0);
-            (2.0 * cycles as f64 * std::f64::consts::PI * input as f64).sin() as f32
+            (2.0 * cycles as f64 * core::f64::consts::PI * input as f64).sin() as f32
         }
         _ => return Ok(None),
     };

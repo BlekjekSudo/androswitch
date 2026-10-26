@@ -7,6 +7,9 @@
 
 use crate::engine::Engine;
 use crate::err::VmExit;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const FORM: &str = "Ljava/text/Normalizer$Form;";
@@ -1300,6 +1303,9 @@ pub(crate) fn static_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn decompose_and_recompose() {

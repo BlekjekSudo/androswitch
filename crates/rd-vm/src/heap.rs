@@ -128,14 +128,14 @@ impl Heap {
         }
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
     pub(crate) fn is_young(&self, r: ObjRef) -> bool {
         self.young
             .get(r.wrapping_sub(1) as usize)
             .copied()
             .unwrap_or(true)
     }
-    #[cfg(feature = "std")]
+    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
     pub(crate) fn remembered(&self) -> impl Iterator<Item = ObjRef> + '_ {
         self.remembered.iter().copied()
     }
@@ -206,6 +206,10 @@ impl Heap {
         self.gc_scopes.push(None);
         #[cfg(not(feature = "std"))]
         self.owned_scopes.guest_enter(self.execution_owner());
+    }
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    pub(crate) fn gc_host_restore(&mut self, mark: crate::portable::execution::ScopeMark) {
+        self.owned_scopes.restore_host(mark);
     }
     #[cfg(feature = "std")]
     pub(crate) fn gc_scope_restore(&mut self, depth: usize) {
@@ -610,6 +614,9 @@ impl HeapObj {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     use alloc::vec;
 
     #[test]

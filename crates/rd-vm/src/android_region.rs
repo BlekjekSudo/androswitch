@@ -3,6 +3,9 @@
 //! a bounding box, so covered icons do not become visible semantic targets.
 use crate::err::{put_field_result, VmExit};
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::{Engine, Value};
 type Rect = [i32; 4];
 fn int(v: &Value) -> i32 {
@@ -255,6 +258,9 @@ pub(crate) fn call(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn subtraction_preserves_hole() {
         let r = subtract(vec![[0, 0, 100, 100]], &[[25, 25, 75, 75]]).unwrap();

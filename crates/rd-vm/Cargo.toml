@@ -35,6 +35,9 @@ rd-testsupport = { path = "../rd-testsupport" }
 default = ["std", "advanced-components"]
 # Explicit host contract harness; never enabled by the device runtime build.
 portable-test-support = []
+# The device build is the isolated as-vm package. Desktop reference builds
+# accept the shared cfg name while retaining their complete std dependencies.
+upstream-runtime = ["std"]
 std = ["serde/std", "dep:serde_json", "rd-dex/std", "rd-apk/std", "dep:regex", "dep:fancy-regex"]
 advanced-components = ["std", "virtual-devices"]
 virtual-devices = ["std"]

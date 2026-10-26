@@ -5,6 +5,10 @@ use crate::{Engine, ObjRef, Value, VmExit};
 use alloc::string::{String, ToString};
 
 pub fn alloc_string(vm: &mut Engine, text: String) -> Result<ObjRef, VmExit> {
+    #[cfg(feature = "upstream-runtime")]
+    if vm.framework_host().is_none() {
+        return crate::upstream_intrinsics::alloc_string(vm, text);
+    }
     if let Some(object) = vm.portable.strings.get(&text) {
         return Ok(*object);
     }
@@ -48,6 +52,10 @@ pub fn call_static_intrinsic(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    #[cfg(feature = "upstream-runtime")]
+    if vm.framework_host().is_none() {
+        return crate::upstream_intrinsics::call_static_intrinsic(vm, class, name, sig, args);
+    }
     if let Some(value) = crate::arrays::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
@@ -88,6 +96,18 @@ pub fn call_instance_intrinsic_mref(
     receiver: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
+    #[cfg(feature = "upstream-runtime")]
+    if vm.framework_host().is_none() {
+        return crate::upstream_intrinsics::call_instance_intrinsic_mref(
+            vm,
+            receiver_class,
+            declaring_class,
+            name,
+            sig,
+            receiver,
+            args,
+        );
+    }
     if let Some(value) = crate::jbitset::instance_intrinsic(
         vm,
         receiver_class,
@@ -182,3 +202,18 @@ pub fn call_instance_intrinsic_mref(
     }
     Ok(None)
 }
+
+#[cfg(feature = "upstream-runtime")]
+pub(crate) use crate::java_values::object_to_string;
+#[cfg(feature = "upstream-runtime")]
+pub use crate::upstream_intrinsics::{
+    call_instance_intrinsic, exception, string_arg, values_equal,
+};
+#[cfg(feature = "upstream-runtime")]
+pub(crate) use crate::upstream_intrinsics::{context_impl, host_print, is_throwable_class};
+
+#[cfg(feature = "upstream-runtime")]
+pub use crate::upstream_intrinsics::{
+    dispatch_display_event, EVENT_FLAG_DISPLAY_ADDED, EVENT_FLAG_DISPLAY_CHANGED,
+    EVENT_FLAG_DISPLAY_REMOVED,
+};

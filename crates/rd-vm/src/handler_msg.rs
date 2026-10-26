@@ -25,6 +25,9 @@ use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::framework::{HostObj, QueuedMsg};
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const HANDLER: &str = "Landroid/os/Handler;";
@@ -152,7 +155,7 @@ fn remove_where(
     pred: impl Fn(&Engine, &QueuedMsg) -> bool,
 ) -> Result<usize, VmExit> {
     let l = looper_of(vm, handler)?;
-    let entries = queue_mut(vm, l).map(std::mem::take).unwrap_or_default();
+    let entries = queue_mut(vm, l).map(core::mem::take).unwrap_or_default();
     let (gone, keep): (Vec<_>, Vec<_>) = entries
         .into_iter()
         .partition(|e| e.handler == Some(handler) && pred(vm, e));

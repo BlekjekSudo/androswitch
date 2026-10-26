@@ -10,6 +10,12 @@ pub enum HostMethodKind {
     Constructor,
 }
 pub trait FrameworkHost {
+    fn monotonic_micros(&self) -> Option<u64> {
+        None
+    }
+    fn write_log(&self, _fd: i32, _text: &str) -> Result<usize, VmExit> {
+        Err(crate::err::vm_error("API_UNAVAILABLE", "application log sink").into())
+    }
     fn system_property(&self, _key: &str) -> Result<Option<String>, VmExit> {
         Ok(None)
     }

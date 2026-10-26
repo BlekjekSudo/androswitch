@@ -32,6 +32,9 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const METHOD: &str = "Ljava/lang/reflect/Method;";
@@ -194,7 +197,7 @@ fn wrap_target(vm: &mut Engine, e: VmExit) -> VmExit {
                     .inspect(|o| {
                         if let Some(m) = &t.message {
                             if let Ok(s) = crate::intrinsics::alloc_string(vm, m.clone()) {
-                                let _ = vm.heap.put_field(*o, "message", Value::Obj(s));
+                                let _ = crate::throwable_message::set(vm, *o, Value::Obj(s));
                             }
                         }
                     }),
@@ -314,7 +317,7 @@ pub(crate) fn instance_intrinsic(
                         cur = vm.cp.superclass_of(&c);
                     }
                 }
-                let mut seen = std::collections::HashSet::new();
+                let mut seen = crate::maps::HashSet::new();
                 let mut found: Vec<(String, String, String)> = Vec::new();
                 for c in &classes {
                     for (mname, proto, flags) in vm.cp.declared_methods(c) {
@@ -464,6 +467,9 @@ pub(crate) fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::param_types;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn splits_params() {

@@ -8,6 +8,9 @@ use super::{
     str_val, system_service_singleton,
 };
 use crate::framework::HostObj;
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use crate::{Engine, ObjRef, Value, VmExit};
 
 const TELEPHONY_MANAGER: &str = "Landroid/telephony/TelephonyManager;";

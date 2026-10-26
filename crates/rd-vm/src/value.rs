@@ -109,6 +109,9 @@ pub fn narrow_i32(raw: i32, desc: &str) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn accessors_are_typed() {

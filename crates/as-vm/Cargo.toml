@@ -9,6 +9,8 @@ description = "Feature-isolated no_std build of the shared RustyDroid VM source"
 build = "build.rs"
 
 [lib]
+# Keep the upstream crate name so its original integration tests compile unchanged.
+name = "rd_vm"
 # One implementation tree. Do not copy the interpreter or shared intrinsics.
 path = "../rd-vm/src/lib.rs"
 
@@ -21,9 +23,275 @@ rd-dex = { path = "../rd-dex", default-features = false }
 rd-apk = { path = "../rd-apk", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 
+as-sqlite = { path = "../as-sqlite", optional = true }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
+regex = { version = "1.13.1", default-features = false, features = ["unicode-perl", "unicode-case"], optional = true }
+fancy-regex = { version = "=0.13.0", default-features = false, features = ["unicode"], optional = true }
+libm = { version = "0.2", optional = true }
+siphasher = { version = "1.0", default-features = false, optional = true }
+
 [dev-dependencies]
+rd-render = { package = "as-vm-render-testsupport", path = "../as-vm-render-testsupport" }
+rd-jni = { path = "../rd-jni" }
 rd-testsupport = { package = "as-vm-testsupport", path = "../as-vm-testsupport" }
 
 [features]
 default = []
 portable-test-support = []
+upstream-runtime = ["dep:as-sqlite", "dep:serde_json", "dep:regex", "dep:fancy-regex", "dep:libm", "dep:siphasher"]
+
+# Complete virtual/reference surfaces remain explicit; enabling them never
+# means the physical Switch has the corresponding sensor or service.
+advanced-components = ["upstream-runtime", "virtual-devices"]
+virtual-devices = ["upstream-runtime"]
+upstream-parity-tests = ["upstream-runtime", "advanced-components", "rd-render/upstream-tests"]
+
+[[test]]
+name = "upstream_accessibility_virtual"
+path = "../rd-vm/tests/accessibility_virtual.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_activity_history"
+path = "../rd-vm/tests/activity_history.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_alloc_budget_311"
+path = "../rd-vm/tests/alloc_budget_311.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_array_containers"
+path = "../rd-vm/tests/android_array_containers.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_assets"
+path = "../rd-vm/tests/android_assets.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_atomic_file"
+path = "../rd-vm/tests/android_atomic_file.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_base64_streams"
+path = "../rd-vm/tests/android_base64_streams.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_bitset"
+path = "../rd-vm/tests/android_bitset.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_display"
+path = "../rd-vm/tests/android_display.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_inherited_dispatch"
+path = "../rd-vm/tests/android_inherited_dispatch.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_json"
+path = "../rd-vm/tests/android_json.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_json_274"
+path = "../rd-vm/tests/android_json_274.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_stub_surfaces"
+path = "../rd-vm/tests/android_stub_surfaces.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_sysservices_batch1"
+path = "../rd-vm/tests/android_sysservices_batch1.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_sysservices_batch6"
+path = "../rd-vm/tests/android_sysservices_batch6.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_touch"
+path = "../rd-vm/tests/android_touch.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_uri_267"
+path = "../rd-vm/tests/android_uri_267.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_util_lru"
+path = "../rd-vm/tests/android_util_lru.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_androidx"
+path = "../rd-vm/tests/androidx.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_androidx_hierarchy"
+path = "../rd-vm/tests/androidx_hierarchy.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_app"
+path = "../rd-vm/tests/app.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_app_xml"
+path = "../rd-vm/tests/app_xml.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_arrays_303"
+path = "../rd-vm/tests/arrays_303.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_bigdecimal_272"
+path = "../rd-vm/tests/bigdecimal_272.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_camera_305"
+path = "../rd-vm/tests/camera_305.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_collections_gc"
+path = "../rd-vm/tests/collections_gc.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_file_300"
+path = "../rd-vm/tests/file_300.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_gc"
+path = "../rd-vm/tests/gc.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_gc_generations"
+path = "../rd-vm/tests/gc_generations.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_gms"
+path = "../rd-vm/tests/gms.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_graphics_301"
+path = "../rd-vm/tests/graphics_301.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_inflate_263"
+path = "../rd-vm/tests/inflate_263.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_io_chars_266"
+path = "../rd-vm/tests/io_chars_266.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jit"
+path = "../rd-vm/tests/jit.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jtext_format_295"
+path = "../rd-vm/tests/jtext_format_295.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_m10"
+path = "../rd-vm/tests/m10.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_m8"
+path = "../rd-vm/tests/m8.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_m9"
+path = "../rd-vm/tests/m9.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_narrow_arrays_250"
+path = "../rd-vm/tests/narrow_arrays_250.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_native"
+path = "../rd-vm/tests/native.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_numerics_319"
+path = "../rd-vm/tests/numerics_319.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_parcel_261"
+path = "../rd-vm/tests/parcel_261.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_parcel_binder"
+path = "../rd-vm/tests/parcel_binder.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_regex_262"
+path = "../rd-vm/tests/regex_262.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_regex_lookaround"
+path = "../rd-vm/tests/regex_lookaround.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_sqlite_prefs_257"
+path = "../rd-vm/tests/sqlite_prefs_257.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_string_270"
+path = "../rd-vm/tests/string_270.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_view_hierarchy_316"
+path = "../rd-vm/tests/view_hierarchy_316.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_vm_exec"
+path = "../rd-vm/tests/vm_exec.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_xml_269"
+path = "../rd-vm/tests/xml_269.rs"
+required-features = ["upstream-parity-tests"]

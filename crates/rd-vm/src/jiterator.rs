@@ -4,6 +4,9 @@
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::{Engine, Value};
 
 fn exception(class: &str, message: &str) -> VmExit {

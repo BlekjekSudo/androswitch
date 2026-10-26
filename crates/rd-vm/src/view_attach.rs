@@ -18,7 +18,10 @@
 //! Detach mirrors this (`onDetachedFromWindow`, `onViewDetachedFromWindow`)
 //! when a view is removed from an attached parent or the activity finishes.
 
-use std::collections::HashSet;
+use crate::maps::HashSet;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 
 use crate::engine::Engine;
 use crate::err::VmExit;

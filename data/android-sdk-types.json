@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "sdk_api": 35,
+  "source": "Android SDK platform android-35/android.jar",
+  "source_sha256": "4566663c3876e022b4fa4ced8c8697c4ab1688267f090114fd92d027b32e619b",
+  "classes": 5981,
+  "purpose": "declaration metadata only; runtime API availability is independently implemented and verified",
+  "source_code_included": false
+}

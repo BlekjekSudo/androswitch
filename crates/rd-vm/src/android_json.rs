@@ -9,6 +9,9 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const JSON_READER: &str = "Landroid/util/JsonReader;";
@@ -1888,7 +1891,7 @@ fn json_writer(
     })();
     match result {
         Ok(out) => {
-            let pending = std::mem::take(&mut state.pending);
+            let pending = core::mem::take(&mut state.pending);
             writer_save(vm, recv, &state)?;
             writer_emit(vm, recv, &pending)?;
             Ok(Some(match out {

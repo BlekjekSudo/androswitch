@@ -495,6 +495,35 @@ fn implemented_callback_dependencies_have_explicit_interface_metadata_and_no_unk
             "android.opengl.GLSurfaceView$EGLContextFactory",
         ] {
             let descriptor = format!("L{};", name.replace('.', "/"));
+            // Public SDK declarations are discoverable without implementing
+            // their methods. Metadata availability must not grant a method ID.
+            assert_eq!(
+                rd_vm::classpath::host_interface_modifiers(&descriptor),
+                Some(0x0609)
+            );
+            assert!(rd_vm::classpath::host_class_known(&descriptor));
+            let class = lookup(&mut app, Some(name), false, app_loader.clone()).unwrap();
+            assert!(class.as_ref().unwrap().is_some());
+            let (method, sig) = match name {
+                "android.view.View$OnLongClickListener" => ("onLongClick", "(Landroid/view/View;)Z"),
+                "android.view.View$OnKeyListener" => ("onKey", "(Landroid/view/View;ILandroid/view/KeyEvent;)Z"),
+                _ => ("createContext", "(Ljavax/microedition/khronos/egl/EGL10;Ljavax/microedition/khronos/egl/EGLDisplay;Ljavax/microedition/khronos/egl/EGLConfig;)Ljavax/microedition/khronos/egl/EGLContext;"),
+            };
+            assert_eq!(
+                rd_vm::framework_host::FrameworkHost::method_metadata(
+                    app.android.as_ref(),
+                    &descriptor,
+                    method,
+                    sig
+                ),
+                None
+            );
+        }
+        for name in [
+            "android.view.View$AndroSwitchMissingListener",
+            "android.opengl.GLSurfaceView$AndroSwitchMissingFactory",
+        ] {
+            let descriptor = format!("L{};", name.replace('.', "/"));
             assert_eq!(
                 rd_vm::classpath::host_interface_modifiers(&descriptor),
                 None

@@ -22,6 +22,9 @@
 use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const CSL: &str = "Landroid/content/res/ColorStateList;";
@@ -525,6 +528,9 @@ pub fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn state_set_matching_follows_aosp() {

@@ -27,6 +27,9 @@ use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const EXACTLY: i32 = 0x4000_0000;
@@ -45,7 +48,7 @@ const ACCELERATE_DECELERATE_INTERPOLATOR: &str =
     "Landroid/view/animation/AccelerateDecelerateInterpolator;";
 
 fn density() -> f32 {
-    std::env::var("RD_DENSITY_DPI")
+    crate::port_env::var("RD_DENSITY_DPI")
         .ok()
         .and_then(|v| v.parse::<f32>().ok())
         .unwrap_or(280.0)
@@ -648,7 +651,7 @@ fn interpolator_intrinsic(
                         input.powf(2.0 * factor)
                     }
                 }
-                _ => ((input + 1.0) * std::f32::consts::PI).cos() / 2.0 + 0.5,
+                _ => ((input + 1.0) * core::f32::consts::PI).cos() / 2.0 + 0.5,
             };
             Ok(Some(Value::Float(value)))
         }
@@ -1667,11 +1670,13 @@ impl Engine {
         let mw = (prop(self, root, "MeasuredWidth").unwrap_or(fw_) & 0x00ff_ffff).clamp(0, fw_);
         let mh = (prop(self, root, "MeasuredHeight").unwrap_or(fh_) & 0x00ff_ffff).clamp(0, fh_);
         let (x, y) = (fw_.saturating_sub(mw) / 2, fh_.saturating_sub(mh) / 2);
-        if std::env::var("RD_TRACE_DRAW").is_ok() {
+        #[cfg(feature = "std")]
+        if crate::port_env::var("RD_TRACE_DRAW").is_ok() {
             let kids = match self.fw.get(root) {
                 Some(HostObj::View { children, .. }) => children.len(),
                 _ => 0,
             };
+            #[cfg(feature = "std")]
             eprintln!(
                 "D/RustyDroid: dialog window {} spec=({lw},{lh}) measured={mw}x{mh} at ({x},{y}) children={kids}",
                 self.heap.class_of(root).unwrap_or("?")

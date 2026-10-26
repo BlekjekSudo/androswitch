@@ -1,5 +1,8 @@
 use super::*;
 use crate::framework::{HostObj, Vis};
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use serde::{Deserialize, Serialize};
 const NODE: &str = "Landroid/view/accessibility/AccessibilityNodeInfo;";
 const EVENT: &str = "Landroid/view/accessibility/AccessibilityEvent;";

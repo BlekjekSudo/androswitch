@@ -25,6 +25,9 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const BD: &str = "Ljava/math/BigDecimal;";
@@ -102,7 +105,7 @@ fn div_round(n: i128, d: i128, mode: &str) -> Result<i128, VmExit> {
     let sign: i128 = if (n < 0) != (d < 0) { -1 } else { 1 };
     let twice = r.unsigned_abs().saturating_mul(2);
     let cmp = twice.cmp(&d.unsigned_abs());
-    use std::cmp::Ordering::*;
+    use core::cmp::Ordering::*;
     let inc = match mode {
         "UP" => true,
         "DOWN" => false,
@@ -744,7 +747,7 @@ pub fn instance_intrinsic(
             let mut n = u.unsigned_abs();
             let mut out = Vec::new();
             loop {
-                out.push(std::char::from_digit((n % radix as u128) as u32, radix).unwrap_or('0'));
+                out.push(core::char::from_digit((n % radix as u128) as u32, radix).unwrap_or('0'));
                 n /= radix as u128;
                 if n == 0 {
                     break;
@@ -788,6 +791,9 @@ pub fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn decimal_text_and_rounding() {

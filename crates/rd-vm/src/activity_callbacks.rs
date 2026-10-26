@@ -25,6 +25,9 @@
 use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const CB_SIG: &str = "(Landroid/app/Application$ActivityLifecycleCallbacks;)V";
@@ -153,6 +156,9 @@ pub(crate) fn dispatch(
 #[cfg(test)]
 mod tests {
     use super::event_of;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn events() {

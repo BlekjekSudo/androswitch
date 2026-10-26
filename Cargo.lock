@@ -215,10 +215,28 @@ name = "as-vm"
 version = "0.1.0"
 dependencies = [
  "as-platform",
+ "as-sqlite",
+ "as-vm-render-testsupport",
  "as-vm-testsupport",
+ "fancy-regex",
+ "libm",
  "rd-apk",
  "rd-dex",
+ "rd-jni",
+ "regex",
  "serde",
+ "serde_json",
+ "siphasher",
+]
+
+[[package]]
+name = "as-vm-render-testsupport"
+version = "0.1.0"
+dependencies = [
+ "as-vm",
+ "flate2",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -910,6 +928,12 @@ name = "simd-adler32"
 version = "0.3.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a219298ac11a56ea9a6d2120044824d6f01aeb034955e7af7bc16858527deea"
+
+[[package]]
+name = "siphasher"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
 name = "slice-group-by"

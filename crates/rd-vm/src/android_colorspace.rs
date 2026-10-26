@@ -16,6 +16,9 @@
 use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const CS: &str = "Landroid/graphics/ColorSpace;";
@@ -383,6 +386,9 @@ pub fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn srgb_matrix_matches_reference() {
         let m = rgb_to_xyz(&SRGB_P, &D65);

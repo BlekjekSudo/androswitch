@@ -23,7 +23,11 @@
 //!   interpretador segue para o DEX real da biblioteca (androidx/okhttp
 //!   viajam no APK). Host só sequestra o que implementa de verdade.
 
-use std::collections::{HashMap, HashSet};
+use crate::maps::HashMap;
+use crate::maps::HashSet;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};

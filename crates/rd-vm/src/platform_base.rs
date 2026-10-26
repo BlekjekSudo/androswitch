@@ -15,6 +15,9 @@
 
 use crate::engine::Engine;
 use crate::err::VmExit;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const BASES: &[&str] = &[
@@ -227,7 +230,7 @@ pub(crate) fn vibrator(
                     Some(Value::Long(ms)) => format!("oneShot {ms}ms"),
                     _ => "effect".into(),
                 };
-                crate::intrinsics::host_print(1, &format!("I/RdVibrator: vibrate {desc}\n"));
+                crate::intrinsics::host_print(vm, 1, &format!("I/RdVibrator: vibrate {desc}\n"));
                 Value::Null
             }
             "cancel" => Value::Null,
@@ -449,7 +452,11 @@ pub(crate) fn insets_controller(
             if int(0) & 8 != 0 {
                 vm.fw.m9.keyboard_visible = name == "show";
             }
-            crate::intrinsics::host_print(1, &format!("I/RdInsets: {name} types=0x{:x}\n", int(0)));
+            crate::intrinsics::host_print(
+                vm,
+                1,
+                &format!("I/RdInsets: {name} types=0x{:x}\n", int(0)),
+            );
             Value::Null
         }
         "addOnControllableInsetsChangedListener"

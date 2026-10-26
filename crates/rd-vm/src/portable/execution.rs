@@ -66,6 +66,10 @@ pub(crate) struct Frames {
     serial: u64,
 }
 impl Frames {
+    #[cfg(feature = "upstream-runtime")]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.owners.values().all(Vec::is_empty)
+    }
     pub(crate) fn enter(
         &mut self,
         owner: u64,
@@ -191,6 +195,26 @@ impl OwnerScopes {
         self.restore(mark);
         if let Some(object) = object {
             self.pin(mark.owner, object);
+        }
+    }
+    /// Upstream host dispatch retains nested native temporaries only in the
+    /// same owner's immediately enclosing host scope. A guest frame is a
+    /// boundary, and another suspended owner's scopes are never modified.
+    #[cfg(feature = "upstream-runtime")]
+    pub(crate) fn restore_host(&mut self, mark: ScopeMark) {
+        let roots = self
+            .owners
+            .get_mut(&mark.owner)
+            .and_then(|scopes| scopes.stack.get_mut(mark.depth))
+            .and_then(Option::take)
+            .unwrap_or_default();
+        self.restore(mark);
+        if let Some(Some(parent)) = self
+            .owners
+            .get_mut(&mark.owner)
+            .and_then(|scopes| scopes.stack.last_mut())
+        {
+            parent.extend(roots);
         }
     }
     pub(crate) fn pin(&mut self, owner: u64, object: ObjRef) {

@@ -34,6 +34,11 @@ binary identities unrecorded. New changes need their own hardware verification.
 | [Portable string encodings](PORTABLE_ENCODINGS.md) | API 26 byte encoders, alias recognition, allocation bounds and JVM/ART comparison limits |
 | [Independent M9 startup](M9_EXTERNAL_APPS.md) | Frozen game APKs, general API/ABI work, actual failures and first-screen gate |
 
+The active foundation work is [complete RustyDroid API parity](UPSTREAM_PARITY_PLAN.md),
+with [source synchronization](UPSTREAM_PORTING.md) tracked separately from
+product dispatch, shared state and actual Horizon execution. The experimental
+full reference core is not selected by the shipping runner.
+
 ## Design and progress
 
 | Document | Contents |

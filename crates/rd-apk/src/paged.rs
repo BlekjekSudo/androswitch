@@ -425,6 +425,27 @@ impl PagedZip {
     }
 }
 
+// The existing host page cache implements the same positional source as Horizon.
+impl core::fmt::Debug for PagedZip {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("PagedZip")
+            .field("len", &self.file_len())
+            .finish_non_exhaustive()
+    }
+}
+impl crate::zip::ReadAt for PagedZip {
+    fn len(&self) -> u64 {
+        self.file_len()
+    }
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> RdResult<usize> {
+        let remaining = self.file_len().saturating_sub(offset);
+        let len = output.len().min(remaining.min(usize::MAX as u64) as usize);
+        let bytes = self.read_range(offset, len)?;
+        output[..bytes.len()].copy_from_slice(&bytes);
+        Ok(bytes.len())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -687,26 +708,5 @@ mod tests {
         let z = PagedZip::open(&path)?;
         assert!(z.read("a").is_err(), "lho ~u64::MAX recusa sem panic");
         Ok(())
-    }
-}
-
-// The existing host page cache implements the same positional source as Horizon.
-impl core::fmt::Debug for PagedZip {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("PagedZip")
-            .field("len", &self.file_len())
-            .finish_non_exhaustive()
-    }
-}
-impl crate::zip::ReadAt for PagedZip {
-    fn len(&self) -> u64 {
-        self.file_len()
-    }
-    fn read_at(&self, offset: u64, output: &mut [u8]) -> RdResult<usize> {
-        let remaining = self.file_len().saturating_sub(offset);
-        let len = output.len().min(remaining.min(usize::MAX as u64) as usize);
-        let bytes = self.read_range(offset, len)?;
-        output[..bytes.len()].copy_from_slice(&bytes);
-        Ok(bytes.len())
     }
 }

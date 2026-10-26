@@ -17,6 +17,9 @@ use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::framework::HostObj;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const WINDOW: &str = "Landroid/view/Window;";

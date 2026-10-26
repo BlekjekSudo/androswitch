@@ -311,6 +311,8 @@ impl Classpath {
                     Some(name) => name.unwrap_or_default(),
                     None => binary_short_name.to_string(),
                 }
+            } else if let Some(metadata) = crate::sdk_types::lookup(component) {
+                metadata.simple.to_string()
             } else if !host_class_known(component) {
                 return Err(invalid("class is absent from the classpath"));
             } else if binary_short_name.contains('$') {
@@ -721,7 +723,7 @@ impl Classpath {
         let mut visited: HashSet<String> = queue.iter().cloned().collect();
         let mut budget = 64;
         while let Some(cur) = queue.pop() {
-            if cur == sup {
+            if cur == sup || sdk_subtype(&cur, sup) {
                 return true;
             }
             // host (JDK/platform) interfaces: builtin super-interface closure
@@ -748,7 +750,7 @@ impl Classpath {
     /// closure BFS por chamada, cap de orçamento). Interfaces de plataforma
     /// (CharSequence/Comparable/…) vêm da tabela builtin.
     pub fn is_subtype(&self, sub: &str, sup: &str) -> bool {
-        if sub == sup {
+        if sub == sup || sdk_subtype(sub, sup) {
             return true;
         }
         // JLS 4.10: every reference type (incl. unmodelled host classes such
@@ -794,7 +796,7 @@ impl Classpath {
         // a fresh descriptor String or cache across mutable classpath calls.
         let mut cur = sub;
         for _ in 0..16 {
-            if cur == sup {
+            if cur == sup || sdk_subtype(cur, sup) {
                 return true;
             }
             let Some((dex, def)) = self
@@ -839,6 +841,14 @@ impl Classpath {
     pub fn call_site_offset(&self, dex_idx: usize, n: usize) -> Option<u32> {
         self.dexes[dex_idx].call_site_offsets.get(n).copied()
     }
+}
+
+// Public SDK declarations supplement the inherited graph. Hidden AOSP
+// superclass edges remain in builtin_hierarchy; SDK stubs can erase them.
+fn sdk_subtype(sub: &str, sup: &str) -> bool {
+    crate::sdk_types::lookup(sub).is_some_and(|metadata| {
+        metadata.parents.contains(&sup) || metadata.interfaces.contains(&sup)
+    })
 }
 
 /// Hierarquia embutida mínima para classes de plataforma que a VM conhece sem
@@ -2757,7 +2767,7 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         | "Landroid/telecom/VideoProfile$CameraCapabilities;"
         | "Landroid/telecom/StatusHints;"
         | "Landroid/telecom/GatewayInfo;" => Some(OBJECT),
-        _ => None,
+        _ => crate::sdk_types::lookup(class).map(|metadata| metadata.parents),
     }
 }
 
@@ -3505,7 +3515,7 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         | "Landroid/telecom/VideoProfile$CameraCapabilities;"
         | "Landroid/telecom/StatusHints;"
         | "Landroid/telecom/GatewayInfo;" => Some(&["Landroid/os/Parcelable;"]),
-        _ => None,
+        _ => crate::sdk_types::lookup(class).map(|metadata| metadata.interfaces),
     }
 }
 
@@ -3532,6 +3542,11 @@ pub fn host_superclass(desc: &str) -> Option<&'static str> {
 /// are implicitly static (JLS9.1.1); top-level reflection interfaces have no
 /// STATIC modifier. These facts do not implement arbitrary interface methods.
 pub fn host_interface_modifiers(desc: &str) -> Option<u32> {
+    if let Some(metadata) = crate::sdk_types::lookup(desc) {
+        if metadata.flags & 0x200 != 0 {
+            return Some(metadata.flags);
+        }
+    }
     match desc {
         "Ljava/lang/reflect/Member;"
         | "Ljava/lang/Runnable;"
@@ -3595,13 +3610,16 @@ fn is_shadowed_platform_stub(descriptor: &str, access_flags: u32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     use alloc::vec;
     fn legacy_interface_closure(cp: &Classpath, start: &str, sup: &str) -> bool {
         let mut queue = cp.interfaces_of(start);
         let mut visited: HashSet<String> = queue.iter().cloned().collect();
         let mut budget = 64;
         while let Some(cur) = queue.pop() {
-            if cur == sup {
+            if cur == sup || sdk_subtype(&cur, sup) {
                 return true;
             }
             // host (JDK/platform) interfaces: builtin super-interface closure
@@ -3622,7 +3640,7 @@ mod tests {
     }
 
     fn legacy_is_subtype(cp: &Classpath, sub: &str, sup: &str) -> bool {
-        if sub == sup {
+        if sub == sup || sdk_subtype(sub, sup) {
             return true;
         }
         // JLS 4.10: every reference type (incl. unmodelled host classes such
@@ -3665,7 +3683,7 @@ mod tests {
         }
         let mut cur = sub.to_string();
         for _ in 0..16 {
-            if cur == sup {
+            if cur == sup || sdk_subtype(&cur, sup) {
                 return true;
             }
             // interfaces declaradas por esta classe (closure transitiva)

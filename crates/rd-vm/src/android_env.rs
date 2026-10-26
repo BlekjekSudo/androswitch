@@ -7,6 +7,9 @@
 use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::framework::ENVIRONMENT;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 fn string(vm: &mut Engine, text: &str) -> Result<Value, VmExit> {
@@ -48,6 +51,9 @@ pub(crate) fn host_static(
 mod tests {
     use super::*;
     use crate::engine::VmConfig;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn environment_directory_constants_match_android_names() {

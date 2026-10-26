@@ -18,6 +18,9 @@ use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const TREE_MAP: &str = "Ljava/util/TreeMap;";
@@ -483,7 +486,7 @@ fn put(vm: &mut Engine, r: ObjRef, k: Value, v: Value) -> Result<Value, VmExit> 
     match vm.fw.objects.get_mut(&r) {
         Some(HostObj::Map { entries }) => {
             if found {
-                Ok(std::mem::replace(&mut entries[i].1, v))
+                Ok(core::mem::replace(&mut entries[i].1, v))
             } else {
                 entries.insert(i, (k, v));
                 Ok(Value::Null)

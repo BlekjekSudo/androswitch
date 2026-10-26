@@ -11,6 +11,9 @@ use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const PQ: &str = "Ljava/util/PriorityQueue;";
@@ -42,7 +45,7 @@ fn compare(vm: &mut Engine, cmp: &Value, a: &Value, b: &Value) -> Result<i32, Vm
                 *x,
                 "compareTo",
                 "(Ljava/lang/Object;)I",
-                std::slice::from_ref(b),
+                core::slice::from_ref(b),
             )?,
             _ => {
                 return Err(VmExit::Exception(Throwable::new(

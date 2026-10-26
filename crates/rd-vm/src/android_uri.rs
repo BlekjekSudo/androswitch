@@ -28,8 +28,9 @@
 //! `appendQueryParameter`, `clearQuery`, `fragment`/`encodedFragment`,
 //! `opaquePart`/`encodedOpaquePart`, `build`, `toString`.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -40,7 +41,7 @@ pub const URI: &str = "Landroid/net/Uri;";
 const BUILDER: &str = "Landroid/net/Uri$Builder;";
 
 #[derive(Default, Clone)]
-struct B {
+pub(crate) struct B {
     scheme: Option<String>,
     opaque: Option<String>,
     authority: Option<String>,
@@ -49,20 +50,15 @@ struct B {
     fragment: Option<String>,
 }
 
-thread_local! {
-    static BUILDERS: RefCell<HashMap<ObjRef, B>> = RefCell::new(HashMap::new());
-}
-
 /// GC: drop state of collected objects (slots are reused).
-pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
-    BUILDERS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+pub(crate) fn gc_purge(vm: &Engine, alive: &dyn Fn(ObjRef) -> bool) {
+    vm.module_tables
+        .android_uri_builders
+        .clone()
+        .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
-/// Issue #230: fronteira de `Engine` — builders são por `ObjRef` de um
-/// heap que deixou de existir quando o `Engine` anterior morreu.
-pub(crate) fn reset_all() {
-    BUILDERS.with(|m| m.borrow_mut().clear());
-}
+// Issue #230: this state now belongs to Engine.module_tables and dies with its heap.
 
 /// Encoded parts of a Uri string.
 #[derive(Debug, Default, PartialEq)]
@@ -510,7 +506,10 @@ pub fn instance_intrinsic(
                 .heap
                 .alloc_instance(BUILDER.to_string(), Vec::new())
                 .map_err(crate::err::oom_throwable)?;
-            BUILDERS.with(|m| m.borrow_mut().insert(r, b));
+            vm.module_tables
+                .android_uri_builders
+                .clone()
+                .with(|m| m.borrow_mut().insert(r, b));
             Value::Obj(r)
         }
         "equals" => Value::Int(match args.first() {
@@ -531,9 +530,9 @@ pub fn instance_intrinsic(
             let a: Vec<u16> = s.encode_utf16().collect();
             let b: Vec<u16> = o.encode_utf16().collect();
             Value::Int(match a.cmp(&b) {
-                std::cmp::Ordering::Less => -1,
-                std::cmp::Ordering::Equal => 0,
-                std::cmp::Ordering::Greater => 1,
+                core::cmp::Ordering::Less => -1,
+                core::cmp::Ordering::Equal => 0,
+                core::cmp::Ordering::Greater => 1,
             })
         }
         "describeContents" => Value::Int(0),
@@ -548,10 +547,18 @@ fn builder(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     if name == "<init>" {
-        BUILDERS.with(|m| m.borrow_mut().insert(recv, B::default()));
+        vm.module_tables
+            .android_uri_builders
+            .clone()
+            .with(|m| m.borrow_mut().insert(recv, B::default()));
         return Ok(Some(Value::Null));
     }
-    let Some(mut b) = BUILDERS.with(|m| m.borrow().get(&recv).cloned()) else {
+    let Some(mut b) = vm
+        .module_tables
+        .android_uri_builders
+        .clone()
+        .with(|m| m.borrow().get(&recv).cloned())
+    else {
         return Ok(None);
     };
     let a0 = sval(vm, args.first());
@@ -650,13 +657,19 @@ fn builder(
         }
         _ => return Ok(None),
     };
-    BUILDERS.with(|m| m.borrow_mut().insert(recv, b));
+    vm.module_tables
+        .android_uri_builders
+        .clone()
+        .with(|m| m.borrow_mut().insert(recv, b));
     Ok(Some(if ret_self { Value::Obj(recv) } else { out }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn parses_hierarchical_and_opaque() {
         let p = parse_parts("https://user@ex.com:8080/a/b%20c?x=1&y=a+b#frag");

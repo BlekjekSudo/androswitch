@@ -7,6 +7,9 @@ use crate::err::{not_implemented, Throwable, VmExit};
 use crate::heap::HeapObj;
 pub use crate::java_values::values_equal;
 pub(crate) use crate::java_values::{default_to_string, object_to_string};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::repr;
 use crate::value::Value;
 
@@ -169,7 +172,12 @@ fn java_floor_mod_i64(a: i64, b: i64) -> i64 {
 
 /// Escreve no stdout/stderr do host. PrintStream Java NUNCA lança IOException
 /// (spec de java.io.PrintStream) — engolir falha de E/S é a semântica correta.
-pub(crate) fn host_print(fd: i32, s: &str) {
+// PrintStream swallows I/O errors by contract; Android Log remains fallible.
+pub(crate) fn host_print(vm: &Engine, fd: i32, s: &str) {
+    let _ = vm.output.write(vm.framework_host().as_deref(), fd, s);
+}
+#[cfg(feature = "std")]
+pub(crate) fn print_sink(fd: i32, s: &str) {
     use std::io::Write;
     if fd == 2 {
         let _ = std::io::stderr().write_all(s.as_bytes());
@@ -202,6 +210,7 @@ pub(crate) fn host_print(fd: i32, s: &str) {
 /// Destino do fd=1 do app (System.out). fd=2 (System.err) é SEMPRE o stderr
 /// do host — Android real manda app stdout/Log para o logcat, nunca para o
 /// stream do dump.
+#[cfg(feature = "std")]
 #[derive(Clone, Default, Debug)]
 pub enum HostOut {
     /// stdout do host (default da biblioteca — semântica Java).
@@ -210,22 +219,26 @@ pub enum HostOut {
     /// stderr do host (modo CLI — stdout reservado ao artefato do comando).
     Stderr,
     /// Buffer em memória (testes — assert do conteúdo impresso).
-    Buffer(std::sync::Arc<std::sync::Mutex<Vec<u8>>>),
+    Buffer(alloc::sync::Arc<std::sync::Mutex<Vec<u8>>>),
 }
 
+#[cfg(feature = "std")]
 static APP_STDOUT: std::sync::Mutex<HostOut> = std::sync::Mutex::new(HostOut::Std);
 
+#[cfg(feature = "std")]
 fn app_stdout_mode() -> HostOut {
     APP_STDOUT.lock().expect("app stdout mode").clone()
 }
 
 /// Configura o destino do System.out do app (issue #55).
+#[cfg(feature = "std")]
 pub fn set_app_stdout(mode: HostOut) {
     *APP_STDOUT.lock().expect("app stdout mode") = mode;
 }
 
 /// Roteia System.out do app para o STDERR do host (contrato de máquina:
 /// stdout reservado ao artefato do comando — issue #55). Idempotente.
+#[cfg(feature = "std")]
 pub fn route_app_stdout_to_stderr() {
     set_app_stdout(HostOut::Stderr);
 }
@@ -668,9 +681,9 @@ fn call_static_intrinsic_rooted(
             let a = args[0].as_int()?;
             let b = args[1].as_int()?;
             Ok(Some(Value::Int(match a.cmp(&b) {
-                std::cmp::Ordering::Less => -1,
-                std::cmp::Ordering::Equal => 0,
-                std::cmp::Ordering::Greater => 1,
+                core::cmp::Ordering::Less => -1,
+                core::cmp::Ordering::Equal => 0,
+                core::cmp::Ordering::Greater => 1,
             })))
         }
         (LONG, "valueOf", "(J)Ljava/lang/Long;") => {
@@ -2042,7 +2055,7 @@ fn atomic_ref_array_intrinsic(
             .map_err(crate::err::oom_throwable)?;
         vm.heap
             .array_elems_mut(array)?
-            .extend(std::iter::repeat(Value::Null).take(len));
+            .extend(core::iter::repeat(Value::Null).take(len));
         crate::err::put_field_result(vm.heap.put_field(recv, "elements", Value::Obj(array)))?;
         return Ok(Some(Value::Null));
     }
@@ -2676,7 +2689,7 @@ fn vector_intrinsic(
             let req = requested as usize;
             let cur_len = list_elems(vm, recv)?.len();
             if req > cur_len {
-                let extra_bytes = (req - cur_len).saturating_mul(std::mem::size_of::<Value>());
+                let extra_bytes = (req - cur_len).saturating_mul(core::mem::size_of::<Value>());
                 let avail = vm.heap.budget().saturating_sub(vm.heap.used());
                 if extra_bytes > avail {
                     return Err(VmExit::Exception(Throwable::new(
@@ -3556,7 +3569,7 @@ fn map_intrinsic(
             let old = {
                 let entries = map_entries(vm, recv)?;
                 if let Some(i) = idx {
-                    Some(std::mem::replace(&mut entries[i].1, v))
+                    Some(core::mem::replace(&mut entries[i].1, v))
                 } else {
                     entries.push((k, v));
                     None
@@ -3752,7 +3765,7 @@ fn list_intrinsic(
             if i < 0 || i as usize >= elems.len() {
                 return Err(iobe(format!("set índice {i}, tamanho {}", elems.len())));
             }
-            let old = std::mem::replace(&mut elems[i as usize], args[1].clone());
+            let old = core::mem::replace(&mut elems[i as usize], args[1].clone());
             Ok(Some(old))
         }
         ("remove", "(I)Ljava/lang/Object;") => {
@@ -5285,18 +5298,16 @@ fn instance_intrinsic_dispatch(
                 None => Value::Null,
                 Some(_) => Value::Obj(vm.heap.alloc_string(string_arg(vm, &args[0])?)?),
             };
-            crate::err::put_field_result(vm.heap.put_field(recv, "message", msg))?;
+            crate::throwable_message::set(vm, recv, msg)?;
             Ok(Some(Value::Null))
         }
-        (_, "getMessage", "()Ljava/lang/String;") if is_throwable_class(vm, recv_class) => Ok(
-            Some(vm.heap.get_field(recv, "message").unwrap_or(Value::Null)),
-        ),
+        (_, "getMessage", "()Ljava/lang/String;") if is_throwable_class(vm, recv_class) => {
+            Ok(Some(crate::throwable_message::stored(vm, recv)?))
+        }
         (_, "getLocalizedMessage", "()Ljava/lang/String;")
             if is_throwable_class(vm, recv_class) =>
         {
-            Ok(Some(
-                vm.heap.get_field(recv, "message").unwrap_or(Value::Null),
-            ))
+            Ok(Some(crate::throwable_message::stored(vm, recv)?))
         }
 
         // issue #27: unboxing (contraparte do valueOf que d8 emite)
@@ -5346,28 +5357,28 @@ fn instance_intrinsic_dispatch(
         // embutido (objeto alocado pelo sget de System.out; interp.rs). PrintStream
         // nunca lança — falha de E/S é engolida (host_print).
         (PRINTSTREAM, "println", "()V") => {
-            host_print(ps_fd(vm, recv)?, "\n");
+            host_print(vm, ps_fd(vm, recv)?, "\n");
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "println", "(I)V") => {
             let s = format!("{}\n", args[0].as_int()?);
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "println", "(J)V") => {
             let s = format!("{}\n", args[0].as_long()?);
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "println", "(Z)V") => {
             let s = format!("{}\n", args[0].as_int()? != 0);
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "println", "(C)V") => {
             let c = char::from_u32(args[0].as_int()? as u32).unwrap_or('\u{FFFD}');
             let s = format!("{c}\n");
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "println", "(Ljava/lang/String;)V") => {
@@ -5376,7 +5387,7 @@ fn instance_intrinsic_dispatch(
                 Some(_) => string_arg(vm, &args[0])?,
             };
             s.push('\n');
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "println", "(Ljava/lang/Object;)V") => {
@@ -5385,7 +5396,7 @@ fn instance_intrinsic_dispatch(
                 Some(r) => object_to_string(vm, r)?,
             };
             s.push('\n');
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "print", "(Ljava/lang/String;)V") => {
@@ -5393,7 +5404,7 @@ fn instance_intrinsic_dispatch(
                 None => "null".to_string(),
                 Some(_) => string_arg(vm, &args[0])?,
             };
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "print", "(Ljava/lang/Object;)V") => {
@@ -5401,27 +5412,27 @@ fn instance_intrinsic_dispatch(
                 None => "null".to_string(),
                 Some(r) => object_to_string(vm, r)?,
             };
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "print", "(I)V") => {
             let s = args[0].as_int()?.to_string();
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "print", "(J)V") => {
             let s = args[0].as_long()?.to_string();
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "print", "(Z)V") => {
             let s = (args[0].as_int()? != 0).to_string();
-            host_print(ps_fd(vm, recv)?, &s);
+            host_print(vm, ps_fd(vm, recv)?, &s);
             Ok(Some(Value::Null))
         }
         (PRINTSTREAM, "print", "(C)V") => {
             let c = char::from_u32(args[0].as_int()? as u32).unwrap_or('\u{FFFD}');
-            host_print(ps_fd(vm, recv)?, &c.to_string());
+            host_print(vm, ps_fd(vm, recv)?, &c.to_string());
             Ok(Some(Value::Null))
         }
         (INTEGER, "toString", "()Ljava/lang/String;") => {
@@ -5651,6 +5662,7 @@ fn java_pow(a: f64, b: f64) -> f64 {
 }
 
 /// Native loading is never silently ignored, including in minimal builds.
+#[cfg(feature = "std")]
 pub(crate) fn call_native_loader(
     vm: &mut Engine,
     class: &str,
@@ -5661,6 +5673,7 @@ pub(crate) fn call_native_loader(
     vm.with_host_roots(|vm| call_native_loader_rooted(vm, class, name, sig, args))
 }
 
+#[cfg(feature = "std")]
 fn call_native_loader_rooted(
     vm: &mut Engine,
     class: &str,
@@ -5740,6 +5753,9 @@ fn utf16_unit_at(s: &str, index: usize) -> Option<u16> {
 #[cfg(test)]
 mod utf16_optimization_tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn allocation_free_char_at_matches_all_utf16_units_and_invalid_indices() {

@@ -1,4 +1,7 @@
 use super::*;
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use serde::{Deserialize, Serialize};
 const BUILDER: &str = "Landroid/content/pm/ShortcutInfo$Builder;";
 const INFO: &str = "Landroid/content/pm/ShortcutInfo;";

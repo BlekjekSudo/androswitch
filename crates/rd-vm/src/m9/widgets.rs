@@ -1,5 +1,8 @@
 use super::*;
 use crate::framework::{HostObj, UiNode, Vis};
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use serde::{Deserialize, Serialize};
 const REMOTE: &str = "Landroid/widget/RemoteViews;";
 const MANAGER: &str = "Landroid/appwidget/AppWidgetManager;";

@@ -13,8 +13,13 @@
 //! always succeed: there is one process, so no other process can hold an
 //! advisory lock. `FileChannel.map` is not supported.
 
-use std::cell::RefCell;
-use std::collections::{BTreeMap, BTreeSet};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
+use alloc::collections::BTreeMap;
+use alloc::collections::BTreeSet;
+#[cfg(feature = "std")]
+use core::cell::RefCell;
 
 use crate::engine::Engine;
 use crate::err::VmExit;
@@ -44,7 +49,7 @@ struct OpenDesc {
 }
 
 #[derive(Default)]
-struct Vfs {
+pub(crate) struct Vfs {
     dirs: BTreeSet<String>,
     files: BTreeMap<String, Vec<u8>>,
     meta: BTreeMap<String, VfsMeta>,
@@ -54,8 +59,26 @@ struct Vfs {
     next_desc: i64,
 }
 
+#[cfg(feature = "std")]
 thread_local! {
     static VFS: RefCell<Vfs> = RefCell::new(Vfs::default());
+}
+
+// The desktop oracle retains session-scoped VFS persistence. The isolated
+// no_std parity harness owns its memory filesystem explicitly through Engine.
+// This backend is not the Horizon persistent VFS and must not be selected by
+// the product runner until the filesystem adapter migration is complete.
+macro_rules! vfs {
+    ($vm:expr) => {{
+        #[cfg(feature = "std")]
+        {
+            &VFS
+        }
+        #[cfg(not(feature = "std"))]
+        {
+            $vm.parity_vfs.clone()
+        }
+    }};
 }
 
 fn normalize(p: &str) -> String {
@@ -113,9 +136,9 @@ fn parent_of(p: &str) -> Option<String> {
     }
 }
 
-fn mkdirs(p: &str) {
+fn mkdirs(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) {
     let p = absolute(p);
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut v = v.borrow_mut();
         let mut cur = String::new();
         for seg in p.split('/').filter(|s| !s.is_empty()) {
@@ -126,19 +149,19 @@ fn mkdirs(p: &str) {
     });
 }
 
-fn is_dir(p: &str) -> bool {
+fn is_dir(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) -> bool {
     if p.is_empty() {
         return false;
     }
     let p = absolute(p);
-    p == "/" || VFS.with(|v| v.borrow().dirs.contains(&p))
+    p == "/" || vfs!(vm).with(|v| v.borrow().dirs.contains(&p))
 }
-fn is_file(p: &str) -> bool {
+fn is_file(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) -> bool {
     if p.is_empty() {
         return false;
     }
     let p = absolute(p);
-    VFS.with(|v| v.borrow().files.contains_key(&p))
+    vfs!(vm).with(|v| v.borrow().files.contains_key(&p))
 }
 
 pub(crate) fn new_file(vm: &mut Engine, path: &str) -> Result<Value, VmExit> {
@@ -156,7 +179,11 @@ pub(crate) fn new_file(vm: &mut Engine, path: &str) -> Result<Value, VmExit> {
 /// Android's deterministic emulated shared-storage root, held only in the
 /// VM's virtual filesystem (never mapped to host disk).
 pub(crate) fn external_storage_path(vm: &mut Engine, path: &str) -> Result<Value, VmExit> {
-    mkdirs("/storage/emulated/0");
+    mkdirs(
+        #[cfg(not(feature = "std"))]
+        vm,
+        "/storage/emulated/0",
+    );
     new_file(vm, path)
 }
 
@@ -190,7 +217,11 @@ fn app_dir(vm: &mut Engine, sub: &str) -> Result<Value, VmExit> {
     } else {
         format!("/data/user/0/{pkg}/{sub}")
     };
-    mkdirs(&p);
+    mkdirs(
+        #[cfg(not(feature = "std"))]
+        vm,
+        &p,
+    );
     new_file(vm, &p)
 }
 
@@ -309,7 +340,11 @@ pub fn context_dirs(
                 }
             };
             let p = format!("/storage/emulated/0/Android/data/{pkg}/{sub}");
-            mkdirs(&p);
+            mkdirs(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &p,
+            );
             new_file(vm, &p)?
         }
         ("databaseList", _) | ("fileList", _) => {
@@ -319,7 +354,7 @@ pub fn context_dirs(
             } else {
                 format!("/data/user/0/{pkg}/files/")
             };
-            let names: Vec<String> = VFS.with(|v| {
+            let names: Vec<String> = vfs!(vm).with(|v| {
                 v.borrow()
                     .files
                     .keys()
@@ -341,7 +376,7 @@ pub fn context_dirs(
             // Close/forget any open SQLite handle first; otherwise its next
             // committed mutation would rewrite (resurrect) the deleted image.
             let was_open = crate::jsqlite::forget_database(vm, &p);
-            let deleted = VFS.with(|v| v.borrow_mut().files.remove(&p).is_some());
+            let deleted = vfs!(vm).with(|v| v.borrow_mut().files.remove(&p).is_some());
             Value::Int((was_open || deleted) as i32)
         }
         _ => return Ok(None),
@@ -375,10 +410,14 @@ pub fn static_intrinsic(
                 Some(Value::Obj(d)) => path_of(vm, *d),
                 _ => "/data/local/tmp".into(),
             };
-            mkdirs(&dir);
-            let n = VFS.with(|v| v.borrow().files.len());
+            mkdirs(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &dir,
+            );
+            let n = vfs!(vm).with(|v| v.borrow().files.len());
             let p = format!("{dir}/{pre}{n}{suf}");
-            VFS.with(|v| v.borrow_mut().files.insert(absolute(&p), Vec::new()));
+            vfs!(vm).with(|v| v.borrow_mut().files.insert(absolute(&p), Vec::new()));
             new_file(vm, &p)?
         }
         _ => return Ok(None),
@@ -405,8 +444,8 @@ fn atomic_paths(vm: &Engine, recv: ObjRef) -> Result<(String, String), VmExit> {
     Ok((absolute(&path_of(vm, base)), absolute(&path_of(vm, backup))))
 }
 
-fn atomic_rename(from: &str, to: &str) -> bool {
-    VFS.with(|v| {
+fn atomic_rename(#[cfg(not(feature = "std"))] vm: &Engine, from: &str, to: &str) -> bool {
+    vfs!(vm).with(|v| {
         let mut v = v.borrow_mut();
         let Some(bytes) = v.files.remove(from) else {
             return false;
@@ -449,16 +488,34 @@ fn atomic_close_stream(vm: &mut Engine, args: &[Value]) {
     }
 }
 
-fn atomic_restore_backup(base: &str, backup: &str) {
-    if is_file(backup) {
-        delete_file(base);
-        atomic_rename(backup, base);
+fn atomic_restore_backup(#[cfg(not(feature = "std"))] vm: &Engine, base: &str, backup: &str) {
+    if is_file(
+        #[cfg(not(feature = "std"))]
+        vm,
+        backup,
+    ) {
+        delete_file(
+            #[cfg(not(feature = "std"))]
+            vm,
+            base,
+        );
+        atomic_rename(
+            #[cfg(not(feature = "std"))]
+            vm,
+            backup,
+            base,
+        );
     }
 }
 
 fn atomic_open_read(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
     let (base, backup) = atomic_paths(vm, recv)?;
-    atomic_restore_backup(&base, &backup);
+    atomic_restore_backup(
+        #[cfg(not(feature = "std"))]
+        vm,
+        &base,
+        &backup,
+    );
     atomic_create_stream(vm, FIS, &base)
 }
 
@@ -488,9 +545,34 @@ fn atomic_file_intrinsic(
         }
         ("startWrite", "()Ljava/io/FileOutputStream;") => {
             let (base, backup) = atomic_paths(vm, recv)?;
-            if is_file(&base) || is_dir(&base) {
-                if !is_file(&backup) && !is_dir(&backup) {
-                    if !is_file(&base) || !atomic_rename(&base, &backup) {
+            if is_file(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &base,
+            ) || is_dir(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &base,
+            ) {
+                if !is_file(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &backup,
+                ) && !is_dir(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &backup,
+                ) {
+                    if !is_file(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        &base,
+                    ) || !atomic_rename(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        &base,
+                        &backup,
+                    ) {
                         return Err(atomic_throw(
                             "Ljava/io/IOException;",
                             format!("Couldn't rename file {base} to backup file {backup}"),
@@ -499,7 +581,11 @@ fn atomic_file_intrinsic(
                 } else {
                     // A pre-existing backup is the older committed state;
                     // the current base is an interrupted replacement.
-                    delete_file(&base);
+                    delete_file(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        &base,
+                    );
                 }
             }
             match atomic_create_stream(vm, FOS, &base) {
@@ -508,8 +594,16 @@ fn atomic_file_intrinsic(
                     let Some(parent) = parent_of(&base) else {
                         return Err(error);
                     };
-                    mkdirs(&parent);
-                    if !is_dir(&parent) {
+                    mkdirs(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        &parent,
+                    );
+                    if !is_dir(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        &parent,
+                    ) {
                         return Err(error);
                     }
                     Ok(Some(atomic_create_stream(vm, FOS, &base)?))
@@ -519,15 +613,32 @@ fn atomic_file_intrinsic(
         ("finishWrite", "(Ljava/io/FileOutputStream;)V") => {
             atomic_close_stream(vm, args);
             let (_, backup) = atomic_paths(vm, recv)?;
-            delete_file(&backup);
+            delete_file(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &backup,
+            );
             Ok(Some(Value::Null))
         }
         ("failWrite", "(Ljava/io/FileOutputStream;)V") => {
             atomic_close_stream(vm, args);
             let (base, backup) = atomic_paths(vm, recv)?;
-            delete_file(&base);
-            if is_file(&backup) {
-                atomic_rename(&backup, &base);
+            delete_file(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &base,
+            );
+            if is_file(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &backup,
+            ) {
+                atomic_rename(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &backup,
+                    &base,
+                );
             }
             Ok(Some(Value::Null))
         }
@@ -572,8 +683,16 @@ fn atomic_file_intrinsic(
         }
         ("delete", "()V") => {
             let (base, backup) = atomic_paths(vm, recv)?;
-            delete_file(&base);
-            delete_file(&backup);
+            delete_file(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &base,
+            );
+            delete_file(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &backup,
+            );
             Ok(Some(Value::Null))
         }
         _ => Ok(None),
@@ -667,19 +786,43 @@ pub fn instance_intrinsic(
             Some(x) => new_file(vm, &x)?,
             None => Value::Null,
         },
-        "exists" => b(is_dir(&p) || is_file(&p)),
-        "isDirectory" => b(is_dir(&p)),
-        "isFile" => b(is_file(&p)),
+        "exists" => b(is_dir(
+            #[cfg(not(feature = "std"))]
+            vm,
+            &p,
+        ) || is_file(
+            #[cfg(not(feature = "std"))]
+            vm,
+            &p,
+        )),
+        "isDirectory" => b(is_dir(
+            #[cfg(not(feature = "std"))]
+            vm,
+            &p,
+        )),
+        "isFile" => b(is_file(
+            #[cfg(not(feature = "std"))]
+            vm,
+            &p,
+        )),
         "isAbsolute" => b(p.starts_with('/')),
         "isHidden" => b(!p.is_empty()
             && p != "."
             && p != ".."
             && p.rsplit('/').next().is_some_and(|n| n.starts_with('.'))),
-        "canRead" | "canWrite" | "canExecute" => b(is_dir(&p) || is_file(&p)),
+        "canRead" | "canWrite" | "canExecute" => b(is_dir(
+            #[cfg(not(feature = "std"))]
+            vm,
+            &p,
+        ) || is_file(
+            #[cfg(not(feature = "std"))]
+            vm,
+            &p,
+        )),
         "length" => Value::Long(if p.is_empty() {
             0
         } else {
-            VFS.with(|v| {
+            vfs!(vm).with(|v| {
                 v.borrow()
                     .files
                     .get(&abs)
@@ -687,25 +830,63 @@ pub fn instance_intrinsic(
                     .unwrap_or(0)
             })
         }),
-        "lastModified" => Value::Long(if is_dir(&p) || is_file(&p) {
-            crate::jlsystem::epoch_ms()
-        } else {
-            0
-        }),
+        "lastModified" => Value::Long(
+            if is_dir(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &p,
+            ) || is_file(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &p,
+            ) {
+                crate::jlsystem::epoch_ms()
+            } else {
+                0
+            },
+        ),
         "mkdir" => {
             let ok = !p.is_empty()
-                && !is_dir(&p)
-                && !is_file(&p)
-                && parent_of(&abs).is_some_and(|x| is_dir(&x));
+                && !is_dir(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &p,
+                )
+                && !is_file(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &p,
+                )
+                && parent_of(&abs).is_some_and(|x| {
+                    is_dir(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        &x,
+                    )
+                });
             if ok {
-                VFS.with(|v| v.borrow_mut().dirs.insert(abs.clone()));
+                vfs!(vm).with(|v| v.borrow_mut().dirs.insert(abs.clone()));
             }
             b(ok)
         }
         "mkdirs" => {
-            let ok = !p.is_empty() && !is_dir(&p) && !is_file(&p);
+            let ok = !p.is_empty()
+                && !is_dir(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &p,
+                )
+                && !is_file(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &p,
+                );
             if ok {
-                mkdirs(&abs);
+                mkdirs(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &abs,
+                );
             }
             b(ok)
         }
@@ -716,10 +897,22 @@ pub fn instance_intrinsic(
                     "No such file or directory",
                 ));
             }
-            let ok = !is_dir(&p) && !is_file(&p);
+            let ok = !is_dir(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &p,
+            ) && !is_file(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &p,
+            );
             if ok {
                 if let Some(par) = parent_of(&abs) {
-                    if !is_dir(&par) {
+                    if !is_dir(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        &par,
+                    ) {
                         return Err(crate::err::Throwable::new(
                             "Ljava/io/IOException;",
                             "No such file or directory".to_string(),
@@ -727,7 +920,7 @@ pub fn instance_intrinsic(
                         .into());
                     }
                 }
-                VFS.with(|v| v.borrow_mut().files.insert(abs.clone(), Vec::new()));
+                vfs!(vm).with(|v| v.borrow_mut().files.insert(abs.clone(), Vec::new()));
             }
             b(ok)
         }
@@ -735,7 +928,7 @@ pub fn instance_intrinsic(
             if p.is_empty() {
                 return Ok(Some(b(false)));
             }
-            let ok = VFS.with(|v| {
+            let ok = vfs!(vm).with(|v| {
                 let mut v = v.borrow_mut();
                 if v.files.remove(&abs).is_some() {
                     v.meta.remove(&abs);
@@ -773,10 +966,20 @@ pub fn instance_intrinsic(
                 return Ok(Some(b(false)));
             }
             let dst = absolute(&dst_raw);
-            b(os_rename(&abs, &dst).is_ok())
+            b(os_rename(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &abs,
+                &dst,
+            )
+            .is_ok())
         }
         "list" | "listFiles" if sig.starts_with("()") => {
-            if !is_dir(&p) {
+            if !is_dir(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &p,
+            ) {
                 return Ok(Some(Value::Null));
             }
             let prefix = if abs == "/" {
@@ -784,7 +987,7 @@ pub fn instance_intrinsic(
             } else {
                 format!("{abs}/")
             };
-            let names: Vec<String> = VFS.with(|v| {
+            let names: Vec<String> = vfs!(vm).with(|v| {
                 let v = v.borrow();
                 v.dirs
                     .iter()
@@ -921,17 +1124,33 @@ fn stream_intrinsic(
         let abs = absolute(&path);
         if class == FOS {
             let append = matches!(args.get(1), Some(Value::Int(1)));
-            if parent_of(&abs).is_some_and(|p| !is_dir(&p)) || is_dir(&abs) {
+            if parent_of(&abs).is_some_and(|p| {
+                !is_dir(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &p,
+                )
+            }) || is_dir(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &abs,
+            ) {
                 return Err(fnf(&abs));
             }
-            VFS.with(|v| {
+            vfs!(vm).with(|v| {
                 let mut v = v.borrow_mut();
                 let e = v.files.entry(abs.clone()).or_default();
                 if !append && !sig.contains("FileDescriptor") {
                     e.clear();
                 }
             });
-        } else if class == FIS && !is_file(&abs) {
+        } else if class == FIS
+            && !is_file(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &abs,
+            )
+        {
             return Err(fnf(&abs));
         }
         let sv = crate::intrinsics::alloc_string(vm, abs)?;
@@ -946,7 +1165,7 @@ fn stream_intrinsic(
     let set_pos = |vm: &mut Engine, x: usize| {
         crate::err::put_field_result(vm.heap.put_field(recv, "rd_pos", Value::Long(x as i64)))
     };
-    let len = VFS.with(|v| v.borrow().files.get(&p).map(Vec::len).unwrap_or(0));
+    let len = vfs!(vm).with(|v| v.borrow().files.get(&p).map(Vec::len).unwrap_or(0));
     Ok(Some(match (class, name) {
         (FOS, "write") => {
             let data = match sig {
@@ -987,7 +1206,7 @@ fn stream_intrinsic(
                     all[off..off + n].to_vec()
                 }
             };
-            let new_len = VFS.with(|v| -> Result<usize, VmExit> {
+            let new_len = vfs!(vm).with(|v| -> Result<usize, VmExit> {
                 let mut vfs = v.borrow_mut();
                 let cur_len = vfs.files.get(&p).map_or(0, Vec::len);
                 let target_len = cur_len
@@ -1022,7 +1241,13 @@ fn stream_intrinsic(
                 } else {
                     OS_O_RDONLY
                 };
-                if let Some(fd) = os_register_path(&p, flags, pos as u64) {
+                if let Some(fd) = os_register_path(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &p,
+                    flags,
+                    pos as u64,
+                ) {
                     crate::err::put_field_result(vm.heap.put_field(
                         fd_obj,
                         "descriptor",
@@ -1035,7 +1260,11 @@ fn stream_intrinsic(
             }
         }
         (FD, "valid") => match vm.heap.get_field(recv, "descriptor") {
-            Ok(Value::Int(fd)) => Value::Int(os_fd_valid(fd) as i32),
+            Ok(Value::Int(fd)) => Value::Int(os_fd_valid(
+                #[cfg(not(feature = "std"))]
+                vm,
+                fd,
+            ) as i32),
             _ => Value::Int(1),
         },
         (FD, "sync") => Value::Null,
@@ -1047,7 +1276,8 @@ fn stream_intrinsic(
         }
         (FIS, "read") => {
             if sig == "()I" {
-                let b = VFS.with(|v| v.borrow().files.get(&p).and_then(|f| f.get(pos).copied()));
+                let b =
+                    vfs!(vm).with(|v| v.borrow().files.get(&p).and_then(|f| f.get(pos).copied()));
                 match b {
                     Some(b) => {
                         set_pos(vm, pos + 1)?;
@@ -1091,7 +1321,7 @@ fn stream_intrinsic(
                 if want == 0 {
                     return Ok(Some(Value::Int(0)));
                 }
-                let chunk: Vec<u8> = VFS.with(|v| {
+                let chunk: Vec<u8> = vfs!(vm).with(|v| {
                     let v = v.borrow();
                     let Some(f) = v.files.get(&p) else {
                         return Vec::new();
@@ -1126,44 +1356,56 @@ fn stream_intrinsic(
 }
 
 /// Creates `p`'s parent directories (public entry for other host modules).
-pub(crate) fn mkdirs_pub(p: &str) {
-    mkdirs(p);
+pub(crate) fn mkdirs_pub(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) {
+    mkdirs(
+        #[cfg(not(feature = "std"))]
+        vm,
+        p,
+    );
 }
 
 /// Ensures a file exists at `p` (parents included), keeping its content.
-pub(crate) fn touch(p: &str) {
+pub(crate) fn touch(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) {
     let p = absolute(p);
     if let Some(parent) = parent_of(&p) {
-        mkdirs(&parent);
+        mkdirs(
+            #[cfg(not(feature = "std"))]
+            vm,
+            &parent,
+        );
     }
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         v.borrow_mut().files.entry(p).or_default();
     });
 }
 
 /// Reads a virtual file's bytes for another host module (e.g. SQLite loads
 /// its serialized database image from the app-private VFS path).
-pub(crate) fn read_bytes(p: &str) -> Option<Vec<u8>> {
+pub(crate) fn read_bytes(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) -> Option<Vec<u8>> {
     let p = absolute(p);
-    VFS.with(|v| v.borrow().files.get(&p).cloned())
+    vfs!(vm).with(|v| v.borrow().files.get(&p).cloned())
 }
 
 /// Replaces a virtual file's bytes, creating parent directories as Android
 /// does for app-private storage paths.
-pub(crate) fn write_bytes(p: &str, bytes: Vec<u8>) {
+pub(crate) fn write_bytes(#[cfg(not(feature = "std"))] vm: &Engine, p: &str, bytes: Vec<u8>) {
     let p = absolute(p);
     if let Some(parent) = parent_of(&p) {
-        mkdirs(&parent);
+        mkdirs(
+            #[cfg(not(feature = "std"))]
+            vm,
+            &parent,
+        );
     }
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         v.borrow_mut().files.insert(p, bytes);
     });
 }
 
 /// Deletes a virtual file. Returns whether a file existed.
-pub(crate) fn delete_file(p: &str) -> bool {
+pub(crate) fn delete_file(#[cfg(not(feature = "std"))] vm: &Engine, p: &str) -> bool {
     let p = absolute(p);
-    VFS.with(|v| v.borrow_mut().files.remove(&p).is_some())
+    vfs!(vm).with(|v| v.borrow_mut().files.remove(&p).is_some())
 }
 
 /// Issue #230: Android "clear data" / uninstall — apaga todo o
@@ -1175,7 +1417,7 @@ pub(crate) fn delete_file(p: &str) -> bool {
 /// getExternalFilesDir/getExternalCacheDir). Sem isto,
 /// `package_clear`/`package_remove` no MCP só resetavam permissões e
 /// os dados "apagados" continuavam legíveis.
-pub fn clear_package_data(package: &str) {
+pub fn clear_package_data(#[cfg(not(feature = "std"))] vm: &Engine, package: &str) {
     let roots = [
         format!("/data/user/0/{package}"),
         format!("/data/data/{package}"),
@@ -1186,7 +1428,7 @@ pub fn clear_package_data(package: &str) {
             .iter()
             .any(|root| p == root || p.strip_prefix(root).is_some_and(|s| s.starts_with('/')))
     };
-    VFS.with(|cell| {
+    vfs!(vm).with(|cell| {
         let mut v = cell.borrow_mut();
         let dead_descs: Vec<i64> = v
             .open_descs
@@ -1207,56 +1449,130 @@ pub fn clear_package_data(package: &str) {
 /// Issue #230: sessão nova = dispositivo limpo. Zera o VFS inteiro
 /// (arquivos, metadados e descritores) — chamado na criação de cada
 /// `AgentSession`, de onde nascem os cenários isolados do `rd test`.
-pub fn reset_all() {
-    VFS.with(|cell| *cell.borrow_mut() = Vfs::default());
+pub fn reset_all(#[cfg(not(feature = "std"))] vm: &Engine) {
+    vfs!(vm).with(|cell| *cell.borrow_mut() = Vfs::default());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn paths_and_vfs() {
+        #[cfg(not(feature = "std"))]
+        let vm = crate::Engine::new(alloc::vec![], Default::default());
+
         assert_eq!(normalize("/a/./b/../c/"), "/a/c");
         assert_eq!(parent_of("/a/c").as_deref(), Some("/a"));
         assert_eq!(parent_of("/a").as_deref(), Some("/"));
-        mkdirs("/x/y/z");
-        assert!(is_dir("/x/y") && is_dir("/x/y/z") && !is_file("/x/y"));
+        mkdirs(
+            #[cfg(not(feature = "std"))]
+            &vm,
+            "/x/y/z",
+        );
+        assert!(
+            is_dir(
+                #[cfg(not(feature = "std"))]
+                &vm,
+                "/x/y"
+            ) && is_dir(
+                #[cfg(not(feature = "std"))]
+                &vm,
+                "/x/y/z"
+            ) && !is_file(
+                #[cfg(not(feature = "std"))]
+                &vm,
+                "/x/y"
+            )
+        );
     }
 
     #[test]
     fn clear_package_data_isolates_packages_and_reset_all_clears() {
-        reset_all();
-        write_bytes("/data/user/0/com.example.a/files/x.txt", b"a".to_vec());
+        #[cfg(not(feature = "std"))]
+        let vm = crate::Engine::new(alloc::vec![], Default::default());
+
+        reset_all(
+            #[cfg(not(feature = "std"))]
+            &vm,
+        );
         write_bytes(
+            #[cfg(not(feature = "std"))]
+            &vm,
+            "/data/user/0/com.example.a/files/x.txt",
+            b"a".to_vec(),
+        );
+        write_bytes(
+            #[cfg(not(feature = "std"))]
+            &vm,
             "/storage/emulated/0/Android/data/com.example.a/files/ext.txt",
             b"e".to_vec(),
         );
-        write_bytes("/data/user/0/com.example.b/files/y.txt", b"b".to_vec());
-        write_bytes("/data/user/0/com.example.ab/files/z.txt", b"z".to_vec());
-        clear_package_data("com.example.a");
+        write_bytes(
+            #[cfg(not(feature = "std"))]
+            &vm,
+            "/data/user/0/com.example.b/files/y.txt",
+            b"b".to_vec(),
+        );
+        write_bytes(
+            #[cfg(not(feature = "std"))]
+            &vm,
+            "/data/user/0/com.example.ab/files/z.txt",
+            b"z".to_vec(),
+        );
+        clear_package_data(
+            #[cfg(not(feature = "std"))]
+            &vm,
+            "com.example.a",
+        );
         assert_eq!(
-            read_bytes("/data/user/0/com.example.a/files/x.txt"),
+            read_bytes(
+                #[cfg(not(feature = "std"))]
+                &vm,
+                "/data/user/0/com.example.a/files/x.txt"
+            ),
             None,
             "#230: clear data apaga os arquivos do pacote"
         );
         assert_eq!(
-            read_bytes("/storage/emulated/0/Android/data/com.example.a/files/ext.txt"),
+            read_bytes(
+                #[cfg(not(feature = "std"))]
+                &vm,
+                "/storage/emulated/0/Android/data/com.example.a/files/ext.txt"
+            ),
             None,
             "#230: clear data apaga também os externos específicos do app"
         );
         assert_eq!(
-            read_bytes("/data/user/0/com.example.ab/files/z.txt"),
+            read_bytes(
+                #[cfg(not(feature = "std"))]
+                &vm,
+                "/data/user/0/com.example.ab/files/z.txt"
+            ),
             Some(b"z".to_vec()),
             "pacote com prefixo textual comum (com.example.ab) não é tocado"
         );
         assert_eq!(
-            read_bytes("/data/user/0/com.example.b/files/y.txt"),
+            read_bytes(
+                #[cfg(not(feature = "std"))]
+                &vm,
+                "/data/user/0/com.example.b/files/y.txt"
+            ),
             Some(b"b".to_vec()),
             "pacote vizinho fica intacto"
         );
-        reset_all();
+        reset_all(
+            #[cfg(not(feature = "std"))]
+            &vm,
+        );
         assert_eq!(
-            read_bytes("/data/user/0/com.example.b/files/y.txt"),
+            read_bytes(
+                #[cfg(not(feature = "std"))]
+                &vm,
+                "/data/user/0/com.example.b/files/y.txt"
+            ),
             None,
             "#230: sessão nova zera o VFS inteiro"
         );
@@ -1452,17 +1768,24 @@ fn os_stat_in(vfs: &mut Vfs, path: &str) -> Result<OsStatData, i32> {
     })
 }
 
-pub(crate) fn os_stat(path: &str) -> Result<OsStatData, i32> {
+pub(crate) fn os_stat(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    path: &str,
+) -> Result<OsStatData, i32> {
     let path = os_abs(path);
-    VFS.with(|v| os_stat_in(&mut v.borrow_mut(), &path))
+    vfs!(vm).with(|v| os_stat_in(&mut v.borrow_mut(), &path))
 }
 
-pub(crate) fn os_access(path: &str, mode: i32) -> Result<bool, i32> {
+pub(crate) fn os_access(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    path: &str,
+    mode: i32,
+) -> Result<bool, i32> {
     if mode & !0o7 != 0 {
         return Err(OS_EINVAL);
     }
     let path = os_abs(path);
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let kind = os_classify(&vfs, &path);
         if !matches!(kind, OsPathKind::File | OsPathKind::Dir) {
@@ -1494,7 +1817,12 @@ fn os_alloc_desc(vfs: &mut Vfs, path: String, flags: i32, pos: u64) -> i32 {
     fd
 }
 
-pub(crate) fn os_open(path: &str, flags: i32, mode: i32) -> Result<i32, i32> {
+pub(crate) fn os_open(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    path: &str,
+    flags: i32,
+    mode: i32,
+) -> Result<i32, i32> {
     if path.is_empty() {
         return Err(OS_ENOENT);
     }
@@ -1503,7 +1831,7 @@ pub(crate) fn os_open(path: &str, flags: i32, mode: i32) -> Result<i32, i32> {
     if access == 3 {
         return Err(OS_EINVAL);
     }
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let kind = os_classify(&vfs, &path);
         match kind {
@@ -1557,9 +1885,14 @@ pub(crate) fn os_open(path: &str, flags: i32, mode: i32) -> Result<i32, i32> {
     })
 }
 
-pub(crate) fn os_register_path(path: &str, flags: i32, pos: u64) -> Option<i32> {
+pub(crate) fn os_register_path(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    path: &str,
+    flags: i32,
+    pos: u64,
+) -> Option<i32> {
     let path = os_abs(path);
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         if os_classify(&vfs, &path) != OsPathKind::File {
             return None;
@@ -1584,8 +1917,8 @@ fn os_cleanup_desc(vfs: &mut Vfs, desc_id: i64) {
     }
 }
 
-pub(crate) fn os_close(fd: i32) -> Result<(), i32> {
-    VFS.with(|v| {
+pub(crate) fn os_close(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Result<(), i32> {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let desc_id = vfs.fds.remove(&fd).ok_or(OS_EBADF)?;
         os_cleanup_desc(&mut vfs, desc_id);
@@ -1593,8 +1926,8 @@ pub(crate) fn os_close(fd: i32) -> Result<(), i32> {
     })
 }
 
-pub(crate) fn os_dup(fd: i32) -> Result<i32, i32> {
-    VFS.with(|v| {
+pub(crate) fn os_dup(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Result<i32, i32> {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let desc_id = os_desc_id(&vfs, fd)?;
         let mut new_fd = 3;
@@ -1606,11 +1939,15 @@ pub(crate) fn os_dup(fd: i32) -> Result<i32, i32> {
     })
 }
 
-pub(crate) fn os_dup2(fd: i32, new_fd: i32) -> Result<i32, i32> {
+pub(crate) fn os_dup2(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    new_fd: i32,
+) -> Result<i32, i32> {
     if new_fd < 0 {
         return Err(OS_EBADF);
     }
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let desc_id = os_desc_id(&vfs, fd)?;
         if fd == new_fd {
@@ -1624,27 +1961,43 @@ pub(crate) fn os_dup2(fd: i32, new_fd: i32) -> Result<i32, i32> {
     })
 }
 
-pub(crate) fn os_fd_path(fd: i32) -> Result<String, i32> {
-    VFS.with(|v| {
+pub(crate) fn os_fd_path(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Result<String, i32> {
+    vfs!(vm).with(|v| {
         let vfs = v.borrow();
         Ok(os_desc_snapshot(&vfs, fd)?.1)
     })
 }
 
-pub(crate) fn os_fd_valid(fd: i32) -> bool {
-    VFS.with(|v| v.borrow().fds.contains_key(&fd))
+pub(crate) fn os_fd_valid(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> bool {
+    vfs!(vm).with(|v| v.borrow().fds.contains_key(&fd))
 }
 
-pub(crate) fn os_fstat(fd: i32) -> Result<OsStatData, i32> {
-    let path = os_fd_path(fd)?;
-    os_stat(&path)
+pub(crate) fn os_fstat(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+) -> Result<OsStatData, i32> {
+    let path = os_fd_path(
+        #[cfg(not(feature = "std"))]
+        vm,
+        fd,
+    )?;
+    os_stat(
+        #[cfg(not(feature = "std"))]
+        vm,
+        &path,
+    )
 }
 
-fn os_read_at(fd: i32, count: usize, offset: Option<i64>) -> Result<Vec<u8>, i32> {
+fn os_read_at(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    count: usize,
+    offset: Option<i64>,
+) -> Result<Vec<u8>, i32> {
     if offset.is_some_and(|value| value < 0) {
         return Err(OS_EINVAL);
     }
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let (desc_id, path, flags, pos) = os_desc_snapshot(&vfs, fd)?;
         let access = flags & 0o3;
@@ -1673,19 +2026,45 @@ fn os_read_at(fd: i32, count: usize, offset: Option<i64>) -> Result<Vec<u8>, i32
     })
 }
 
-pub(crate) fn os_read(fd: i32, count: usize) -> Result<Vec<u8>, i32> {
-    os_read_at(fd, count, None)
+pub(crate) fn os_read(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    count: usize,
+) -> Result<Vec<u8>, i32> {
+    os_read_at(
+        #[cfg(not(feature = "std"))]
+        vm,
+        fd,
+        count,
+        None,
+    )
 }
 
-pub(crate) fn os_pread(fd: i32, count: usize, offset: i64) -> Result<Vec<u8>, i32> {
-    os_read_at(fd, count, Some(offset))
+pub(crate) fn os_pread(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    count: usize,
+    offset: i64,
+) -> Result<Vec<u8>, i32> {
+    os_read_at(
+        #[cfg(not(feature = "std"))]
+        vm,
+        fd,
+        count,
+        Some(offset),
+    )
 }
 
-fn os_write_at(fd: i32, data: &[u8], offset: Option<i64>) -> Result<usize, i32> {
+fn os_write_at(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    data: &[u8],
+    offset: Option<i64>,
+) -> Result<usize, i32> {
     if offset.is_some_and(|value| value < 0) {
         return Err(OS_EINVAL);
     }
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let (desc_id, path, flags, pos) = os_desc_snapshot(&vfs, fd)?;
         let access = flags & 0o3;
@@ -1732,16 +2111,42 @@ fn os_write_at(fd: i32, data: &[u8], offset: Option<i64>) -> Result<usize, i32> 
     })
 }
 
-pub(crate) fn os_write(fd: i32, data: &[u8]) -> Result<usize, i32> {
-    os_write_at(fd, data, None)
+pub(crate) fn os_write(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    data: &[u8],
+) -> Result<usize, i32> {
+    os_write_at(
+        #[cfg(not(feature = "std"))]
+        vm,
+        fd,
+        data,
+        None,
+    )
 }
 
-pub(crate) fn os_pwrite(fd: i32, data: &[u8], offset: i64) -> Result<usize, i32> {
-    os_write_at(fd, data, Some(offset))
+pub(crate) fn os_pwrite(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    data: &[u8],
+    offset: i64,
+) -> Result<usize, i32> {
+    os_write_at(
+        #[cfg(not(feature = "std"))]
+        vm,
+        fd,
+        data,
+        Some(offset),
+    )
 }
 
-pub(crate) fn os_lseek(fd: i32, offset: i64, whence: i32) -> Result<i64, i32> {
-    VFS.with(|v| {
+pub(crate) fn os_lseek(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    offset: i64,
+    whence: i32,
+) -> Result<i64, i32> {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let (desc_id, path, flags, pos) = os_desc_snapshot(&vfs, fd)?;
         if flags & OS_O_PATH != 0 {
@@ -1769,11 +2174,15 @@ pub(crate) fn os_lseek(fd: i32, offset: i64, whence: i32) -> Result<i64, i32> {
     })
 }
 
-pub(crate) fn os_ftruncate(fd: i32, length: i64) -> Result<(), i32> {
+pub(crate) fn os_ftruncate(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    length: i64,
+) -> Result<(), i32> {
     if length < 0 {
         return Err(OS_EINVAL);
     }
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let (_id, path, flags, _pos) = os_desc_snapshot(&vfs, fd)?;
         if flags & OS_O_PATH != 0 || flags & 0o3 == OS_O_RDONLY {
@@ -1799,16 +2208,20 @@ pub(crate) fn os_ftruncate(fd: i32, length: i64) -> Result<(), i32> {
     })
 }
 
-pub(crate) fn os_fsync(fd: i32) -> Result<(), i32> {
-    VFS.with(|v| {
+pub(crate) fn os_fsync(#[cfg(not(feature = "std"))] vm: &Engine, fd: i32) -> Result<(), i32> {
+    vfs!(vm).with(|v| {
         let vfs = v.borrow();
         os_desc_id(&vfs, fd).map(|_| ())
     })
 }
 
-pub(crate) fn os_chmod(path: &str, mode: i32) -> Result<(), i32> {
+pub(crate) fn os_chmod(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    path: &str,
+    mode: i32,
+) -> Result<(), i32> {
     let path = os_abs(path);
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let kind = os_classify(&vfs, &path);
         if !matches!(kind, OsPathKind::File | OsPathKind::Dir) {
@@ -1825,14 +2238,32 @@ pub(crate) fn os_chmod(path: &str, mode: i32) -> Result<(), i32> {
     })
 }
 
-pub(crate) fn os_fchmod(fd: i32, mode: i32) -> Result<(), i32> {
-    let path = os_fd_path(fd)?;
-    os_chmod(&path, mode)
+pub(crate) fn os_fchmod(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    mode: i32,
+) -> Result<(), i32> {
+    let path = os_fd_path(
+        #[cfg(not(feature = "std"))]
+        vm,
+        fd,
+    )?;
+    os_chmod(
+        #[cfg(not(feature = "std"))]
+        vm,
+        &path,
+        mode,
+    )
 }
 
-fn os_chown_path(path: &str, uid: i32, gid: i32) -> Result<(), i32> {
+fn os_chown_path(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    path: &str,
+    uid: i32,
+    gid: i32,
+) -> Result<(), i32> {
     let path = os_abs(path);
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let kind = os_classify(&vfs, &path);
         if !matches!(kind, OsPathKind::File | OsPathKind::Dir) {
@@ -1852,21 +2283,51 @@ fn os_chown_path(path: &str, uid: i32, gid: i32) -> Result<(), i32> {
     })
 }
 
-pub(crate) fn os_chown(path: &str, uid: i32, gid: i32) -> Result<(), i32> {
-    os_chown_path(path, uid, gid)
+pub(crate) fn os_chown(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    path: &str,
+    uid: i32,
+    gid: i32,
+) -> Result<(), i32> {
+    os_chown_path(
+        #[cfg(not(feature = "std"))]
+        vm,
+        path,
+        uid,
+        gid,
+    )
 }
 
-pub(crate) fn os_fchown(fd: i32, uid: i32, gid: i32) -> Result<(), i32> {
-    let path = os_fd_path(fd)?;
-    os_chown_path(&path, uid, gid)
+pub(crate) fn os_fchown(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+    uid: i32,
+    gid: i32,
+) -> Result<(), i32> {
+    let path = os_fd_path(
+        #[cfg(not(feature = "std"))]
+        vm,
+        fd,
+    )?;
+    os_chown_path(
+        #[cfg(not(feature = "std"))]
+        vm,
+        &path,
+        uid,
+        gid,
+    )
 }
 
-pub(crate) fn os_mkdir(path: &str, mode: i32) -> Result<(), i32> {
+pub(crate) fn os_mkdir(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    path: &str,
+    mode: i32,
+) -> Result<(), i32> {
     if path.is_empty() {
         return Err(OS_ENOENT);
     }
     let path = os_abs(path);
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         match os_classify(&vfs, &path) {
             OsPathKind::File | OsPathKind::Dir => Err(OS_EEXIST),
@@ -1893,9 +2354,9 @@ fn os_dir_empty(vfs: &Vfs, path: &str) -> bool {
         && !vfs.files.keys().any(|file| file.starts_with(&prefix))
 }
 
-pub(crate) fn os_remove(path: &str) -> Result<(), i32> {
+pub(crate) fn os_remove(#[cfg(not(feature = "std"))] vm: &Engine, path: &str) -> Result<(), i32> {
     let path = os_abs(path);
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         match os_classify(&vfs, &path) {
             OsPathKind::File => {
@@ -1920,9 +2381,9 @@ pub(crate) fn os_remove(path: &str) -> Result<(), i32> {
     })
 }
 
-pub(crate) fn os_unlink(path: &str) -> Result<(), i32> {
+pub(crate) fn os_unlink(#[cfg(not(feature = "std"))] vm: &Engine, path: &str) -> Result<(), i32> {
     let path = os_abs(path);
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         match os_classify(&vfs, &path) {
             OsPathKind::File => {
@@ -1947,16 +2408,25 @@ fn os_move_prefix(value: &str, old: &str, new: &str) -> String {
     }
 }
 
-pub(crate) fn os_rename(old_path: &str, new_path: &str) -> Result<(), i32> {
+pub(crate) fn os_rename(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    old_path: &str,
+    new_path: &str,
+) -> Result<(), i32> {
     if old_path.is_empty() || new_path.is_empty() {
         return Err(OS_ENOENT);
     }
     let old_path = os_abs(old_path);
     let new_path = os_abs(new_path);
     if old_path == new_path {
-        return os_stat(&old_path).map(|_| ());
+        return os_stat(
+            #[cfg(not(feature = "std"))]
+            vm,
+            &old_path,
+        )
+        .map(|_| ());
     }
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let mut vfs = v.borrow_mut();
         let old_kind = os_classify(&vfs, &old_path);
         let new_kind = os_classify(&vfs, &new_path);
@@ -2033,9 +2503,12 @@ pub(crate) fn os_rename(old_path: &str, new_path: &str) -> Result<(), i32> {
     })
 }
 
-pub(crate) fn os_statvfs(path: &str) -> Result<OsStatVfsData, i32> {
+pub(crate) fn os_statvfs(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    path: &str,
+) -> Result<OsStatVfsData, i32> {
     let path = os_abs(path);
-    VFS.with(|v| {
+    vfs!(vm).with(|v| {
         let vfs = v.borrow();
         match os_classify(&vfs, &path) {
             OsPathKind::File | OsPathKind::Dir => {}
@@ -2062,14 +2535,32 @@ pub(crate) fn os_statvfs(path: &str) -> Result<OsStatVfsData, i32> {
     })
 }
 
-pub(crate) fn os_fstatvfs(fd: i32) -> Result<OsStatVfsData, i32> {
-    let path = os_fd_path(fd)?;
-    os_statvfs(&path)
+pub(crate) fn os_fstatvfs(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    fd: i32,
+) -> Result<OsStatVfsData, i32> {
+    let path = os_fd_path(
+        #[cfg(not(feature = "std"))]
+        vm,
+        fd,
+    )?;
+    os_statvfs(
+        #[cfg(not(feature = "std"))]
+        vm,
+        &path,
+    )
 }
 
-pub(crate) fn os_realpath(path: &str) -> Result<String, i32> {
+pub(crate) fn os_realpath(
+    #[cfg(not(feature = "std"))] vm: &Engine,
+    path: &str,
+) -> Result<String, i32> {
     // The VFS has no symbolic links, so canonicalization is normalization
     // after verifying that the path exists.
-    os_stat(path)?;
+    os_stat(
+        #[cfg(not(feature = "std"))]
+        vm,
+        path,
+    )?;
     Ok(os_abs(path))
 }

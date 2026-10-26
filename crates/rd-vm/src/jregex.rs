@@ -18,8 +18,9 @@
 //!   DOTALL (32); UNICODE_CASE/UNICODE_CHARACTER_CLASS are accepted (the
 //!   regex crate is Unicode-aware by default).
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -38,7 +39,7 @@ enum Anchor {
 }
 
 #[derive(Debug, Default, Clone)]
-struct MState {
+pub(crate) struct MState {
     pattern: ObjRef,
     input: String,
     /// Groups of the last successful match, as byte ranges.
@@ -51,20 +52,18 @@ struct MState {
     hit_end: bool,
 }
 
-thread_local! {
-    static CACHE: RefCell<HashMap<(String, i32, u8), fancy_regex::Regex>> = RefCell::new(HashMap::new());
-    static MATCHERS: RefCell<HashMap<ObjRef, MState>> = RefCell::new(HashMap::new());
-}
-
 /// GC: objects that have state here (marking consults `gc_entry` only
 /// for these).
-pub(crate) fn gc_keys(out: &mut Vec<ObjRef>) {
-    MATCHERS.with(|m| out.extend(m.borrow().keys().copied()));
+pub(crate) fn gc_keys(vm: &Engine, out: &mut Vec<ObjRef>) {
+    vm.module_tables
+        .jregex_matchers
+        .clone()
+        .with(|m| out.extend(m.borrow().keys().copied()));
 }
 
 /// GC ephemeron: state of a reachable object (holds heap refs).
-pub(crate) fn gc_entry(r: ObjRef, out: &mut impl std::fmt::Write) {
-    MATCHERS.with(|m| {
+pub(crate) fn gc_entry(vm: &Engine, r: ObjRef, out: &mut impl core::fmt::Write) {
+    vm.module_tables.jregex_matchers.clone().with(|m| {
         if let Some(v) = m.borrow().get(&r) {
             let _ = write!(out, "|{v:?}");
         }
@@ -72,16 +71,14 @@ pub(crate) fn gc_entry(r: ObjRef, out: &mut impl std::fmt::Write) {
 }
 
 /// GC: drop state of collected objects (slots are reused).
-pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
-    MATCHERS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+pub(crate) fn gc_purge(vm: &Engine, alive: &dyn Fn(ObjRef) -> bool) {
+    vm.module_tables
+        .jregex_matchers
+        .clone()
+        .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
-/// Issue #230: fronteira de `Engine` — limpa só os matchers (indexados
-/// por `ObjRef`); o `CACHE` de regex compiladas é cache puro por
-/// (pattern, flags), válido entre engines, e fica.
-pub(crate) fn reset_all() {
-    MATCHERS.with(|m| m.borrow_mut().clear());
-}
+// Issue #230: this state now belongs to Engine.module_tables and dies with its heap.
 
 fn exc(class: &str, msg: impl Into<String>) -> VmExit {
     VmExit::Exception(Throwable::new(class, msg))
@@ -170,11 +167,12 @@ pub(crate) fn translate(src: &str, flags: i32) -> String {
     out
 }
 
-pub(crate) fn compile(src: &str, flags: i32) -> Result<fancy_regex::Regex, VmExit> {
-    compile_with_anchor(src, flags, Anchor::None)
+pub(crate) fn compile(vm: &Engine, src: &str, flags: i32) -> Result<fancy_regex::Regex, VmExit> {
+    compile_with_anchor(vm, src, flags, Anchor::None)
 }
 
 fn compile_with_anchor(
+    vm: &Engine,
     src: &str,
     flags: i32,
     anchor: Anchor,
@@ -186,13 +184,18 @@ fn compile_with_anchor(
         ));
     }
     let key = (src.to_string(), flags, anchor as u8);
-    if let Some(r) = CACHE.with(|c| c.borrow().get(&key).cloned()) {
+    if let Some(r) = vm
+        .module_tables
+        .jregex_cache
+        .clone()
+        .with(|c| c.borrow().get(&key).cloned())
+    {
         return Ok(r);
     }
     if anchor != Anchor::None {
         // Validate raw pattern syntax first so the newline fallback below only
         // triggers when a valid `(?x)` trailing `#` comment swallowed `)`.
-        compile_with_anchor(src, flags, Anchor::None)?;
+        compile_with_anchor(vm, src, flags, Anchor::None)?;
     }
     let t = translate(src, flags);
     let mut modes = String::new();
@@ -229,7 +232,7 @@ fn compile_with_anchor(
             format!("{src}: not supported by RustyDroid's regex engine ({e})"),
         )
     })?;
-    CACHE.with(|c| {
+    vm.module_tables.jregex_cache.clone().with(|c| {
         let mut c = c.borrow_mut();
         // Bound retained native compilation state across transient Java Patterns.
         if c.len() >= 128 {
@@ -299,7 +302,7 @@ fn pattern_of(vm: &Engine, p: ObjRef) -> (String, i32) {
 }
 
 fn new_pattern(vm: &mut Engine, src: String, flags: i32) -> Result<Value, VmExit> {
-    compile(&src, flags)?;
+    compile(vm, &src, flags)?;
     let s = jstr(vm, src)?;
     let r = vm
         .heap
@@ -319,7 +322,7 @@ fn new_matcher(vm: &mut Engine, pattern: ObjRef, input: String) -> Result<Value,
         .heap
         .alloc_instance(MATCHER.to_string(), Vec::new())
         .map_err(crate::err::oom_throwable)?;
-    MATCHERS.with(|m| {
+    vm.module_tables.jregex_matchers.clone().with(|m| {
         m.borrow_mut().insert(
             r,
             MState {
@@ -346,7 +349,7 @@ fn new_match_result(vm: &mut Engine, st: &MState) -> Result<Value, VmExit> {
         matched: st.matched,
         hit_end: st.hit_end,
     };
-    MATCHERS.with(|m| {
+    vm.module_tables.jregex_matchers.clone().with(|m| {
         m.borrow_mut().insert(r, snap);
     });
     Ok(Value::Obj(r))
@@ -526,7 +529,7 @@ pub fn static_intrinsic(
         "matches" => {
             let src = req_char_seq(vm, args.first(), "Pattern.matches(null, input)")?;
             let input = req_char_seq(vm, args.get(1), "Pattern.matches(regex, null)")?;
-            Value::Int(anchored_full(&src, 0, &input, 0)?.is_some() as i32)
+            Value::Int(anchored_full(vm, &src, 0, &input, 0)?.is_some() as i32)
         }
         _ => return Ok(None),
     }))
@@ -535,6 +538,7 @@ pub fn static_intrinsic(
 type GroupSpans = Vec<Option<(usize, usize)>>;
 
 fn anchored_full(
+    vm: &Engine,
     src: &str,
     flags: i32,
     input: &str,
@@ -542,7 +546,7 @@ fn anchored_full(
 ) -> Result<Option<GroupSpans>, VmExit> {
     // Java matches(): the whole region must match; compile directly from `(src, flags)`
     // so `Pattern.COMMENTS` (`#` without trailing `\n`) and patterns near 64 KiB work.
-    let full = compile_with_anchor(src, flags, Anchor::Full)?;
+    let full = compile_with_anchor(vm, src, flags, Anchor::Full)?;
     let Some(caps) = full.captures(&input[from..]).map_err(runtime_error)? else {
         return Ok(None);
     };
@@ -627,7 +631,7 @@ pub fn instance_intrinsic(
             "split" | "splitAsStream" if name == "split" => {
                 let input = req_char_seq(vm, args.first(), "Pattern.split(null)")?;
                 let limit = args.get(1).and_then(|v| v.as_int().ok()).unwrap_or(0);
-                let re = compile(&src, flags)?;
+                let re = compile(vm, &src, flags)?;
                 let parts = split(&re, &input, limit)?;
                 let mut vals = Vec::new();
                 for p in parts {
@@ -651,11 +655,16 @@ pub fn instance_intrinsic(
         }));
     }
     if recv_class == MATCH_RESULT {
-        let Some(st) = MATCHERS.with(|m| m.borrow().get(&recv).cloned()) else {
+        let Some(st) = vm
+            .module_tables
+            .jregex_matchers
+            .clone()
+            .with(|m| m.borrow().get(&recv).cloned())
+        else {
             return Ok(None);
         };
         let (src, flags) = pattern_of(vm, st.pattern);
-        let re = compile(&src, flags)?;
+        let re = compile(vm, &src, flags)?;
         if name == "toString" {
             let last = if st.matched {
                 st.groups
@@ -677,11 +686,16 @@ pub fn instance_intrinsic(
     if recv_class != MATCHER {
         return Ok(None);
     }
-    let Some(mut st) = MATCHERS.with(|m| m.borrow().get(&recv).cloned()) else {
+    let Some(mut st) = vm
+        .module_tables
+        .jregex_matchers
+        .clone()
+        .with(|m| m.borrow().get(&recv).cloned())
+    else {
         return Ok(None);
     };
     let (src, flags) = pattern_of(vm, st.pattern);
-    let re = compile(&src, flags)?;
+    let re = compile(vm, &src, flags)?;
     let no_match = || exc("Ljava/lang/IllegalStateException;", "No match found");
     let set_caps = |st: &mut MState, caps: Option<fancy_regex::Captures<'_>>| match caps {
         Some(c) => {
@@ -728,9 +742,9 @@ pub fn instance_intrinsic(
         "matches" | "lookingAt" => {
             let input = st.input.clone();
             let groups = if name == "matches" {
-                anchored_full(&src, flags, &input, 0)?
+                anchored_full(vm, &src, flags, &input, 0)?
             } else {
-                let anchored = compile_with_anchor(&src, flags, Anchor::Start)?;
+                let anchored = compile_with_anchor(vm, &src, flags, Anchor::Start)?;
                 anchored.captures(&input).map_err(runtime_error)?.map(|c| {
                     (0..c.len())
                         .map(|i| c.get(i).map(|m| (m.start(), m.end())))
@@ -832,7 +846,10 @@ pub fn instance_intrinsic(
         )?,
         _ => return Ok(None),
     };
-    MATCHERS.with(|m| m.borrow_mut().insert(recv, st));
+    vm.module_tables
+        .jregex_matchers
+        .clone()
+        .with(|m| m.borrow_mut().insert(recv, st));
     Ok(Some(out))
 }
 
@@ -847,6 +864,9 @@ fn next_char(s: &str, b: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn translates_java_syntax() {
         assert_eq!(translate(r"\Qa.b\E+", 0), r"a\.b+");
@@ -856,7 +876,9 @@ mod tests {
     }
     #[test]
     fn java_split_semantics() {
-        let re = compile(",", 0).unwrap();
+        let vm = crate::Engine::new(alloc::vec![], Default::default());
+
+        let re = compile(&vm, ",", 0).unwrap();
         assert_eq!(split(&re, "a,b,,", 0).unwrap(), vec!["a", "b"]);
         assert_eq!(split(&re, "a,b,,", -1).unwrap(), vec!["a", "b", "", ""]);
         assert_eq!(split(&re, "a,b,c", 2).unwrap(), vec!["a", "b,c"]);
@@ -864,7 +886,9 @@ mod tests {
     }
     #[test]
     fn replacement_groups() {
-        let re = compile(r"(\d+)-(\d+)", 0).unwrap();
+        let vm = crate::Engine::new(alloc::vec![], Default::default());
+
+        let re = compile(&vm, r"(\d+)-(\d+)", 0).unwrap();
         assert_eq!(replace(&re, "1-2 3-4", "$2:$1", true).unwrap(), "2:1 4:3");
         assert_eq!(replace(&re, "1-2 3-4", r"\$", false).unwrap(), "$ 3-4");
     }

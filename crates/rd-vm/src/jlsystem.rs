@@ -19,6 +19,9 @@
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const SYSTEM: &str = "Ljava/lang/System;";
@@ -30,7 +33,7 @@ fn exc(class: &str, msg: impl Into<String>) -> VmExit {
 }
 
 pub(crate) fn epoch_ms() -> i64 {
-    std::env::var("RD_EPOCH_MS")
+    crate::port_env::var("RD_EPOCH_MS")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(DEFAULT_EPOCH_MS)

@@ -78,6 +78,9 @@ def vm_routes(root: Path, upstream_paths: set[str]) -> list[dict]:
         attrs, name = match.groups()
         if '#[path = "portable/' in attrs:
             continue
+        original_path = re.search(r'#\[path = "(\w+)\.rs"\]', attrs)
+        if original_path:
+            name = original_path[1]
         declarations.setdefault(name, []).append(attrs)
     routes = []
     for path in sorted(upstream_paths):
@@ -90,7 +93,14 @@ def vm_routes(root: Path, upstream_paths: set[str]) -> list[dict]:
         shared = name == "lib" or any("#[cfg(" not in a for a in attrs)
         status = "shared-source-with-adapters" if shared else "host-only-original"
         routes.append({"path": path, "device_route": status,
-                       "cfg": attrs, "behavior_parity": "unverified"})
+                       "cfg": attrs,
+                       "experimental_original_declared": shared or any(
+                           any(feature in a for feature in (
+                               'feature = "upstream-runtime"',
+                               'feature = "advanced-components"',
+                               'feature = "virtual-devices"')) for a in attrs),
+                       "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+                       "behavior_parity": "unverified"})
     return routes
 
 
@@ -140,6 +150,34 @@ def verify_fork_core(root: Path, upstream: set[str], entries: list[dict]) -> lis
     return errors
 
 
+def upstream_test_routes(root: Path, upstream: set[str]) -> tuple[list[dict], list[str]]:
+    """Every original integration suite must be registered, including backends.
+
+    Registration is only a routing check. Zero-test targets, compilation, host
+    execution, and Horizon execution are separate evidence and never a pass here.
+    """
+    expected = sorted(p for p in upstream if re.fullmatch(r"crates/rd-vm/tests/[^/]+\.rs", p))
+    manifest = root / "crates/as-vm/Cargo.toml"
+    if not manifest.is_file():
+        return [], ["PORTABLE_TEST_MANIFEST_MISSING"] if expected else []
+    declarations = tomllib.loads(manifest.read_text(encoding="utf-8")).get("test", [])
+    by_path: dict[str, list[dict]] = {}
+    for entry in declarations:
+        target = (manifest.parent / entry.get("path", "")).resolve()
+        if target.is_relative_to(root.resolve()):
+            by_path.setdefault(target.relative_to(root.resolve()).as_posix(), []).append(entry)
+    routes, errors = [], []
+    for path in expected:
+        entries = by_path.get(path, [])
+        if len(entries) != 1:
+            errors.append(f"UPSTREAM_TEST_ROUTE_MISSING_OR_DUPLICATED: {path}")
+        elif "upstream-parity-tests" not in entries[0].get("required-features", []):
+            errors.append(f"UPSTREAM_TEST_ROUTE_NOT_ISOLATED: {path}")
+        routes.append({"path": path, "targets": [e["name"] for e in entries],
+                       "execution": "unverified"})
+    return routes, errors
+
+
 def audit(root: Path, lock: dict, check_latest: bool = False) -> dict:
     revision = lock["revision"]
     # Checking the actual Git tree prevents an accidentally shortened manifest
@@ -152,6 +190,8 @@ def audit(root: Path, lock: dict, check_latest: bool = False) -> dict:
     files, errors = verify_entries(root, lock["files"])
     errors.extend(verify_vm_boundary(root))
     errors.extend(verify_fork_core(root, set(tree), lock.get("fork_core_files", [])))
+    test_routes, test_errors = upstream_test_routes(root, set(tree))
+    errors.extend(test_errors)
     if tree != declared:
         errors.append("UPSTREAM_MANIFEST_INCOMPLETE_OR_CHANGED")
     if git(root, "show", "-s", "--format=%T", revision) != lock["tree"]:
@@ -171,6 +211,8 @@ def audit(root: Path, lock: dict, check_latest: bool = False) -> dict:
         "errors": errors, "files": files, "vm_modules": modules,
         "fork_core_files": lock.get("fork_core_files", []),
         "host_only_originals": excluded,
+        "host_only_originals_scope": "Exclusions in the shipping/default device profile, not the experimental upstream-runtime profile",
+        "upstream_test_routes": test_routes,
         # Compilation, source equality and aggregate hardware test counts are
         # insufficient for claiming all upstream behavior works on Horizon.
         "device_behavior_parity_pass": not excluded and bool(modules) and all(m["behavior_parity"] == "verified" for m in modules),

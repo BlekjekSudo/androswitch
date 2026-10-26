@@ -10,7 +10,11 @@
 //! and the XML codec, while `framework.rs` owns guest-object materialization
 //! and listener notification.
 
-use std::collections::{BTreeMap, BTreeSet};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
+use alloc::collections::BTreeMap;
+use alloc::collections::BTreeSet;
 
 /// A `SharedPreferences` value. Floats are stored by IEEE-754 bits so
 /// equality and persistence preserve `-0.0`, infinities and NaN sign/payload
@@ -250,7 +254,7 @@ pub(crate) fn parse(bytes: &[u8]) -> Option<PrefStore> {
     if bytes.len() > 16 * 1024 * 1024 {
         return None;
     }
-    let text = std::str::from_utf8(bytes).ok()?;
+    let text = core::str::from_utf8(bytes).ok()?;
     let map_start = text.find("<map")?;
     let mut rest = &text[map_start..];
     let mut store = PrefStore::new();
@@ -391,6 +395,9 @@ pub(crate) fn parse(bytes: &[u8]) -> Option<PrefStore> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn xml_roundtrip_preserves_types_entities_and_sets() {

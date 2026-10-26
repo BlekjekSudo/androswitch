@@ -19,8 +19,9 @@
 //!   `TypedArray.getValue` reports an int as a color type when the attribute
 //!   name contains "color" or "tint".
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 
 use rd_apk::axml::{AttrValue, XmlAttribute, XmlElement};
 
@@ -47,30 +48,26 @@ enum Ev {
     },
 }
 
-struct ParserState {
+pub(crate) struct ParserState {
     file: String,
     events: Vec<Ev>,
     /// -1 = START_DOCUMENT, events.len() = END_DOCUMENT.
     pos: isize,
 }
 
-thread_local! {
-    static PARSERS: RefCell<HashMap<ObjRef, ParserState>> = RefCell::new(HashMap::new());
-    static ARRAYS: RefCell<HashMap<ObjRef, Vec<Option<XmlAttribute>>>> = RefCell::new(HashMap::new());
-}
-
 /// GC: drop state of collected objects (slots are reused).
-pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
-    PARSERS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
-    ARRAYS.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+pub(crate) fn gc_purge(vm: &Engine, alive: &dyn Fn(ObjRef) -> bool) {
+    vm.module_tables
+        .xml_res_parsers
+        .clone()
+        .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+    vm.module_tables
+        .xml_res_arrays
+        .clone()
+        .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
-/// Issue #230: fronteira de `Engine` — parsers/atributos pendurados em
-/// `ObjRef`s de um heap morto não podem vazar para o próximo `Engine`.
-pub(crate) fn reset_all() {
-    PARSERS.with(|m| m.borrow_mut().clear());
-    ARRAYS.with(|m| m.borrow_mut().clear());
-}
+// Issue #230: this state now belongs to Engine.module_tables and dies with its heap.
 
 fn flatten(e: &XmlElement, depth: i32, out: &mut Vec<Ev>) {
     out.push(Ev::Start {
@@ -160,7 +157,7 @@ fn open_xml(vm: &mut Engine, id: i32) -> Result<Value, VmExit> {
         .heap
         .alloc_instance(PARSER.to_string(), Vec::new())
         .map_err(crate::err::oom_throwable)?;
-    PARSERS.with(|p| {
+    vm.module_tables.xml_res_parsers.clone().with(|p| {
         p.borrow_mut().insert(
             r,
             ParserState {
@@ -173,13 +170,16 @@ fn open_xml(vm: &mut Engine, id: i32) -> Result<Value, VmExit> {
     Ok(Value::Obj(r))
 }
 
-fn is_parser(r: ObjRef) -> bool {
-    PARSERS.with(|p| p.borrow().contains_key(&r))
+fn is_parser(vm: &Engine, r: ObjRef) -> bool {
+    vm.module_tables
+        .xml_res_parsers
+        .clone()
+        .with(|p| p.borrow().contains_key(&r))
 }
 
 /// Attributes of the parser's current start tag.
-fn current_attrs(r: ObjRef) -> Option<Vec<XmlAttribute>> {
-    PARSERS.with(|p| {
+fn current_attrs(vm: &Engine, r: ObjRef) -> Option<Vec<XmlAttribute>> {
+    vm.module_tables.xml_res_parsers.clone().with(|p| {
         let p = p.borrow();
         let st = p.get(&r)?;
         match st.events.get(usize::try_from(st.pos).ok()?) {
@@ -200,7 +200,9 @@ pub(crate) fn fill_typed_array(
     let (Some(Value::Obj(s)), Some(Value::Obj(a))) = (set, attrs) else {
         return;
     };
-    let Some(cur) = current_attrs(*s) else { return };
+    let Some(cur) = current_attrs(vm, *s) else {
+        return;
+    };
     let Ok((ids, _)) = vm.heap.as_array_elems(*a) else {
         return;
     };
@@ -219,7 +221,7 @@ pub(crate) fn fill_typed_array(
                 .cloned()
         })
         .collect();
-    ARRAYS.with(|m| {
+    vm.module_tables.xml_res_arrays.clone().with(|m| {
         let mut arrays = m.borrow_mut();
         if let Some(existing) = arrays.get(&ta) {
             let mut merged = existing.clone();
@@ -279,7 +281,10 @@ pub(crate) fn fill_theme_typed_array(
             })
         })
         .collect();
-    ARRAYS.with(|m| m.borrow_mut().insert(ta, values));
+    vm.module_tables
+        .xml_res_arrays
+        .clone()
+        .with(|m| m.borrow_mut().insert(ta, values));
 }
 
 fn str_val(vm: &mut Engine, s: String) -> Result<Value, VmExit> {
@@ -375,7 +380,12 @@ fn typed_array_get(
     sig: &str,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    let Some(vals) = ARRAYS.with(|m| m.borrow().get(&recv).cloned()) else {
+    let Some(vals) = vm
+        .module_tables
+        .xml_res_arrays
+        .clone()
+        .with(|m| m.borrow().get(&recv).cloned())
+    else {
         return Ok(None);
     };
     let idx = match args.first() {
@@ -397,7 +407,10 @@ fn typed_array_get(
             Value::Int(n.unwrap_or(0))
         }
         "recycle" | "close" => {
-            ARRAYS.with(|m| m.borrow_mut().remove(&recv));
+            vm.module_tables
+                .xml_res_arrays
+                .clone()
+                .with(|m| m.borrow_mut().remove(&recv));
             Value::Null
         }
         _ => {
@@ -494,7 +507,7 @@ fn type_of(a: &XmlAttribute) -> i32 {
 }
 
 fn find_attr(vm: &Engine, recv: ObjRef, args: &[Value], indexed: bool) -> Option<XmlAttribute> {
-    let attrs = current_attrs(recv)?;
+    let attrs = current_attrs(vm, recv)?;
     if indexed {
         let i = match args.first() {
             Some(Value::Int(i)) => *i as usize,
@@ -550,11 +563,11 @@ pub fn instance_intrinsic(
     if recv_class == "Landroid/content/res/TypedArray;" {
         return typed_array_get(vm, recv, name, sig, args);
     }
-    if recv_class != PARSER || !is_parser(recv) {
+    if recv_class != PARSER || !is_parser(vm, recv) {
         return Ok(None);
     }
     // Pull-parser state machine.
-    let state = PARSERS.with(|p| {
+    let state = vm.module_tables.xml_res_parsers.clone().with(|p| {
         let p = p.borrow();
         let st = &p[&recv];
         let ev = usize::try_from(st.pos)
@@ -594,15 +607,25 @@ pub fn instance_intrinsic(
             if name == "nextTag" {
                 while np < len
                     && matches!(
-                        PARSERS.with(|p| p.borrow()[&recv].events.get(np as usize).cloned()),
+                        vm.module_tables
+                            .xml_res_parsers
+                            .clone()
+                            .with(|p| p.borrow()[&recv].events.get(np as usize).cloned()),
                         Some(Ev::Text(..))
                     )
                 {
                     np += 1;
                 }
             }
-            PARSERS.with(|p| p.borrow_mut().get_mut(&recv).map(|s| s.pos = np));
-            let nev = PARSERS.with(|p| p.borrow()[&recv].events.get(np as usize).cloned());
+            vm.module_tables
+                .xml_res_parsers
+                .clone()
+                .with(|p| p.borrow_mut().get_mut(&recv).map(|s| s.pos = np));
+            let nev = vm
+                .module_tables
+                .xml_res_parsers
+                .clone()
+                .with(|p| p.borrow()[&recv].events.get(np as usize).cloned());
             Value::Int(event_type(np, &nev))
         }
         "getEventType" => Value::Int(event_type(pos, &ev)),
@@ -640,13 +663,18 @@ pub fn instance_intrinsic(
         "getLineNumber" => Value::Int((pos + 1) as i32),
         "getColumnNumber" => Value::Int(-1),
         "close" => {
-            PARSERS.with(|p| p.borrow_mut().remove(&recv));
+            vm.module_tables
+                .xml_res_parsers
+                .clone()
+                .with(|p| p.borrow_mut().remove(&recv));
             Value::Null
         }
         "require" => Value::Null,
-        "getAttributeCount" => {
-            Value::Int(current_attrs(recv).map(|a| a.len() as i32).unwrap_or(-1))
-        }
+        "getAttributeCount" => Value::Int(
+            current_attrs(vm, recv)
+                .map(|a| a.len() as i32)
+                .unwrap_or(-1),
+        ),
         "getAttributeName" => {
             let a = find_attr(vm, recv, args, true).map(|a| a.name);
             opt_str(vm, a)?
@@ -705,14 +733,14 @@ pub fn instance_intrinsic(
             } else {
                 "class"
             };
-            let a = current_attrs(recv)
+            let a = current_attrs(vm, recv)
                 .and_then(|v| v.into_iter().find(|a| a.name == n))
                 .map(|a| a.text());
             opt_str(vm, a)?
         }
         "getIdAttributeResourceValue" => {
             let d = args.first().cloned().unwrap_or(Value::Int(0));
-            match current_attrs(recv)
+            match current_attrs(vm, recv)
                 .and_then(|v| v.into_iter().find(|a| a.name == "id"))
                 .map(|a| a.value)
             {

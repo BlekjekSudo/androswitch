@@ -7,8 +7,11 @@ use super::{
     float_arg, get_field, get_float_field, get_int_field, get_long_field, illegal, illegal_state,
     int_arg, long_arg, obj_arg, opt_str_arg, put_field, read_byte_array, str_val,
 };
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use crate::{Engine, ObjRef, Value, VmExit};
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
 
 const AUDIO_MANAGER: &str = "Landroid/media/AudioManager;";
 const AUDIO_FOCUS_REQ: &str = "Landroid/media/AudioFocusRequest;";

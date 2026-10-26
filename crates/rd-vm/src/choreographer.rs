@@ -16,6 +16,9 @@
 use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const CHOREOGRAPHER: &str = "Landroid/view/Choreographer;";
@@ -109,7 +112,7 @@ pub(crate) fn instance_intrinsic(
 /// ran.
 pub(crate) fn run_frame(vm: &mut Engine) -> Result<usize, VmExit> {
     let now = vm.fw.clock();
-    let (due, later): (Vec<_>, Vec<_>) = std::mem::take(&mut vm.frames.callbacks)
+    let (due, later): (Vec<_>, Vec<_>) = core::mem::take(&mut vm.frames.callbacks)
         .into_iter()
         .partition(|(_, t)| *t <= now);
     vm.frames.callbacks = later;

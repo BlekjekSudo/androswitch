@@ -27,6 +27,9 @@ use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const STRING: &str = "Ljava/lang/String;";
@@ -121,8 +124,8 @@ fn char_units(c: i32) -> Vec<u16> {
 
 /// Shared Pattern/String engine: flags, lookaround, replacement and split
 /// semantics must agree between java.lang.String and java.util.regex.
-fn compile(pattern: &str) -> Result<fancy_regex::Regex, VmExit> {
-    crate::jregex::compile(pattern, 0)
+fn compile(vm: &Engine, pattern: &str) -> Result<fancy_regex::Regex, VmExit> {
+    crate::jregex::compile(vm, pattern, 0)
 }
 
 pub(crate) fn java_split(
@@ -252,9 +255,9 @@ pub(crate) fn decode(b: &[u8], cs: &str) -> String {
     }
 }
 
-fn string_matches(input: &str, pat: &str) -> Result<bool, VmExit> {
+fn string_matches(vm: &Engine, input: &str, pat: &str) -> Result<bool, VmExit> {
     // Validate raw pattern syntax and 64 KiB cap first.
-    compile(pat)?;
+    compile(vm, pat)?;
     let body = crate::jregex::translate(pat, 0);
     let build = |s: &str| -> Result<fancy_regex::Regex, Box<fancy_regex::Error>> {
         fancy_regex::RegexBuilder::new(s)
@@ -527,23 +530,23 @@ pub(crate) fn instance_intrinsic(
         | ("split", "(Ljava/lang/String;I)[Ljava/lang/String;") => {
             let pat = charseq(vm, &args[0])?;
             let limit = if args.len() > 1 { int(1) } else { 0 };
-            let re = compile(&pat)?;
+            let re = compile(vm, &pat)?;
             let parts = java_split(&this, &re, limit)?;
             string_array(vm, parts)?
         }
         ("replaceAll", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") => {
             let (p, r) = (charseq(vm, &args[0])?, charseq(vm, &args[1])?);
-            let out = crate::jregex::replace(&compile(&p)?, &this, &r, true)?;
+            let out = crate::jregex::replace(&compile(vm, &p)?, &this, &r, true)?;
             new_str(vm, out)?
         }
         ("replaceFirst", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;") => {
             let (p, r) = (charseq(vm, &args[0])?, charseq(vm, &args[1])?);
-            let out = crate::jregex::replace(&compile(&p)?, &this, &r, false)?;
+            let out = crate::jregex::replace(&compile(vm, &p)?, &this, &r, false)?;
             new_str(vm, out)?
         }
         ("matches", "(Ljava/lang/String;)Z") => {
             let p = charseq(vm, &args[0])?;
-            b(string_matches(&this, &p)?)
+            b(string_matches(vm, &this, &p)?)
         }
         ("getBytes", "()[B") => byte_array(vm, this.as_bytes())?,
         ("getBytes", "(Ljava/lang/String;)[B") | ("getBytes", "(Ljava/nio/charset/Charset;)[B") => {
@@ -1136,6 +1139,9 @@ fn sign_pad(digits: String, neg: bool, width: usize, flags: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn utf16_search() {
@@ -1162,7 +1168,9 @@ mod tests {
 
     #[test]
     fn replacement_syntax() {
-        let re = compile(r"(\d+)-(\d+)").unwrap();
+        let vm = crate::Engine::new(alloc::vec![], Default::default());
+
+        let re = compile(&vm, r"(\d+)-(\d+)").unwrap();
         assert_eq!(
             crate::jregex::replace(&re, "1-2", "$2:$1", true).unwrap(),
             "2:1"

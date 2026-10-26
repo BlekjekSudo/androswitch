@@ -7,6 +7,9 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const TEXT_UTILS: &str = "Landroid/text/TextUtils;";
@@ -144,6 +147,8 @@ pub(crate) fn log_intrinsic(
         };
         return Ok(Some(s(vm, value)?));
     }
+    let log_host = vm.framework_host();
+    let output = vm.output.clone();
     crate::android_log::call(
         vm,
         class,
@@ -152,9 +157,6 @@ pub(crate) fn log_intrinsic(
         args,
         crate::intrinsics::object_to_string,
         |priority| priority >= 3,
-        |line| {
-            crate::intrinsics::host_print(1, line);
-            Ok(line.len())
-        },
+        |line| output.write(log_host.as_deref(), 1, line),
     )
 }

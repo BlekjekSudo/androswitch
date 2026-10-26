@@ -74,6 +74,18 @@ This is separate from the portable RustyDroid VM, which remains `no_std+alloc`.
 See [renderer port details](docs/MESA_SWITCH_PORT.md) for pinned artifacts,
 platform adapters, limits and verification; a successful link is not a GPU pass.
 
+## Android SDK declaration metadata
+
+The supplemental type declarations are derived from the locally installed
+Android SDK API 35 `android.jar`, credited to the Android Open Source Project
+and Android contributors. Only type names, inheritance, interfaces, modifiers
+and inner-class names are generated; no executable SDK method bodies or JAR
+are redistributed. [The input receipt](data/android-sdk-types.json) pins its
+SHA-256 and [the generator](scripts/generate-android-types.py) is reproducible.
+This declaration source does not change the API 26 behavior profile and does
+not imply those classes' methods work. RustyDroid's original hierarchy remains
+authoritative where SDK stubs hide internal parent classes.
+
 ## Platform, tooling and test sources
 
 M8 adds native **SQLite 3.54.1**, by the SQLite authors/contributors (public

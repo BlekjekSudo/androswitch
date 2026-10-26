@@ -7,8 +7,11 @@ use super::{
     get_int_field, get_long_field, get_str_field, illegal, illegal_state, int_arg, obj_arg,
     obj_array, put_field, req_str_arg, str_val,
 };
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use crate::{Engine, ObjRef, Value, VmExit};
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
 
 const CAMERA_MANAGER: &str = "Landroid/hardware/camera2/CameraManager;";
 const CAMERA_CHARS: &str = "Landroid/hardware/camera2/CameraCharacteristics;";

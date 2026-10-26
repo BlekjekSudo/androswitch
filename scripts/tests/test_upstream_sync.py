@@ -53,6 +53,20 @@ class UpstreamAudit(unittest.TestCase):
         self.assertEqual(routes[1]["device_route"], "shared-source-with-adapters")
         self.assertTrue(all(r["behavior_parity"] == "unverified" for r in routes))
 
+    def test_experimental_alias_does_not_become_a_shipping_or_behavior_pass(self):
+        vm = self.root / "crates/rd-vm/src"
+        vm.mkdir(parents=True)
+        (vm / "lib.rs").write_text(
+            '#[cfg(feature = "std")]\npub mod intrinsics;\n'
+            '#[cfg(feature = "upstream-runtime")]\n#[path = "intrinsics.rs"]\npub(crate) mod shared_intrinsics;\n'
+            '#[cfg(not(feature = "std"))]\n#[path = "portable/intrinsics.rs"]\npub mod intrinsics;\n',
+            encoding="utf-8")
+        routes = AUDIT.vm_routes(self.root, {"crates/rd-vm/src/intrinsics.rs"})
+        self.assertEqual(len(routes), 1)
+        self.assertEqual(routes[0]["device_route"], "host-only-original")
+        self.assertTrue(routes[0]["experimental_original_declared"])
+        self.assertEqual(routes[0]["behavior_parity"], "unverified")
+
     def test_shortened_lock_does_not_hide_omission_from_actual_git_tree(self):
         # A real local Git tree, not an expected-array mirror of the checker.
         AUDIT.git(self.root, "init", "--quiet")
@@ -96,6 +110,27 @@ class UpstreamAudit(unittest.TestCase):
         self.assertEqual(AUDIT.verify_fork_core(self.root, set(), [entry]), [])
         helper.write_bytes(b"unreviewed change\n")
         self.assertIn("FORK_CORE_ADAPTATION_DRIFT", AUDIT.verify_fork_core(self.root, set(), [entry])[0])
+
+    def test_entire_upstream_corpus_must_have_unique_isolated_routes(self):
+        folder = self.root / "crates/as-vm"
+        folder.mkdir(parents=True)
+        manifest = folder / "Cargo.toml"
+        original = {"crates/rd-vm/tests/first.rs", "crates/rd-vm/tests/second.rs",
+                    "crates/rd-vm/tests/common/mod.rs"}
+        first = '\n[[test]]\nname="upstream_first"\npath="../rd-vm/tests/first.rs"\nrequired-features=["upstream-parity-tests"]\n'
+        manifest.write_text(first, encoding="utf-8")
+        routes, errors = AUDIT.upstream_test_routes(self.root, original)
+        self.assertEqual(len(routes), 2)
+        self.assertIn("second.rs", errors[0])
+        second = first.replace("first", "second")
+        manifest.write_text(first + second, encoding="utf-8")
+        routes, errors = AUDIT.upstream_test_routes(self.root, original)
+        self.assertEqual(errors, [])
+        self.assertTrue(all(r["execution"] == "unverified" for r in routes))
+        manifest.write_text(first + second + first, encoding="utf-8")
+        self.assertTrue(AUDIT.upstream_test_routes(self.root, original)[1])
+        manifest.write_text((first + second).replace('required-features=["upstream-parity-tests"]', ''), encoding="utf-8")
+        self.assertTrue(all("NOT_ISOLATED" in e for e in AUDIT.upstream_test_routes(self.root, original)[1]))
 
 
 if __name__ == "__main__":

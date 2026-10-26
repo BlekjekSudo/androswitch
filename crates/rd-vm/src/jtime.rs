@@ -27,6 +27,9 @@
 use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const LD: &str = "Ljava/time/LocalDate;";
@@ -1113,9 +1116,9 @@ fn date_intrinsic(
                 .unwrap_or(0);
             let ordering = long_field(vm, recv, "rd_ms").cmp(&other);
             Ok(Some(Value::Int(match ordering {
-                std::cmp::Ordering::Less => -1,
-                std::cmp::Ordering::Equal => 0,
-                std::cmp::Ordering::Greater => 1,
+                core::cmp::Ordering::Less => -1,
+                core::cmp::Ordering::Equal => 0,
+                core::cmp::Ordering::Greater => 1,
             })))
         }
         ("equals", "(Ljava/lang/Object;)Z") => {
@@ -1284,7 +1287,7 @@ pub fn static_intrinsic(
                     let lv = vm.heap.get_field(*l, "rd_lang").unwrap_or(Value::Null);
                     str_arg(vm, &lv)
                 }
-                _ => std::env::var("RD_LOCALE")
+                _ => crate::port_env::var("RD_LOCALE")
                     .unwrap_or_else(|_| "en".into())
                     .chars()
                     .take(2)
@@ -1634,6 +1637,9 @@ fn format_with(vm: &mut Engine, fmt: &Value, ms: i64) -> Result<Value, VmExit> {
 mod tests {
     use super::*;
     use crate::engine::VmConfig;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn civil_roundtrip_and_format() {

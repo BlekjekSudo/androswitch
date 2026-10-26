@@ -21,7 +21,7 @@ disconnected Android environment inside the Switch runner.
 in the upstream Git tree, rather than selected class families. Each entry has
 the original Git blob ID. A changed file also records its reviewed adaptation
 reason and canonical SHA-256. Text canonicalization only normalizes CRLF to LF.
-The 31 added core files, including extracted shared helpers, have their own
+The 40 added core files, including extracted shared helpers, have their own
 reviewed hashes and provenance where applicable. Missing files, duplicate
 entries, an incomplete manifest, an unreviewed change,
 or drift after review fail the gate.
@@ -97,6 +97,26 @@ These shared families do **not** establish complete Java or Android support.
 For example, upstream BitSet's empty constructor capacity differs from the JDK,
 and the upstream Arrays dispatcher does not implement every JDK overload.
 The inherited behavior is preserved and its limitations stay visible.
+
+## Experimental complete reference core
+
+The [complete port plan](UPSTREAM_PARITY_PLAN.md) supersedes an APK-driven
+approach to missing APIs. `as-vm/upstream-runtime` compiles the original framework
+dependency closure on the freestanding Horizon target using `core + alloc`.
+Its original dispatcher and GC are shared; 13 module tables in eight original
+modules now belong to the Engine. All 50 original integration suites use their
+original source paths and builders, with an isolated host renderer. CI executes
+the portable reference corpus. No original native/JIT zero-case suite is counted
+as a working Horizon backend.
+
+These are development results. The shipping/default runner still uses its
+previous adapter path, and the source audit's exclusion list describes that
+default profile. A second in-memory filesystem, framework tree, collection
+store or virtual hardware model must not become the product's platform state.
+`ReferenceFileSystem` is explicitly an oracle, native SQLite transport still
+needs persistent device integration, and the SDK type catalog embeds no method
+implementations. The original GC side-state scan remains conservative; owner
+roots and platform references are added without claiming a fully precise scan.
 
 ## Remaining parity work
 

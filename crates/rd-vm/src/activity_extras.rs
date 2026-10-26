@@ -20,6 +20,9 @@
 use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const BACK_DISPATCHER: &str = "Landroid/window/OnBackInvokedDispatcher;";
@@ -241,6 +244,9 @@ pub(crate) fn back_invoked_top(vm: &Engine, activity: ObjRef) -> Option<ObjRef> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     use rd_testsupport::vm::*;
     #[test]
     fn context_wrapper_delegates_package_query_to_real_base_dex_override() {

@@ -20,34 +20,36 @@
 //! by `AnnotatedElement`; repeatable-container expansion, field annotations,
 //! and parameter annotations are not implemented.
 
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use rd_dex::annotations::{
     parse_annotation_item, parse_annotation_set_item, parse_annotations_directory,
     EncodedAnnotation, EncodedValue, Visibility,
 };
-
-use std::cell::RefCell;
-use std::collections::HashSet;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::{ElemKind, ObjRef};
 use crate::value::Value;
 
-thread_local! {
-    /// Live annotation instances (cheap gate for instance dispatch).
-    static INSTANCES: RefCell<HashSet<ObjRef>> = RefCell::new(HashSet::new());
-}
-
 /// GC: drop state of collected objects (slots are reused).
-pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
-    INSTANCES.with(|m| m.borrow_mut().retain(|k| alive(*k)));
+pub(crate) fn gc_purge(vm: &Engine, alive: &dyn Fn(ObjRef) -> bool) {
+    vm.module_tables
+        .jannotations_instances
+        .clone()
+        .with(|m| m.borrow_mut().retain(|k| alive(*k)));
 }
 
 /// Issue #230: fronteira de `Engine` — sem isto, um objeto qualquer do
 /// próximo `Engine` que reutilize o mesmo `ObjRef` seria despachado
 /// como se fosse uma instância de anotação do heap anterior.
-pub(crate) fn reset_all() {
-    INSTANCES.with(|m| m.borrow_mut().clear());
+#[cfg(test)]
+pub(crate) fn reset_all(vm: &Engine) {
+    vm.module_tables
+        .jannotations_instances
+        .clone()
+        .with(|m| m.borrow_mut().clear());
 }
 
 /// Runtime annotations of `desc` as (dex index, annotation).
@@ -237,7 +239,10 @@ fn instance(vm: &mut Engine, di: usize, a: &EncodedAnnotation) -> Result<ObjRef,
         .heap
         .alloc_instance(ty, fields)
         .map_err(crate::err::oom_throwable)?;
-    INSTANCES.with(|s| s.borrow_mut().insert(r));
+    vm.module_tables
+        .jannotations_instances
+        .clone()
+        .with(|s| s.borrow_mut().insert(r));
     Ok(r)
 }
 
@@ -395,7 +400,11 @@ pub fn instance_intrinsic(
     recv: ObjRef,
 ) -> Result<Option<Value>, VmExit> {
     if !sig.starts_with("()")
-        || !INSTANCES.with(|s| s.borrow().contains(&recv))
+        || !vm
+            .module_tables
+            .jannotations_instances
+            .clone()
+            .with(|s| s.borrow().contains(&recv))
         || !matches!(vm.heap.get_field(recv, "rd_annotation"), Ok(Value::Int(1)))
     {
         return Ok(None);
@@ -423,15 +432,28 @@ pub fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
-    fn host_reset_clears_instances_from_previous_engine() {
-        INSTANCES.with(|s| s.borrow_mut().insert(4242));
-        assert!(INSTANCES.with(|s| s.borrow().contains(&4242)));
-        crate::reset_host_thread_state();
+    fn annotation_instances_are_owned_by_each_engine() {
+        let first = crate::Engine::new(alloc::vec![], Default::default());
+        first.module_tables.jannotations_instances.with(|s| {
+            s.borrow_mut().insert(4242);
+        });
+        let second = crate::Engine::new(alloc::vec![], Default::default());
+        assert!(!second
+            .module_tables
+            .jannotations_instances
+            .with(|s| s.borrow().contains(&4242)));
+        reset_all(&second);
         assert!(
-            !INSTANCES.with(|s| s.borrow().contains(&4242)),
-            "#230: ObjRef de heap morto não pode seguir marcado como instância de anotação"
+            first
+                .module_tables
+                .jannotations_instances
+                .with(|s| s.borrow().contains(&4242)),
+            "resetting another Engine must not destroy a live annotation's state"
         );
     }
 }

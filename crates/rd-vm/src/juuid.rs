@@ -8,7 +8,9 @@
 //!   `version`, `variant`, `equals`, `hashCode` (JDK formula), `compareTo`
 //!   (signed, as in the JDK).
 
-use std::cell::Cell;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -17,27 +19,27 @@ use crate::value::Value;
 
 const UUID: &str = "Ljava/util/UUID;";
 
-fn initial_seed() -> u64 {
-    std::env::var("RD_UUID_SEED")
+pub(crate) fn initial_seed() -> u64 {
+    crate::port_env::var("RD_UUID_SEED")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(0x9E37_79B9_7F4A_7C15)
-}
-
-thread_local! {
-    static RNG: Cell<u64> = Cell::new(initial_seed());
 }
 
 /// Issue #230: fronteira de `Engine` — a sequência de
 /// `UUID.randomUUID()` volta à semente (`RD_UUID_SEED`), em vez de
 /// depender de quantos UUIDs engines anteriores geraram na thread
 /// (determinismo, PRF-04).
-pub(crate) fn reset_all() {
-    RNG.with(|r| r.set(initial_seed()));
+#[cfg(test)]
+pub(crate) fn reset_all(vm: &Engine) {
+    vm.module_tables
+        .juuid_rng
+        .clone()
+        .with(|r| r.set(initial_seed()));
 }
 
-fn next_u64() -> u64 {
-    RNG.with(|r| {
+fn next_u64(vm: &Engine) -> u64 {
+    vm.module_tables.juuid_rng.clone().with(|r| {
         let mut x = r.get();
         x ^= x << 13;
         x ^= x >> 7;
@@ -106,8 +108,8 @@ pub fn static_intrinsic(
     }
     Ok(Some(match name {
         "randomUUID" => {
-            let msb = (next_u64() & !0xf000) | 0x4000;
-            let lsb = (next_u64() & !(0xc000_0000_0000_0000)) | 0x8000_0000_0000_0000;
+            let msb = (next_u64(vm) & !0xf000) | 0x4000;
+            let lsb = (next_u64(vm) & !(0xc000_0000_0000_0000)) | 0x8000_0000_0000_0000;
             new_uuid(vm, msb as i64, lsb as i64)?
         }
         "fromString" => {
@@ -193,9 +195,9 @@ pub fn instance_intrinsic(
                 )));
             };
             Value::Int(match (m, l).cmp(&o) {
-                std::cmp::Ordering::Less => -1,
-                std::cmp::Ordering::Equal => 0,
-                std::cmp::Ordering::Greater => 1,
+                core::cmp::Ordering::Less => -1,
+                core::cmp::Ordering::Equal => 0,
+                core::cmp::Ordering::Greater => 1,
             })
         }
         _ => return Ok(None),
@@ -254,7 +256,10 @@ fn md5(input: &[u8]) -> [u8; 16] {
 
 #[cfg(test)]
 mod tests {
-    use std::fmt::Write as _;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
+    use core::fmt::Write as _;
 
     use super::*;
     #[test]
@@ -272,12 +277,14 @@ mod tests {
 
     #[test]
     fn reset_all_restarts_sequence() {
-        reset_all();
-        let first = next_u64();
-        let _ = next_u64();
-        reset_all();
+        let vm = crate::Engine::new(alloc::vec![], Default::default());
+
+        reset_all(&vm);
+        let first = next_u64(&vm);
+        let _ = next_u64(&vm);
+        reset_all(&vm);
         assert_eq!(
-            next_u64(),
+            next_u64(&vm),
             first,
             "#230: RNG de UUID reinicia na fronteira de Engine"
         );

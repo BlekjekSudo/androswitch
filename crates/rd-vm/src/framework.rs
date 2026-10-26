@@ -19,7 +19,10 @@
 //!   o listener (objeto do app que implementa View.OnClickListener) é
 //!   invocado via resolução DEX.
 
-use std::collections::HashMap;
+use crate::maps::HashMap;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -933,7 +936,7 @@ pub struct HostState {
     /// `List.subList` views: view → (parent, offset, len). See
     /// `jcollections::sublist_*` (write-through semantics).
     pub(crate) sublists: HashMap<ObjRef, (ObjRef, usize, usize)>,
-    pub(crate) sublist_order: std::collections::VecDeque<ObjRef>,
+    pub(crate) sublist_order: alloc::collections::VecDeque<ObjRef>,
     /// Engine-local Binder handle table for `Parcel.writeStrongBinder`:
     /// the marshalled int handle is `index + 1` (0 is null). This models
     /// local Binder transport inside one Engine; it is not a kernel Binder
@@ -960,6 +963,7 @@ pub struct HostState {
     pub(crate) main_thread: Option<ObjRef>,
     /// M8: objetos `Class` canônicos por descritor (getClass devolve sempre a
     /// mesma referência para a mesma classe — identidade como na JVM).
+    #[cfg(feature = "std")]
     class_objs: HashMap<String, ObjRef>,
     /// M8: ClassLoader canônico (um por VM — single-classloader; a distinção
     /// bootstrap=null do Java não se aplica ao runtime host).
@@ -997,7 +1001,7 @@ pub struct HostState {
     pub shared_prefs_impl: Option<ObjRef>,
     /// M3.2: APK aberto (Resources) — layouts AXML + resources.arsc para o
     /// LayoutInflater. Injetado via `Engine::set_resources` (CLI `rd app run`).
-    pub resources: Option<std::sync::Arc<rd_apk::Apk>>,
+    pub resources: Option<alloc::sync::Arc<rd_apk::Apk>>,
     /// M8 full scope: estado dos subsistemas de compat real (RecyclerView,
     /// Dialogs, OkHttp, SQLite/Room, Services/Broadcasts/DeepLinks,
     /// WorkManager, SharedPreferences stateful) — ver `crate::m8`.
@@ -1094,11 +1098,11 @@ impl Engine {
     /// M3.2: injeta o APK aberto como fonte de Resources (layouts AXML +
     /// resources.arsc). O CLI `rd app run` chama isto UMA vez por execução.
     pub fn set_resources(&mut self, apk: rd_apk::Apk) {
-        self.set_resources_arc(std::sync::Arc::new(apk));
+        self.set_resources_arc(alloc::sync::Arc::new(apk));
     }
 
     /// ADR 008 Stage 1: O(1) launch injection — no deep `Apk` clone.
-    pub fn set_resources_arc(&mut self, apk: std::sync::Arc<rd_apk::Apk>) {
+    pub fn set_resources_arc(&mut self, apk: alloc::sync::Arc<rd_apk::Apk>) {
         #[cfg(feature = "advanced-components")]
         {
             self.fw.m9.target_sdk = apk.manifest.target_sdk;
@@ -1180,7 +1184,15 @@ impl Engine {
     /// Anexa estado host a um objeto recém-alocado (chamado do new-instance).
     /// A herança é por DESCRIÇÃO de superclass gravada no DEX — caminhar
     /// nomes não exige as classes de plataforma no DEX.
-    pub fn attach_host_state(&mut self, class: &str, r: ObjRef) -> Result<(), VmExit> {
+    #[cfg(feature = "std")]
+    pub fn attach_host_state(&mut self, class: &str, object: ObjRef) -> Result<(), VmExit> {
+        self.attach_upstream_host_state(class, object)
+    }
+    pub(crate) fn attach_upstream_host_state(
+        &mut self,
+        class: &str,
+        r: ObjRef,
+    ) -> Result<(), VmExit> {
         if self.fw.objects.contains_key(&r) || r == 0 {
             return Ok(());
         }
@@ -1286,6 +1298,7 @@ impl Engine {
     /// M8: objeto `Class` canônico do descritor (lazy; identidade estável —
     /// `a.getClass() == a.getClass()`). Campo de heap "class_name" guarda o
     /// DESCRITOR (ex.: "Lcom/x/Y;"); os métodos de Class o convertem.
+    #[cfg(feature = "std")]
     pub(crate) fn class_object_for(&mut self, desc: &str) -> Result<ObjRef, VmExit> {
         if let Some(c) = self.fw.class_objs.get(desc) {
             return Ok(*c);
@@ -1851,21 +1864,25 @@ impl Engine {
             return Ok(consumed);
         }
         let Some(content) = self.window_content_of(activity) else {
-            if std::env::var("RD_FW_DEBUG").is_ok() {
+            if crate::port_env::var("RD_FW_DEBUG").is_ok() {
+                #[cfg(feature = "std")]
                 eprintln!("[fw] touch: sem content (window vazia)");
             }
             return Ok(false); // sem setContentView: nada a tocar
         };
-        if std::env::var("RD_FW_DEBUG").is_ok() {
+        if crate::port_env::var("RD_FW_DEBUG").is_ok() {
             let mut d = String::from("[fw] tree no touch:\n");
             self.dump_view(content, 0, &mut d);
+            #[cfg(feature = "std")]
             eprintln!("{d}");
         }
         let Some(target) = self.hit_test(content, x, y) else {
-            if std::env::var("RD_FW_DEBUG").is_ok() {
+            if crate::port_env::var("RD_FW_DEBUG").is_ok() {
+                #[cfg(feature = "std")]
                 eprintln!("[fw] touch: hit-test sem alvo em ({x},{y})");
                 let mut d = String::new();
                 self.dump_view(content, 0, &mut d);
+                #[cfg(feature = "std")]
                 eprintln!("{d}");
             }
             return Ok(false);
@@ -1993,8 +2010,10 @@ impl Engine {
             self.call(d, def, &m, vec![Value::Obj(activity), Value::Obj(target)])?;
             return Ok(true);
         }
-        if std::env::var("RD_FW_DEBUG").is_ok() {
+        #[cfg(feature = "std")]
+        if crate::port_env::var("RD_FW_DEBUG").is_ok() {
             let cls = self.heap.class_of(target).unwrap_or("?");
+            #[cfg(feature = "std")]
             eprintln!("[fw] touch: alvo #{target} ({cls}) sem listener nem android:onClick");
         }
         Ok(false)
@@ -2510,7 +2529,8 @@ impl Engine {
             // lists) progresses without needing a screenshot.
             if self.fw.traversal_pending && !self.fw.in_traversal {
                 self.fw.traversal_pending = false;
-                if std::env::var("RD_TRACE_DRAW").is_ok() {
+                if crate::port_env::var("RD_TRACE_DRAW").is_ok() {
+                    #[cfg(feature = "std")]
                     eprintln!(
                         "D/RustyDroid: traversal at {} ms (frame callbacks {})",
                         self.fw.clock_ms,
@@ -2523,10 +2543,14 @@ impl Engine {
                 if let Err(e) = r {
                     match e {
                         VmExit::Exception(t) => {
-                            eprintln!(
-                                "W/RustyDroid: traversal failed: {} {:?}",
-                                t.class, t.message
-                            )
+                            self.output.write(
+                                self.framework_host().as_deref(),
+                                2,
+                                &format!(
+                                    "W/RustyDroid: traversal failed: {} {:?}\n",
+                                    t.class, t.message
+                                ),
+                            )?;
                         }
                         other => return Err(other),
                     }
@@ -2564,7 +2588,8 @@ impl Engine {
             if let Some(HostObj::Looper { queue }) = self.fw.objects.get_mut(&looper) {
                 queue.remove(idx);
             }
-            if std::env::var("RD_FW_DEBUG").is_ok() {
+            if crate::port_env::var("RD_FW_DEBUG").is_ok() {
+                #[cfg(feature = "std")]
                 eprintln!(
                     "[fw] drain: runnable #{} ({}) quando {} <= {}",
                     msg.runnable,
@@ -2913,7 +2938,7 @@ impl Engine {
 
     pub(crate) fn find_view_by_id(&self, root: ObjRef, id: i32) -> Option<ObjRef> {
         let mut stack = vec![(root, 0usize)];
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = crate::maps::HashSet::new();
         while let Some((cur, depth)) = stack.pop() {
             if depth > MAX_VIEW_DEPTH || !seen.insert(cur) {
                 continue;
@@ -3253,7 +3278,8 @@ fn call_host_instance_rooted(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if std::env::var("RD_FW_DEBUG").is_ok() {
+    if crate::port_env::var("RD_FW_DEBUG").is_ok() {
+        #[cfg(feature = "std")]
         eprintln!("[fw] host dispatch: {mref_class}->{name}{sig} recv=#{recv}");
     }
     // classes do receiver (concreto) e da method ref (declarante)
@@ -3263,7 +3289,8 @@ fn call_host_instance_rooted(
     };
     let is_view = |vm: &Engine| {
         let r = vm.cp.is_subtype(&recv_class, VIEW);
-        if std::env::var("RD_FW_DEBUG").is_ok() && !r {
+        if crate::port_env::var("RD_FW_DEBUG").is_ok() && !r {
+            #[cfg(feature = "std")]
             eprintln!(
                 "[fw] is_subtype({recv_class}, VIEW) = false; sup={:?}",
                 vm.cp.superclass_of(&recv_class)
@@ -4377,7 +4404,7 @@ fn call_host_instance_rooted(
                             Vec::new()
                         }
                     }
-                    _ => std::mem::take(children),
+                    _ => core::mem::take(children),
                 },
                 _ => Vec::new(),
             };
@@ -4596,9 +4623,13 @@ fn ensure_prefs_loaded(vm: &mut Engine, name: &str) {
         return;
     }
     let path = crate::prefs::path(&vm.fw.package_name, name);
-    let store = crate::jfile::read_bytes(&path)
-        .and_then(|bytes| crate::prefs::parse(&bytes))
-        .unwrap_or_default();
+    let store = crate::jfile::read_bytes(
+        #[cfg(not(feature = "std"))]
+        vm,
+        &path,
+    )
+    .and_then(|bytes| crate::prefs::parse(&bytes))
+    .unwrap_or_default();
     vm.fw.m8.prefs_stores.insert(name.to_string(), store);
     vm.fw.m8.prefs_loaded.insert(name.to_string());
 }
@@ -4623,7 +4654,12 @@ fn persist_prefs(vm: &Engine, name: &str) -> bool {
         .get(name)
         .map(crate::prefs::serialize)
         .unwrap_or_else(|| crate::prefs::serialize(&Default::default()));
-    crate::jfile::write_bytes(&crate::prefs::path(&vm.fw.package_name, name), bytes);
+    crate::jfile::write_bytes(
+        #[cfg(not(feature = "std"))]
+        vm,
+        &crate::prefs::path(&vm.fw.package_name, name),
+        bytes,
+    );
     true
 }
 
@@ -4639,7 +4675,7 @@ fn pref_wrong_type(key: &str, expected: &str, actual: &PrefValue) -> VmExit {
 
 fn pref_string_set_obj(
     vm: &mut Engine,
-    values: &std::collections::BTreeSet<Option<String>>,
+    values: &alloc::collections::BTreeSet<Option<String>>,
 ) -> Result<ObjRef, VmExit> {
     let set = vm
         .heap
@@ -4717,7 +4753,7 @@ fn extract_pref_string_set(
         }
         raw_values = Some(values);
     }
-    let mut strings = std::collections::BTreeSet::new();
+    let mut strings = alloc::collections::BTreeSet::new();
     for value in raw_values.unwrap_or_default() {
         match value {
             Value::Null => {
@@ -5476,6 +5512,9 @@ impl Engine {
 #[cfg(test)]
 mod point_hit_tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn bounded_windows_include_dialogs_without_activity_content() {
         let mut vm = Engine::new(vec![], crate::VmConfig::default());

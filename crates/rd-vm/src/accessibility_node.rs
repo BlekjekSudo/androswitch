@@ -3,6 +3,9 @@
 //! and populate the ordinary Android node API.
 use crate::err::{put_field_result, VmExit};
 use crate::heap::ObjRef;
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use crate::{Engine, Value};
 const NODE: &str = "Landroid/view/accessibility/AccessibilityNodeInfo;";
 fn put(vm: &mut Engine, r: ObjRef, k: &str, v: Value) -> Result<(), VmExit> {
@@ -272,10 +275,10 @@ impl Engine {
                 let Value::Obj(provider) = provider else {
                     continue;
                 };
-                let mut queue = std::collections::VecDeque::from([-1]);
+                let mut queue = alloc::collections::VecDeque::from([-1]);
                 // Deduplicate on enqueue, not just after processing, to bound
                 // cyclic/shared child edges as well as provider callbacks.
-                let mut seen = std::collections::HashSet::from([-1]);
+                let mut seen = crate::maps::HashSet::from([-1]);
                 while let Some(id) = queue.pop_front() {
                     if visited >= 2048 {
                         return Err(crate::err::vm_error(
@@ -343,6 +346,9 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     use rd_testsupport::vm::*;
     fn fixture() -> (Engine, ObjRef, ObjRef) {
         let mut b = DexBuilder::new();

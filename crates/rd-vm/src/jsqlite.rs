@@ -43,8 +43,14 @@
 //!   collation, custom functions/extensions, multi-process locking and every
 //!   overload/result-code nuance remain Appendix C gaps.
 
-use std::collections::{HashMap, HashSet};
+use crate::maps::HashMap;
+use crate::maps::HashSet;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
+#[cfg(feature = "std")]
 use std::io::{BufRead, BufReader, Write};
+#[cfg(feature = "std")]
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use serde_json::{json, Value as J};
@@ -63,6 +69,7 @@ const CLOSABLE: &str = "Landroid/database/sqlite/SQLiteClosable;";
 const SQL_CURSOR: &str = "Landroid/database/sqlite/SQLiteCursor;";
 const DRIVER: &str = "Landroid/database/sqlite/SQLiteDirectCursorDriver;";
 
+#[cfg(feature = "std")]
 const PY: &str = r#"
 import sys, json, sqlite3, base64, math
 dbs = {}
@@ -133,12 +140,14 @@ pub enum Sv {
     Blob(Vec<u8>),
 }
 
+#[cfg(feature = "std")]
 struct Proc {
     child: Child,
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
 }
 
+#[cfg(feature = "std")]
 impl Drop for Proc {
     fn drop(&mut self) {
         let _ = self.child.kill();
@@ -165,7 +174,10 @@ struct Cursor {
 /// Per-Engine SQLite state (lives in `M8State`).
 #[derive(Default)]
 pub struct SqlState {
+    #[cfg(feature = "std")]
     proc: Option<Proc>,
+    #[cfg(not(feature = "std"))]
+    connections: HashMap<String, as_sqlite::Connection>,
     /// The backend failed to start: use the m8 subset.
     pub(crate) unavailable: bool,
     dbs: HashMap<ObjRef, String>,
@@ -178,8 +190,8 @@ pub struct SqlState {
     cursors: HashMap<ObjRef, Cursor>,
 }
 
-impl std::fmt::Debug for SqlState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Debug for SqlState {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SqlState")
             .field("dbs", &self.dbs.len())
             .field("programs", &self.programs.len())
@@ -210,19 +222,20 @@ struct Res {
     last: i64,
 }
 
+#[cfg(feature = "std")]
 fn backend_ready(vm: &mut Engine) -> bool {
     let st = &mut vm.fw.m8.sqlx;
     if st.proc.is_some() {
         return true;
     }
     if st.unavailable
-        || std::env::var("RD_SQLITE")
+        || crate::port_env::var("RD_SQLITE")
             .map(|v| v == "subset")
             .unwrap_or(false)
     {
         return false;
     }
-    let py = std::env::var("RD_SQLITE_PYTHON").unwrap_or_else(|_| "python3".into());
+    let py = crate::port_env::var("RD_SQLITE_PYTHON").unwrap_or_else(|_| "python3".into());
     let spawned = Command::new(py)
         .arg("-u")
         .arg("-c")
@@ -361,10 +374,11 @@ fn sql_exc(kind: &str, msg: &str, sql: &str) -> VmExit {
 
 /// `RD_SQL_TRACE=1`: log every statement, its bound args and any error.
 fn sql_trace() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("RD_SQL_TRACE").is_ok_and(|v| v != "0"))
+    static ON: rd_dex::sync::OnceLock<bool> = rd_dex::sync::OnceLock::new();
+    *ON.get_or_init(|| crate::port_env::var("RD_SQL_TRACE").is_ok_and(|v| v != "0"))
 }
 
+#[cfg(feature = "std")]
 fn send(vm: &mut Engine, req: &J) -> Result<J, VmExit> {
     let line = {
         let p =
@@ -416,7 +430,12 @@ fn ensure_loaded(vm: &mut Engine, db: &str) -> Result<(), VmExit> {
     // Mark first: loading is a backend-process boundary, and a failed load is
     // a typed corruption error rather than a reason to retry on every SQL op.
     vm.fw.m8.sqlx.loaded.insert(db.to_string());
-    let Some(bytes) = crate::jfile::read_bytes(db).filter(|b| !b.is_empty()) else {
+    let Some(bytes) = crate::jfile::read_bytes(
+        #[cfg(not(feature = "std"))]
+        vm,
+        db,
+    )
+    .filter(|b| !b.is_empty()) else {
         return Ok(());
     };
     let r = send(vm, &json!({"op": "load", "db": db, "data": b64(&bytes)}))?;
@@ -449,7 +468,12 @@ fn persist_db(vm: &mut Engine, db: &str) -> Result<(), VmExit> {
         .map(unb64)
         .unwrap_or_default();
     if !data.is_empty() {
-        crate::jfile::write_bytes(db, data);
+        crate::jfile::write_bytes(
+            #[cfg(not(feature = "std"))]
+            vm,
+            db,
+            data,
+        );
     }
     Ok(())
 }
@@ -502,6 +526,7 @@ fn run(vm: &mut Engine, db: &str, sql: &str, args: &[Sv]) -> Result<Res, VmExit>
     let req = json!({"op": "exec", "db": db, "sql": sql, "args": args.iter().map(sv_json).collect::<Vec<_>>()});
     let r = send(vm, &req)?;
     if sql_trace() {
+        #[cfg(feature = "std")]
         eprintln!(
             "S/RustyDroid: sql {sql} args={} err={}",
             req["args"],
@@ -715,7 +740,11 @@ fn new_db(vm: &mut Engine, path: &str) -> Result<ObjRef, VmExit> {
     vm.fw.m8.sqlx.clear_slot(r);
     vm.fw.m8.sqlx.dbs.insert(r, path.to_string());
     if path.starts_with('/') {
-        crate::jfile::touch(path);
+        crate::jfile::touch(
+            #[cfg(not(feature = "std"))]
+            vm,
+            path,
+        );
     }
     Ok(r)
 }
@@ -1596,7 +1625,11 @@ fn helper_open(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
             } else {
                 vm.fw.package_name.clone()
             };
-            crate::jfile::mkdirs_pub(&format!("/data/user/0/{pkg}/databases"));
+            crate::jfile::mkdirs_pub(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &format!("/data/user/0/{pkg}/databases"),
+            );
             format!("/data/user/0/{pkg}/databases/{n}")
         }
         None => format!(":memory:{recv}"),
@@ -1833,7 +1866,12 @@ pub fn static_intrinsic(
         if was_open || vm.fw.m8.sqlx.loaded.contains(&path) {
             backend_close(vm, &path);
         }
-        let deleted_file = persistent_db(&path) && crate::jfile::delete_file(&path);
+        let deleted_file = persistent_db(&path)
+            && crate::jfile::delete_file(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &path,
+            );
         return Ok(Some(Value::Int((was_open || deleted_file) as i32)));
     }
     let path =
@@ -1846,9 +1884,94 @@ pub fn static_intrinsic(
     Ok(Some(Value::Obj(new_db(vm, &path)?)))
 }
 
+// The portable reference keeps the upstream SQL/Java protocol and substitutes only its
+// transport. No Python process or in-memory SQL approximation is involved.
+#[cfg(not(feature = "std"))]
+fn backend_ready(_vm: &mut Engine) -> bool {
+    true
+}
+
+#[cfg(not(feature = "std"))]
+fn send(vm: &mut Engine, req: &J) -> Result<J, VmExit> {
+    use as_sqlite::{Connection, Value as Native};
+    fn input(v: Sv) -> Native {
+        match v {
+            Sv::Null => Native::Null,
+            Sv::Int(v) => Native::Integer(v),
+            Sv::Real(v) => Native::Real(v),
+            Sv::Text(v) => Native::Text(v),
+            Sv::Blob(v) => Native::Blob(v),
+        }
+    }
+    fn output(v: Native) -> J {
+        sv_json(&match v {
+            Native::Null => Sv::Null,
+            Native::Integer(v) => Sv::Int(v),
+            Native::Real(v) => Sv::Real(v),
+            Native::Text(v) => Sv::Text(v),
+            Native::Blob(v) => Sv::Blob(v),
+        })
+    }
+    let db = req["db"]
+        .as_str()
+        .ok_or_else(|| crate::err::vm_error("INVALID_ARG", "SQLite database identity"))?;
+    let op = req["op"]
+        .as_str()
+        .ok_or_else(|| crate::err::vm_error("INVALID_ARG", "SQLite operation"))?;
+    let connections = &mut vm.fw.m8.sqlx.connections;
+    let result = (|| -> as_sqlite::Result<J> {
+        if op == "close" {
+            connections.remove(db);
+            return Ok(json!({}));
+        }
+        if op == "load" {
+            let image = unb64(req["data"].as_str().unwrap_or(""));
+            connections.insert(db.to_string(), Connection::open(Some(&image))?);
+            return Ok(json!({}));
+        }
+        if !connections.contains_key(db) {
+            connections.insert(db.to_string(), Connection::open(None)?);
+        }
+        let connection = &connections[db];
+        if op == "dump" {
+            return Ok(json!({"data": b64(&connection.snapshot()?)}));
+        }
+        if op != "exec" {
+            return Err(as_sqlite::Error {
+                code: 21,
+                message: format!("unknown SQL operation {op}"),
+            });
+        }
+        let sql = req["sql"].as_str().unwrap_or("");
+        let arguments = req["args"]
+            .as_array()
+            .map(|a| a.iter().map(|v| input(json_sv(v))).collect::<Vec<_>>())
+            .unwrap_or_default();
+        let rows = connection.query(sql, &arguments)?;
+        let status = connection.query("SELECT changes(), last_insert_rowid()", &[])?;
+        let status = status.values.first();
+        let number = |index| match status.and_then(|r| r.get(index)) {
+            Some(Native::Integer(v)) => *v,
+            _ => 0,
+        };
+        Ok(
+            json!({"cols": rows.columns, "rows": rows.values.into_iter().map(|r| r.into_iter().map(output).collect::<Vec<_>>()).collect::<Vec<_>>(), "changes": number(0), "last": number(1)}),
+        )
+    })();
+    Ok(match result {
+        Ok(value) => value,
+        Err(error) => {
+            json!({"err": error.message, "kind": if error.code & 255 == 19 { "constraint" } else { "DatabaseError" }})
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn base64_roundtrip() {
         for s in [&b""[..], b"a", b"ab", b"abc", b"\x00\xff\x10hello"] {

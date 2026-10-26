@@ -14,6 +14,9 @@
 
 use crate::engine::Engine;
 use crate::err::VmExit;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const BUILD: &str = "Landroid/os/Build;";
@@ -22,7 +25,7 @@ pub const DEFAULT_SDK_INT: i32 = 34;
 
 /// Emulated `Build.VERSION.SDK_INT` (env `RD_SDK_INT`, default 34).
 pub fn sdk_int() -> i32 {
-    std::env::var("RD_SDK_INT")
+    crate::port_env::var("RD_SDK_INT")
         .ok()
         .and_then(|v| v.trim().parse::<i32>().ok())
         .filter(|v| (21..=40).contains(v))
@@ -130,6 +133,9 @@ pub(crate) fn host_static(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn release_names() {

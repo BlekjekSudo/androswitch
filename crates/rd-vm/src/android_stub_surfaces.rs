@@ -40,6 +40,9 @@ use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::framework::HostObj;
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const WEBVIEW: &str = "Landroid/webkit/WebView;";
@@ -2253,7 +2256,7 @@ fn entity_pairs(vm: &Engine, r: ObjRef) -> Vec<(Value, f32)> {
     let scores = float_values(vm, Some(&get(vm, r, "rd_entity_scores")));
     names
         .into_iter()
-        .zip(scores.into_iter().chain(std::iter::repeat(0.0)))
+        .zip(scores.into_iter().chain(core::iter::repeat(0.0)))
         .collect()
 }
 fn set_entity_pairs(vm: &mut Engine, r: ObjRef, pairs: Vec<(Value, f32)>) -> Result<(), VmExit> {
@@ -6157,7 +6160,7 @@ fn metadata_entries(vm: &Engine, metadata: ObjRef) -> Vec<(Value, Value)> {
     let keys = collection_items(vm, Some(&get(vm, metadata, "rd_keys")));
     let values = collection_items(vm, Some(&get(vm, metadata, "rd_values")));
     keys.into_iter()
-        .zip(values.into_iter().chain(std::iter::repeat(Value::Null)))
+        .zip(values.into_iter().chain(core::iter::repeat(Value::Null)))
         .collect()
 }
 fn metadata_set_entries(
@@ -10989,7 +10992,7 @@ fn af_objects_equal(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, VmExi
                 *x,
                 "equals",
                 "(Ljava/lang/Object;)Z",
-                std::slice::from_ref(b),
+                core::slice::from_ref(b),
             )?;
             Ok(result.as_int().unwrap_or(0) != 0)
         }
@@ -13896,7 +13899,7 @@ fn af_finder_find(vm: &mut Engine, finder: ObjRef, id: Value) -> Result<Option<S
         finder,
         "findByAutofillId",
         "(Landroid/view/autofill/AutofillId;)Ljava/lang/String;",
-        std::slice::from_ref(&id),
+        core::slice::from_ref(&id),
     ) {
         Ok(value) => Ok(opt_str(vm, Some(&value))),
         Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {
@@ -13962,7 +13965,7 @@ fn af_validator_is_valid(
                     validator_ref,
                     "isValid",
                     "(Landroid/service/autofill/ValueFinder;)Z",
-                    std::slice::from_ref(&finder_value),
+                    core::slice::from_ref(&finder_value),
                 )?;
                 if valid.as_int().unwrap_or(0) == 0 {
                     return Ok(false);
@@ -13980,7 +13983,7 @@ fn af_validator_is_valid(
                     validator_ref,
                     "isValid",
                     "(Landroid/service/autofill/ValueFinder;)Z",
-                    std::slice::from_ref(&finder_value),
+                    core::slice::from_ref(&finder_value),
                 )?;
                 if valid.as_int().unwrap_or(0) != 0 {
                     return Ok(true);
@@ -14424,7 +14427,7 @@ fn af_field_classification_instance(
                 };
                 score(b)
                     .partial_cmp(&score(a))
-                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .unwrap_or(core::cmp::Ordering::Equal)
             });
             if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&matches_ref) {
                 *elems = matches;
@@ -14902,7 +14905,7 @@ fn tr_values_map_equal(vm: &mut Engine, left: &Value, right: &Value) -> Result<b
                 a,
                 "equals",
                 "(Ljava/lang/Object;)Z",
-                std::slice::from_ref(&other),
+                core::slice::from_ref(&other),
             )?;
             if equal != Value::Int(1) {
                 return Ok(false);
@@ -15920,7 +15923,7 @@ fn tr_value_changed(
             old_ref,
             "equals",
             "(Ljava/lang/Object;)Z",
-            std::slice::from_ref(&new),
+            core::slice::from_ref(&new),
         )?;
         return Ok(equal != Value::Int(1));
     }
@@ -16474,7 +16477,7 @@ fn tr_capture_visibility_values(vm: &mut Engine, values: ObjRef) -> Result<(), V
         view,
         "getLocationOnScreen",
         "([I)V",
-        std::slice::from_ref(&location),
+        core::slice::from_ref(&location),
     ) {
         Ok(_) => {}
         Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {}
@@ -16743,7 +16746,7 @@ fn tr_capture_change_bounds_values(
                 view,
                 "getLocationInWindow",
                 "([I)V",
-                std::slice::from_ref(&location),
+                core::slice::from_ref(&location),
             ) {
                 Ok(_) => {}
                 Err(VmExit::Error(error)) if error.code == "NOT_FOUND" => {}
@@ -18283,7 +18286,7 @@ fn transition_instance(
                         child,
                         "setInterpolator",
                         "(Landroid/animation/TimeInterpolator;)Landroid/transition/Transition;",
-                        std::slice::from_ref(&interpolator),
+                        core::slice::from_ref(&interpolator),
                     )?;
                 }
             }
@@ -18549,7 +18552,7 @@ fn transition_instance(
                         child,
                         "setEpicenterCallback",
                         "(Landroid/transition/Transition$EpicenterCallback;)V",
-                        std::slice::from_ref(&callback),
+                        core::slice::from_ref(&callback),
                     )?;
                 }
             }
@@ -18566,7 +18569,7 @@ fn transition_instance(
                     callback,
                     "onGetEpicenter",
                     "(Landroid/transition/Transition;)Landroid/graphics/Rect;",
-                    std::slice::from_ref(&self_value),
+                    core::slice::from_ref(&self_value),
                 )?
             } else {
                 Value::Null
@@ -18589,7 +18592,7 @@ fn transition_instance(
                         child,
                         "setPathMotion",
                         "(Landroid/transition/PathMotion;)V",
-                        std::slice::from_ref(&original),
+                        core::slice::from_ref(&original),
                     )?;
                 }
             }
@@ -18611,7 +18614,7 @@ fn transition_instance(
                         child,
                         "setPropagation",
                         "(Landroid/transition/TransitionPropagation;)V",
-                        std::slice::from_ref(&propagation),
+                        core::slice::from_ref(&propagation),
                     )?;
                 }
             }
@@ -18643,7 +18646,7 @@ fn transition_instance(
                         child,
                         "setSceneRoot",
                         "(Landroid/view/ViewGroup;)Landroid/transition/Transition;",
-                        std::slice::from_ref(&root),
+                        core::slice::from_ref(&root),
                     )?;
                 }
             }
@@ -18938,7 +18941,7 @@ fn tr_transition_specific_instance(
                         child,
                         "setInterpolator",
                         "(Landroid/animation/TimeInterpolator;)Landroid/transition/Transition;",
-                        std::slice::from_ref(&interpolator),
+                        core::slice::from_ref(&interpolator),
                     )?;
                 }
                 if flags & 2 != 0 {
@@ -18948,7 +18951,7 @@ fn tr_transition_specific_instance(
                         child,
                         "setPropagation",
                         "(Landroid/transition/TransitionPropagation;)V",
-                        std::slice::from_ref(&propagation),
+                        core::slice::from_ref(&propagation),
                     )?;
                 }
                 if flags & 4 != 0 {
@@ -18958,7 +18961,7 @@ fn tr_transition_specific_instance(
                         child,
                         "setPathMotion",
                         "(Landroid/transition/PathMotion;)V",
-                        std::slice::from_ref(&path_motion),
+                        core::slice::from_ref(&path_motion),
                     )?;
                 }
                 if flags & 8 != 0 {
@@ -18968,7 +18971,7 @@ fn tr_transition_specific_instance(
                         child,
                         "setEpicenterCallback",
                         "(Landroid/transition/Transition$EpicenterCallback;)V",
-                        std::slice::from_ref(&callback),
+                        core::slice::from_ref(&callback),
                     )?;
                 }
             }
@@ -19377,7 +19380,13 @@ fn sysos_fd_arg(vm: &mut Engine, args: &[Value], index: usize) -> Result<(ObjRef
             };
             if path.is_empty() {
                 -1
-            } else if let Some(registered) = crate::jfile::os_register_path(&path, 2, 0) {
+            } else if let Some(registered) = crate::jfile::os_register_path(
+                #[cfg(not(feature = "std"))]
+                vm,
+                &path,
+                2,
+                0,
+            ) {
                 put(vm, fd_obj, "descriptor", Value::Int(registered))?;
                 registered
             } else {
@@ -19388,7 +19397,12 @@ fn sysos_fd_arg(vm: &mut Engine, args: &[Value], index: usize) -> Result<(ObjRef
     Ok((fd_obj, fd))
 }
 fn sysos_new_fd_obj(vm: &mut Engine, fd: i32) -> Result<Value, VmExit> {
-    let path = crate::jfile::os_fd_path(fd).unwrap_or_default();
+    let path = crate::jfile::os_fd_path(
+        #[cfg(not(feature = "std"))]
+        vm,
+        fd,
+    )
+    .unwrap_or_default();
     let path_value = jstr(vm, path)?;
     let obj = alloc_obj(
         vm,
@@ -19676,12 +19690,12 @@ fn android_system_instance(
                 let nsec = field_long(vm, recv, "tv_nsec");
                 let other_nsec = field_long(vm, other, "tv_nsec");
                 Value::Int(match sec.cmp(&other_sec) {
-                    std::cmp::Ordering::Less => -1,
-                    std::cmp::Ordering::Greater => 1,
-                    std::cmp::Ordering::Equal => match nsec.cmp(&other_nsec) {
-                        std::cmp::Ordering::Less => -1,
-                        std::cmp::Ordering::Greater => 1,
-                        std::cmp::Ordering::Equal => 0,
+                    core::cmp::Ordering::Less => -1,
+                    core::cmp::Ordering::Greater => 1,
+                    core::cmp::Ordering::Equal => match nsec.cmp(&other_nsec) {
+                        core::cmp::Ordering::Less => -1,
+                        core::cmp::Ordering::Greater => 1,
+                        core::cmp::Ordering::Equal => 0,
                     },
                 })
             }
@@ -19921,12 +19935,26 @@ fn android_os_static(
             bool_value(sysos_map(
                 vm,
                 "access",
-                crate::jfile::os_access(&path, iarg(args, 1)),
+                crate::jfile::os_access(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &path,
+                    iarg(args, 1),
+                ),
             )?)
         }
         ("chmod", "(Ljava/lang/String;I)V") => {
             let path = sysos_path_arg(vm, args, 0, "chmod")?;
-            sysos_map(vm, "chmod", crate::jfile::os_chmod(&path, iarg(args, 1)))?;
+            sysos_map(
+                vm,
+                "chmod",
+                crate::jfile::os_chmod(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &path,
+                    iarg(args, 1),
+                ),
+            )?;
             Value::Null
         }
         ("chown", "(Ljava/lang/String;II)V") | ("lchown", "(Ljava/lang/String;II)V") => {
@@ -19934,24 +19962,55 @@ fn android_os_static(
             sysos_map(
                 vm,
                 name,
-                crate::jfile::os_chown(&path, iarg(args, 1), iarg(args, 2)),
+                crate::jfile::os_chown(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &path,
+                    iarg(args, 1),
+                    iarg(args, 2),
+                ),
             )?;
             Value::Null
         }
         ("close", "(Ljava/io/FileDescriptor;)V") => {
             let (fd_obj, fd) = sysos_fd_arg(vm, args, 0)?;
-            sysos_map(vm, "close", crate::jfile::os_close(fd))?;
+            sysos_map(
+                vm,
+                "close",
+                crate::jfile::os_close(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    fd,
+                ),
+            )?;
             put(vm, fd_obj, "descriptor", Value::Int(-1))?;
             Value::Null
         }
         ("dup", "(Ljava/io/FileDescriptor;)Ljava/io/FileDescriptor;") => {
             let (_, fd) = sysos_fd_arg(vm, args, 0)?;
-            let new_fd = sysos_map(vm, "dup", crate::jfile::os_dup(fd))?;
+            let new_fd = sysos_map(
+                vm,
+                "dup",
+                crate::jfile::os_dup(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    fd,
+                ),
+            )?;
             sysos_new_fd_obj(vm, new_fd)?
         }
         ("dup2", "(Ljava/io/FileDescriptor;I)Ljava/io/FileDescriptor;") => {
             let (fd_obj, fd) = sysos_fd_arg(vm, args, 0)?;
-            let new_fd = sysos_map(vm, "dup2", crate::jfile::os_dup2(fd, iarg(args, 1)))?;
+            let new_fd = sysos_map(
+                vm,
+                "dup2",
+                crate::jfile::os_dup2(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    fd,
+                    iarg(args, 1),
+                ),
+            )?;
             if new_fd == fd {
                 Value::Obj(fd_obj)
             } else {
@@ -19969,7 +20028,16 @@ fn android_os_static(
         }
         ("fchmod", "(Ljava/io/FileDescriptor;I)V") => {
             let (_, fd) = sysos_fd_arg(vm, args, 0)?;
-            sysos_map(vm, "fchmod", crate::jfile::os_fchmod(fd, iarg(args, 1)))?;
+            sysos_map(
+                vm,
+                "fchmod",
+                crate::jfile::os_fchmod(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    fd,
+                    iarg(args, 1),
+                ),
+            )?;
             Value::Null
         }
         ("fchown", "(Ljava/io/FileDescriptor;II)V") => {
@@ -19977,23 +20045,53 @@ fn android_os_static(
             sysos_map(
                 vm,
                 "fchown",
-                crate::jfile::os_fchown(fd, iarg(args, 1), iarg(args, 2)),
+                crate::jfile::os_fchown(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    fd,
+                    iarg(args, 1),
+                    iarg(args, 2),
+                ),
             )?;
             Value::Null
         }
         ("fdatasync", "(Ljava/io/FileDescriptor;)V") | ("fsync", "(Ljava/io/FileDescriptor;)V") => {
             let (_, fd) = sysos_fd_arg(vm, args, 0)?;
-            sysos_map(vm, name, crate::jfile::os_fsync(fd))?;
+            sysos_map(
+                vm,
+                name,
+                crate::jfile::os_fsync(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    fd,
+                ),
+            )?;
             Value::Null
         }
         ("fstat", "(Ljava/io/FileDescriptor;)Landroid/system/StructStat;") => {
             let (_, fd) = sysos_fd_arg(vm, args, 0)?;
-            let stat = sysos_map(vm, "fstat", crate::jfile::os_fstat(fd))?;
+            let stat = sysos_map(
+                vm,
+                "fstat",
+                crate::jfile::os_fstat(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    fd,
+                ),
+            )?;
             sysos_stat_obj(vm, &stat)?
         }
         ("fstatvfs", "(Ljava/io/FileDescriptor;)Landroid/system/StructStatVfs;") => {
             let (_, fd) = sysos_fd_arg(vm, args, 0)?;
-            let stat = sysos_map(vm, "fstatvfs", crate::jfile::os_fstatvfs(fd))?;
+            let stat = sysos_map(
+                vm,
+                "fstatvfs",
+                crate::jfile::os_fstatvfs(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    fd,
+                ),
+            )?;
             sysos_statvfs_obj(vm, &stat)?
         }
         ("ftruncate", "(Ljava/io/FileDescriptor;J)V") => {
@@ -20001,7 +20099,12 @@ fn android_os_static(
             sysos_map(
                 vm,
                 "ftruncate",
-                crate::jfile::os_ftruncate(fd, larg(args, 1)),
+                crate::jfile::os_ftruncate(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    fd,
+                    larg(args, 1),
+                ),
             )?;
             Value::Null
         }
@@ -20057,23 +20160,54 @@ fn android_os_static(
             Value::Long(sysos_map(
                 vm,
                 "lseek",
-                crate::jfile::os_lseek(fd, larg(args, 1), iarg(args, 2)),
+                crate::jfile::os_lseek(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    fd,
+                    larg(args, 1),
+                    iarg(args, 2),
+                ),
             )?)
         }
         ("stat", "(Ljava/lang/String;)Landroid/system/StructStat;")
         | ("lstat", "(Ljava/lang/String;)Landroid/system/StructStat;") => {
             let path = sysos_path_arg(vm, args, 0, name)?;
-            let stat = sysos_map(vm, name, crate::jfile::os_stat(&path))?;
+            let stat = sysos_map(
+                vm,
+                name,
+                crate::jfile::os_stat(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &path,
+                ),
+            )?;
             sysos_stat_obj(vm, &stat)?
         }
         ("statvfs", "(Ljava/lang/String;)Landroid/system/StructStatVfs;") => {
             let path = sysos_path_arg(vm, args, 0, "statvfs")?;
-            let stat = sysos_map(vm, "statvfs", crate::jfile::os_statvfs(&path))?;
+            let stat = sysos_map(
+                vm,
+                "statvfs",
+                crate::jfile::os_statvfs(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &path,
+                ),
+            )?;
             sysos_statvfs_obj(vm, &stat)?
         }
         ("mkdir", "(Ljava/lang/String;I)V") => {
             let path = sysos_path_arg(vm, args, 0, "mkdir")?;
-            sysos_map(vm, "mkdir", crate::jfile::os_mkdir(&path, iarg(args, 1)))?;
+            sysos_map(
+                vm,
+                "mkdir",
+                crate::jfile::os_mkdir(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &path,
+                    iarg(args, 1),
+                ),
+            )?;
             Value::Null
         }
         ("open", "(Ljava/lang/String;II)Ljava/io/FileDescriptor;") => {
@@ -20081,7 +20215,13 @@ fn android_os_static(
             let fd = sysos_map(
                 vm,
                 "open",
-                crate::jfile::os_open(&path, iarg(args, 1), iarg(args, 2)),
+                crate::jfile::os_open(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &path,
+                    iarg(args, 1),
+                    iarg(args, 2),
+                ),
             )?;
             sysos_new_fd_obj(vm, fd)?
         }
@@ -20091,7 +20231,16 @@ fn android_os_static(
             if count == 0 {
                 Value::Int(0)
             } else {
-                let bytes = sysos_map(vm, "read", crate::jfile::os_read(fd, count))?;
+                let bytes = sysos_map(
+                    vm,
+                    "read",
+                    crate::jfile::os_read(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        fd,
+                        count,
+                    ),
+                )?;
                 if bytes.is_empty() {
                     Value::Int(-1)
                 } else {
@@ -20110,7 +20259,13 @@ fn android_os_static(
                 let bytes = sysos_map(
                     vm,
                     "pread",
-                    crate::jfile::os_pread(fd, count, larg(args, 4)),
+                    crate::jfile::os_pread(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        fd,
+                        count,
+                        larg(args, 4),
+                    ),
                 )?;
                 if bytes.is_empty() {
                     Value::Int(-1)
@@ -20127,7 +20282,16 @@ fn android_os_static(
             if count == 0 {
                 Value::Int(0)
             } else {
-                Value::Int(sysos_map(vm, "write", crate::jfile::os_write(fd, &bytes))? as i32)
+                Value::Int(sysos_map(
+                    vm,
+                    "write",
+                    crate::jfile::os_write(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        fd,
+                        &bytes,
+                    ),
+                )? as i32)
             }
         }
         ("pwrite", "(Ljava/io/FileDescriptor;[BIIJ)I") => {
@@ -20139,7 +20303,13 @@ fn android_os_static(
                 Value::Int(sysos_map(
                     vm,
                     "pwrite",
-                    crate::jfile::os_pwrite(fd, &bytes, larg(args, 4)),
+                    crate::jfile::os_pwrite(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        fd,
+                        &bytes,
+                        larg(args, 4),
+                    ),
                 )? as i32)
             }
         }
@@ -20147,7 +20317,15 @@ fn android_os_static(
             let path = sysos_path_arg(vm, args, 0, "readlink")?;
             // The VFS has no links: a path that exists is not a symbolic
             // link (EINVAL), and all other failures keep their errno.
-            sysos_map(vm, "readlink", crate::jfile::os_stat(&path))?;
+            sysos_map(
+                vm,
+                "readlink",
+                crate::jfile::os_stat(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &path,
+                ),
+            )?;
             return Err(sysos_errno_exit(vm, "readlink", SYSEO_EINVAL));
         }
         ("realpath", "(Ljava/lang/String;)Ljava/lang/String;") => {
@@ -20155,29 +20333,62 @@ fn android_os_static(
                 Value::Null
             } else {
                 let path = sysos_path_arg(vm, args, 0, "realpath")?;
-                let canonical = sysos_map(vm, "realpath", crate::jfile::os_realpath(&path))?;
+                let canonical = sysos_map(
+                    vm,
+                    "realpath",
+                    crate::jfile::os_realpath(
+                        #[cfg(not(feature = "std"))]
+                        vm,
+                        &path,
+                    ),
+                )?;
                 jstr(vm, canonical)?
             }
         }
         ("remove", "(Ljava/lang/String;)V") => {
             let path = sysos_path_arg(vm, args, 0, "remove")?;
-            sysos_map(vm, "remove", crate::jfile::os_remove(&path))?;
+            sysos_map(
+                vm,
+                "remove",
+                crate::jfile::os_remove(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &path,
+                ),
+            )?;
             Value::Null
         }
         ("unlink", "(Ljava/lang/String;)V") => {
             let path = sysos_path_arg(vm, args, 0, "unlink")?;
-            sysos_map(vm, "unlink", crate::jfile::os_unlink(&path))?;
+            sysos_map(
+                vm,
+                "unlink",
+                crate::jfile::os_unlink(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &path,
+                ),
+            )?;
             Value::Null
         }
         ("rename", "(Ljava/lang/String;Ljava/lang/String;)V") => {
             let old_path = sysos_path_arg(vm, args, 0, "rename")?;
             let new_path = sysos_path_arg(vm, args, 1, "rename")?;
-            sysos_map(vm, "rename", crate::jfile::os_rename(&old_path, &new_path))?;
+            sysos_map(
+                vm,
+                "rename",
+                crate::jfile::os_rename(
+                    #[cfg(not(feature = "std"))]
+                    vm,
+                    &old_path,
+                    &new_path,
+                ),
+            )?;
             Value::Null
         }
         ("strerror", "(I)Ljava/lang/String;") => jstr(vm, sysos_strerror(iarg(args, 0)))?,
         ("uname", "()Landroid/system/StructUtsname;") => {
-            let machine = match std::env::consts::ARCH {
+            let machine = match crate::port_env::ARCH {
                 "aarch64" => "aarch64",
                 "arm" => "armv7l",
                 _ => "x86_64",
@@ -32720,14 +32931,14 @@ fn p41_tile_service_instance(
                 intent,
                 "getIBinderExtra",
                 "(Ljava/lang/String;)Landroid/os/IBinder;",
-                std::slice::from_ref(&service_key),
+                core::slice::from_ref(&service_key),
             )?;
             let token_key = jstr(vm, "token")?;
             let tile_token = vm.invoke_instance(
                 intent,
                 "getIBinderExtra",
                 "(Ljava/lang/String;)Landroid/os/IBinder;",
-                std::slice::from_ref(&token_key),
+                core::slice::from_ref(&token_key),
             )?;
             put(vm, recv, "mTileToken", tile_token)?;
             if matches!(service_binder, Value::Null) {
@@ -34500,7 +34711,7 @@ fn p35_recognition_service_instance(
             recv,
             "onTriggerModelDownload",
             "(Landroid/content/Intent;)V",
-            std::slice::from_ref(&p35_arg(args, 0)),
+            core::slice::from_ref(&p35_arg(args, 0)),
         )?,
         (
             "onTriggerModelDownload",
@@ -34617,7 +34828,7 @@ fn p35_recognition_support_instance(
                     list,
                     "add",
                     "(Ljava/lang/Object;)Z",
-                    std::slice::from_ref(&p35_arg(args, 0)),
+                    core::slice::from_ref(&p35_arg(args, 0)),
                 )?;
                 return Ok(Some(Value::Obj(recv)));
             }
@@ -37646,7 +37857,7 @@ fn p35c_compute_distance_bearing(
     lat2_deg: f64,
     lon2_deg: f64,
 ) -> (f32, f32, f32) {
-    use std::f64::consts::PI;
+    use core::f64::consts::PI;
     let lat1 = lat1_deg * PI / 180.0;
     let lat2 = lat2_deg * PI / 180.0;
     let lon1 = lon1_deg * PI / 180.0;
@@ -38392,7 +38603,7 @@ fn p35c_location_convert_from_string(input: &str) -> Result<f64, VmExit> {
     let parse_double = |token: &str| {
         crate::numerics::parse_float(token).map_err(|_| iae(format!("coordinate={coordinate}")))
     };
-    let bad_int = |_: std::num::ParseIntError| iae(format!("coordinate={coordinate}"));
+    let bad_int = |_: core::num::ParseIntError| iae(format!("coordinate={coordinate}"));
     if tokens.len() == 1 {
         let value = parse_double(tokens[0])?;
         return Ok(if negative { -value } else { value });
@@ -40371,7 +40582,7 @@ fn p35e_parse_dn(input: &str) -> Option<Vec<(String, String)>> {
             }
             ',' | '+' if !in_quotes => {
                 flush_hex(&mut buffer, &mut hex_buffer);
-                let raw = std::mem::take(&mut buffer);
+                let raw = core::mem::take(&mut buffer);
                 if raw.trim().is_empty() || !push_component(&raw, &mut components) {
                     return None;
                 }
@@ -41233,7 +41444,7 @@ fn p36a_length(x: f32, y: f32, z: f32) -> f32 {
 fn p36a_set_rotate(a: f32, mut x: f32, mut y: f32, mut z: f32) -> [f32; 16] {
     let mut out = [0.0f32; 16];
     out[15] = 1.0;
-    let radians = a * (std::f32::consts::PI / 180.0f32);
+    let radians = a * (core::f32::consts::PI / 180.0f32);
     let s = (radians as f64).sin() as f32;
     let c = (radians as f64).cos() as f32;
     if 1.0 == x && 0.0 == y && 0.0 == z {
@@ -41283,7 +41494,7 @@ fn p36a_set_rotate(a: f32, mut x: f32, mut y: f32, mut z: f32) -> [f32; 16] {
 }
 
 fn p36a_set_rotate_euler(x: f32, y: f32, z: f32, corrected: bool) -> [f32; 16] {
-    let factor = std::f32::consts::PI / 180.0f32;
+    let factor = core::f32::consts::PI / 180.0f32;
     let x = x * factor;
     let y = y * factor;
     let z = z * factor;
@@ -41539,7 +41750,7 @@ fn p36a_matrix_static(
             let aspect = farg(args, 3);
             let z_near = farg(args, 4);
             let z_far = farg(args, 5);
-            let f = (1.0f64 / (fovy as f64 * (std::f64::consts::PI / 360.0)).tan()) as f32;
+            let f = (1.0f64 / (fovy as f64 * (core::f64::consts::PI / 360.0)).tan()) as f32;
             let range_reciprocal = 1.0 / (z_near - z_far);
             let mut output = [0.0f32; 16];
             output[0] = f / aspect;
@@ -42884,13 +43095,13 @@ fn p36c_new_discovery_info(
         info,
         "setServiceType",
         "(Ljava/lang/String;)V",
-        std::slice::from_ref(&service_type),
+        core::slice::from_ref(&service_type),
     )?;
     vm.invoke_instance(
         info,
         "setNetwork",
         "(Landroid/net/Network;)V",
-        std::slice::from_ref(&network),
+        core::slice::from_ref(&network),
     )?;
     Ok(Value::Obj(info))
 }
@@ -43121,7 +43332,7 @@ fn p36c_sip_static(
                     P36C_SIP_MANAGER,
                     "isApiSupported",
                     "(Landroid/content/Context;)Z",
-                    std::slice::from_ref(&context),
+                    core::slice::from_ref(&context),
                 )?
             }
         }
@@ -43131,7 +43342,7 @@ fn p36c_sip_static(
                 P36C_SIP_MANAGER,
                 "isApiSupported",
                 "(Landroid/content/Context;)Z",
-                std::slice::from_ref(&context),
+                core::slice::from_ref(&context),
             )?;
             if supported.as_int().unwrap_or(0) == 0 {
                 Value::Null
@@ -43141,7 +43352,7 @@ fn p36c_sip_static(
                     manager,
                     "<init>",
                     "(Landroid/content/Context;)V",
-                    std::slice::from_ref(&context),
+                    core::slice::from_ref(&context),
                 )?;
                 Value::Obj(manager)
             }
@@ -43155,7 +43366,7 @@ fn p36c_sip_static(
                 intent,
                 "getStringExtra",
                 "(Ljava/lang/String;)Ljava/lang/String;",
-                std::slice::from_ref(&key),
+                core::slice::from_ref(&key),
             )?
         }
         ("getOfferSessionDescription", "(Landroid/content/Intent;)Ljava/lang/String;") => {
@@ -43167,7 +43378,7 @@ fn p36c_sip_static(
                 intent,
                 "getStringExtra",
                 "(Ljava/lang/String;)Ljava/lang/String;",
-                std::slice::from_ref(&key),
+                core::slice::from_ref(&key),
             )?
         }
         ("isIncomingCallIntent", "(Landroid/content/Intent;)Z") => {
@@ -43179,13 +43390,13 @@ fn p36c_sip_static(
                     P36C_SIP_MANAGER,
                     "getCallId",
                     "(Landroid/content/Intent;)Ljava/lang/String;",
-                    std::slice::from_ref(&intent),
+                    core::slice::from_ref(&intent),
                 )?;
                 let offer = vm.invoke_static(
                     P36C_SIP_MANAGER,
                     "getOfferSessionDescription",
                     "(Landroid/content/Intent;)Ljava/lang/String;",
-                    std::slice::from_ref(&intent),
+                    core::slice::from_ref(&intent),
                 )?;
                 Value::Int(i32::from(
                     matches!(call_id, Value::Obj(_)) && matches!(offer, Value::Obj(_)),
@@ -43284,7 +43495,7 @@ fn p36c_sip_instance(
                 P36C_SIP_MANAGER,
                 "isVoipSupported",
                 "(Landroid/content/Context;)Z",
-                std::slice::from_ref(&context),
+                core::slice::from_ref(&context),
             )?;
             if supported.as_int().unwrap_or(0) == 0 {
                 return Err(throw(
@@ -43309,7 +43520,7 @@ fn p36c_sip_instance(
                 P36C_SIP_MANAGER,
                 "getCallId",
                 "(Landroid/content/Intent;)Ljava/lang/String;",
-                std::slice::from_ref(&intent),
+                core::slice::from_ref(&intent),
             )?;
             if matches!(call_id, Value::Null) {
                 return Err(throw(
@@ -43321,7 +43532,7 @@ fn p36c_sip_instance(
                 P36C_SIP_MANAGER,
                 "getOfferSessionDescription",
                 "(Landroid/content/Intent;)Ljava/lang/String;",
-                std::slice::from_ref(&intent),
+                core::slice::from_ref(&intent),
             )?;
             if matches!(offer, Value::Null) {
                 return Err(throw(
@@ -43554,14 +43765,14 @@ fn p36d_new_bluetooth_device(
             device,
             "<init>",
             "(Ljava/lang/String;)V",
-            std::slice::from_ref(&address),
+            core::slice::from_ref(&address),
         )?;
     }
     vm.invoke_instance(
         device,
         "setAttributionSource",
         "(Landroid/content/AttributionSource;)V",
-        std::slice::from_ref(&attribution),
+        core::slice::from_ref(&attribution),
     )?;
     Ok(Value::Obj(device))
 }
@@ -43723,7 +43934,7 @@ fn p36d_bt_adapter_instance(
                 manager,
                 name,
                 "(Landroid/content/AttributionSource;)Ljava/lang/String;",
-                std::slice::from_ref(&attribution),
+                core::slice::from_ref(&attribution),
             ) {
                 Err(VmExit::Exception(t)) if t.class == "Landroid/os/RemoteException;" => {
                     Value::Null
@@ -43768,7 +43979,7 @@ fn p36d_bt_manager_instance(
                 P36D_BT_ADAPTER,
                 "createAdapter",
                 "(Landroid/content/AttributionSource;)Landroid/bluetooth/BluetoothAdapter;",
-                std::slice::from_ref(&attribution),
+                core::slice::from_ref(&attribution),
             )?;
             put(vm, recv, "mAttributionSource", attribution)?;
             put(vm, recv, "mAdapter", adapter)?;
@@ -43833,7 +44044,7 @@ fn p36d_bt_manager_instance(
                     device_ref,
                     "equals",
                     "(Ljava/lang/Object;)Z",
-                    std::slice::from_ref(&connected_device),
+                    core::slice::from_ref(&connected_device),
                 )?;
                 if equal.as_int().unwrap_or(0) != 0 {
                     state = 2;
@@ -44424,7 +44635,7 @@ fn p36d_set_scan_filter_address(
             P36D_BT_ADAPTER,
             "isAddressRandomStatic",
             "(Ljava/lang/String;)Z",
-            std::slice::from_ref(&address),
+            core::slice::from_ref(&address),
         )?;
         if random_static.as_int().unwrap_or(0) == 0 {
             return Err(iae(
@@ -45035,14 +45246,14 @@ fn p36d_nfc_a_instance(
                 extras,
                 "getShort",
                 "(Ljava/lang/String;)S",
-                std::slice::from_ref(&sak_key),
+                core::slice::from_ref(&sak_key),
             )?;
             let atqa_key = jstr(vm, "atqa".to_string())?;
             let atqa = vm.invoke_instance(
                 extras,
                 "getByteArray",
                 "(Ljava/lang/String;)[B",
-                std::slice::from_ref(&atqa_key),
+                core::slice::from_ref(&atqa_key),
             )?;
             put(vm, recv, "mSak", sak)?;
             put(vm, recv, "mAtqa", atqa)?;
@@ -45298,7 +45509,7 @@ fn p36d_card_emulation_static(
                 pm,
                 "hasSystemFeature",
                 "(Ljava/lang/String;)Z",
-                std::slice::from_ref(&feature),
+                core::slice::from_ref(&feature),
             )?;
             if supported.as_int().unwrap_or(0) == 0 {
                 return Err(throw("Ljava/lang/UnsupportedOperationException;", ""));
@@ -45416,7 +45627,7 @@ fn p36d_aid_group_instance(
                     P36D_CARD_EMULATION,
                     "isValidAid",
                     "(Ljava/lang/String;)Z",
-                    std::slice::from_ref(aid),
+                    core::slice::from_ref(aid),
                 )?;
                 if valid.as_int().unwrap_or(0) == 0 {
                     let shown = p36c_object_string(vm, aid)?;
@@ -45528,7 +45739,7 @@ fn partial36e_host_static(
                 "Ljava/util/UUID;",
                 "fromString",
                 "(Ljava/lang/String;)Ljava/util/UUID;",
-                std::slice::from_ref(&text),
+                core::slice::from_ref(&text),
             )?;
             vm.statics.insert(key, value.clone());
             return Ok(Some(value));
@@ -45725,7 +45936,7 @@ fn p36e_clone_bundle(vm: &mut Engine, source: &Value) -> Result<Value, VmExit> {
         copy_ref,
         "<init>",
         "(Landroid/os/Bundle;)V",
-        std::slice::from_ref(&Value::Obj(source_ref)),
+        core::slice::from_ref(&Value::Obj(source_ref)),
     )?;
     Ok(copy)
 }
@@ -45758,7 +45969,7 @@ fn p36e_list_add(vm: &mut Engine, list: &Value, item: Value) -> Result<(), VmExi
         *list_ref,
         "add",
         "(Ljava/lang/Object;)Z",
-        std::slice::from_ref(&item),
+        core::slice::from_ref(&item),
     )?;
     Ok(())
 }
@@ -46167,7 +46378,7 @@ fn p36e_metadata_bundle_call(
     key: &Value,
 ) -> Result<Value, VmExit> {
     let bundle = p36e_bundle_ref(vm, receiver)?;
-    vm.invoke_instance(bundle, method, sig, std::slice::from_ref(key))
+    vm.invoke_instance(bundle, method, sig, core::slice::from_ref(key))
 }
 
 fn p36e_metadata_text_by_key(
@@ -46180,7 +46391,7 @@ fn p36e_metadata_text_by_key(
         receiver,
         "getText",
         "(Ljava/lang/String;)Ljava/lang/CharSequence;",
-        std::slice::from_ref(&key),
+        core::slice::from_ref(&key),
     )
 }
 
@@ -46194,7 +46405,7 @@ fn p36e_metadata_string_by_key(
         receiver,
         "getString",
         "(Ljava/lang/String;)Ljava/lang/String;",
-        std::slice::from_ref(&key),
+        core::slice::from_ref(&key),
     )
 }
 
@@ -46205,7 +46416,7 @@ fn p36e_metadata_long_by_key(vm: &mut Engine, receiver: ObjRef, key: &str) -> Re
             receiver,
             "getLong",
             "(Ljava/lang/String;)J",
-            std::slice::from_ref(&key),
+            core::slice::from_ref(&key),
         )?
         .as_long()
         .unwrap_or(0))
@@ -46266,7 +46477,7 @@ fn p36e_media_metadata_instance(
                 recv,
                 "getText",
                 "(Ljava/lang/String;)Ljava/lang/CharSequence;",
-                std::slice::from_ref(&key),
+                core::slice::from_ref(&key),
             )?;
             match text {
                 Value::Obj(object) => {
@@ -46382,7 +46593,7 @@ fn p36e_media_metadata_instance(
                             "Landroid/net/Uri;",
                             "parse",
                             "(Ljava/lang/String;)Landroid/net/Uri;",
-                            std::slice::from_ref(&next),
+                            core::slice::from_ref(&next),
                         )?;
                         break;
                     }
@@ -46396,7 +46607,7 @@ fn p36e_media_metadata_instance(
                         "Landroid/net/Uri;",
                         "parse",
                         "(Ljava/lang/String;)Landroid/net/Uri;",
-                        std::slice::from_ref(&media_uri_text),
+                        core::slice::from_ref(&media_uri_text),
                     )?
                 };
                 let builder = p36e_new(vm, P36E_MEDIA_DESCRIPTION_BUILDER, "()V", &[])?;
@@ -46407,50 +46618,50 @@ fn p36e_media_metadata_instance(
                     builder_ref,
                     "setMediaId",
                     "(Ljava/lang/String;)Landroid/media/MediaDescription$Builder;",
-                    std::slice::from_ref(&media_id),
+                    core::slice::from_ref(&media_id),
                 )?;
                 vm.invoke_instance(
                     builder_ref,
                     "setTitle",
                     "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
-                    std::slice::from_ref(&texts[0]),
+                    core::slice::from_ref(&texts[0]),
                 )?;
                 vm.invoke_instance(
                     builder_ref,
                     "setSubtitle",
                     "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
-                    std::slice::from_ref(&texts[1]),
+                    core::slice::from_ref(&texts[1]),
                 )?;
                 vm.invoke_instance(
                     builder_ref,
                     "setDescription",
                     "(Ljava/lang/CharSequence;)Landroid/media/MediaDescription$Builder;",
-                    std::slice::from_ref(&texts[2]),
+                    core::slice::from_ref(&texts[2]),
                 )?;
                 vm.invoke_instance(
                     builder_ref,
                     "setIconBitmap",
                     "(Landroid/graphics/Bitmap;)Landroid/media/MediaDescription$Builder;",
-                    std::slice::from_ref(&icon),
+                    core::slice::from_ref(&icon),
                 )?;
                 vm.invoke_instance(
                     builder_ref,
                     "setIconUri",
                     "(Landroid/net/Uri;)Landroid/media/MediaDescription$Builder;",
-                    std::slice::from_ref(&icon_uri),
+                    core::slice::from_ref(&icon_uri),
                 )?;
                 vm.invoke_instance(
                     builder_ref,
                     "setMediaUri",
                     "(Landroid/net/Uri;)Landroid/media/MediaDescription$Builder;",
-                    std::slice::from_ref(&media_uri),
+                    core::slice::from_ref(&media_uri),
                 )?;
                 let folder_key = jstr(vm, "android.media.metadata.BT_FOLDER_TYPE")?;
                 let contains_folder = vm.invoke_instance(
                     recv,
                     "containsKey",
                     "(Ljava/lang/String;)Z",
-                    std::slice::from_ref(&folder_key),
+                    core::slice::from_ref(&folder_key),
                 )?;
                 if contains_folder.as_int().unwrap_or(0) != 0 {
                     let extras = empty_bundle(vm)?;
@@ -46473,7 +46684,7 @@ fn p36e_media_metadata_instance(
                         builder_ref,
                         "setExtras",
                         "(Landroid/os/Bundle;)Landroid/media/MediaDescription$Builder;",
-                        std::slice::from_ref(&extras),
+                        core::slice::from_ref(&extras),
                     )?;
                 }
                 let description = vm.invoke_instance(
@@ -46527,7 +46738,7 @@ fn p36e_media_metadata_instance(
                 match kind {
                     1 => {
                         let text = p36e_metadata_string_by_key(vm, recv, key)?;
-                        let object_hash = p36e_objects_hash(vm, std::slice::from_ref(&text))?;
+                        let object_hash = p36e_objects_hash(vm, core::slice::from_ref(&text))?;
                         hash = hash.wrapping_mul(31).wrapping_add(object_hash);
                     }
                     0 => {
@@ -46676,7 +46887,7 @@ fn p36e_media_metadata_builder_instance(
                         bundle,
                         "get",
                         "(Ljava/lang/String;)Ljava/lang/Object;",
-                        std::slice::from_ref(&key),
+                        core::slice::from_ref(&key),
                     )?;
                     let Value::Obj(bitmap) = stored else {
                         continue;
@@ -46941,7 +47152,7 @@ fn p36e_playback_state_builder_instance(
                 recv,
                 "addCustomAction",
                 "(Landroid/media/session/PlaybackState$CustomAction;)Landroid/media/session/PlaybackState$Builder;",
-                std::slice::from_ref(&action),
+                core::slice::from_ref(&action),
             )?
         }
         (
@@ -47615,7 +47826,7 @@ fn p36e_media_browser_instance(
                     callback,
                     "onError",
                     "(Ljava/lang/String;)V",
-                    std::slice::from_ref(&media_id),
+                    core::slice::from_ref(&media_id),
                 )?;
             }
             Value::Null
@@ -47757,7 +47968,7 @@ fn p36e_projection_manager_instance(
                 intent,
                 "getIBinderExtra",
                 "(Ljava/lang/String;)Landroid/os/IBinder;",
-                std::slice::from_ref(&extra),
+                core::slice::from_ref(&extra),
             )?;
             if !matches!(projection, Value::Obj(_)) {
                 Value::Null
@@ -47831,7 +48042,7 @@ fn p36e_projection_manager_instance(
                 service,
                 "addCallback",
                 "(Landroid/media/projection/IMediaProjectionWatcherCallback;)V",
-                std::slice::from_ref(&Value::Obj(delegate)),
+                core::slice::from_ref(&Value::Obj(delegate)),
             ) {
                 Err(VmExit::Exception(throwable))
                     if throwable.class == "Landroid/os/RemoteException;" =>
@@ -47859,7 +48070,7 @@ fn p36e_projection_manager_instance(
                         service,
                         "removeCallback",
                         "(Landroid/media/projection/IMediaProjectionWatcherCallback;)V",
-                        std::slice::from_ref(&delegate),
+                        core::slice::from_ref(&delegate),
                     ) {
                         Err(VmExit::Exception(throwable))
                             if throwable.class == "Landroid/os/RemoteException;" =>
@@ -48074,7 +48285,7 @@ fn p36e_uuid_from_string(vm: &mut Engine, value: &Value) -> Result<Value, VmExit
         "Ljava/util/UUID;",
         "fromString",
         "(Ljava/lang/String;)Ljava/util/UUID;",
-        std::slice::from_ref(value),
+        core::slice::from_ref(value),
     )
 }
 
@@ -48156,7 +48367,7 @@ fn p36e_audio_effect_descriptor_instance(
                     parcel,
                     "writeString",
                     "(Ljava/lang/String;)V",
-                    std::slice::from_ref(&text),
+                    core::slice::from_ref(&text),
                 )?;
             }
             Value::Null
@@ -49155,7 +49366,7 @@ fn p36f_mat_rotate_axis(dim: usize, rot: f32, x: f32, y: f32, z: f32) -> Vec<f32
     if dim == 4 {
         m[15] = 1.0;
     }
-    let rot = rot * (std::f32::consts::PI / 180.0);
+    let rot = rot * (core::f32::consts::PI / 180.0);
     let c = rot.cos();
     let s = rot.sin();
     // AOSP: `if (!(len != 1))` normalizes only an already-unit axis.
@@ -49190,7 +49401,7 @@ fn p36f_mat_rotate2d(dim: usize, rot: f32) -> Vec<f32> {
     } else {
         vec![0.0; 4]
     };
-    let rot = rot * (std::f32::consts::PI / 180.0);
+    let rot = rot * (core::f32::consts::PI / 180.0);
     let c = rot.cos();
     let s = rot.sin();
     m[0] = c;
@@ -49418,7 +49629,7 @@ fn p36f_matrix_instance(
             let aspect = farg(args, 1);
             let near = farg(args, 2);
             let far = farg(args, 3);
-            let top = near * (fovy * std::f32::consts::PI / 360.0).tan();
+            let top = near * (fovy * core::f32::consts::PI / 360.0).tan();
             let bottom = -top;
             let out = p36f_mat_frustum(bottom * aspect, top * aspect, bottom, top, near, far);
             store(vm, &out)?;
@@ -51092,7 +51303,7 @@ fn p36h_ssid_utf8_text(bytes: &[u8]) -> Option<String> {
     let mut units = 0usize;
     let mut rest = bytes;
     while !rest.is_empty() && units < 32 {
-        match std::str::from_utf8(rest) {
+        match core::str::from_utf8(rest) {
             Ok(s) => {
                 for c in s.chars() {
                     if units + c.len_utf16() > 32 {
@@ -51108,7 +51319,7 @@ fn p36h_ssid_utf8_text(bytes: &[u8]) -> Option<String> {
                 if valid_up_to == 0 {
                     return None;
                 }
-                let prefix = std::str::from_utf8(&rest[..valid_up_to]).ok()?;
+                let prefix = core::str::from_utf8(&rest[..valid_up_to]).ok()?;
                 for c in prefix.chars() {
                     if units + c.len_utf16() > 32 {
                         return Some(out);
@@ -52750,7 +52961,7 @@ fn p36i_guest_equals(vm: &mut Engine, a: &Value, b: &Value) -> bool {
                         *x,
                         "equals",
                         "(Ljava/lang/Object;)Z",
-                        std::slice::from_ref(b)
+                        core::slice::from_ref(b)
                     ),
                     Ok(Value::Int(1))
                 )

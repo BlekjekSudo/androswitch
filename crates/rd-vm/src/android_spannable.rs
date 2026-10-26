@@ -17,8 +17,9 @@
 //! - **Copying.** Copying a `Spanned` source (constructor, `append`,
 //!   `insert`, `replace`) copies its spans.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -37,24 +38,23 @@ struct Span {
 }
 
 #[derive(Debug, Clone, Default)]
-struct State {
+pub(crate) struct State {
     text: Vec<u16>,
     spans: Vec<Span>,
 }
 
-thread_local! {
-    static STATES: RefCell<HashMap<ObjRef, State>> = RefCell::new(HashMap::new());
-}
-
 /// GC: objects that have state here (marking consults `gc_entry` only
 /// for these).
-pub(crate) fn gc_keys(out: &mut Vec<ObjRef>) {
-    STATES.with(|m| out.extend(m.borrow().keys().copied()));
+pub(crate) fn gc_keys(vm: &Engine, out: &mut Vec<ObjRef>) {
+    vm.module_tables
+        .android_spannable_states
+        .clone()
+        .with(|m| out.extend(m.borrow().keys().copied()));
 }
 
 /// GC ephemeron: state of a reachable object (holds heap refs).
-pub(crate) fn gc_entry(r: ObjRef, out: &mut impl std::fmt::Write) {
-    STATES.with(|m| {
+pub(crate) fn gc_entry(vm: &Engine, r: ObjRef, out: &mut impl core::fmt::Write) {
+    vm.module_tables.android_spannable_states.clone().with(|m| {
         if let Some(v) = m.borrow().get(&r) {
             let _ = write!(out, "|{v:?}");
         }
@@ -62,16 +62,14 @@ pub(crate) fn gc_entry(r: ObjRef, out: &mut impl std::fmt::Write) {
 }
 
 /// GC: drop state of collected objects (slots are reused).
-pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
-    STATES.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+pub(crate) fn gc_purge(vm: &Engine, alive: &dyn Fn(ObjRef) -> bool) {
+    vm.module_tables
+        .android_spannable_states
+        .clone()
+        .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
-/// Issue #230: esvazia a tabela na fronteira de `Engine` — sem isso um
-/// `Engine` novo na mesma thread herda estados indexados por `ObjRef`s
-/// de um heap morto (os refs reiniciam a cada `Heap::new`).
-pub(crate) fn reset_all() {
-    STATES.with(|m| m.borrow_mut().clear());
-}
+// Issue #230: this state now belongs to Engine.module_tables and dies with its heap.
 
 pub(crate) fn is_spannable(class: &str) -> bool {
     class == SS || class == SSB
@@ -92,7 +90,12 @@ fn int(args: &[Value], i: usize) -> Result<i32, VmExit> {
 fn source(vm: &mut Engine, v: Option<&Value>) -> Result<State, VmExit> {
     match v {
         Some(Value::Obj(r)) => {
-            if let Some(st) = STATES.with(|s| s.borrow().get(r).cloned()) {
+            if let Some(st) = vm
+                .module_tables
+                .android_spannable_states
+                .clone()
+                .with(|s| s.borrow().get(r).cloned())
+            {
                 return Ok(st);
             }
             let s = match vm.heap.as_str(*r) {
@@ -112,12 +115,15 @@ fn source(vm: &mut Engine, v: Option<&Value>) -> Result<State, VmExit> {
     }
 }
 
-fn get(r: ObjRef) -> State {
-    STATES.with(|s| s.borrow().get(&r).cloned().unwrap_or_default())
+fn get(vm: &Engine, r: ObjRef) -> State {
+    vm.module_tables
+        .android_spannable_states
+        .clone()
+        .with(|s| s.borrow().get(&r).cloned().unwrap_or_default())
 }
 
-fn put(r: ObjRef, st: State) {
-    STATES.with(|s| {
+fn put(vm: &Engine, r: ObjRef, st: State) {
+    vm.module_tables.android_spannable_states.clone().with(|s| {
         s.borrow_mut().insert(r, st);
     });
 }
@@ -176,7 +182,7 @@ fn jstr(vm: &mut Engine, s: String) -> Result<Value, VmExit> {
 
 fn new_obj(vm: &mut Engine, class: &str, st: State) -> Result<Value, VmExit> {
     let r = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
-    put(r, st);
+    put(vm, r, st);
     Ok(Value::Obj(r))
 }
 
@@ -235,12 +241,12 @@ pub fn instance_intrinsic(
                 }
                 st = sub;
             }
-            put(recv, st);
+            put(vm, recv, st);
             Value::Null
         }
-        "length" => Value::Int(get(recv).text.len() as i32),
+        "length" => Value::Int(get(vm, recv).text.len() as i32),
         "charAt" => {
-            let st = get(recv);
+            let st = get(vm, recv);
             let i = int(args, 0)?;
             match st.text.get(i.max(0) as usize) {
                 Some(c) if i >= 0 => Value::Int(*c as i32),
@@ -253,11 +259,11 @@ pub fn instance_intrinsic(
             }
         }
         "toString" => {
-            let st = get(recv);
+            let st = get(vm, recv);
             jstr(vm, String::from_utf16_lossy(&st.text))?
         }
         "hashCode" => {
-            let st = get(recv);
+            let st = get(vm, recv);
             Value::Int(
                 st.text
                     .iter()
@@ -265,17 +271,23 @@ pub fn instance_intrinsic(
             )
         }
         "equals" => {
-            let st = get(recv);
+            let st = get(vm, recv);
             let same = match args.first() {
-                Some(Value::Obj(o)) if STATES.with(|s| s.borrow().contains_key(o)) => {
-                    get(*o).text == st.text
+                Some(Value::Obj(o))
+                    if vm
+                        .module_tables
+                        .android_spannable_states
+                        .clone()
+                        .with(|s| s.borrow().contains_key(o)) =>
+                {
+                    get(vm, *o).text == st.text
                 }
                 _ => false,
             };
             Value::Int(same as i32)
         }
         "subSequence" => {
-            let st = get(recv);
+            let st = get(vm, recv);
             let (a, b) = range(st.text.len(), int(args, 0)?, int(args, 1)?, "subSequence")?;
             let mut sub = State {
                 text: st.text[a..b].to_vec(),
@@ -294,7 +306,7 @@ pub fn instance_intrinsic(
         }
         "getChars" => {
             // getChars(int start, int end, char[] dest, int destoff)
-            let st = get(recv);
+            let st = get(vm, recv);
             let (a, b) = range(st.text.len(), int(args, 0)?, int(args, 1)?, "getChars")?;
             if let Some(Value::Obj(dst)) = args.get(2) {
                 let off = int(args, 3)?.max(0) as usize;
@@ -308,7 +320,7 @@ pub fn instance_intrinsic(
             Value::Null
         }
         "setSpan" => {
-            let mut st = get(recv);
+            let mut st = get(vm, recv);
             let (a, b) = range(st.text.len(), int(args, 1)?, int(args, 2)?, "setSpan")?;
             let what = args.first().cloned().unwrap_or(Value::Null);
             let flags = int(args, 3)?;
@@ -324,18 +336,18 @@ pub fn instance_intrinsic(
                     flags,
                 });
             }
-            put(recv, st);
+            put(vm, recv, st);
             Value::Null
         }
         "removeSpan" => {
-            let mut st = get(recv);
+            let mut st = get(vm, recv);
             let what = args.first().cloned().unwrap_or(Value::Null);
             st.spans.retain(|s| s.what != what);
-            put(recv, st);
+            put(vm, recv, st);
             Value::Null
         }
         "getSpanStart" | "getSpanEnd" | "getSpanFlags" => {
-            let st = get(recv);
+            let st = get(vm, recv);
             let what = args.first().cloned().unwrap_or(Value::Null);
             Value::Int(match st.spans.iter().find(|s| s.what == what) {
                 Some(s) if name == "getSpanStart" => s.start as i32,
@@ -346,7 +358,7 @@ pub fn instance_intrinsic(
             })
         }
         "getSpans" => {
-            let st = get(recv);
+            let st = get(vm, recv);
             let (qa, qb) = (int(args, 0)?.max(0) as usize, int(args, 1)?.max(0) as usize);
             let want = match args.get(2) {
                 Some(Value::Obj(c)) => crate::reflect::class_desc(vm, *c)
@@ -375,7 +387,7 @@ pub fn instance_intrinsic(
         }
         "nextSpanTransition" => {
             // nextSpanTransition(int start, int limit, Class kind)
-            let st = get(recv);
+            let st = get(vm, recv);
             let (start, limit) = (int(args, 0)?.max(0) as usize, int(args, 1)?.max(0) as usize);
             let mut next = limit;
             for sp in &st.spans {
@@ -390,7 +402,7 @@ pub fn instance_intrinsic(
         }
         // ── SpannableStringBuilder editing ──────────────────────────────
         "append" if builder => {
-            let mut st = get(recv);
+            let mut st = get(vm, recv);
             let src = match sig {
                 "(C)Landroid/text/SpannableStringBuilder;"
                 | "(C)Landroid/text/Editable;"
@@ -430,20 +442,20 @@ pub fn instance_intrinsic(
                     flags: int(args, 2)?,
                 });
             }
-            put(recv, st);
+            put(vm, recv, st);
             Value::Obj(recv)
         }
         "insert" if builder => {
-            let mut st = get(recv);
+            let mut st = get(vm, recv);
             let at = int(args, 0)?;
             let (a, _) = range(st.text.len(), at, at, "insert")?;
             let src = source(vm, args.get(1))?;
             splice(&mut st, a, a, &src);
-            put(recv, st);
+            put(vm, recv, st);
             Value::Obj(recv)
         }
         "replace" if builder => {
-            let mut st = get(recv);
+            let mut st = get(vm, recv);
             let (a, b) = range(st.text.len(), int(args, 0)?, int(args, 1)?, "replace")?;
             let mut src = source(vm, args.get(2))?;
             if args.len() >= 5 {
@@ -454,24 +466,24 @@ pub fn instance_intrinsic(
                 };
             }
             splice(&mut st, a, b, &src);
-            put(recv, st);
+            put(vm, recv, st);
             Value::Obj(recv)
         }
         "delete" if builder => {
-            let mut st = get(recv);
+            let mut st = get(vm, recv);
             let (a, b) = range(st.text.len(), int(args, 0)?, int(args, 1)?, "delete")?;
             splice(&mut st, a, b, &State::default());
-            put(recv, st);
+            put(vm, recv, st);
             Value::Obj(recv)
         }
         "clear" if builder => {
-            put(recv, State::default());
+            put(vm, recv, State::default());
             Value::Null
         }
         "clearSpans" => {
-            let mut st = get(recv);
+            let mut st = get(vm, recv);
             st.spans.clear();
-            put(recv, st);
+            put(vm, recv, st);
             Value::Null
         }
         _ => return Ok(None),
@@ -481,6 +493,9 @@ pub fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn splice_shifts_spans() {
         let mut st = State {

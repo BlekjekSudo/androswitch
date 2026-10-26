@@ -28,6 +28,9 @@
 use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const VT: &str = "Landroid/view/VelocityTracker;";
@@ -390,6 +393,9 @@ pub fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     /// Samples at `t_ms` = 0, 10, …, newest first, with `f(t_ms)` as x.
     fn series(end_ms: i64, count: i64, f: impl Fn(f32) -> f32) -> Vec<Sample> {

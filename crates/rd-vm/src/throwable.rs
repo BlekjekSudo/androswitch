@@ -20,7 +20,10 @@
 //! - `printStackTrace` writes `toString()` plus the `Caused by:` chain to the
 //!   log as `W/System.err`.
 
-use std::fmt::Write as _;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
+use core::fmt::Write as _;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -28,10 +31,16 @@ use crate::heap::{ElemKind, ObjRef};
 use crate::value::Value;
 
 fn field(vm: &Engine, r: ObjRef, f: &str) -> Value {
+    if f == "message" {
+        return crate::throwable_message::stored(vm, r).unwrap_or(Value::Null);
+    }
     vm.heap.get_field(r, f).unwrap_or(Value::Null)
 }
 
 fn put(vm: &mut Engine, r: ObjRef, f: &str, v: Value) -> Result<(), VmExit> {
+    if f == "message" {
+        return crate::throwable_message::set(vm, r, v);
+    }
     crate::err::put_field_result(vm.heap.put_field(r, f, v))
 }
 
@@ -69,7 +78,7 @@ pub(crate) fn instance_intrinsic(
     // `rd_trace`. Uncaught-exception logging prints it.
     if name == "<init>" && vm.config.exception_trace {
         let mut trace = String::new();
-        for label in vm.frame_labels.iter().rev().take(16) {
+        for label in vm.frame_labels().rev().take(16) {
             let _ = write!(&mut trace, "\n  at {label}");
         }
         let t = crate::intrinsics::alloc_string(vm, trace)?;
@@ -204,7 +213,7 @@ pub(crate) fn instance_intrinsic(
                 cur = c;
             }
             for l in out.lines() {
-                crate::intrinsics::host_print(1, &format!("W/System.err: {l}\n"));
+                crate::intrinsics::host_print(vm, 1, &format!("W/System.err: {l}\n"));
             }
             Ok(Some(Value::Null))
         }

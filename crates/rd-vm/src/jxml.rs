@@ -8,6 +8,9 @@
 use crate::engine::Engine;
 use crate::err::{put_field_result, Throwable, VmExit};
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const INPUT_SOURCE: &str = "Lorg/xml/sax/InputSource;";
@@ -432,7 +435,7 @@ fn resolve_element_attributes(
     ns_stack.push(frame);
 
     let mut resolved = Vec::with_capacity(raw_attrs.len());
-    let mut expanded_names = std::collections::HashSet::new();
+    let mut expanded_names = crate::maps::HashSet::new();
     for (name, value) in raw_attrs {
         if name == "xmlns" || name.starts_with("xmlns:") {
             if ns_prefixes {
@@ -1098,7 +1101,7 @@ fn parse_xml(xml: &str) -> Result<Vec<XmlEvent>, String> {
             root_count += 1;
         }
         let mut attributes = Vec::new();
-        let mut names = std::collections::HashSet::new();
+        let mut names = crate::maps::HashSet::new();
         let self_closing;
         loop {
             skip_space(bytes, &mut offset);
@@ -1298,6 +1301,9 @@ mod tests {
         XmlEventKind, ATTRIBUTES_IMPL, LOCATOR_IMPL,
     };
     use crate::engine::{Engine, VmConfig};
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     use crate::value::Value;
 
     #[test]

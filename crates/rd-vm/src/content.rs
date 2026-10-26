@@ -22,6 +22,9 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const RESOLVER: &str = "Landroid/content/ContentResolver;";
@@ -34,7 +37,7 @@ pub(crate) struct ContentState {
     /// (uri string, notifyForDescendants, observer)
     pub observers: Vec<(String, bool, ObjRef)>,
     /// "global/animator_duration_scale" → "1.0"
-    pub settings: std::collections::HashMap<String, String>,
+    pub settings: crate::maps::HashMap<String, String>,
 }
 
 fn default_setting(key: &str) -> Option<&'static str> {
@@ -277,6 +280,9 @@ pub(crate) fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn uri_parts() {

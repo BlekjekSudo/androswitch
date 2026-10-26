@@ -14,6 +14,9 @@ use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::framework::HostObj;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const VTO: &str = "Landroid/view/ViewTreeObserver;";
@@ -74,7 +77,7 @@ pub(crate) fn merge_into_root(vm: &mut Engine, root: ObjRef) -> Result<(), VmExi
         vm.vto_by_root.remove(&r);
         let moved = vm.vto.get_mut(&o).map(|ob| {
             ob.alive = false;
-            std::mem::take(&mut ob.listeners)
+            core::mem::take(&mut ob.listeners)
         });
         if let (Some(moved), Some(t)) = (moved, vm.vto.get_mut(&target)) {
             t.listeners.extend(moved);
@@ -178,6 +181,9 @@ pub(crate) fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::kind_of;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn listener_kind_from_signature() {

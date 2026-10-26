@@ -41,6 +41,25 @@ pub(super) struct Services {
     fs: Rc<dyn as_platform::fs::FileSystem>,
 }
 impl Services {
+    pub(super) fn write_log(&self, text: &str) -> Result<usize> {
+        let directory = "logs/android";
+        as_platform::fs::mkdirs(self.fs.as_ref(), directory).map_err(storage_error)?;
+        let path = format!("{directory}/{}.log", self.package);
+        let offset = self
+            .fs
+            .stat(&path)
+            .map_err(storage_error)?
+            .map_or(0, |m| m.length);
+        let truncate = offset + text.len() as u64 > 1 << 20;
+        self.fs
+            .write_at(
+                &path,
+                if truncate { 0 } else { offset },
+                text.as_bytes(),
+                truncate,
+            )
+            .map_err(storage_error)
+    }
     pub(super) fn initialize_runtime_class(vm: &mut Engine, class: &str) -> Result<()> {
         reflection::initialize_class(vm, class)
     }

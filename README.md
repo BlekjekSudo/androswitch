@@ -22,6 +22,15 @@ so desktop Cargo features cannot switch the runner to desktop VM state.
 Latest upstream Arrays/BitSet code and lazy parser improvements now share the
 portable path; source synchronization is kept separate from execution evidence.
 
+The complete framework dependency closure now has an experimental
+`as-vm/upstream-runtime` reference path using `core + alloc`, the inherited
+intrinsic dispatcher and GC, Engine-owned module tables, and native SQLite
+instead of a Python subprocess. All 50 original VM integration suites are
+registered against that path. **It is not enabled in the shipping runner**:
+Horizon services and canonical framework/storage state still require integration.
+See the [complete port plan](docs/UPSTREAM_PARITY_PLAN.md). SDK declaration
+metadata is supplemental type information, not implementation coverage.
+
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
 219 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,
 inspect results and export JSON from one installation. See [scope and actual

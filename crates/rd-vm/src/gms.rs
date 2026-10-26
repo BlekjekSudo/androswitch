@@ -33,7 +33,10 @@
 //! uma execução de topo termina em exceção não tratada — sem hook no
 //! loop do interpretador nesta rodada.
 
-use std::collections::HashMap;
+use crate::maps::HashMap;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -539,7 +542,7 @@ pub struct GmsState {
     /// aninhados enfileiram em `task_queue` em vez de recursar (um
     /// OnCompleteListener que se re-adiciona abortava o processo).
     pub task_delivering: bool,
-    pub task_queue: std::collections::VecDeque<TaskDelivery>,
+    pub task_queue: alloc::collections::VecDeque<TaskDelivery>,
     /// Entradas descartadas pelo teto (todas as famílias).
     pub dropped_log_entries: usize,
     /// Profundidade corrente de callbacks host→DEX (ver
@@ -2831,8 +2834,8 @@ fn fs_run_query(vm: &mut Engine, q: &FsQuery) -> Result<ObjRef, VmExit> {
     vm.fw.gms.fs_query_snaps.insert(r, snaps);
     Ok(r)
 }
-fn fs_cmp(a: Option<&Value>, b: Option<&Value>) -> std::cmp::Ordering {
-    use std::cmp::Ordering::*;
+fn fs_cmp(a: Option<&Value>, b: Option<&Value>) -> core::cmp::Ordering {
+    use core::cmp::Ordering::*;
     let key = |v: Option<&Value>| -> (u8, f64, String) {
         match v {
             None | Some(Value::Null) => (0, 0.0, String::new()),
@@ -2871,7 +2874,7 @@ fn fire_guarded(vm: &mut Engine, ev: PendingFire) -> Result<(), VmExit> {
 }
 
 fn fire_drain(vm: &mut Engine, first: PendingFire) -> Result<(), VmExit> {
-    let mut queue = std::collections::VecDeque::from([first]);
+    let mut queue = alloc::collections::VecDeque::from([first]);
     let mut budget = MAX_FIRES_PER_TRIGGER;
     while let Some(ev) = queue.pop_front() {
         match &ev {
@@ -2879,7 +2882,7 @@ fn fire_drain(vm: &mut Engine, first: PendingFire) -> Result<(), VmExit> {
             PendingFire::Rtdb(path) => rtdb_fire_now(vm, path)?,
             PendingFire::Auth => fire_auth_listeners_now(vm)?,
         }
-        let pending = std::mem::take(&mut vm.fw.gms.pending_fires);
+        let pending = core::mem::take(&mut vm.fw.gms.pending_fires);
         queue.extend(pending);
         budget = budget.saturating_sub(1);
         if budget == 0 {
@@ -3604,7 +3607,7 @@ fn remote_config_instance(
         }
         "activate" => {
             let mut changed = false;
-            let pending = std::mem::take(&mut vm.fw.gms.rc_pending);
+            let pending = core::mem::take(&mut vm.fw.gms.rc_pending);
             for (k, v) in pending {
                 if lookup(&vm.fw.gms.rc_values, &k) != Some(v.as_str()) {
                     changed = true;
@@ -3620,7 +3623,7 @@ fn remote_config_instance(
             // fetch seguido de activate (mesma lógica, sem recursão DEX).
             vm.fw.gms.rc_pending = vm.fw.gms.rc_server.clone();
             let mut changed = false;
-            let pending = std::mem::take(&mut vm.fw.gms.rc_pending);
+            let pending = core::mem::take(&mut vm.fw.gms.rc_pending);
             for (k, v) in pending {
                 if lookup(&vm.fw.gms.rc_values, &k) != Some(v.as_str()) {
                     changed = true;
@@ -6512,6 +6515,9 @@ impl Engine {
 #[cfg(test)]
 mod narrow_bytes_250 {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     /// issue #250: o `byte[]` criado pelo host guarda valores COM sinal,
     /// a mesma invariante do aput-byte e do fill-array-data.

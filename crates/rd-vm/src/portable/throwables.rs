@@ -1,13 +1,8 @@
 //! Minimal Throwable detail-message state in a budgeted, GC-scanned heap slot.
 //! The slot is not a valid DEX field name, so subclass fields cannot alias it.
 use crate::{err, Engine, ObjRef, Value, VmExit};
-use alloc::{
-    format,
-    string::{String, ToString},
-    vec,
-};
+use alloc::{format, string::ToString};
 const CLASS: &str = "Ljava/lang/Throwable;";
-const SLOT: &str = "java.lang.Throwable#detailMessage";
 
 pub(crate) fn is_host_type(vm: &Engine, class: &str) -> bool {
     vm.cp.find_class(class).is_none() && vm.cp.is_subtype(class, CLASS)
@@ -15,51 +10,8 @@ pub(crate) fn is_host_type(vm: &Engine, class: &str) -> bool {
 pub(crate) fn attach(vm: &mut Engine, object: ObjRef) -> Result<(), VmExit> {
     set(vm, object, Value::Null)
 }
-fn set(vm: &mut Engine, object: ObjRef, value: Value) -> Result<(), VmExit> {
-    err::put_field_result(vm.heap.put_field(object, SLOT, value))
-}
-fn stored(vm: &Engine, object: ObjRef) -> Result<Value, VmExit> {
-    let class = vm.heap.class_of(object)?;
-    if !vm.cp.is_subtype(class, CLASS) {
-        return Err(err::vm_error(
-            "VM_TYPE_ERROR",
-            "Throwable message receiver is not Throwable",
-        )
-        .into());
-    }
-    let value = vm.heap.get_field(object, SLOT)?;
-    if let Some(reference) = value.as_ref()? {
-        vm.heap.as_str(reference)?;
-    }
-    Ok(value)
-}
-pub(crate) fn message(vm: &Engine, object: ObjRef) -> Result<Option<String>, VmExit> {
-    stored(vm, object)?
-        .as_ref()?
-        .map(|r| vm.heap.as_str(r).map(ToString::to_string))
-        .transpose()
-        .map_err(Into::into)
-}
-pub(crate) fn materialize(
-    vm: &mut Engine,
-    class: &str,
-    message: Option<&str>,
-) -> Result<ObjRef, VmExit> {
-    let object = vm
-        .heap
-        .alloc_instance(class.to_string(), vec![])
-        .map_err(err::oom_throwable)?;
-    let message = match message {
-        Some(text) => Value::Obj(
-            vm.heap
-                .alloc_string(text.to_string())
-                .map_err(err::oom_throwable)?,
-        ),
-        None => Value::Null,
-    };
-    set(vm, object, message)?;
-    Ok(object)
-}
+pub(crate) use crate::throwable_message::message;
+use crate::throwable_message::{set, stored};
 
 // Constructors are not inherited. Specialized builtin exceptions must not be
 // given nonexistent ()/(String) constructors just because they are Throwable.

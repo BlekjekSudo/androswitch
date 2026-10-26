@@ -22,6 +22,9 @@ use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::framework::HostObj;
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const PARCEL: &str = "Landroid/os/Parcel;";
@@ -1268,13 +1271,13 @@ fn sparse_entries(vm: &mut Engine, sparse: ObjRef) -> Result<Vec<(i32, Value)>, 
     for i in 0..n {
         let index = Value::Int(i as i32);
         let key = vm
-            .invoke_instance(sparse, "keyAt", "(I)I", std::slice::from_ref(&index))?
+            .invoke_instance(sparse, "keyAt", "(I)I", core::slice::from_ref(&index))?
             .as_int()?;
         let value = vm.invoke_instance(
             sparse,
             "valueAt",
             "(I)Ljava/lang/Object;",
-            std::slice::from_ref(&index),
+            core::slice::from_ref(&index),
         )?;
         entries.push((key, value));
     }
@@ -1320,10 +1323,10 @@ fn sparse_int_entries(vm: &mut Engine, sparse: ObjRef) -> Result<Vec<(i32, i32)>
     for i in 0..n {
         let index = Value::Int(i as i32);
         let key = vm
-            .invoke_instance(sparse, "keyAt", "(I)I", std::slice::from_ref(&index))?
+            .invoke_instance(sparse, "keyAt", "(I)I", core::slice::from_ref(&index))?
             .as_int()?;
         let value = vm
-            .invoke_instance(sparse, "valueAt", "(I)I", std::slice::from_ref(&index))?
+            .invoke_instance(sparse, "valueAt", "(I)I", core::slice::from_ref(&index))?
             .as_int()?;
         entries.push((key, value));
     }
@@ -3200,7 +3203,7 @@ fn parcel_instance(
                             _ => None,
                         };
                         write_string_to(vm, recv, key.as_deref())?;
-                        write_present_typed(vm, recv, std::slice::from_ref(v), int_arg(args, 1))?;
+                        write_present_typed(vm, recv, core::slice::from_ref(v), int_arg(args, 1))?;
                     }
                 }
             }
@@ -4216,6 +4219,9 @@ mod tests {
     use super::*;
     use crate::engine::Engine;
     use crate::intrinsics::{alloc_string, call_instance_intrinsic};
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     fn engine() -> Engine {
         Engine::new(vec![], Default::default())
@@ -4292,21 +4298,21 @@ mod tests {
             p,
             "writeString",
             "(Ljava/lang/String;)V",
-            std::slice::from_ref(&text),
+            core::slice::from_ref(&text),
         );
         callp(
             &mut vm,
             p,
             "writeByteArray",
             "([B)V",
-            std::slice::from_ref(&blob),
+            core::slice::from_ref(&blob),
         );
         callp(
             &mut vm,
             p,
             "writeValue",
             "(Ljava/lang/Object;)V",
-            std::slice::from_ref(&list),
+            core::slice::from_ref(&list),
         );
 
         let size = callp(&mut vm, p, "dataSize", "()I", &[]);
@@ -4376,7 +4382,7 @@ mod tests {
         let label = s(&mut vm, "sparse-label");
         vm.sparse.insert(
             sparse,
-            std::collections::BTreeMap::from([
+            alloc::collections::BTreeMap::from([
                 (-3_i64, Value::Null),
                 (2_i64, label),
                 (10_i64, number),
@@ -4424,7 +4430,7 @@ mod tests {
             .unwrap();
         vm.sparse.insert(
             booleans,
-            std::collections::BTreeMap::from([
+            alloc::collections::BTreeMap::from([
                 (-1_i64, Value::Int(0)),
                 (5_i64, Value::Int(1)),
                 (9_i64, Value::Int(1)),
@@ -4448,7 +4454,7 @@ mod tests {
         ));
         assert_eq!(
             vm.sparse.get(&got_booleans).unwrap(),
-            &std::collections::BTreeMap::from([
+            &alloc::collections::BTreeMap::from([
                 (-1_i64, Value::Int(0)),
                 (5_i64, Value::Int(1)),
                 (9_i64, Value::Int(1)),
@@ -4964,7 +4970,7 @@ mod tests {
             sp8,
             "writeString8Array",
             "([Ljava/lang/String;)V",
-            std::slice::from_ref(&arr),
+            core::slice::from_ref(&arr),
         );
         callp(&mut vm, sp8, "setDataPosition", "(I)V", &[Value::Int(0)]);
         let got = obj(callp(
@@ -4994,7 +5000,7 @@ mod tests {
                 p,
                 "hasClassCookie",
                 "(Ljava/lang/Class;)Z",
-                std::slice::from_ref(&clazz),
+                core::slice::from_ref(&clazz),
             ),
             Value::Int(1)
         );
@@ -5004,7 +5010,7 @@ mod tests {
                 p,
                 "getClassCookie",
                 "(Ljava/lang/Class;)Ljava/lang/Object;",
-                std::slice::from_ref(&clazz),
+                core::slice::from_ref(&clazz),
             ),
             cookie
         );
@@ -5029,7 +5035,7 @@ mod tests {
                 p,
                 "getClassCookie",
                 "(Ljava/lang/Class;)Ljava/lang/Object;",
-                std::slice::from_ref(&clazz),
+                core::slice::from_ref(&clazz),
             ),
             Value::Null
         );
@@ -5148,7 +5154,7 @@ mod tests {
                 binder,
                 "queryLocalInterface",
                 "(Ljava/lang/String;)Landroid/os/IInterface;",
-                std::slice::from_ref(&descriptor),
+                core::slice::from_ref(&descriptor),
             ),
             Value::Obj(owner)
         );

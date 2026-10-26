@@ -33,6 +33,9 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 const DF: &str = "Ljava/text/DecimalFormat;";
@@ -926,9 +929,9 @@ fn component(
                 _ => return Err(exc("Ljava/lang/NullPointerException;", "compareTo(null)")),
             };
             Value::Int(match pkg.cmp(&op).then(cls.cmp(&oc)) {
-                std::cmp::Ordering::Less => -1,
-                std::cmp::Ordering::Equal => 0,
-                std::cmp::Ordering::Greater => 1,
+                core::cmp::Ordering::Less => -1,
+                core::cmp::Ordering::Equal => 0,
+                core::cmp::Ordering::Greater => 1,
             })
         }
         _ => return Ok(None),
@@ -943,6 +946,9 @@ fn java_hash(s: &str) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     fn f(p: &str, dec: char, group: char) -> Fmt {
         Fmt {
             pat: parse_pattern(p),

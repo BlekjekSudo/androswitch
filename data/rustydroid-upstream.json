@@ -123,14 +123,14 @@
     {
       "path": "Cargo.lock",
       "blob": "e49c73cdaab443b04b6a9b89db617f22dac69fe6",
-      "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained.",
-      "sha256": "cf530f7e9c44d99e02f1076b88ff2f3eac251f2a0be54f29ebcc9649db1622d0"
+      "reason": "Lock portable regex/fancy-regex/libm/siphasher and existing native SQLite dependencies; desktop transports remain isolated from device builds.",
+      "sha256": "b4f2cfcbd78471be956d2130895ba237e67c0201bbdb7ec80debc26dbbbea164"
     },
     {
       "path": "Cargo.toml",
       "blob": "709e70d00a0a57b521838749779c47344e3c4fa7",
-      "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained.",
-      "sha256": "62a523a105226038e8fa18e7d2f0b044a6b9b6a91b61dbccbc89ecc733a8cb14"
+      "reason": "Register the isolated portable reference renderer alongside existing workspace packages; original runtime history and desktop packages retained.",
+      "sha256": "7949dabec6e92df1c78b1d9751c88ac072ef808fc599812a9993185aa630c68e"
     },
     {
       "path": "GOVERNANCE.md",
@@ -293,8 +293,8 @@
     {
       "path": "crates/rd-apk/src/paged.rs",
       "blob": "2ebbe0ea612a6d1b8f93c485af9d8d732309057a",
-      "reason": "Existing desktop page cache implements portable ReadAt; host filesystem stays outside device core.",
-      "sha256": "fdded186bd0751909784200d4219aeffe44f6102dc1dd5c5ade9afaca6c89d27"
+      "reason": "Retain the existing positional source bridge; move unchanged Debug/ReadAt implementations before the unit-test module for strict workspace clippy.",
+      "sha256": "8eabac69625a8dd95015f857625b37e998501344645ee24863252c76639e2410"
     },
     {
       "path": "crates/rd-apk/src/pool.rs",
@@ -467,8 +467,8 @@
     {
       "path": "crates/rd-dex/src/lib.rs",
       "blob": "cc9a70f5ce092a731829c65cce6e31a7f4d47219",
-      "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained.",
-      "sha256": "f49c5d0b8950031acbbad05729570b4d1cec167e1824c37d53dd86a62a47ebee"
+      "reason": "Expose the existing synchronized OnceLock adapter for immutable upstream module caches on core/alloc.",
+      "sha256": "169d0d4a955af2ed120f6423006cb5793bb3be41ebc5852dc4821d9aaf556e22"
     },
     {
       "path": "crates/rd-dex/src/methods.rs",
@@ -697,8 +697,8 @@
     {
       "path": "crates/rd-vm/Cargo.toml",
       "blob": "42373b4dddd6fdb44a17c9cc70217877d8f8b0c4",
-      "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained.",
-      "sha256": "147688179243131b42eaebf43e75c9cac03a440b0001e7494167b7f75a3e1db6"
+      "reason": "Recognize the shared upstream-runtime cfg as a desktop std reference feature; the actual no_std full build is the isolated as-vm package.",
+      "sha256": "98e4863cf27ba8bcc7328c76f1a9b22f92775ebeb0af79710547aaae704e61f7"
     },
     {
       "path": "crates/rd-vm/assets/glyphs.bin",
@@ -718,97 +718,135 @@
     },
     {
       "path": "crates/rd-vm/src/accessibility_node.rs",
-      "blob": "4662c7ffb23e2e26276732f5f1d32db057451109"
+      "blob": "4662c7ffb23e2e26276732f5f1d32db057451109",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "a8770a5a35e32bff9b98e220f48ca99322dd4368997c8c1b4064b5636efe9471"
     },
     {
       "path": "crates/rd-vm/src/activity_callbacks.rs",
-      "blob": "a4f5495837f635693a141e60006deb10415fc591"
+      "blob": "a4f5495837f635693a141e60006deb10415fc591",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "f816eecb9cd33ae9b99a4ddea26786540fb2c0dd7f841f5907efb16e635a5f01"
     },
     {
       "path": "crates/rd-vm/src/activity_extras.rs",
-      "blob": "74f2ec81c009c119bf0ee2a3c6f1da8dbfd2ff84"
+      "blob": "74f2ec81c009c119bf0ee2a3c6f1da8dbfd2ff84",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "2f79d2bacb82386108031987b46bd9bed70cfa355eda19d1b8a4f96c1b8e36db"
     },
     {
       "path": "crates/rd-vm/src/android_build.rs",
-      "blob": "74fa5ebcd59626b791622d33db61c0b40f0a2e6c"
+      "blob": "74fa5ebcd59626b791622d33db61c0b40f0a2e6c",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "ec0e7bc88e36356739341606561d62e75cf73de0a28dad67baa25f1e177b842e"
     },
     {
       "path": "crates/rd-vm/src/android_colorspace.rs",
-      "blob": "4467807fe7438fb91c60a347ab43642e5f6788d1"
+      "blob": "4467807fe7438fb91c60a347ab43642e5f6788d1",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "384085413a2e6cc55a3d5e723f3020a46a2e403786585e2117edd7ef29e1a90b"
     },
     {
       "path": "crates/rd-vm/src/android_display.rs",
-      "blob": "889d079116c6c54aba745a5b412f7a1e2b8ddf5b"
+      "blob": "889d079116c6c54aba745a5b412f7a1e2b8ddf5b",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "8e92349de21526b89ac3d2ff8f1d3742bb0b64ea800ed2ba56006d8dc383e0b6"
     },
     {
       "path": "crates/rd-vm/src/android_drawable.rs",
-      "blob": "b0f5a5fb595c710be9af9cb12c418a94eb5f53ad"
+      "blob": "b0f5a5fb595c710be9af9cb12c418a94eb5f53ad",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "1a21f0a0e957d70a8d5ee1359ea56ed90bff06ec4faeae00c2640b44a4b91234"
     },
     {
       "path": "crates/rd-vm/src/android_env.rs",
-      "blob": "6c0d1b6defb7c64f5cbf840061a2638e19c9ff82"
+      "blob": "6c0d1b6defb7c64f5cbf840061a2638e19c9ff82",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "8b3124faffb4acdb894ad34bf9c9de23fdcf5e85efb5cf65cb3579239d30980c"
     },
     {
       "path": "crates/rd-vm/src/android_json.rs",
-      "blob": "779b23d8bfdae7e7682e7df1a5fe5ad76abfba72"
+      "blob": "779b23d8bfdae7e7682e7df1a5fe5ad76abfba72",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "c413e44e3185a44033a0c8dea26cc88e41b231dd85aacc2af2a7ccb9708abdd8"
     },
     {
       "path": "crates/rd-vm/src/android_motion.rs",
-      "blob": "eed0abcd004281eee7d343762f68d977b0458f95"
+      "blob": "eed0abcd004281eee7d343762f68d977b0458f95",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "23d440a2ebe645e6adff46588dd52c2336cce74813a82a8e4752acd772b377f9"
     },
     {
       "path": "crates/rd-vm/src/android_observable.rs",
-      "blob": "74137c37f99c0a46935beb6af18b2fd259f6184f"
+      "blob": "74137c37f99c0a46935beb6af18b2fd259f6184f",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "a6b74884bda1296eac82c8473eb759cd289f79cfcb80b324f0b9c842b87bf80a"
     },
     {
       "path": "crates/rd-vm/src/android_pm.rs",
-      "blob": "ea24cded91dd8077f086ed15713857ac449c0bd1"
+      "blob": "ea24cded91dd8077f086ed15713857ac449c0bd1",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "40d6ec48131deef6914fbd5405574c9dcbf85c801e57da244e73dad7ca9ad52b"
     },
     {
       "path": "crates/rd-vm/src/android_region.rs",
-      "blob": "7c7fa49ae5fc5aee2bc0131d628018ec39142a37"
+      "blob": "7c7fa49ae5fc5aee2bc0131d628018ec39142a37",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "d8691a2f92db5496e8ee906fac7552139429b51671719bcc5d0adc661c5ba907"
     },
     {
       "path": "crates/rd-vm/src/android_res.rs",
-      "blob": "fc37b5ef40c468d454dd98b4d01c465f9f0a9fcd"
+      "blob": "fc37b5ef40c468d454dd98b4d01c465f9f0a9fcd",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "45b5a26a9f98036f6f423e9da28decdda26714b5b9daeea4de134cd4ac260432"
     },
     {
       "path": "crates/rd-vm/src/android_spannable.rs",
-      "blob": "6f7d747f7c63427ed474d0ddb254bb513113620d"
+      "blob": "6f7d747f7c63427ed474d0ddb254bb513113620d",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "36d10de5771a2dadca1c2ab2db903b8440d622b792ac53dd27d133d23e41dc1a"
     },
     {
       "path": "crates/rd-vm/src/android_stub_surfaces.rs",
       "blob": "359a8fe195b4991b205e79efc4d43cc2b94ddca5",
-      "reason": "Narrow clippy annotations retain upstream/AOSP paired-comparison NaN semantics for chooser scores and location parsing; range replacement changes observable behavior.",
-      "sha256": "27ff83bcf2e61afbc9b940528111fbcf9ae8ac22262900e4ea4e3d9e53f3bf68"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "a01df7f0c01adb4df2c00f67107f0604684a6b055ccf850eb55476506e8d0c74"
     },
     {
       "path": "crates/rd-vm/src/android_sysservices.rs",
-      "blob": "624b2dbe7faec1999fd7f295f56c7bb012a29f07"
+      "blob": "624b2dbe7faec1999fd7f295f56c7bb012a29f07",
+      "reason": "Core/alloc reference compilation and shared private Throwable detail-message state; ordinary message-bearing objects keep their existing fields.",
+      "sha256": "3245ab488cc1fb2c0b01c22e192a053cfd0f1d9562fb01739e69180ae0f4d1d2"
     },
     {
       "path": "crates/rd-vm/src/android_text.rs",
       "blob": "336c67353854da05e18f6f44b1688c19c489010d",
-      "reason": "Logging extracted to shared android_log with real bounded device sink.",
-      "sha256": "41e98364ff7660764cc86f1307acd54fb98354ff40c33a2e3929c686c3bf36a6"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "b7f16a6a1ce47cffc79c7d4cfa2b2ae0651e43ed4d29ff2d8f8735181c613503"
     },
     {
       "path": "crates/rd-vm/src/android_uri.rs",
-      "blob": "8634a78f5537e28e7fcf20070c2e569fa9992e86"
+      "blob": "8634a78f5537e28e7fcf20070c2e569fa9992e86",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "2e08b12dc00ef7f99efdfb0eb8fa63a301057c5ca2e14464a503aacccf8db304"
     },
     {
       "path": "crates/rd-vm/src/android_util.rs",
       "blob": "f9309801df01bcbf9e19168bfe8e603d896485bf",
-      "reason": "Tests use mutable shared array snapshot helper for precise copied-reference pins.",
-      "sha256": "880443e1fc70a8ea1cfd415b97076bcf1ddb308e36d9fe62fe58e06873b3c589"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "070c82cc7585a57c1ccb610880c4aa2c50dc43cdc41e07dc8d5e672dc2311806"
     },
     {
       "path": "crates/rd-vm/src/android_velocity.rs",
-      "blob": "272cb9d619cefbf3bb2cee76645f9f12f371343c"
+      "blob": "272cb9d619cefbf3bb2cee76645f9f12f371343c",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "b0290e8c50e7e5b9359daf215db6b67c7af0168d08e756c20fc575d106cadcdf"
     },
     {
       "path": "crates/rd-vm/src/androidx.rs",
-      "blob": "5ed5422287490bda828c15a4999d8934fd696541"
+      "blob": "5ed5422287490bda828c15a4999d8934fd696541",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "03c58231034c70482578bbd9c586b0f705a56f69f9f3e7e06ef492af3d4d1abc"
     },
     {
       "path": "crates/rd-vm/src/arrays.rs",
@@ -818,41 +856,51 @@
     },
     {
       "path": "crates/rd-vm/src/atomics.rs",
-      "blob": "a31d72856e3723a4158af1439e60b7761235a57a"
+      "blob": "a31d72856e3723a4158af1439e60b7761235a57a",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "36b765904986a8bfa529d77cbb3d79bc7a77ac2cde9bd1392633734890a2bd38"
     },
     {
       "path": "crates/rd-vm/src/boxes.rs",
       "blob": "a4e2f35ef7125ab26a61c43894a18abe170d6b13",
-      "reason": "Shared wrapper implementation/metadata and bounded cache, with previously JVM-proved semantic corrections.",
-      "sha256": "139927cf42f5edb37d388c189e21c666818a6c0d8b2fa90381b4710bfb79fee6"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "4365b465d783a89c9e0d9b163ab4ad978606217e611766738cf50e56569bed26"
     },
     {
       "path": "crates/rd-vm/src/bundle.rs",
-      "blob": "32221cf1683b98b168156287ac1bcc99ec9fe3b2"
+      "blob": "32221cf1683b98b168156287ac1bcc99ec9fe3b2",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "e7d18c03f2aad62f7d3a8b01c0da38047b374e474868ee9fc8b71def0bffe421"
     },
     {
       "path": "crates/rd-vm/src/choreographer.rs",
-      "blob": "5f80bae70406206dbce8c94d1651d271512041b4"
+      "blob": "5f80bae70406206dbce8c94d1651d271512041b4",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "05a41fce49dabad4bbd8942ccd99d621495786a0898ef9a8e327607ec38e8d86"
     },
     {
       "path": "crates/rd-vm/src/classpath.rs",
       "blob": "68fafc4e0f82c3d79435a1500b06bf97fa0a40e8",
-      "reason": "Latest hierarchy/security changes merged with device class loading and supported runtime metadata; class existence is not execution evidence.",
-      "sha256": "58e76309ee19e7c77780d0cb150207d6b333b6171358d5611908d22b74c8d0f4"
+      "reason": "Retain original builtin/Dex hierarchy as authoritative and supplement missing public type/interface/modifier facts with hash-pinned SDK declaration metadata; metadata does not implement Android methods.",
+      "sha256": "748736aa4f204e0efffb8a8171e92cbbe0d21b3cc5511cfe1c4caccbf1937da9"
     },
     {
       "path": "crates/rd-vm/src/collections.rs",
-      "blob": "67067871ce56283df6f0e6bdad2eb62758b290cb"
+      "blob": "67067871ce56283df6f0e6bdad2eb62758b290cb",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "0bb3de095b71e57349c9af976fd03c83bb9eb9940821700b248c0244518b3668"
     },
     {
       "path": "crates/rd-vm/src/content.rs",
-      "blob": "b94f9778ec9107aa7f0aebfa884d55c267a7663c"
+      "blob": "b94f9778ec9107aa7f0aebfa884d55c267a7663c",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "329ef0b619c12908f6a94e9d821225edf8342038a0bb795db61b867f6ed42e06"
     },
     {
       "path": "crates/rd-vm/src/engine.rs",
       "blob": "12c30c00f65aa42ba948034b12ece34e522cc35e",
-      "reason": "Latest host state/reset plus explicit device state and actual owner/frame/class-initialization/GC adapters.",
-      "sha256": "fb81f4a0c618ec32c4732c1c5d7cce00b87b1a87da510085fcc03df30579df61"
+      "reason": "Compile original framework/GC fields in the experimental no_std reference path, own module/output/reference-VFS tables per Engine, preserve real execution-owner scopes, and use one private Throwable detail-message slot. Default shipping framework integration remains pending.",
+      "sha256": "f3168605097c583404a3b1bb1a00e27b07258e4dd3da9c2023462fe9d5e8f723"
     },
     {
       "path": "crates/rd-vm/src/err.rs",
@@ -862,55 +910,69 @@
     },
     {
       "path": "crates/rd-vm/src/framework.rs",
-      "blob": "08b3ca0b5dcc3b0351a9c17d0c010e23aee932c4"
+      "blob": "08b3ca0b5dcc3b0351a9c17d0c010e23aee932c4",
+      "reason": "Compile original framework algorithms with core/alloc and module state, retain the portable canonical Class cache, and route diagnostic output through the platform log transport; shipping lifecycle/view state integration remains pending.",
+      "sha256": "f632292bcf0f025a4a13bc8b18ade06fe7f1730f2e3fe60d421796262adb1c8e"
     },
     {
       "path": "crates/rd-vm/src/gc.rs",
       "blob": "d97e30c0509970d7ad11519dd1294c112d9e4758",
-      "reason": "Latest host collector plus boxed-cache roots; device collector separately adapted.",
-      "sha256": "0ec3907e5e102e6256ea230b9233c61a89e31059f4b1b2a2ee351ff60c610282"
+      "reason": "Port original collector to core/alloc; add actual execution-owner, canonical cache, framework/native roots and platform collection hooks. Preserve inherited conservative side-state scanning; exclude an exactly default reference-free framework from scalar-ID false roots. Clock availability is explicit.",
+      "sha256": "23a61a935a2ed4c8f321b988752156c0a8dce3f9cc7c75a2de2feb615388f6d9"
     },
     {
       "path": "crates/rd-vm/src/gms.rs",
-      "blob": "d2ba346ee632d8d3f3e9feda891d277476d9c504"
+      "blob": "d2ba346ee632d8d3f3e9feda891d277476d9c504",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "5451a2ce7a3f127c74d20cf56a8581a84cc9dc3fa243a2980ad790785467ec78"
     },
     {
       "path": "crates/rd-vm/src/graphics.rs",
-      "blob": "a8ba5ad036d3d183afc748d15d2ef4330b1418eb"
+      "blob": "a8ba5ad036d3d183afc748d15d2ef4330b1418eb",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "4a1439f8a8e93db5938053b68526e387fc9464a0ac02c7ae14a66223faccfb77"
     },
     {
       "path": "crates/rd-vm/src/handler_msg.rs",
-      "blob": "7dd274d98b4d8907bee538db1fe9ce712235b214"
+      "blob": "7dd274d98b4d8907bee538db1fe9ce712235b214",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "06721a13b734684103b7afaa82ce1150769f427c18c3ed3bf6801d51ac0ec5bb"
     },
     {
       "path": "crates/rd-vm/src/heap.rs",
       "blob": "6f08f266e4c63723dc90e62bbb3adcc69b39b85a",
-      "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained.",
-      "sha256": "a26037180cb51c6491d9dbbc21dc373ce6570c2e279b59855ee6feb3d5bcb890"
+      "reason": "Make inherited generational metadata available to the shared collector and bridge nested upstream host scopes to actual execution-owner scopes; no cross-owner or guest-boundary temporary promotion.",
+      "sha256": "5bf429ce70e60ebcc275b1f13688d5134c7273cc83e2b15c7b5525b9b7eef870"
     },
     {
       "path": "crates/rd-vm/src/inflate.rs",
-      "blob": "0eff9bc0b926f2d8488cc8f8653979f8ad315e93"
+      "blob": "0eff9bc0b926f2d8488cc8f8653979f8ad315e93",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "f44dd978362c1a60134644693c44454f80275ca2dfdf6273296656856ab5c34a"
     },
     {
       "path": "crates/rd-vm/src/interp.rs",
       "blob": "5f684f7b394e00142d8d825e65fea37b3aaaf8bc",
-      "reason": "Latest semantics plus portable platform/field dispatch and actual owner frames; reference-array zero/null normalized from JVM observations.",
-      "sha256": "83689d5eb5324521be53d0c38b92a5bb1abec2e214ea11f18a7d46bca29cc4b9"
+      "reason": "Enable inherited framework dispatch and statics in the experimental reference path, preserve real owner frames and portable exception dispatch, and use the shared private Throwable message state. This is not yet the bound Horizon framework path.",
+      "sha256": "5a7c6daced28c4799b5b74e4e25ab7333f852c684bbf3632f7e5ef47826dc6b0"
     },
     {
       "path": "crates/rd-vm/src/intrinsics.rs",
       "blob": "82c29016a7deca96ce2cf00ae8678093c1c9f104",
-      "reason": "Latest desktop dispatcher retained; value helpers extracted, Set dedup delegates latest guest equality, logging/wrappers shared.",
-      "sha256": "d13a75e1e1eb7bcd53a5a6100bccb0dbcd9f6fea95f14dd5b81a83191295c12e"
+      "reason": "Reuse the original rooted dispatcher on the no_std reference path; per-Engine output, common object-value helpers and a private shared Throwable detail-message slot replace desktop globals/duplicated state. Keep runtime items before test modules for strict clippy; PrintStream output shares one implementation across reference variants.",
+      "sha256": "0442dabf7decebfa278ad6755d2723e3f7d16d13b65d03a6d4c87f74bdcfb74c"
     },
     {
       "path": "crates/rd-vm/src/jannotations.rs",
-      "blob": "45c88692ab46b67639e9e25721d795b8fb5bccf1"
+      "blob": "45c88692ab46b67639e9e25721d795b8fb5bccf1",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "f2e8a42bc6b264243c3c4190604d4bd8bfd90906f5602486dec7941680cb81d5"
     },
     {
       "path": "crates/rd-vm/src/jbigdecimal.rs",
-      "blob": "7fe074dc50a454d696573169614489db26e0a72f"
+      "blob": "7fe074dc50a454d696573169614489db26e0a72f",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "4700203249aec17bb4a942bf1b74b52383da0691f88996949571b66945d25e6d"
     },
     {
       "path": "crates/rd-vm/src/jbitset.rs",
@@ -920,19 +982,27 @@
     },
     {
       "path": "crates/rd-vm/src/jbreakiter.rs",
-      "blob": "862ab2ee92f0092e13697db67fe0fc55f72b1a0f"
+      "blob": "862ab2ee92f0092e13697db67fe0fc55f72b1a0f",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "9f8553a7332e7c8fe913bb80b9bc984964d86e31da0ec7c8da634d8b464dd715"
     },
     {
       "path": "crates/rd-vm/src/jcollections.rs",
-      "blob": "c430f33bd02428ff1115520f67bb352402c1a3e8"
+      "blob": "c430f33bd02428ff1115520f67bb352402c1a3e8",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "a9f819dced885f1f477b93fff69e5f53211714f0b2f45b74591f58adbd78265d"
     },
     {
       "path": "crates/rd-vm/src/jfile.rs",
-      "blob": "316a72330f5c1b14b28a584e436cd0de0daa10ba"
+      "blob": "316a72330f5c1b14b28a584e436cd0de0daa10ba",
+      "reason": "Keep original filesystem/API algorithms, passing explicit Engine context on the no_std reference path instead of TLS. The scoped in-memory VFS is an oracle only and is not a substitute for the product persistent GuestFileSystem.",
+      "sha256": "592231192828766ca5b545a4eb2397d632d1d06db904aa43c96b3026bbdef8f8"
     },
     {
       "path": "crates/rd-vm/src/jio_chars.rs",
-      "blob": "1bd846fbaee6caf088aac90657fefddd8a3d8a10"
+      "blob": "1bd846fbaee6caf088aac90657fefddd8a3d8a10",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "05533ea1121928071ad4220322d9e3e6a6f55cc196957e0f599184a281d71128"
     },
     {
       "path": "crates/rd-vm/src/jit.rs",
@@ -940,149 +1010,213 @@
     },
     {
       "path": "crates/rd-vm/src/jiterator.rs",
-      "blob": "a3218cf409c61e017987da1f788b1d4a110a5d45"
+      "blob": "a3218cf409c61e017987da1f788b1d4a110a5d45",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "651071ca763b57e10be5cae4d364dd88c146b6c8c27e5e24edd0950b1e8f9c3d"
     },
     {
       "path": "crates/rd-vm/src/jlclass.rs",
-      "blob": "69d48c877da3ab97ddb75801b3eb06ccfcda01b6"
+      "blob": "69d48c877da3ab97ddb75801b3eb06ccfcda01b6",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "88a02cc48a6ec1e353b7dce7ffe7335848f55f33dd276782d1ef433c678c3d5f"
     },
     {
       "path": "crates/rd-vm/src/jlocks.rs",
-      "blob": "93ad72b27a2e8c9aca9bedeb995bc01387245303"
+      "blob": "93ad72b27a2e8c9aca9bedeb995bc01387245303",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "48f3e72b69ed50297e4dd7277cf39c5cc9d0748b0b083cecc6a5092c04d95c9f"
     },
     {
       "path": "crates/rd-vm/src/jlstring.rs",
-      "blob": "343bc0cb06d95d7b6fd3af037b8e259155bc8a16"
+      "blob": "343bc0cb06d95d7b6fd3af037b8e259155bc8a16",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "5f1a39438aaf743eb9acf2ba83b34aeb243779b5b3da954ed86cc9b70542289d"
     },
     {
       "path": "crates/rd-vm/src/jlsystem.rs",
       "blob": "14de70bb6cfb20dea9d55b87b943fd3472f040d7",
-      "reason": "System.gc delegates to the existing real collector so the same shared upstream array callback/GC corpus runs on both VM paths.",
-      "sha256": "84081a66fa4127e4cb85e7036ca6c81402064ad78ca4a1d163c0be8b110aa8c7"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "8f4981e3a7ff45bb95d2ede2fa5dc39d2d186ba06f63724a6d4d455113c09e11"
     },
     {
       "path": "crates/rd-vm/src/jnormalizer.rs",
-      "blob": "9ba4cd83b64b39ebfd156aedf6a4762d9fa6d1da"
+      "blob": "9ba4cd83b64b39ebfd156aedf6a4762d9fa6d1da",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "fdd6a26d8843ed6b6a7080e1678635155c19b128706637cb700b54ccbb7ff5ca"
     },
     {
       "path": "crates/rd-vm/src/jpriorityqueue.rs",
-      "blob": "666728da73169360ce69036f271a7ff3b04f2cfe"
+      "blob": "666728da73169360ce69036f271a7ff3b04f2cfe",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "4c41434ff6004098d95580b9e5832f6a13aa18e6a9780673438ba35cf5653b12"
     },
     {
       "path": "crates/rd-vm/src/jrandom.rs",
       "blob": "8877a32e7cb99bf998c74a2f5edf1d8dfea06611",
-      "reason": "Documented module-local clippy false positive; preserves runtime HashMap initialization.",
-      "sha256": "650d0343b49e0112dc669c2fd854662e0cc528edcc984a7689903b90922cf9d2"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "2574f1f25bfcda3a2425c167624768d42b0f99be3952f4be183f60c06e682c5e"
     },
     {
       "path": "crates/rd-vm/src/jregex.rs",
-      "blob": "d70c3c78eda9e13a7f0d27d85e1697b524b21bb3"
+      "blob": "d70c3c78eda9e13a7f0d27d85e1697b524b21bb3",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "afd433e7c0bd41e7d9b878a0b643b9a171cf2b66085936fa7d5fe1577af6e5ad"
     },
     {
       "path": "crates/rd-vm/src/jresources.rs",
-      "blob": "eec1776fa2e28c54be246d30e032d529f3be266a"
+      "blob": "eec1776fa2e28c54be246d30e032d529f3be266a",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "3aed221569d629ede3aefcf65287ccf9ae6641d4ab952397600ce4d860583be4"
     },
     {
       "path": "crates/rd-vm/src/jsb.rs",
-      "blob": "d7da1a8b3c06d78ca8bea04e00ec19c73b7546e2"
+      "blob": "d7da1a8b3c06d78ca8bea04e00ec19c73b7546e2",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "458564a158263265d76f3c8efdf2da981f301d342b88765d0650bb3e3a677d61"
     },
     {
       "path": "crates/rd-vm/src/jsecurity.rs",
-      "blob": "bac15417cee019eaba849edd82ad28c929db5af7"
+      "blob": "bac15417cee019eaba849edd82ad28c929db5af7",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "01c827499c578ae081208088826aee51b9dd17b68a8717a421e1ef8bbe9db33f"
     },
     {
       "path": "crates/rd-vm/src/jsorted.rs",
-      "blob": "0f43c8869a135bb96ef505b20a02677410be3f66"
+      "blob": "0f43c8869a135bb96ef505b20a02677410be3f66",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "210fbb00012838f978711a211a39a8e2145861b65b33115cf9438d2db9a5fead"
     },
     {
       "path": "crates/rd-vm/src/jsqlite.rs",
-      "blob": "e53e6d6df5564e90eafd316dec94ed75cdeae2aa"
+      "blob": "e53e6d6df5564e90eafd316dec94ed75cdeae2aa",
+      "reason": "Preserve upstream Java SQL/lifecycle algorithms; no_std uses existing native as-sqlite transport instead of a Python subprocess, with per-Engine connections and shared codecs/errors. Device persistence/resource-limit integration is unverified. Keep runtime items before test modules for strict clippy.",
+      "sha256": "0b4df0f6bf4c53533e4affec7c1d182907551e10bc07e0421ac191a0b0260cac"
     },
     {
       "path": "crates/rd-vm/src/jstring_tokenizer.rs",
-      "blob": "3018b1575fadf7dbc38af5575aa5e6aa6c317a70"
+      "blob": "3018b1575fadf7dbc38af5575aa5e6aa6c317a70",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "2d5a6dfa3d95cd102321a07028e9763a9926b975269ba22343a16df312a3e621"
     },
     {
       "path": "crates/rd-vm/src/jtext_format.rs",
-      "blob": "b65c8c47c77d1101983a399b82e036af6548af3c"
+      "blob": "b65c8c47c77d1101983a399b82e036af6548af3c",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "cbf8b0d8016d8ce63840382b276c45456167655eec17227a007321aff8342763"
     },
     {
       "path": "crates/rd-vm/src/jtime.rs",
-      "blob": "d9508b55af5738c8c84564c45188a22d1ba4633a"
+      "blob": "d9508b55af5738c8c84564c45188a22d1ba4633a",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "a530229eed1642b353d92162bb80e98992a20809852b8e5acdf16d94299c1564"
     },
     {
       "path": "crates/rd-vm/src/juuid.rs",
-      "blob": "f7f5e5536c2e82b662fc224ef4fb357e278967ef"
+      "blob": "f7f5e5536c2e82b662fc224ef4fb357e278967ef",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "76df73a791743572c690706ad7fbfc3c570a6ef69ea5e0980baee4e9f3052fd3"
     },
     {
       "path": "crates/rd-vm/src/jxml.rs",
-      "blob": "033484d2428e94b3f970ae436c84c7b3a8785073"
+      "blob": "033484d2428e94b3f970ae436c84c7b3a8785073",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "d218e7d9863bcb5e8fc699cd15d1f274345f86705a77587892f53e9119af496c"
     },
     {
       "path": "crates/rd-vm/src/lib.rs",
       "blob": "1eeaef3f3207221f18c389904be8b943ee3f8302",
-      "reason": "Target module selection remains explicit; all latest modules retained, host-only originals enumerated and not claimed as device parity.",
-      "sha256": "9a001352f872e7c5c14f041c9b34e7fd03fb531282a919b3378851d7454bb450"
+      "reason": "Register the entire original framework dependency closure behind explicit experimental features, keep desktop native/JIT backends separate, share original intrinsics/GC plus core/alloc helpers, and retain default portable dispatch until state integration is complete.",
+      "sha256": "2d0cccfdcf94196cdace2a55bcece213d081988181f39c602e49d7a7e251dfba"
     },
     {
       "path": "crates/rd-vm/src/m10/biometrics.rs",
-      "blob": "b19bd18df1c0a6ccdfe9b0f62201c6de4122cef8"
+      "blob": "b19bd18df1c0a6ccdfe9b0f62201c6de4122cef8",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "7ee09168c8bd43b9e5a8dd900797b1a931c6e253d65bada5270509ccfa3e88be"
     },
     {
       "path": "crates/rd-vm/src/m10/camera.rs",
-      "blob": "049c9bd9d4d60266a9d76dbf43db9d73efba7c6d"
+      "blob": "049c9bd9d4d60266a9d76dbf43db9d73efba7c6d",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "a540069e67278c117e73e750631b96ac2e40dfd716cba823f78d600f406c44f5"
     },
     {
       "path": "crates/rd-vm/src/m10/connectivity.rs",
-      "blob": "adf04f872fed77ae735912813912545190b710d0"
+      "blob": "adf04f872fed77ae735912813912545190b710d0",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "8e04c815e1cd15b3d986e1a73d3666d2a6a9fa4de2e51019dc2fc516562c44e1"
     },
     {
       "path": "crates/rd-vm/src/m10/location.rs",
-      "blob": "49f9655fb37fcb274a3e9a2fc99d5add98d367b1"
+      "blob": "49f9655fb37fcb274a3e9a2fc99d5add98d367b1",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "5e06460ee0e020c8451a1220433cdec7c976bca3ee64e1f7fc73e6b76a360c08"
     },
     {
       "path": "crates/rd-vm/src/m10/media.rs",
-      "blob": "365151df0f8f50c9fc55b73015db7d5523ce0b8b"
+      "blob": "365151df0f8f50c9fc55b73015db7d5523ce0b8b",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "7e9044df096fb90301b14e31a6749643e263df4cd6cff113b213b090a5deedb5"
     },
     {
       "path": "crates/rd-vm/src/m10/mod.rs",
-      "blob": "3aba16236d14a98229a1582f91fbd6015aa18604"
+      "blob": "3aba16236d14a98229a1582f91fbd6015aa18604",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "de91dc81ba5646a9d00d4bee07fa4331b0b45bc9757187d0bde07d81da8e0151"
     },
     {
       "path": "crates/rd-vm/src/m10/sensors.rs",
-      "blob": "ddf1c2818bbce8be27e1c6d748aeed3523f5bfb6"
+      "blob": "ddf1c2818bbce8be27e1c6d748aeed3523f5bfb6",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "04cb9fb8a7f936225f1a2caf0c14b47e520336afefc44669ea8a89a588b1bb70"
     },
     {
       "path": "crates/rd-vm/src/m10/sysconfig.rs",
-      "blob": "be3e56132a169d398ba671126ed14369e0e40eff"
+      "blob": "be3e56132a169d398ba671126ed14369e0e40eff",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "4df65bfce1eaa9116890fb622543b279ce472c3c52f3b678dec3e12050cf339f"
     },
     {
       "path": "crates/rd-vm/src/m8.rs",
-      "blob": "5e07d1d6f383b10377c6b1dce2a2c435f2bfac31"
+      "blob": "5e07d1d6f383b10377c6b1dce2a2c435f2bfac31",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "b292117e57c26e27a6d1df5d3cad96f23f2c659eb4dd25249d07e67f8153a36f"
     },
     {
       "path": "crates/rd-vm/src/m9/accessibility.rs",
-      "blob": "ce20b162962ad9ec40e94337d2571546716a4c47"
+      "blob": "ce20b162962ad9ec40e94337d2571546716a4c47",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "d863385cdc7b5a5eda51fa5b1c611e1fdb4a06a99e69fd5c9c3271321563fe1e"
     },
     {
       "path": "crates/rd-vm/src/m9/ime.rs",
-      "blob": "7008dc53e008aaa77b947013074ffd0016089991"
+      "blob": "7008dc53e008aaa77b947013074ffd0016089991",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "48b07dd9a02f18f467dc36a959f1b65d5d921213c69501ac64b91d6f4a95e8bc"
     },
     {
       "path": "crates/rd-vm/src/m9/mod.rs",
-      "blob": "1a7c6680a352019cf14ecd3917c4d60364701e48"
+      "blob": "1a7c6680a352019cf14ecd3917c4d60364701e48",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "5eed744efe832276fcc96b04f87b00266e6f81a938638999be77bdaf756c45c3"
     },
     {
       "path": "crates/rd-vm/src/m9/notifications.rs",
-      "blob": "186c05a5fafcf76f6087201c80882ebfae094dae"
+      "blob": "186c05a5fafcf76f6087201c80882ebfae094dae",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "84642e10164f17fa7134358cf3419cdf0c8f2e9c66e660ad54b15d4a8c6aa355"
     },
     {
       "path": "crates/rd-vm/src/m9/shortcuts.rs",
-      "blob": "8a24f2fa452c423033b86dec0c1aefc85a968467"
+      "blob": "8a24f2fa452c423033b86dec0c1aefc85a968467",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "b40f9831511f7deacf2a2c1a4924cb8b1678b2a161621902cc77efafead65e7f"
     },
     {
       "path": "crates/rd-vm/src/m9/widgets.rs",
-      "blob": "04ea0be7d1ac1bf9d56107699d05fd3626f955bb"
+      "blob": "04ea0be7d1ac1bf9d56107699d05fd3626f955bb",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "7ab79e11a6f3aeca01d4471e9fecc908106c4837ded595c255c9fccc30c0b2ed"
     },
     {
       "path": "crates/rd-vm/src/native.rs",
@@ -1091,76 +1225,104 @@
     {
       "path": "crates/rd-vm/src/numerics.rs",
       "blob": "d9c13387636aed716de9e4b4535dee8470b775bf",
-      "reason": "Latest numeric fixes plus shared radix/FP parser, Integer/Long operations and extracted formatting.",
-      "sha256": "8c345038f222549fe4f44365b981ae22245d251e0a440f5ef20d4ab6676dad43"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "008f3240c94ec0ea86f064e707a18a6e75d1eeffab42a09baa5a10c5b19a7ce9"
     },
     {
       "path": "crates/rd-vm/src/parcel.rs",
-      "blob": "4b88478e509bcd00f89b5bfe585d6b7838c7b5a4"
+      "blob": "4b88478e509bcd00f89b5bfe585d6b7838c7b5a4",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "c1c1ea6970301bf5430724dc4477981bc565a92269b52fae5057b8cd4371b45e"
     },
     {
       "path": "crates/rd-vm/src/perms.rs",
-      "blob": "4ebe0cd7622209b4c0b62b29ac8acebc01a46ca6"
+      "blob": "4ebe0cd7622209b4c0b62b29ac8acebc01a46ca6",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "62087396386e3c618ad45b317be9b1607026bc53967adda2c89e6ebb8cdf8a56"
     },
     {
       "path": "crates/rd-vm/src/platform_base.rs",
-      "blob": "bd6422b858d3b7f04a480939951283b3142641d9"
+      "blob": "bd6422b858d3b7f04a480939951283b3142641d9",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "ef2012ba81f14ca5a782e45ccb6ca91072124b879529e9b4f2f20f0981583f77"
     },
     {
       "path": "crates/rd-vm/src/prefs.rs",
-      "blob": "857dd838a7e81785cadaf01d24a86467346f77a2"
+      "blob": "857dd838a7e81785cadaf01d24a86467346f77a2",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "7e5ee004aa5687c9666bc78060dffa5c80c888dc462751f9eafd6de807352c7f"
     },
     {
       "path": "crates/rd-vm/src/reflect.rs",
-      "blob": "7e5ca343c452015a449f68468b21078587fd506f"
+      "blob": "7e5ca343c452015a449f68468b21078587fd506f",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "0ff36c857e5ebd65e131eb343e8a161db3f86f44204465ee9c01e1ef73c1ddb6"
     },
     {
       "path": "crates/rd-vm/src/repr.rs",
       "blob": "141df7ec1e5f09c9d77c18de6743028bc46a0b7d",
-      "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained.",
-      "sha256": "0fbac8a829f59b9ebb02d4dbe7162d5db5f4bff95bf175e5daf4fbb9c09a3077"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "cef872b37c8a1045dc85175e621a0b80ba37d4dc906f69783cdc9e853133ed86"
     },
     {
       "path": "crates/rd-vm/src/screen_model.rs",
-      "blob": "87e133b5438cf1776230143395300e2fd0b98dd9"
+      "blob": "87e133b5438cf1776230143395300e2fd0b98dd9",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "27dd9a5215c594356fe6c8fe7c33487449ab90edade0bab67dcafbacddd6e553"
     },
     {
       "path": "crates/rd-vm/src/threads.rs",
-      "blob": "bd6b71a06aa0f0f67b5bb4ed35b27ea055385d4f"
+      "blob": "bd6b71a06aa0f0f67b5bb4ed35b27ea055385d4f",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "2cb1155e74588bb7ddf995234055e34919e2fb147702a0c691bc5fe9966a5423"
     },
     {
       "path": "crates/rd-vm/src/throwable.rs",
-      "blob": "f66353a72762b81206f05730afa9d6f117a5d83e"
+      "blob": "f66353a72762b81206f05730afa9d6f117a5d83e",
+      "reason": "Core/alloc portability of the existing Throwable API with one private detail-message slot shared by interpreted, JNI, host and materialized exceptions.",
+      "sha256": "ebdb940a525fcaaceb27453d3673d38d93229e10f66bdc2a5e1ccca302d0dbff"
     },
     {
       "path": "crates/rd-vm/src/value.rs",
       "blob": "a3eaa984713bfa577ce0e557c395f2d28b59551a",
-      "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained.",
-      "sha256": "38f7fdd55e731ac9da98694d165ffd638f9e80b564e1cfee15538549fe456159"
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "edd5287124e4a68a0474519a027c50d563c4974a96638d0bf6a4e169f32d8dbb"
     },
     {
       "path": "crates/rd-vm/src/view_attach.rs",
-      "blob": "08b5c5397059050a577c5bc088f585e5d2d7f0b5"
+      "blob": "08b5c5397059050a577c5bc088f585e5d2d7f0b5",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "03d822f43b5402aaac31816ad3f091a04e560e56826b190df106c8780706bf73"
     },
     {
       "path": "crates/rd-vm/src/view_layout.rs",
-      "blob": "b3ed0175727e45d276f9a729c2256dbaa8b8e8b0"
+      "blob": "b3ed0175727e45d276f9a729c2256dbaa8b8e8b0",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "a90edee5760c3e15d948f00c10e1c26f343ff6e6261d95f8dbb637b4c655f2d8"
     },
     {
       "path": "crates/rd-vm/src/view_props.rs",
-      "blob": "182d45e571bb6f8644286f6636ca32bf06db9116"
+      "blob": "182d45e571bb6f8644286f6636ca32bf06db9116",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "3d279a7a43b6a72b64f29435e8540c685aa12f6cd814b2e7907c44359c37158a"
     },
     {
       "path": "crates/rd-vm/src/vto.rs",
-      "blob": "7ca78dc063e0f10ac2cd642fd8c8f2c544161220"
+      "blob": "7ca78dc063e0f10ac2cd642fd8c8f2c544161220",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "e94fa150bf4a1525e2e72e6d3f68384416a17764c333f8773ae8daf9ad7da7f2"
     },
     {
       "path": "crates/rd-vm/src/window.rs",
-      "blob": "dc6f343021a310bc16a55b47c5f0e5eef7464803"
+      "blob": "dc6f343021a310bc16a55b47c5f0e5eef7464803",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "324de639a2963de78a358c253456696c1d4c7e2bf329274aad7455ab40311e82"
     },
     {
       "path": "crates/rd-vm/src/xml_res.rs",
-      "blob": "3b89aa610cc28d47e59cc376b073dab6ab0afa90"
+      "blob": "3b89aa610cc28d47e59cc376b073dab6ab0afa90",
+      "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity.",
+      "sha256": "95014a6487eddb03c37c481153ac12d3882765561ffec5100ea2be4f3ecaa62e"
     },
     {
       "path": "crates/rd-vm/tests/accessibility_virtual.rs",
@@ -1236,7 +1398,9 @@
     },
     {
       "path": "crates/rd-vm/tests/androidx.rs",
-      "blob": "5b75ee3cc2aa7a052a991c702aca85bba87cf35c"
+      "blob": "5b75ee3cc2aa7a052a991c702aca85bba87cf35c",
+      "reason": "Preserve original test behavior; use Default for the selected portable/desktop grant-set collection type.",
+      "sha256": "9dc3227754c45e04a2fc09a8665dfb173af92b8e5ebcd42b8079095ede1472b3"
     },
     {
       "path": "crates/rd-vm/tests/androidx_hierarchy.rs",
@@ -1312,7 +1476,9 @@
     },
     {
       "path": "crates/rd-vm/tests/m8.rs",
-      "blob": "cfce039927afe69f3b50ef987d9625bea11a2062"
+      "blob": "cfce039927afe69f3b50ef987d9625bea11a2062",
+      "reason": "Keep upstream guest behavior assertions across portable and desktop paths. Portable tests explicitly share a reference session VFS. Replace legacy diagnostic-table row assertions with actual Cursor count queries on the real selected SQL transport.",
+      "sha256": "3b45330aabac07d079087919891b69cb20c75a690c489afff3c85704a573d79b"
     },
     {
       "path": "crates/rd-vm/tests/m9.rs",
@@ -1360,7 +1526,9 @@
     },
     {
       "path": "crates/rd-vm/tests/vm_exec.rs",
-      "blob": "6862ba9d7d04232fc1faf332dfcc098f4973e615"
+      "blob": "6862ba9d7d04232fc1faf332dfcc098f4973e615",
+      "reason": "Keep upstream execution assertions unchanged; portable println captures the explicit per-Engine AppOutput sink instead of desktop stdout.",
+      "sha256": "852ce5fe37b726ac27670ca7db15b6cb21f1c2581fd61c0b4a827ccf90f86b21"
     },
     {
       "path": "crates/rd-vm/tests/xml_269.rs",
@@ -1868,8 +2036,8 @@
     },
     {
       "path": "crates/rd-vm/src/framework_host.rs",
-      "sha256": "8552514197a4cca0d6435957ab225d352a83898e33428a95ecc7377cf8909add",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+      "sha256": "60855f71d0546353e1f784c1183e2e2dfd14fd60eb72def2b68789b304b3eb61",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
     },
     {
       "path": "crates/rd-vm/src/integer_bits.rs",
@@ -1926,8 +2094,8 @@
     },
     {
       "path": "crates/rd-vm/src/portable/execution.rs",
-      "sha256": "ca0b9b90b27c267a5802da4c1fe0a7281b8be75eef437523f1b95720a83f5714",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+      "sha256": "bd68895e7dc16eeeea49366f4798c58190b0f38e9ffb803d432fde5395eb38cf",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
     },
     {
       "path": "crates/rd-vm/src/portable/execution_contracts.rs",
@@ -1951,13 +2119,13 @@
     },
     {
       "path": "crates/rd-vm/src/portable/intrinsics.rs",
-      "sha256": "dd33ac4d613488d7f3fd18c7b50c14d3825a364697d44db8b6fa8b2f08919315",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+      "sha256": "83205989953aa1eaee3b51f0d260d2e2ea956970d1dec309c037f9e65c3f4f36",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
     },
     {
       "path": "crates/rd-vm/src/portable/mod.rs",
-      "sha256": "736cec5e9076e1ef9e3dfc048058f653a880400b18c34f9ebdb2838cb4a33c4c",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+      "sha256": "9f61c2751d8620ee1d035ca014000d2030135dd99464d64df5ef7e5ba935323f",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
     },
     {
       "path": "crates/rd-vm/src/portable/monitor.rs",
@@ -1981,8 +2149,8 @@
     },
     {
       "path": "crates/rd-vm/src/portable/throwables.rs",
-      "sha256": "af8bcee569ba59e3346e858efcda06844cdac69e11cb4a3c44025169e4316276",
-      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+      "sha256": "8c75169d89b27dc7065adc82840dcfa001be99b9b771c2ac8b0b083e98c84430",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
     },
     {
       "path": "crates/rd-vm/src/primitive_parse.rs",
@@ -2014,6 +2182,60 @@
       "path": "crates/rd-apk/src/zip_source.rs",
       "sha256": "baa7fb70a6996466a0a1bb223d5e2eb790be3e40b6aa6e3a03085d2bb4013bad",
       "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/app_output.rs",
+      "sha256": "6c03f9c8c05fedcef8eb94dbf4ce3a9553e77abfa74388827aed83610feeb618",
+      "scope": "Per-Engine output transport with explicit platform log sink or bounded inspectable reference records. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/collection_clock.rs",
+      "sha256": "61215802449df9e64875792bb44f12c436d10e26b7843d3ba5c35deacb6c80d3",
+      "scope": "Platform monotonic GC measurements with explicit availability; virtual guest time is separate. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/module_tables.rs",
+      "sha256": "856210c76cf53da1adec7defa208f3b6811abe7b66f0272e8021bc25d812f99e",
+      "scope": "Engine-owned reference module side tables, replacing process/TLS lifetime coupling. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/port_env.rs",
+      "sha256": "d9f9893da2cc87350c57bade99cf4363fff29443f65e24935745788b5709be68",
+      "scope": "Desktop environment adapter and explicitly absent diagnostic overrides on the freestanding reference path. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/port_float.rs",
+      "sha256": "2510afadf6ef6be568445b5dc81b1991c16309b40dbc8b72eb3e597d37b19af1",
+      "scope": "Freestanding libm float operations and explicit UFCS host-oracle tests, including composition, extreme integer exponents and IEEE special values. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/port_prelude.rs",
+      "sha256": "679bd01d368c0c84e07e3a799aa14434bdbe58ddb2f7a775c63b8d18baeaf9ef",
+      "scope": "Core/alloc imports for the complete inherited framework dependency closure. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/reference_filesystem.rs",
+      "sha256": "2c52d75fc5ba5385dfd0b3bd472a6ed9b1a8475b67f8f1bef53c7b0306a8983c",
+      "scope": "Explicit session-scoped in-memory reference filesystem; rejects replacing a bound device VFS. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/sdk_types.rs",
+      "sha256": "f64ce36883f7dc13da1b9c73b6a23b88c9e712522f384c33fb7ac069e52f7ed0",
+      "scope": "Generated public Android SDK declaration facts only; no method implementation or compatibility claim. Not a device behavior parity claim.",
+      "derived_from": "Android SDK API 35 public declaration metadata; data/android-sdk-types.json pins input SHA-256 and generator; no SDK method bodies."
+    },
+    {
+      "path": "crates/rd-vm/src/throwable_message.rs",
+      "sha256": "7d7ffc1277f54d1fb8f626fcecf5b1b776e6d6b18f33742476d31720baf39992",
+      "scope": "One private Throwable detail-message slot shared by interpreted/host/JNI exception paths. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
     }
   ]
 }

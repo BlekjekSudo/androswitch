@@ -18,6 +18,9 @@
 use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 pub(crate) const ME: &str = "Landroid/view/MotionEvent;";
@@ -346,6 +349,9 @@ pub fn instance_intrinsic(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     #[test]
     fn action_constants_match_aosp() {
         assert_eq!(

@@ -23,7 +23,11 @@
 //! de ids sem inflar o grafo. Compose (UI-05) continua
 //! `not_implemented` no registro — ver `data/jetpack.toml`.
 
-use std::collections::{BTreeMap, HashMap};
+use crate::maps::HashMap;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
+use alloc::collections::BTreeMap;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -433,7 +437,7 @@ fn complete_future(
         f.done = true;
         f.result = result;
         f.error = error;
-        std::mem::take(&mut f.listeners)
+        core::mem::take(&mut f.listeners)
     };
     for l in listeners {
         let _ = crate::m8::call_dex(vm, l, "run", "()V", Vec::new())?;
@@ -1380,7 +1384,7 @@ fn array_map(
                 .get_mut(&recv)
                 .ok_or_else(|| npe("map"))?;
             match found {
-                Some(i) => old = std::mem::replace(&mut m[i].1, v),
+                Some(i) => old = core::mem::replace(&mut m[i].1, v),
                 None => m.push((k, v)),
             }
             old
@@ -1496,7 +1500,7 @@ fn array_map(
                     format!("length={}; index={i}", m.len()),
                 ));
             }
-            std::mem::replace(&mut m[i as usize].1, v)
+            core::mem::replace(&mut m[i as usize].1, v)
         }
         _ => return Ok(None),
     }))

@@ -37,8 +37,11 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::{ElemKind, ObjRef};
+use crate::maps::HashMap;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
-use std::collections::HashMap;
 
 pub const FB_W: usize = 720;
 pub const FB_H: usize = 1440;
@@ -316,7 +319,7 @@ pub(crate) struct Atlas {
 static GLYPHS: &[u8] = include_bytes!("../assets/glyphs.bin");
 
 fn atlas() -> &'static Atlas {
-    static A: std::sync::OnceLock<Atlas> = std::sync::OnceLock::new();
+    static A: rd_dex::sync::OnceLock<Atlas> = rd_dex::sync::OnceLock::new();
     A.get_or_init(|| {
         let d = GLYPHS;
         let u16_at = |i: usize| u16::from_le_bytes([d[i], d[i + 1]]);
@@ -1011,7 +1014,7 @@ fn oval_poly(l: f32, t: f32, r: f32, bt: f32) -> Vec<(f32, f32)> {
     let (cx, cy, rx, ry) = ((l + r) / 2.0, (t + bt) / 2.0, (r - l) / 2.0, (bt - t) / 2.0);
     (0..48)
         .map(|i| {
-            let a = i as f32 / 48.0 * std::f32::consts::TAU;
+            let a = i as f32 / 48.0 * core::f32::consts::TAU;
             (cx + rx * a.cos(), cy + ry * a.sin())
         })
         .collect()
@@ -1157,7 +1160,7 @@ fn platform_insets_static(
                 ));
             };
             let (a, b) = (insets_values(vm, left), insets_values(vm, right));
-            Some(std::array::from_fn(|i| match name {
+            Some(core::array::from_fn(|i| match name {
                 "max" => a[i].max(b[i]),
                 "min" => a[i].min(b[i]),
                 _ => a[i].saturating_add(b[i]),
@@ -1174,7 +1177,7 @@ fn platform_insets_static(
                 ));
             };
             let (a, b) = (insets_values(vm, left), insets_values(vm, right));
-            Some(std::array::from_fn(|i| a[i].saturating_sub(b[i])))
+            Some(core::array::from_fn(|i| a[i].saturating_sub(b[i])))
         }
         _ => return Ok(None),
     };
@@ -3736,7 +3739,7 @@ impl Raster<'_> {
                         }
                     }
                 }
-                xs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+                xs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(core::cmp::Ordering::Equal));
                 let mut wind = 0;
                 for i in 0..xs.len().saturating_sub(1) {
                     wind += if even_odd { 1 } else { xs[i].1 };
@@ -4086,7 +4089,7 @@ impl Engine {
     }
 
     fn summ_ops(&self, ops: &[Op], depth: usize, out: &mut String, budget: &mut usize) {
-        use std::fmt::Write;
+        use core::fmt::Write;
         if depth > 32 || *budget == 0 {
             return;
         }
@@ -4314,6 +4317,9 @@ include!("screen_model.rs");
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn atlas_loads_and_measures() {

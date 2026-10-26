@@ -10,8 +10,14 @@ use rd_vm::m8::*;
 use rd_vm::value::Value;
 use rd_vm::{Engine, VmConfig};
 
+#[cfg(not(feature = "std"))]
+thread_local! { static SESSION_FS: rd_vm::ReferenceFileSystem = Default::default(); }
 fn engine() -> Engine {
-    Engine::new(Vec::new(), VmConfig::default())
+    #[allow(unused_mut)]
+    let mut engine = Engine::new(Vec::new(), VmConfig::default());
+    #[cfg(not(feature = "std"))]
+    SESSION_FS.with(|filesystem| engine.bind_reference_filesystem(filesystem).unwrap());
+    engine
 }
 fn s(e: &mut Engine, txt: &str) -> Value {
     Value::Obj(e.heap.alloc_string(txt.to_string()).unwrap())
@@ -93,10 +99,6 @@ fn m8_sqlite_crud_cursor() {
         .unwrap();
         assert!(matches!(r, Some(Value::Long(_))), "{r:?}");
     }
-    assert_eq!(
-        e.m8_database("app.db").unwrap().tables["notes"].rows.len(),
-        2
-    );
     let q = s(&mut e, "SELECT id, title FROM notes");
     let cur = match call_m8_instance(
         &mut e,
@@ -148,9 +150,23 @@ fn m8_sqlite_crud_cursor() {
         &[tbl, wh, Value::Null],
     )
     .unwrap();
+    let query = s(&mut e, "SELECT id FROM notes");
+    let remaining = call_m8_instance(
+        &mut e,
+        SQLITE_DB,
+        "rawQuery",
+        "(Ljava/lang/String;[Ljava/lang/String;)Landroid/database/Cursor;",
+        db,
+        &[query, Value::Null],
+    )
+    .unwrap()
+    .unwrap();
+    let Value::Obj(remaining) = remaining else {
+        panic!("query must return Cursor")
+    };
     assert_eq!(
-        e.m8_database("app.db").unwrap().tables["notes"].rows.len(),
-        1
+        call_m8_instance(&mut e, CURSOR, "getCount", "()I", remaining, &[]).unwrap(),
+        Some(Value::Int(1))
     );
 }
 

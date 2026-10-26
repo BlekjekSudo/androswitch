@@ -30,6 +30,7 @@ pub mod opcode;
 pub mod protos;
 pub mod read;
 pub mod strings;
+#[doc(hidden)]
 pub mod sync;
 pub mod types;
 

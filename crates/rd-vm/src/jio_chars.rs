@@ -28,8 +28,9 @@
 //! constructors and the template methods (`Writer.write(String)` →
 //! `write(char[],int,int)`, `Reader.read()` → `read(char[],int,int)`).
 
-use std::cell::RefCell;
-use std::collections::HashMap;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -68,7 +69,7 @@ enum Sink {
 }
 
 #[derive(Debug, Clone)]
-struct WState {
+pub(crate) struct WState {
     sink: Sink,
     pending: Vec<u16>,
     /// StringWriter content (Sink::Buffer).
@@ -85,7 +86,7 @@ enum Source {
 }
 
 #[derive(Debug, Clone)]
-struct RState {
+pub(crate) struct RState {
     source: Source,
     loaded: bool,
     chars: Vec<u16>,
@@ -95,34 +96,37 @@ struct RState {
 }
 
 #[derive(Debug, Clone, Default)]
-struct BState {
+pub(crate) struct BState {
     bytes: Vec<u8>,
     pos: usize,
     mark: usize,
 }
 
-thread_local! {
-    static WRITERS_ST: RefCell<HashMap<ObjRef, WState>> = RefCell::new(HashMap::new());
-    static READERS_ST: RefCell<HashMap<ObjRef, RState>> = RefCell::new(HashMap::new());
-    static BYTES_ST: RefCell<HashMap<ObjRef, BState>> = RefCell::new(HashMap::new());
-}
-
 /// GC: objects that have state here (marking consults `gc_entry` only
 /// for these).
-pub(crate) fn gc_keys(out: &mut Vec<ObjRef>) {
-    WRITERS_ST.with(|m| out.extend(m.borrow().keys().copied()));
-    READERS_ST.with(|m| out.extend(m.borrow().keys().copied()));
-    BYTES_ST.with(|m| out.extend(m.borrow().keys().copied()));
+pub(crate) fn gc_keys(vm: &Engine, out: &mut Vec<ObjRef>) {
+    vm.module_tables
+        .jio_chars_writers_st
+        .clone()
+        .with(|m| out.extend(m.borrow().keys().copied()));
+    vm.module_tables
+        .jio_chars_readers_st
+        .clone()
+        .with(|m| out.extend(m.borrow().keys().copied()));
+    vm.module_tables
+        .jio_chars_bytes_st
+        .clone()
+        .with(|m| out.extend(m.borrow().keys().copied()));
 }
 
 /// GC ephemeron: state of a reachable object (holds heap refs).
-pub(crate) fn gc_entry(r: ObjRef, out: &mut impl std::fmt::Write) {
-    WRITERS_ST.with(|m| {
+pub(crate) fn gc_entry(vm: &Engine, r: ObjRef, out: &mut impl core::fmt::Write) {
+    vm.module_tables.jio_chars_writers_st.clone().with(|m| {
         if let Some(v) = m.borrow().get(&r) {
             let _ = write!(out, "|{:?}", v.sink);
         }
     });
-    READERS_ST.with(|m| {
+    vm.module_tables.jio_chars_readers_st.clone().with(|m| {
         if let Some(v) = m.borrow().get(&r) {
             let _ = write!(out, "|{:?}", v.source);
         }
@@ -130,19 +134,22 @@ pub(crate) fn gc_entry(r: ObjRef, out: &mut impl std::fmt::Write) {
 }
 
 /// GC: drop state of collected objects (slots are reused).
-pub(crate) fn gc_purge(alive: &dyn Fn(ObjRef) -> bool) {
-    WRITERS_ST.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
-    READERS_ST.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
-    BYTES_ST.with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+pub(crate) fn gc_purge(vm: &Engine, alive: &dyn Fn(ObjRef) -> bool) {
+    vm.module_tables
+        .jio_chars_writers_st
+        .clone()
+        .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+    vm.module_tables
+        .jio_chars_readers_st
+        .clone()
+        .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+    vm.module_tables
+        .jio_chars_bytes_st
+        .clone()
+        .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
-/// Issue #230: fronteira de `Engine` — estados de streams indexados por
-/// `ObjRef` morrem com o heap que os criou.
-pub(crate) fn reset_all() {
-    WRITERS_ST.with(|m| m.borrow_mut().clear());
-    READERS_ST.with(|m| m.borrow_mut().clear());
-    BYTES_ST.with(|m| m.borrow_mut().clear());
-}
+// Issue #230: this state now belongs to Engine.module_tables and dies with its heap.
 
 fn exc(class: &str, msg: impl Into<String>) -> VmExit {
     VmExit::Exception(Throwable::new(class, msg))
@@ -299,11 +306,17 @@ fn print_units(vm: &mut Engine, sig: &str, v: Option<&Value>) -> Result<Vec<u16>
 
 // ── writers ─────────────────────────────────────────────────────────────
 
-fn wget(r: ObjRef) -> Option<WState> {
-    WRITERS_ST.with(|m| m.borrow().get(&r).cloned())
+fn wget(vm: &Engine, r: ObjRef) -> Option<WState> {
+    vm.module_tables
+        .jio_chars_writers_st
+        .clone()
+        .with(|m| m.borrow().get(&r).cloned())
 }
-fn wput(r: ObjRef, st: WState) {
-    WRITERS_ST.with(|m| m.borrow_mut().insert(r, st));
+fn wput(vm: &Engine, r: ObjRef, st: WState) {
+    vm.module_tables
+        .jio_chars_writers_st
+        .clone()
+        .with(|m| m.borrow_mut().insert(r, st));
 }
 
 fn flush_writer(
@@ -312,7 +325,7 @@ fn flush_writer(
     close: bool,
     hold_trailing_high: bool,
 ) -> Result<(), VmExit> {
-    let Some(mut st) = wget(recv) else {
+    let Some(mut st) = wget(vm, recv) else {
         return Ok(());
     };
     let units = if !close
@@ -323,19 +336,19 @@ fn flush_writer(
             .is_some_and(|u| (0xD800..=0xDBFF).contains(u))
     {
         let keep = st.pending.pop();
-        let taken = std::mem::take(&mut st.pending);
+        let taken = core::mem::take(&mut st.pending);
         if let Some(hi) = keep {
             st.pending.push(hi);
         }
         taken
     } else {
-        std::mem::take(&mut st.pending)
+        core::mem::take(&mut st.pending)
     };
     let data = String::from_utf16_lossy(&units);
     if close {
         st.closed = true;
     }
-    wput(recv, st.clone());
+    wput(vm, recv, st.clone());
     match &st.sink {
         Sink::Buffer => {}
         Sink::Writer(w) => {
@@ -356,8 +369,8 @@ fn flush_writer(
     Ok(())
 }
 
-fn write_units(recv: ObjRef, units: &[u16]) -> Result<(), VmExit> {
-    let Some(mut st) = wget(recv) else {
+fn write_units(vm: &Engine, recv: ObjRef, units: &[u16]) -> Result<(), VmExit> {
+    let Some(mut st) = wget(vm, recv) else {
         return Ok(());
     };
     if st.closed {
@@ -367,13 +380,13 @@ fn write_units(recv: ObjRef, units: &[u16]) -> Result<(), VmExit> {
         Sink::Buffer => st.text.extend_from_slice(units),
         _ => st.pending.extend_from_slice(units),
     }
-    wput(recv, st);
+    wput(vm, recv, st);
     Ok(())
 }
 
-fn write_text(recv: ObjRef, s: &str) -> Result<(), VmExit> {
+fn write_text(vm: &Engine, recv: ObjRef, s: &str) -> Result<(), VmExit> {
     let units: Vec<u16> = s.encode_utf16().collect();
-    write_units(recv, &units)
+    write_units(vm, recv, &units)
 }
 
 /// Sink for a writer constructor's first argument.
@@ -466,6 +479,7 @@ fn writer(
             && sig.contains("Z)V")
             && args.iter().any(|a| matches!(a, Value::Int(1)));
         wput(
+            vm,
             recv,
             WState {
                 sink,
@@ -477,7 +491,7 @@ fn writer(
         );
         return Ok(Some(Value::Null));
     }
-    if wget(recv).is_none() {
+    if wget(vm, recv).is_none() {
         return Ok(None);
     }
     let ret_self = sig.ends_with(")Ljava/io/Writer;")
@@ -498,7 +512,7 @@ fn writer(
                 sink: Sink::Stream(os, _),
                 closed: false,
                 ..
-            }) = wget(recv)
+            }) = wget(vm, recv)
             {
                 let b = crate::jlstring::byte_array(vm, &raw)?;
                 vm.invoke_instance(os, "write", "([B)V", &[b])?;
@@ -513,7 +527,7 @@ fn writer(
                 sink: Sink::Stream(os, _),
                 closed: false,
                 ..
-            }) = wget(recv)
+            }) = wget(vm, recv)
             {
                 let b = crate::jlstring::byte_array(vm, &raw)?;
                 vm.invoke_instance(os, "write", "([B)V", &[b])?;
@@ -539,7 +553,7 @@ fn writer(
                     .encode_utf16()
                     .collect(),
             };
-            write_units(recv, &units)?;
+            write_units(vm, recv, &units)?;
             Value::Null
         }
         "append" => {
@@ -556,7 +570,7 @@ fn writer(
                 }
                 _ => text_of(vm, args.first())?.encode_utf16().collect(),
             };
-            write_units(recv, &units)?;
+            write_units(vm, recv, &units)?;
             Value::Obj(recv)
         }
         "print" | "println" => {
@@ -564,7 +578,7 @@ fn writer(
             if name == "println" {
                 units.push(b'\n' as u16);
             }
-            write_units(recv, &units)?;
+            write_units(vm, recv, &units)?;
             Value::Null
         }
         "printf" | "format" => {
@@ -584,11 +598,11 @@ fn writer(
                 _ => Vec::new(),
             };
             let s = crate::jlstring::java_format(vm, &fmt, &fargs, ('.', ','))?;
-            write_text(recv, &s)?;
+            write_text(vm, recv, &s)?;
             Value::Obj(recv)
         }
         "newLine" => {
-            write_text(recv, "\n")?;
+            write_text(vm, recv, "\n")?;
             Value::Null
         }
         "flush" => {
@@ -596,7 +610,7 @@ fn writer(
             Value::Null
         }
         "close" => {
-            if class != SW && !wget(recv).is_some_and(|w| w.closed) {
+            if class != SW && !wget(vm, recv).is_some_and(|w| w.closed) {
                 flush_writer(vm, recv, true, false)?;
             }
             Value::Null
@@ -606,13 +620,13 @@ fn writer(
             Value::Int(0)
         }
         "toString" if class == SW => {
-            let t = wget(recv)
+            let t = wget(vm, recv)
                 .map(|w| String::from_utf16_lossy(&w.text))
                 .unwrap_or_default();
             jstr(vm, t)?
         }
         "getBuffer" if class == SW => {
-            let t = wget(recv)
+            let t = wget(vm, recv)
                 .map(|w| String::from_utf16_lossy(&w.text))
                 .unwrap_or_default();
             let sb = vm
@@ -631,7 +645,7 @@ fn writer(
             )?;
             Value::Obj(sb)
         }
-        "getEncoding" => match wget(recv).map(|w| w.sink) {
+        "getEncoding" => match wget(vm, recv).map(|w| w.sink) {
             Some(Sink::Stream(_, cs)) => jstr(vm, cs.replace('-', ""))?,
             _ => Value::Null,
         },
@@ -644,7 +658,7 @@ fn writer(
         )
         && !matches!(sig, "([B)V" | "([BII)V");
     let printwriter_autoflush =
-        class == PW && name == "println" && wget(recv).is_some_and(|w| w.autoflush);
+        class == PW && name == "println" && wget(vm, recv).is_some_and(|w| w.autoflush);
     if stream_write || printwriter_autoflush {
         flush_writer(vm, recv, false, name != "println" && name != "newLine")?;
     }
@@ -657,17 +671,23 @@ fn writer(
 
 // ── readers ─────────────────────────────────────────────────────────────
 
-fn rget(r: ObjRef) -> Option<RState> {
-    READERS_ST.with(|m| m.borrow().get(&r).cloned())
+fn rget(vm: &Engine, r: ObjRef) -> Option<RState> {
+    vm.module_tables
+        .jio_chars_readers_st
+        .clone()
+        .with(|m| m.borrow().get(&r).cloned())
 }
-fn rput(r: ObjRef, st: RState) {
-    READERS_ST.with(|m| m.borrow_mut().insert(r, st));
+fn rput(vm: &Engine, r: ObjRef, st: RState) {
+    vm.module_tables
+        .jio_chars_readers_st
+        .clone()
+        .with(|m| m.borrow_mut().insert(r, st));
 }
 
 /// Drains the reader's source into `chars` on first use.
 fn load(vm: &mut Engine, recv: ObjRef) -> Result<RState, VmExit> {
     let mut st =
-        rget(recv).ok_or_else(|| exc("Ljava/io/IOException;", "reader not initialised"))?;
+        rget(vm, recv).ok_or_else(|| exc("Ljava/io/IOException;", "reader not initialised"))?;
     if st.closed {
         return Err(exc("Ljava/io/IOException;", "Stream closed"));
     }
@@ -677,12 +697,12 @@ fn load(vm: &mut Engine, recv: ObjRef) -> Result<RState, VmExit> {
     match st.source.clone() {
         Source::Text => {}
         Source::Reader(inner) => {
-            if rget(inner).is_some() {
+            if rget(vm, inner).is_some() {
                 let ist = load(vm, inner)?;
                 st.chars = ist.chars[ist.pos..].to_vec();
                 let mut ist2 = ist;
                 ist2.pos = ist2.chars.len();
-                rput(inner, ist2);
+                rput(vm, inner, ist2);
             } else {
                 // DEX Reader: pull through read(char[],int,int) reusing one buffer.
                 let arr = vm
@@ -768,7 +788,7 @@ fn load(vm: &mut Engine, recv: ObjRef) -> Result<RState, VmExit> {
         }
     }
     st.loaded = true;
-    rput(recv, st.clone());
+    rput(vm, recv, st.clone());
     Ok(st)
 }
 
@@ -833,6 +853,7 @@ fn reader(
             _ => (Vec::new(), false),
         };
         rput(
+            vm,
             recv,
             RState {
                 source,
@@ -845,15 +866,15 @@ fn reader(
         );
         return Ok(Some(Value::Null));
     }
-    if rget(recv).is_none() {
+    if rget(vm, recv).is_none() {
         return Ok(None);
     }
     if name == "close" {
-        if let Some(mut st) = rget(recv) {
+        if let Some(mut st) = rget(vm, recv) {
             if !st.closed {
                 st.closed = true;
                 let src = st.source.clone();
-                rput(recv, st);
+                rput(vm, recv, st);
                 match src {
                     Source::Reader(r) | Source::Stream(r, _) => {
                         vm.invoke_instance(r, "close", "()V", &[])?;
@@ -868,7 +889,7 @@ fn reader(
         return Ok(Some(Value::Int(1)));
     }
     if name == "getEncoding" {
-        return match rget(recv) {
+        return match rget(vm, recv) {
             Some(st) if !st.closed => match st.source {
                 Source::Stream(_, cs) => Ok(Some(jstr(vm, cs.replace('-', ""))?)),
                 _ => Ok(Some(Value::Null)),
@@ -974,7 +995,7 @@ fn reader(
         }
         _ => return Ok(None),
     };
-    rput(recv, st);
+    rput(vm, recv, st);
     Ok(Some(out))
 }
 
@@ -983,7 +1004,7 @@ fn reader(
 /// A host `ByteArrayInputStream` over `bytes` (raw resources, assets).
 pub(crate) fn new_byte_input_stream(vm: &mut Engine, bytes: Vec<u8>) -> Result<Value, VmExit> {
     let r = vm.heap.alloc_instance(BAIS.to_string(), Vec::new())?;
-    BYTES_ST.with(|m| {
+    vm.module_tables.jio_chars_bytes_st.clone().with(|m| {
         m.borrow_mut().insert(
             r,
             BState {
@@ -1004,8 +1025,9 @@ fn bytes_stream(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    let get = || BYTES_ST.with(|m| m.borrow().get(&recv).cloned());
-    let set = |st: BState| BYTES_ST.with(|m| m.borrow_mut().insert(recv, st));
+    let byte_states = vm.module_tables.jio_chars_bytes_st.clone();
+    let get = || byte_states.with(|m| m.borrow().get(&recv).cloned());
+    let set = |st: BState| byte_states.with(|m| m.borrow_mut().insert(recv, st));
     if name == "<init>" {
         let st = if class == BAIS {
             let all = require_byte_array(vm, args.first())?;
@@ -1262,7 +1284,10 @@ fn buffered_output_stream(
             ));
         }
         let _ = vm.heap.put_field(recv, "rd_buf_size", Value::Int(size));
-        BYTES_ST.with(|m| m.borrow_mut().insert(recv, BState::default()));
+        vm.module_tables
+            .jio_chars_bytes_st
+            .clone()
+            .with(|m| m.borrow_mut().insert(recv, BState::default()));
         return Ok(Some(Value::Null));
     }
     let wrapped = match vm.heap.get_field(recv, "out") {
@@ -1270,10 +1295,10 @@ fn buffered_output_stream(
         _ => None,
     };
     let flush_buffer = |vm: &mut Engine| -> Result<(), VmExit> {
-        let pending = BYTES_ST.with(|m| {
+        let pending = vm.module_tables.jio_chars_bytes_st.clone().with(|m| {
             let mut map = m.borrow_mut();
             let st = map.entry(recv).or_default();
-            std::mem::take(&mut st.bytes)
+            core::mem::take(&mut st.bytes)
         });
         if !pending.is_empty() {
             if let Some(out) = wrapped {
@@ -1293,12 +1318,15 @@ fn buffered_output_stream(
                     slice(&all, int(args, 1), int(args, 2))?
                 }
             };
-            BYTES_ST.with(|m| m.borrow_mut().entry(recv).or_default().bytes.extend(data));
+            vm.module_tables
+                .jio_chars_bytes_st
+                .clone()
+                .with(|m| m.borrow_mut().entry(recv).or_default().bytes.extend(data));
             let cap = match vm.heap.get_field(recv, "rd_buf_size") {
                 Ok(Value::Int(v)) => v.max(1) as usize,
                 _ => 8192,
             };
-            let over = BYTES_ST.with(|m| {
+            let over = vm.module_tables.jio_chars_bytes_st.clone().with(|m| {
                 m.borrow()
                     .get(&recv)
                     .map(|st| st.bytes.len() >= cap)

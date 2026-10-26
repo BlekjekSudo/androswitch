@@ -28,6 +28,11 @@ AndroSwitch's contracts and status live in `docs/ANDROSWITCH_ROADMAP.md`,
   Prefer shared `core`/`alloc` extraction over a second implementation; record
   state, GC, thread or platform differences that require adaptation. See
   `docs/UPSTREAM_REUSE_AUDIT.md` for the current source-routing audit.
+- Complete upstream API parity is the active porting requirement. Work through
+  the complete pinned module/test inventory; do not use external-APK failures
+  as the implementation backlog. Source presence and compilation do not prove
+  dispatch, state ownership, platform integration, or behavior parity. Keep the
+  original integration corpus registered and report every unverified surface.
 - AndroSwitch uses an API 26 reference environment. A lower APK minSdk is valid;
   targetSdk is not a minimum. This supersedes upstream's Moto E5/minSdk floor
   policy for AndroSwitch APIs. Preserve legacy `rd` behavior until explicitly ported.

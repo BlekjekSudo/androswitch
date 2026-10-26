@@ -733,7 +733,7 @@ fn exception_describe_logs_actual_object_detail_clears_pending_and_is_empty_on_r
     let output = as_platform::fs::read_all(native.fs.as_ref(), &path, 65536).unwrap();
     let text = String::from_utf8(output.clone()).unwrap();
     assert!(
-        text.contains("[w] System.err: java.lang.IllegalStateException: current detail"),
+        text.contains("W/System.err: java.lang.IllegalStateException: current detail"),
         "{text}"
     );
     assert!(!text.contains("initial detail"));

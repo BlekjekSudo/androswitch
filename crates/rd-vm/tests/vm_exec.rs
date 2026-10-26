@@ -1881,9 +1881,22 @@ fn system_out_println_executes() {
     // falso-verde). Agora captura a saída via HostOut::Buffer (issue #55)
     // e asserta o CONTEÚDO impresso (String e Object boxado).
     let buf = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    #[cfg(feature = "std")]
     rd_vm::set_app_stdout(rd_vm::HostOut::Buffer(buf.clone()));
+    #[cfg(not(feature = "std"))]
+    {
+        struct Capture(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+        impl rd_vm::AppOutput for Capture {
+            fn write(&self, _fd: i32, text: &str) -> Result<usize, rd_vm::VmExit> {
+                self.0.lock().unwrap().extend_from_slice(text.as_bytes());
+                Ok(text.len())
+            }
+        }
+        e.bind_app_output(std::rc::Rc::new(Capture(buf.clone())));
+    }
     invoke(&mut e, "oi", "()V", &[]).expect("println(String) não pode falhar");
     invoke(&mut e, "oi_num", "()V", &[]).expect("println(Object box) não pode falhar");
+    #[cfg(feature = "std")]
     rd_vm::set_app_stdout(rd_vm::HostOut::Std); // restaura (testes paralelos)
     let out = String::from_utf8(buf.lock().unwrap().clone()).expect("utf8");
     assert_eq!(out, "hi\n7\n", "println(String) e println(Object) imprimem");

@@ -27,7 +27,11 @@
 //! - **Uncaught exceptions in a green thread** crash the app, matching
 //!   Android's default uncaught-exception handler, which kills the process.
 
-use std::collections::{HashMap, VecDeque};
+use crate::maps::HashMap;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
+use alloc::collections::VecDeque;
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
@@ -81,7 +85,7 @@ pub struct Threads {
 
 impl Threads {
     fn entry(&mut self, t: ObjRef) -> &mut GreenThread {
-        if let std::collections::hash_map::Entry::Vacant(entry) = self.table.entry(t) {
+        if let crate::maps::Entry::Vacant(entry) = self.table.entry(t) {
             self.next_id += 1;
             let id = self.next_id + 1; // 1 is "main"
             entry.insert(GreenThread {
@@ -157,8 +161,8 @@ pub(crate) fn static_intrinsic(
         }
         (THREAD, "interrupted") if sig == "()Z" => {
             let was = match vm.threads.current {
-                Some(t) => std::mem::take(&mut vm.threads.entry(t).interrupted),
-                None => std::mem::take(&mut vm.threads.main_interrupted),
+                Some(t) => core::mem::take(&mut vm.threads.entry(t).interrupted),
+                None => core::mem::take(&mut vm.threads.main_interrupted),
             };
             Ok(Some(Value::Int(was as i32)))
         }
@@ -206,7 +210,7 @@ fn park(vm: &mut Engine, nanos: Option<i64>) -> Result<(), VmExit> {
         Some(t) => {
             let clock = vm.fw.clock();
             let th = vm.threads.entry(t);
-            if std::mem::take(&mut th.permit) || th.interrupted {
+            if core::mem::take(&mut th.permit) || th.interrupted {
                 return Ok(());
             }
             if let Some(n) = nanos {
@@ -220,7 +224,7 @@ fn park(vm: &mut Engine, nanos: Option<i64>) -> Result<(), VmExit> {
         None => {
             // main: consume the permit, or give ready threads a turn and
             // return (a spurious wakeup is permitted by LockSupport).
-            if std::mem::take(&mut vm.threads.main_permit) {
+            if core::mem::take(&mut vm.threads.main_permit) {
                 return Ok(());
             }
             if run_ready(vm, 1)? == 0 {
@@ -439,7 +443,7 @@ fn run_one(vm: &mut Engine, t: ObjRef) -> Result<(), VmExit> {
         }
         Err(VmExit::Error(e)) if e.code == PARK_SIGNAL => {
             let th = vm.threads.entry(t);
-            if std::mem::take(&mut th.permit) {
+            if core::mem::take(&mut th.permit) {
                 // unparked while unwinding: runnable again
                 th.state = ThreadState::Ready;
                 vm.threads.ready.push_back(t);
@@ -524,7 +528,7 @@ fn describe_throwable(vm: &mut Engine, e: ObjRef) -> Result<String, VmExit> {
     if !text.starts_with(&format!("{java}@")) {
         return Ok(text);
     }
-    let msg = match vm.heap.get_field(e, "message") {
+    let msg = match crate::throwable_message::stored(vm, e) {
         Ok(Value::Obj(m)) => vm.heap.as_str(m).ok().map(str::to_string),
         _ => None,
     };
@@ -573,7 +577,7 @@ pub(crate) fn ueh_intrinsic(
         return Ok(Some(Value::Null));
     };
     let class = vm.heap.class_of(e)?.to_string();
-    let msg = match vm.heap.get_field(e, "message") {
+    let msg = match crate::throwable_message::stored(vm, e) {
         Ok(Value::Obj(m)) => vm.heap.as_str(m).ok().map(str::to_string),
         _ => None,
     };
@@ -602,6 +606,7 @@ pub(crate) fn ueh_intrinsic(
         cur = c;
     }
     crate::intrinsics::host_print(
+        vm,
         1,
         &format!("E/AndroidRuntime: FATAL EXCEPTION: main\nE/AndroidRuntime: {text}\n"),
     );

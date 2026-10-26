@@ -115,6 +115,10 @@ impl Engine {
     /// Plain DEX objects need no host-side state. Platform-backed objects must
     /// fail before they can be mistaken for functioning framework objects.
     pub fn attach_host_state(&mut self, class: &str, _object: ObjRef) -> Result<(), VmExit> {
+        #[cfg(feature = "upstream-runtime")]
+        if self.framework_host().is_none() {
+            return self.attach_upstream_host_state(class, _object);
+        }
         if crate::boxes::kind(class).is_some() {
             return Ok(());
         }
@@ -180,11 +184,20 @@ impl Engine {
         if let Some(object) = self.portable.classes.get(desc) {
             return Ok(*object);
         }
-        let name = self.heap.alloc_string(desc.to_string())?;
-        let object = self.heap.alloc_instance(
-            "Ljava/lang/Class;".to_string(),
-            vec![("class_name".to_string(), Value::Obj(name))],
-        )?;
+        let name = self
+            .heap
+            .alloc_string(desc.to_string())
+            .map_err(err::oom_throwable)?;
+        let object = self
+            .heap
+            .alloc_instance(
+                "Ljava/lang/Class;".to_string(),
+                vec![
+                    ("class_name".to_string(), Value::Obj(name)),
+                    ("name".to_string(), Value::Obj(name)),
+                ],
+            )
+            .map_err(err::oom_throwable)?;
         self.portable.classes.insert(desc.to_string(), object);
         Ok(object)
     }

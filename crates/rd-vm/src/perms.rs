@@ -19,6 +19,9 @@
 use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::heap::{ElemKind, ObjRef};
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 #[derive(Debug, Clone)]
@@ -111,7 +114,7 @@ pub(crate) fn instance_intrinsic(
 
 /// Deliver queued permission results (called when the main Looper drains).
 pub(crate) fn deliver_pending(vm: &mut Engine) -> Result<usize, VmExit> {
-    let pending = std::mem::take(&mut vm.pending_permission_results);
+    let pending = core::mem::take(&mut vm.pending_permission_results);
     let n = pending.len();
     for p in pending {
         let perms = vm.heap.as_array_elems(p.permissions)?.0.to_vec();

@@ -26,6 +26,9 @@ use crate::engine::Engine;
 use crate::err::VmExit;
 use crate::framework;
 use crate::heap::ObjRef;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
+use crate::port_prelude::*;
 use crate::value::Value;
 
 use rd_apk::arsc::ResolvedValue;
@@ -803,9 +806,10 @@ fn apply_attrs(vm: &mut Engine, r: ObjRef, el: &XmlElement, caps: AxisCaps) -> R
                     }
                 }
             }
-            other => {
-                if std::env::var("RD_FW_DEBUG").is_ok() {
-                    eprintln!("[fw] inflate: attr android:{other} ignorado no modelo headless M3");
+            _other => {
+                if crate::port_env::var("RD_FW_DEBUG").is_ok() {
+                    #[cfg(feature = "std")]
+                    eprintln!("[fw] inflate: attr android:{_other} ignorado no modelo headless M3");
                 }
             }
         }

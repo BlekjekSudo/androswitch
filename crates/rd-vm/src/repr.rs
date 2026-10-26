@@ -85,6 +85,9 @@ fn format_mantissa_exp(sci: String, neg: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
 
     #[test]
     fn double_matches_java_tostring() {

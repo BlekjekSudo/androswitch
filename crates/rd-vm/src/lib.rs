@@ -15,6 +15,24 @@ use alloc::{
     string::{String, ToString},
 };
 
+mod app_output;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+mod collection_clock;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+mod module_tables;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+mod port_env;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+mod port_float;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+mod port_prelude;
+pub use app_output::AppOutput;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+mod reference_filesystem;
+mod sdk_types;
+mod throwable_message;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+pub use reference_filesystem::ReferenceFileSystem;
 pub mod framework_host;
 #[cfg(not(feature = "std"))]
 pub mod native_host;
@@ -32,87 +50,88 @@ pub(crate) mod maps {
 }
 #[cfg(not(feature = "std"))]
 pub(crate) mod maps {
+    #[cfg(feature = "upstream-runtime")]
+    pub use alloc::collections::btree_map::Entry;
     pub use alloc::collections::{BTreeMap as HashMap, BTreeSet as HashSet};
 }
 
 #[cfg(feature = "advanced-components")]
-#[cfg(feature = "std")]
 pub mod accessibility_node;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod activity_callbacks;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod activity_extras;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub mod android_build;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_colorspace;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_display;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_drawable;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_env;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_json;
 pub mod android_log;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_motion;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_observable;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_pm;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_region;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_res;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_spannable;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_stub_surfaces;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_sysservices;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_text;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_uri;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_util;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod android_velocity;
 /// Apêndice D — shims host AndroidX/Jetpack (data/jetpack.toml).
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub mod androidx;
 pub mod arrays;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod atomics;
 pub mod boxes;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod bundle;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod choreographer;
 pub mod classpath;
 pub mod collection_values;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod collections;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod content;
 pub mod engine;
 pub mod err;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub mod framework;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub mod gc;
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(feature = "std"), not(feature = "upstream-runtime")))]
 #[path = "portable/gc.rs"]
 pub mod gc;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub mod gms;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub mod graphics;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod handler_msg;
 pub mod heap;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub mod inflate;
 mod integer_bits;
 pub mod interp;
@@ -121,107 +140,112 @@ pub mod intrinsics;
 #[cfg(not(feature = "std"))]
 #[path = "portable/intrinsics.rs"]
 pub mod intrinsics;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jannotations;
 mod java_format;
 mod java_values;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jbigdecimal;
 pub mod jbitset;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jbreakiter;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jcollections;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jfile;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jio_chars;
 #[cfg(feature = "jit")]
 #[cfg(feature = "std")]
 pub mod jit;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jiterator;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jlclass;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jlocks;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jlstring;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jlsystem;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jnormalizer;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jpriorityqueue;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jrandom;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jregex;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jresources;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jsb;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jsecurity;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jsorted;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jsqlite;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jstring_tokenizer;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jtext_format;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jtime;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod juuid;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod jxml;
 #[cfg(feature = "virtual-devices")]
 pub mod m10;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub mod m8;
 #[cfg(feature = "advanced-components")]
-#[cfg(feature = "std")]
 pub mod m9;
 #[cfg(feature = "native")]
 #[cfg(feature = "std")]
 pub mod native;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod numerics;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod parcel;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub mod perms;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod platform_base;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod prefs;
 mod primitive_parse;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod reflect;
 pub mod repr;
 mod shared_call;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub mod threads;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod throwable;
+#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[path = "intrinsics.rs"]
+pub(crate) mod upstream_intrinsics;
 pub mod value;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod view_attach;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod view_layout;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod view_props;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod vto;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod window;
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
 pub(crate) mod xml_res;
 
 use rd_dex::annotations::EncodedValue;
 use rd_dex::Dex;
+
+#[cfg(feature = "std")]
+pub(crate) use intrinsics::print_sink as upstream_print_sink;
 
 pub use engine::{ClassCoverage, CoverageSnapshot, Engine, VmConfig};
 pub use err::{Throwable, VmExit};
@@ -235,34 +259,12 @@ pub const MODULE_ID: &str = "rd-vm";
 /// Explicit evidence of the linked VM variant (Cargo features are additive).
 pub const PORTABLE_CORE: bool = !cfg!(feature = "std");
 
-/// Issue #230: fronteira de `Engine` para o estado host que vive em
-/// estado thread-local (macro do std) fora do `Engine`. Esvazia/reinicia as tabelas
-/// indexadas por `ObjRef` (spannable, random, regex, uri, xml,
-/// annotations, io-chars) e o RNG de UUID. Sem isto, um `Engine` novo
-/// na mesma thread (relaunch, próximo cenário de `rd test`) herdava
-/// estado fantasma de um heap morto, porque os `ObjRef`s reiniciam com
-/// o `Heap::new`. O VFS de arquivos NÃO entra aqui: dados persistidos
-/// sobrevivem a relaunch dentro da sessão (comportamento Android);
-/// quem o limpa é `clear_package_data` (clear/remove) e `reset_vfs`
-/// (sessão nova).
-///
-/// Contrato: chamar ao descartar um `Engine` (o MCP faz isso ao matar o
-/// engine ativo) ou antes de construir outro na mesma thread.
-///
-/// Premissa explícita: um `Engine` vivo por vez por thread — o padrão
-/// de todas as superfícies (MCP, CLI, suítes). A migração dessas
-/// tabelas para dentro de `HostState` segue como follow-up da #230.
+/// Legacy host boundary, retained for callers built against RustyDroid.
+/// Object-indexed module tables are now Engine-owned and drop with their heap;
+/// constructing a second Engine cannot reset another live Engine's state.
+/// Persistent filesystem/session data is still reset through its own adapter.
 #[cfg(feature = "std")]
-pub fn reset_host_thread_state() {
-    android_spannable::reset_all();
-    jrandom::reset_all();
-    jregex::reset_all();
-    android_uri::reset_all();
-    xml_res::reset_all();
-    jannotations::reset_all();
-    jio_chars::reset_all();
-    juuid::reset_all();
-}
+pub fn reset_host_thread_state() {}
 
 /// Issue #230: apaga o armazenamento privado de um pacote no VFS
 /// (`/data/user/0/<pkg>/`) — backend de `package_clear`/`package_remove`.
@@ -414,6 +416,9 @@ pub fn unescaped_java(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
     use alloc::vec::Vec;
 
     #[test]

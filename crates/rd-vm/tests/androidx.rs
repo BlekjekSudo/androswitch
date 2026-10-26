@@ -1136,7 +1136,7 @@ fn dex_startup_multidex_fileprovider_permissions_cancellation() {
         0,
         "perfil default: concedido"
     );
-    e.granted_permissions = Some(std::collections::HashSet::new());
+    e.granted_permissions = Some(Default::default());
     assert_eq!(
         iv(cs!(
             e,

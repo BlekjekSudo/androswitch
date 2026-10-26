@@ -7,6 +7,9 @@ use super::{
     float_arg, get_double_field, get_field, get_float_field, get_int_field, get_long_field,
     get_str_field, illegal, long_arg, obj_arg, opt_str_arg, put_field, str_val,
 };
+#[cfg(not(feature = "std"))]
+#[allow(unused_imports)] // Explicit alloc prelude for the inherited module.
+use crate::port_prelude::*;
 use crate::{Engine, ObjRef, Value, VmExit};
 
 const LOCATION_MANAGER: &str = "Landroid/location/LocationManager;";

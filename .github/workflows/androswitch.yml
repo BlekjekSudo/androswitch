@@ -26,10 +26,16 @@ jobs:
         run: python -X utf8 scripts/check-upstream-sync.py --report target/upstream-sync.json
       - name: Verify the upstream omission and drift gate
         run: python -X utf8 -m unittest discover -s scripts/tests -p test_upstream_sync.py -v
+      - name: Verify conservative execution evidence reporting
+        run: python -X utf8 -m unittest discover -s scripts/tests -p test_upstream_parity_report.py -v
       - run: cargo fmt --all -- --check
       - name: Check host tools and the portable VM together without feature leakage
         run: cargo check --workspace --locked
       - run: cargo test -p as-vm --lib --locked
+      - name: Run the complete original VM corpus on the no_std reference path
+        run: cargo test -p as-vm --features upstream-parity-tests --lib --tests --locked -- --test-threads=1
+      - name: Verify Android declaration generator contracts
+        run: python -X utf8 -m unittest discover -s scripts/tests -p test_android_types.py -v
       - run: cargo clippy -p as-platform -p as-package -p as-native -p as-runtime -p as-cli --all-targets --locked -- -D warnings
       - run: cargo test -p as-platform -p as-package -p as-native -p as-runtime -p as-cli --locked
       - run: cargo check -p as-native --no-default-features --locked
