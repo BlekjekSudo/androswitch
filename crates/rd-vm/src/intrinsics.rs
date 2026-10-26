@@ -137,7 +137,6 @@ const INTEGER: &str = "Ljava/lang/Integer;";
 const LONG: &str = "Ljava/lang/Long;";
 const PRINTSTREAM: &str = "Ljava/io/PrintStream;";
 const NFE: &str = "Ljava/lang/NumberFormatException;";
-const ARITH: &str = "Ljava/lang/ArithmeticException;";
 
 /// Escreve no stdout/stderr do host. PrintStream Java NUNCA lança IOException
 /// (spec de java.io.PrintStream) — engolir falha de E/S é a semântica correta.
