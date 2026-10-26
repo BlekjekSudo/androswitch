@@ -66,7 +66,6 @@ pub(crate) struct Frames {
     serial: u64,
 }
 impl Frames {
-    #[cfg(feature = "upstream-runtime")]
     pub(crate) fn is_empty(&self) -> bool {
         self.owners.values().all(Vec::is_empty)
     }

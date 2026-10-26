@@ -52,9 +52,12 @@ Eighty-five original VM sources remain outside the default device profile;
 this is a source inventory, not an API percentage.
 Its [checkpoint](reports/collections-text-20261026.json) records 706 reference
 tests, 995 product/desktop regressions and 135 JVM/DEX cases passing on host.
-The std NRO builds, while two Collections emulator attempts time out. UI/journal
-GC pressure is under investigation; this source checkpoint has no new emulator
-or hardware compatibility pass.
+The std NRO builds, while its two Collections emulator attempts timed out.
+The subsequent [shared GC pressure work](docs/UPSTREAM_GC_PRESSURE.md) reuses
+the original adaptive policy and rechecks pinned live watermarks after callbacks
+unwind. The ordinary SDK APK's UI/journal now completes **34/34 Collections**
+and **30/30 Text** host cases at the unchanged 64 MiB heap. These scoped results
+do not qualify complete upstream behavior or physical hardware.
 
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
 257 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,
@@ -119,7 +122,7 @@ Actual submitted console framebuffer from the M7 Ryujinx test.
 | Native ARM64 | Program-header ELF loader, dependencies, constructors, supported relocations/TLS and real libnx execution |
 | JNI | Native registration, callbacks/reentry, strings, primitive arrays, exception/reference/GC and pthread callback proof |
 | Ryujinx E2E | DEX semantics, persistent storage, native CPU oracle and mixed Java/Kotlin JNI fixtures; see milestone evidence |
-| Merged upstream VM regression | 706 std-reference tests pass, with all 50 original integration routes; native/JIT zero-case targets remain unverified; device API parity is separate |
+| Merged upstream VM regression | 710 std-reference tests pass, with all 50 original integration routes; native/JIT zero-case targets remain unverified; device API parity is separate |
 | Android lifecycle/UI | Supported M5 subset; 14 Java/Kotlin UI snapshots pass in Ryujinx |
 | Native graphics/audio | NativeActivity, incremental assets, input queue, EGL/GLES2; Java AudioTrack, AAudio writes and OpenSL ES PCM queue callbacks |
 | Console launcher | Scan/install/update/launch/return/uninstall; persistent saves, named failures and one NRO |

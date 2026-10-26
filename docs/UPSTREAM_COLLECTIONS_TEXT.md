@@ -76,9 +76,16 @@ The Text group has not been run on this NRO. Host resource pressure was observed
 but an ordinary host UI/journal diagnostic also progressed slowly. It was stopped
 after a debugger sample found the main thread in automatic GC. Original
 `gc.rs` has pinned-allocation pressure backoff that the product collector still
-needs to integrate and verify; the profile sample is not a complete root-cause
+needed to integrate and verify at that checkpoint; the profile sample was not a complete root-cause
 proof. The partial journals, process diagnostic and raw stack remain in the
 [checkpoint report](../reports/collections-text-20261026.json).
+
+The subsequent [GC pressure integration](UPSTREAM_GC_PRESSURE.md) extracts the
+original adaptive policy into one shared module and rechecks a pinned live
+watermark after callbacks unwind. The ordinary SDK APK's Collections UI run now
+finishes with 34/34 PASS, including its full journal writes, at the unchanged
+64 MiB application heap. This closes that host UI diagnostic, not the complete
+upstream collector/state integration or the Horizon/device verification gates.
 
 The combined product regression run caught older assertions that expected
 collection equality to fail and formatted integral float coordinates without

@@ -570,6 +570,11 @@ impl Android {
         self.main_boundary(vm, |vm| self.tick_inner(vm))
     }
     fn tick_inner(&self, vm: &mut Engine) -> Result<()> {
+        // The platform has not removed any queued callback roots yet. Reclaim
+        // dead objects from the previous turn before the next outer Java call
+        // conservatively protects existing Rust host temporaries. Interpreter
+        // safe points alone cannot reclaim objects behind that host cutoff.
+        vm.maybe_gc();
         self.services.flush()?;
         self.services.pump(self, vm)?;
         for _ in 0..256 {

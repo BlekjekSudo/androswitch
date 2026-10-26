@@ -18,6 +18,7 @@ use alloc::{
 mod app_output;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 mod collection_clock;
+mod gc_policy;
 #[cfg(any(feature = "std", feature = "upstream-runtime"))]
 mod local_table;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]

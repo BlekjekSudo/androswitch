@@ -4,7 +4,7 @@ AndroSwitch is a history-preserving fork of **RustyDroid by nadabgfccvd and
 the RustyDroid contributors**. The original fork point is
 `6388281f66d254c8e01a0fdc7a5a9a30239bc762`. The synchronization target is now
 [`3761815dc6a2a1427e9fc66b66e8471b78d1b170`](https://github.com/nadabgfccvd/RustyDroid/commit/3761815dc6a2a1427e9fc66b66e8471b78d1b170),
-the latest upstream main checked on 2026-10-26. Both histories are retained;
+the latest upstream main checked on 2026-10-27. Both histories are retained;
 this is a merge, not a source dump without attribution. See [credits](../CREDITS.md)
 and [notice](../NOTICE.md).
 
@@ -21,7 +21,7 @@ disconnected Android environment inside the Switch runner.
 in the upstream Git tree, rather than selected class families. Each entry has
 the original Git blob ID. A changed file also records its reviewed adaptation
 reason and canonical SHA-256. Text canonicalization only normalizes CRLF to LF.
-The 44 added core files, including extracted shared helpers, have their own
+The 45 added core files, including extracted shared helpers, have their own
 reviewed hashes and provenance where applicable. Missing files, duplicate
 entries, an incomplete manifest, an unreviewed change,
 or drift after review fail the gate.

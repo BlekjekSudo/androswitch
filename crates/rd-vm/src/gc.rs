@@ -53,6 +53,8 @@ pub struct GcStats {
     pub last_freed_bytes: usize,
     pub last_used_before: usize,
     pub last_used_after: usize,
+    /// The preceding watermark may include temporaries pinned by a callback.
+    pub last_had_frames: bool,
     pub last_pause_ms: f64,
     pub last_pause_measured: bool,
     /// WeakReference/PhantomReference referents cleared in the last cycle.
@@ -586,6 +588,7 @@ impl Engine {
             last_freed_bytes: freed_bytes,
             last_used_before: used_before,
             last_used_after: self.heap.used(),
+            last_had_frames: self.has_gc_frames(),
             last_pause_ms: t0.elapsed().as_secs_f64() * 1000.0,
             last_pause_measured: t0.measured(),
             last_cleared_weak: cleared_weak,
@@ -611,6 +614,11 @@ impl Engine {
         if !self.gc_due() {
             return None;
         }
+        // A minor cannot reclaim old temporary objects held by the previous
+        // callback's host cutoff. Re-evaluate that watermark with a full trace.
+        if self.unpinned_boundary_due() {
+            return Some(self.gc());
+        }
         let minor = self.gc_stats.collections % 8 != 7
             && self.heap.used() < self.heap.budget().saturating_mul(3) / 4
             && self.heap.len() - self.heap.free_slots() < crate::heap::MAX_OBJECTS * 3 / 4;
@@ -635,38 +643,28 @@ impl Engine {
     }
 
     pub(crate) fn gc_due(&self) -> bool {
-        let slots = self.heap.len() - self.heap.free_slots();
-        // A live/pinned heap may remain above a pressure watermark. Never
-        // collect every interpreter instruction when the previous GC could
-        // not reclaim it: require growth and use remaining-slot headroom.
-        if self.has_gc_frames()
-            && self.heap.used() <= self.gc_stats.last_used_after
-            && slots <= self.gc_slots_after
-        {
-            return false;
-        }
-        let slot_limit = if !self.has_gc_frames() {
-            crate::heap::MAX_OBJECTS * 3 / 4
-        } else {
-            (crate::heap::MAX_OBJECTS * 3 / 4).max(
-                self.gc_slots_after
-                    .saturating_add(((crate::heap::MAX_OBJECTS - self.gc_slots_after) / 2).max(1)),
-            )
-        };
-        let base = self.gc_stats.last_used_after;
-        let cap = if base < self.heap.budget() / 2 {
-            self.heap.budget() / 2
-        } else {
-            base.saturating_add((self.heap.budget() - base) / 2)
-        };
-        let threshold = base
-            .saturating_mul(2)
-            .max(base.saturating_add(16 << 20))
-            .min(cap);
-        (self.heap.used() >= threshold || slots >= slot_limit)
+        (self.unpinned_boundary_due()
+            || crate::gc_policy::due(
+                self.heap.used(),
+                self.heap.budget(),
+                self.heap.len() - self.heap.free_slots(),
+                self.gc_stats.last_used_after,
+                self.gc_slots_after,
+                self.has_gc_frames(),
+            ))
             && !crate::port_env::var("RD_GC")
                 .map(|v| v == "off" || v == "0")
                 .unwrap_or(false)
+    }
+
+    fn unpinned_boundary_due(&self) -> bool {
+        crate::gc_policy::unpinned_boundary_due(
+            self.heap.used(),
+            self.heap.budget(),
+            self.heap.len() - self.heap.free_slots(),
+            self.gc_stats.last_had_frames,
+            self.has_gc_frames(),
+        )
     }
 
     /// Protect allocations made by a Rust host dispatch while permitting a
@@ -717,6 +715,36 @@ mod tests {
     #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
     #[allow(unused_imports)]
     use crate::port_prelude::*;
+    #[test]
+    fn unpinned_boundary_rechecks_a_pinned_watermark_once_with_a_major_collection() {
+        let mut vm = Engine::new(
+            vec![],
+            crate::VmConfig {
+                heap_budget: 64 * 1024,
+                ..Default::default()
+            },
+        );
+        let live = vm.heap.alloc_string("x".repeat(20_000)).unwrap();
+        vm.statics
+            .insert(("LRoots;".into(), "live".into()), Value::Obj(live));
+        vm.gc_frames.push(vec![live]);
+        vm.gc();
+        assert!(vm.gc_stats.last_had_frames);
+        let major = vm.gc_stats.major_collections;
+        vm.gc_frames.pop();
+        let stats = vm
+            .maybe_gc()
+            .expect("the old pinned watermark needs a recheck");
+        assert_eq!(stats.major_collections, major + 1);
+        assert!(!stats.last_had_frames);
+        assert!(vm.heap.used() > vm.heap.budget() / 2);
+        assert!(
+            vm.maybe_gc().is_none(),
+            "a genuinely live heap must back off"
+        );
+        assert_eq!(vm.heap.as_str(live).unwrap().len(), 20_000);
+    }
+
     #[test]
     fn streaming_collector_matches_legacy_root_and_graph_oracle_across_seeded_heaps() {
         for seed in 1..=64u64 {

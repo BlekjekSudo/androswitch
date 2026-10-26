@@ -12,8 +12,8 @@
     {
       "path": ".gitattributes",
       "blob": "b09e4443db294b69a2ce100c3ebffbea0113f108",
-      "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained. Reviewed narrow raw-evidence rule for reports/collections-text-20261026: preserve byte hashes through Git checkout and exempt original log whitespace, without changing source policies.",
-      "sha256": "0940a53fa791c8fe4b8b62af7f9fd391244478f047c3f14c2092fabe422bfb4c"
+      "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained. Reviewed narrow raw-evidence rule for reports/collections-text-20261026: preserve byte hashes through Git checkout and exempt original log whitespace, without changing source policies. Reviewed the same narrow immutable-evidence byte policy for reports/gc-pressure-20261027; source normalization is unchanged.",
+      "sha256": "9e889b5145aac33d93a1c803d2f92b07ebf184dcf797ba8070e4885ef5835113"
     },
     {
       "path": ".github/CODEOWNERS",
@@ -917,8 +917,8 @@
     {
       "path": "crates/rd-vm/src/gc.rs",
       "blob": "d97e30c0509970d7ad11519dd1294c112d9e4758",
-      "reason": "Port original collector to core/alloc; add actual execution-owner, canonical cache, framework/native roots and platform collection hooks. Preserve inherited conservative side-state scanning; exclude an exactly default reference-free framework from scalar-ID false roots. Clock availability is explicit. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity.",
-      "sha256": "d88784ca04cd7447eab55c7b16e0b695f79bae3f9919b63768edff6df4810563"
+      "reason": "Port original collector to core/alloc; add actual execution-owner, canonical cache, framework/native roots and platform collection hooks. Preserve inherited conservative side-state scanning; exclude an exactly default reference-free framework from scalar-ID false roots. Clock availability is explicit. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. GC pressure integration: extract the pinned upstream byte/slot adaptive pressure calculation into gc_policy, consumed by both collectors; preserve actual execution-owner roots and host temporary cutoffs. A pressure watermark collected with active frames is rechecked once with a full collection after the callback unwinds; real live heaps retain backoff. Added before/after pressure and unpinned-boundary regression contracts. Reviewed gc.rs against upstream 3761815 plus prior adaptation; full collector state integration remains open.",
+      "sha256": "a5c627775ca8f9c86ec149c317165bb353fe9ad74cb70677fb46ef3a66aa97a9"
     },
     {
       "path": "crates/rd-vm/src/gms.rs",
@@ -1125,8 +1125,8 @@
     {
       "path": "crates/rd-vm/src/lib.rs",
       "blob": "1eeaef3f3207221f18c389904be8b943ee3f8302",
-      "reason": "Register the entire original framework dependency closure behind explicit experimental features, keep desktop native/JIT backends separate, share original intrinsics/GC plus core/alloc helpers, and retain default portable dispatch until state integration is complete. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Embedded VM ordered-index policy is preserved independently of std; std activation must not replace every small VM index with randomized TLS-seeded maps. Only the two map-module cfg guards and their policy comment change; original container algorithms remain shared. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained.",
-      "sha256": "b8379b63b05109bdde7e639d1d977cf1c79d570eadab36f1008302f3f01eb5bd"
+      "reason": "Register the entire original framework dependency closure behind explicit experimental features, keep desktop native/JIT backends separate, share original intrinsics/GC plus core/alloc helpers, and retain default portable dispatch until state integration is complete. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Embedded VM ordered-index policy is preserved independently of std; std activation must not replace every small VM index with randomized TLS-seeded maps. Only the two map-module cfg guards and their policy comment change; original container algorithms remain shared. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained. GC pressure integration: extract the pinned upstream byte/slot adaptive pressure calculation into gc_policy, consumed by both collectors; preserve actual execution-owner roots and host temporary cutoffs. A pressure watermark collected with active frames is rechecked once with a full collection after the callback unwinds; real live heaps retain backoff. Added before/after pressure and unpinned-boundary regression contracts. Reviewed gc.rs against upstream 3761815 plus prior adaptation; full collector state integration remains open.",
+      "sha256": "326a0801b10c46c8ce0577dd19a1a1ee5bfc3c4d7e2a6381915986efcd3990b7"
     },
     {
       "path": "crates/rd-vm/src/m10/biometrics.rs",
@@ -2097,8 +2097,9 @@
     },
     {
       "path": "crates/rd-vm/src/portable/execution.rs",
-      "sha256": "bd68895e7dc16eeeea49366f4798c58190b0f38e9ffb803d432fde5395eb38cf",
-      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
+      "sha256": "18e9fdac20c87e3925947c0b45218ceed26944204bf898a0f69ec146d4186fb1",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim.",
+      "reason": " GC pressure integration: extract the pinned upstream byte/slot adaptive pressure calculation into gc_policy, consumed by both collectors; preserve actual execution-owner roots and host temporary cutoffs. A pressure watermark collected with active frames is rechecked once with a full collection after the callback unwinds; real live heaps retain backoff. Added before/after pressure and unpinned-boundary regression contracts. Reviewed gc.rs against upstream 3761815 plus prior adaptation; full collector state integration remains open."
     },
     {
       "path": "crates/rd-vm/src/portable/execution_contracts.rs",
@@ -2117,9 +2118,9 @@
     },
     {
       "path": "crates/rd-vm/src/portable/gc.rs",
-      "sha256": "907ef178623b301446d0b23993da7bd1c8abac9609c9effb3e0d41ead313aaa9",
+      "sha256": "998765b5c168078298eeacbfd471ed439a1d7c2dc5101c680290c5b75d5db404",
       "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
-      "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity."
+      "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. GC pressure integration: extract the pinned upstream byte/slot adaptive pressure calculation into gc_policy, consumed by both collectors; preserve actual execution-owner roots and host temporary cutoffs. A pressure watermark collected with active frames is rechecked once with a full collection after the callback unwinds; real live heaps retain backoff. Added before/after pressure and unpinned-boundary regression contracts. Reviewed gc.rs against upstream 3761815 plus prior adaptation; full collector state integration remains open."
     },
     {
       "path": "crates/rd-vm/src/portable/intrinsics.rs",
@@ -2271,6 +2272,12 @@
       "sha256": "3cd9d404d8aaf0851ea768f069f3dfe9b11cee83de444957f39c653412f89515",
       "derived_from": "RustyDroid arrays.rs host reentry/issue_303 value recursion contract; AndroSwitch execution-owner adaptation",
       "scope": "Scoped built-in collection callback cycle detection; guest overrides preserve finite reentry; no application identity checks. Not a full API parity claim."
+    },
+    {
+      "path": "crates/rd-vm/src/gc_policy.rs",
+      "sha256": "86c8603249605f8a34a40c06fc9a9bce9a82bfc50bda4d53bfb8bfe0169b01e9",
+      "derived_from": "RustyDroid gc.rs at 3761815dc6a2a1427e9fc66b66e8471b78d1b170; common pressure calculation extracted without changing the original adaptive arithmetic.",
+      "scope": "Shared allocation-pressure policy for reference and product collectors, plus one full watermark recheck after pinned callback frames unwind. Does not unify the remaining tracing/state graphs or establish complete GC/API parity."
     }
   ]
 }

@@ -67,6 +67,33 @@ fn click(app: &mut App, x: f32, y: f32) {
 }
 #[test]
 #[ignore = "requires built APK fixtures"]
+fn looper_reclaims_previous_callback_garbage_before_pinning_the_next_callback() {
+    let (mut app, clock, _) = make("java");
+    app.launch().unwrap();
+    click(&mut app, 100., 64.);
+    assert!(has(&app, "Count 1 / app 1"));
+    // One dead previous-callback payload exceeds the collection watermark,
+    // but fits in the unchanged 64 MiB application heap. No test-only GC event
+    // is injected: both software rendering and the GL tick use this looper.
+    for time in [400, 800, 1200] {
+        let garbage = app.vm.heap.alloc_string("x".repeat(18 << 20)).unwrap();
+        assert!(app.vm.heap.used() > app.vm.heap.budget() / 2);
+        let collections = app.vm.gc_stats().collections;
+        clock.0.set(time);
+        app.android.tick(&mut app.vm).unwrap();
+        assert!(app.vm.gc_stats().collections > collections);
+        // A later callback may legitimately reuse the freed arena slot.
+        assert_ne!(app.vm.heap.as_str(garbage).map(str::len), Ok(18 << 20));
+        assert!(app.vm.heap.used() < 1 << 20);
+        app.draw().unwrap();
+    }
+    // The pending SDK Handler callback, activity fields and listener survive.
+    assert!(has(&app, "Ready 1 / app 1"));
+    click(&mut app, 100., 64.);
+    assert!(has(&app, "Ready 2 / app 1"));
+}
+#[test]
+#[ignore = "requires built APK fixtures"]
 fn dex_xml_lifecycle_handler_canvas_gc_and_restart_share_one_state_graph() {
     let (mut app, clock, root) = make("java");
     app.launch().unwrap();

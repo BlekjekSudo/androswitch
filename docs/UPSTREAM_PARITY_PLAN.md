@@ -72,6 +72,12 @@ The inherited implementation must become the common state owner. Horizon
 adapters provide actual transport/services around that implementation; an
 unhandled call must not switch to another independent object store.
 
+The [shared GC pressure checkpoint](UPSTREAM_GC_PRESSURE.md) connects the
+original adaptive byte/slot policy to the product collector and invalidates a
+pinned live watermark once its callback unwinds. The ordinary Collections
+UI/journal run now completes 34/34 host cases at 64 MiB. This does not complete
+the original collector's tracing/state integration or qualify unrun device APIs.
+
 | Boundary | Inherited reference state | Current product state | Remaining integration |
 | --- | --- | --- | --- |
 | Collections/iterators | `HostState.objects`, `jcollections`, `collections` | `as-framework/services/collections`, COW and map adapters | One owner for constructors, factories, views, callbacks and GC edges |
