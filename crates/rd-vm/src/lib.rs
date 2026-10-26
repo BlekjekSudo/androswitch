@@ -44,13 +44,15 @@ mod portable;
 pub mod portable_test_support {
     pub use crate::portable::execution::contracts::*;
 }
-#[cfg(feature = "std")]
+// Index policy belongs to the execution backend. Enabling Rust std must not
+// silently replace the embedded runner's ordered, cheap-to-create VM indexes.
+#[cfg(feature = "desktop-runtime")]
 pub(crate) mod maps {
     #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub use std::collections::hash_map::Entry;
     pub use std::collections::{HashMap, HashSet};
 }
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "desktop-runtime"))]
 pub(crate) mod maps {
     #[cfg(feature = "upstream-runtime")]
     pub use alloc::collections::btree_map::Entry;

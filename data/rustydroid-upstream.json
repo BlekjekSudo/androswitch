@@ -1125,8 +1125,8 @@
     {
       "path": "crates/rd-vm/src/lib.rs",
       "blob": "1eeaef3f3207221f18c389904be8b943ee3f8302",
-      "reason": "Register the entire original framework dependency closure behind explicit experimental features, keep desktop native/JIT backends separate, share original intrinsics/GC plus core/alloc helpers, and retain default portable dispatch until state integration is complete. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md.",
-      "sha256": "019ea0440f9e018ef8f941593e225ec43c4bff8198b1a41d832b3a1dbc628a74"
+      "reason": "Register the entire original framework dependency closure behind explicit experimental features, keep desktop native/JIT backends separate, share original intrinsics/GC plus core/alloc helpers, and retain default portable dispatch until state integration is complete. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Embedded VM ordered-index policy is preserved independently of std; std activation must not replace every small VM index with randomized TLS-seeded maps. Only the two map-module cfg guards and their policy comment change; original container algorithms remain shared.",
+      "sha256": "cc5716db69e69317090191bd90e9238e1fa80990e8ef4dbed78c5b150f361c2d"
     },
     {
       "path": "crates/rd-vm/src/m10/biometrics.rs",
