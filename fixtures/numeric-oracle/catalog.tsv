@@ -328,7 +328,7 @@ Ljava/lang/Math;	nextDown	(F)F	f:80000000	f:80000001
 Ljava/lang/Math;	nextUp	(D)D	d:8000000000000000	d:1
 Ljava/lang/Math;	nextUp	(F)F	f:80000000	f:1
 Ljava/lang/Math;	pow	(DD)D	d:8000000000000000,d:0	d:3ff0000000000000
-Ljava/lang/Math;	random	()D		d:3fe7ea2c9c1d4485
+Ljava/lang/Math;	random	()D		d:3fdcb80f9a29b63e
 Ljava/lang/Math;	rint	(D)D	d:8000000000000000	d:8000000000000000
 Ljava/lang/Math;	round	(D)J	d:bff8000000000000	j:-1
 Ljava/lang/Math;	round	(F)I	f:bfc00000	i:-1
@@ -427,7 +427,7 @@ Ljava/lang/StrictMath;	nextDown	(F)F	f:80000000	f:80000001
 Ljava/lang/StrictMath;	nextUp	(D)D	d:8000000000000000	d:1
 Ljava/lang/StrictMath;	nextUp	(F)F	f:80000000	f:1
 Ljava/lang/StrictMath;	pow	(DD)D	d:8000000000000000,d:0	d:3ff0000000000000
-Ljava/lang/StrictMath;	random	()D		d:3fdece1b12887a1a
+Ljava/lang/StrictMath;	random	()D		d:3fe43ade9847161c
 Ljava/lang/StrictMath;	rint	(D)D	d:8000000000000000	d:8000000000000000
 Ljava/lang/StrictMath;	round	(D)J	d:bff8000000000000	j:-1
 Ljava/lang/StrictMath;	round	(F)I	f:bfc00000	i:-1

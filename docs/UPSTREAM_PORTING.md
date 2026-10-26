@@ -132,10 +132,16 @@ roots and platform references are added without claiming a fully precise scan.
 
 The [shared I/O checkpoint](UPSTREAM_SHARED_IO.md) selects original `jio_chars`
 on the product std profile and extracts File/file-stream/AtomicFile code from
-`jfile` for both dispatchers. The source audit now lists 83 excluded original
+`jfile` for both dispatchers. That checkpoint listed 83 excluded original
 VM paths; this count includes reference/backend surfaces and is not an API
 coverage percentage. Native descriptor ownership and the other platform/state
 boundaries below still need integration and behavior evidence.
+
+The later [numeric integration](UPSTREAM_NUMERICS.md) selects original numerics
+and the extracted Math base arms on std. The current source audit lists 82
+excluded original VM paths. Its exact descriptor catalog is exercised against
+233 independent JVM rows across 218 declarations; this is scoped numeric
+verification, not a whole-runtime API percentage.
 
 The machine inventory is the authoritative exhaustive file list. The work is
 organized by common state and dependency boundaries, rather than the next APK
