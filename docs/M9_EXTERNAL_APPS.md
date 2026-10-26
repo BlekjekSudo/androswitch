@@ -797,3 +797,24 @@ preservation. The follow-up NRO and physical-device results remain separate.
 Reference behavior: [API26 ClassLoader](https://android.googlesource.com/platform/libcore/+/android-8.0.0_r4/ojluni/src/main/java/java/lang/ClassLoader.java),
 [JNI method IDs](https://docs.oracle.com/en/java/javase/21/docs/specs/jni/functions.html#getmethodid),
 [API26 provider parsing](https://github.com/aosp-mirror/platform_frameworks_base/blob/android-8.0.0_r4/core/java/android/content/pm/PackageParser.java).
+
+
+## Latest upstream synchronization — 2026-10-26
+
+The latest-source merge and portable-package boundary now have a complete
+[porting audit](UPSTREAM_PORTING.md) and [execution report](../reports/upstream-sync-20261026.json).
+All upstream paths are retained and reviewed adaptations are hash checked.
+Original host-only VM sources remain tracked as pending target work; this is
+not full Horizon behavior parity.
+
+NRO47 (`df87f3c0c0a7a072929e4493c1bd08c787a8aed75e87d7bcff9bdbe467763a91`)
+is built from source `4da29ea072b0e2d594159000415a5cd3f0e6ad94`.
+Mekorama run `a50d85f9b359487998a991110472f9b3` passes Arrays and reaches
+`Collections.emptySet()`, whose upstream desktop handler uses HostObj collection
+state. It completes native teardown and returns to the launcher, retaining an
+Activity-stop error. Candy run `0ee61cc5e3d241f68615fe17a6f8a607` still requires
+`GLSurfaceView.setEGLContextFactory` and refuses cleanup with
+`NATIVE_RESOURCE_RESET_FAILED: -5`; safe completed return is not verified.
+Neither captures an application first screen. Both isolated headless harness
+runs restore the original profile SD directory. Physical verification of this
+source/NRO is not run.

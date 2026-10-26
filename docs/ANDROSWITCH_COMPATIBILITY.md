@@ -5,6 +5,12 @@ every upstream path. Source synchronization passes separately from device
 behavior parity, which remains unverified. New source imports do not inherit
 the earlier hardware results.
 
+On the synchronized NRO47, headless Ryujinx advances Mekorama through Arrays
+and stops at `Collections.emptySet()`. Candy Crush still requires
+`GLSurfaceView.setEGLContextFactory` and refuses cleanup with native reset error
+`-5`. Neither has a verified first frame. See the [exact source, artifact and
+execution report](../reports/upstream-sync-20261026.json).
+
 | Capability | Upstream | AndroSwitch |
 | --- | --- | --- |
 | ZIP/AXML/ARSC/manifest | `rd-apk` implementation/tests | Shared no_std port; Java APK parsed inside the Ryujinx NRO |

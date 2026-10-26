@@ -42,6 +42,11 @@ remains pending**, independent of source synchronization and older hardware
 feedback. Complete shared-state/adapter porting and inherited contract coverage
 before treating the latest upstream framework as device-compatible.
 
+The [synchronized-source report](../reports/upstream-sync-20261026.json) records
+NRO47 retests: Mekorama next requires the collection-family `emptySet` path;
+Candy Crush remains blocked on EGL context factory behavior and cleanup `-5`.
+Both independent-game first-screen gates remain open.
+
 M7 improvements now use file-backed APKs with a 512 MiB container cap, bounded
 copy/hash/entry reads and lazy native extraction. A 128 MiB original UI APK passes
 host install/launch/asset/save/restart checks. In a later hardware test the user

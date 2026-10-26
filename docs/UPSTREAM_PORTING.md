@@ -129,3 +129,25 @@ Source/host/emulator/device results are tracked separately in the execution
 report. The earlier user-reported 219/219 hardware result applies to its original
 binary and fixture only; it is not evidence for this merged source or all of
 upstream. Mekorama and Candy Crush remain integration probes, not API profiles.
+
+## Recorded synchronization result
+
+The [execution and complete source report](../reports/upstream-sync-20261026.json)
+records the history merge, 427 original paths (362 identical and 65 reviewed
+adaptations), nine relocations, 31 added core files and the 91 host-only original
+VM files. These are source-file counts, not API coverage percentages.
+
+NRO47 builds from source commit `4da29ea072b0e2d594159000415a5cd3f0e6ad94` with
+SHA-256 `df87f3c0c0a7a072929e4493c1bd08c787a8aed75e87d7bcff9bdbe467763a91`.
+Headless Ryujinx retests use the same pinned, unmodified APKs and isolated profile:
+
+| Probe | Observed result |
+| --- | --- |
+| Mekorama | Passes the Arrays blocker; stops at `Collections.emptySet()`. Original upstream dispatch exists in `intrinsics.rs` but uses desktop collection state. Returns to launcher with an Activity-stop error; no application capture. |
+| Candy Crush | Still stops at `GLSurfaceView.setEGLContextFactory`, followed by cleanup refusal `NATIVE_RESOURCE_RESET_FAILED: -5`. There is no matching handler in the latest upstream VM/NDK/render source. No safe completed return or first-screen pass. |
+
+Both harness runs restore the original profile SD directory. This is not a
+physical-device verification, and neither run establishes a first frame.
+The next Collections work belongs to the shared collection family and state
+adapter audit. Context factory behavior requires a real render-thread/context
+contract; source synchronization alone does not implement it.
