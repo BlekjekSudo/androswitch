@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "acceptance_passed": false,
+  "remaining_cases": [
+    {
+      "id": "host.cpu.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.gpu.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.memory.clock_hz",
+      "status": "NOT_RUN"
+    }
+  ],
+  "status": "observed_catalog_not_compatibility_pass",
+  "catalog_completed": true,
+  "selected_group": null,
+  "selected_total": 274,
+  "selected_counts": {
+    "PASS": 271,
+    "NOT_RUN": 3
+  },
+  "selected_completed": true,
+  "selected_passed": false,
+  "backend": "Horizon via diagnostic Ryujinx; not physical hardware or stock Ryujinx",
+  "catalog_sha256": "42ffa0db209a949be58e9c4e6c01a2a913264e1e737483b160d954fb85379437",
+  "explicit_exclusions": [
+    "host.cpu.clock_hz",
+    "host.gpu.clock_hz",
+    "host.memory.clock_hz"
+  ],
+  "total": 274,
+  "counts": {
+    "PASS": 271,
+    "NOT_RUN": 3
+  },
+  "apk_sha256": "26cad05a295549bb8111ca1ea5728e3196a92a3ea07b20c4d5b934ded1414054",
+  "nro_sha256": "44feb57b226c9be55b69e6ad1328ce7abeb921e1d9b8fa89f3d7e713326f5456",
+  "external_status": "execution_verified_visual_review_required",
+  "original_sd_restore": "restored",
+  "launcher_completed": true,
+  "sessions": [
+    {
+      "session_id": "f97067292c3341448894ecfb9c6dd49b-1",
+      "status": "passed_execution",
+      "pending_case": null,
+      "error": null,
+      "raw_report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\f97067292c3341448894ecfb9c6dd49b\\sessions\\f97067292c3341448894ecfb9c6dd49b-1\\session-report.json"
+    }
+  ],
+  "android_reference": "not_run",
+  "physical_hardware": "not_run",
+  "scope": "An interrupted case remains INTERRUPTED; matching raw runtime errors explain it without inventing success."
+}

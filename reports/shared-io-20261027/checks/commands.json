@@ -1,0 +1,200 @@
+[
+  {
+    "program": "cargo",
+    "arguments": [
+      "test",
+      "-p",
+      "as-vm",
+      "--lib",
+      "--test",
+      "shipping_io_chars",
+      "--locked",
+      "--",
+      "--test-threads=1"
+    ],
+    "sha256": "e5d6f06122ecdffa73ccfba31ea3c1444341f1599450a75c0ef9b96c2302472c",
+    "finished": "2026-10-26T23:22:20.8398859Z",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-file\\builder-shipping.log",
+    "exit_code": 0,
+    "started": "2026-10-26T23:22:17.3543384Z",
+    "expected_exit": 0,
+    "name": "builder-shipping"
+  },
+  {
+    "program": "cargo",
+    "arguments": [
+      "test",
+      "-p",
+      "as-vm",
+      "--features",
+      "portable-test-support",
+      "--test",
+      "shipping_gc_generations",
+      "--locked",
+      "--",
+      "--test-threads=1"
+    ],
+    "sha256": "9a614510314520195121196d631b77d6a3dda2fcc225c5b089458e751e1413bd",
+    "finished": "2026-10-26T23:22:36.4407126Z",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-file\\builder-gc.log",
+    "exit_code": 0,
+    "started": "2026-10-26T23:22:20.8839004Z",
+    "expected_exit": 0,
+    "name": "builder-gc"
+  },
+  {
+    "program": "cargo",
+    "arguments": [
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "as-framework/host,as-switch-smoke/host-cli,as-switch-smoke/portable-tests",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "sha256": "4cab55d552a877cc33a1efdfa56e2bf50673f2abfbd9dec41c5cbc99783a7755",
+    "finished": "2026-10-26T23:24:45.8209774Z",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-file\\builder-workspace-clippy.log",
+    "exit_code": 0,
+    "started": "2026-10-26T23:22:36.4436984Z",
+    "expected_exit": 0,
+    "name": "builder-workspace-clippy"
+  },
+  {
+    "program": "cargo",
+    "arguments": [
+      "clippy",
+      "-p",
+      "as-vm",
+      "--features",
+      "upstream-parity-tests",
+      "--all-targets",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "sha256": "07af70434020fcee7e043ddef46eb1efbb307e4f8ecc466211037e5a28df998f",
+    "finished": "2026-10-26T23:25:59.5173484Z",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-file\\builder-reference-clippy.log",
+    "exit_code": 0,
+    "started": "2026-10-26T23:24:45.8229440Z",
+    "expected_exit": 0,
+    "name": "builder-reference-clippy"
+  },
+  {
+    "program": "cargo",
+    "arguments": [
+      "check",
+      "-p",
+      "as-vm",
+      "--no-default-features",
+      "--locked"
+    ],
+    "sha256": "2137b57f44c3b15356f9e131cc2ffc6209331925267691e78ed9ea25cc37e993",
+    "finished": "2026-10-26T23:25:59.8362984Z",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-file\\builder-core.log",
+    "exit_code": 0,
+    "started": "2026-10-26T23:25:59.5198950Z",
+    "expected_exit": 0,
+    "name": "builder-core"
+  },
+  {
+    "program": "cargo",
+    "arguments": [
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "finished": "2026-10-26T23:26:07.2293790Z",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-file\\builder-format.log",
+    "exit_code": 0,
+    "started": "2026-10-26T23:25:59.8381120Z",
+    "expected_exit": 0,
+    "name": "builder-format"
+  },
+  {
+    "program": "python",
+    "arguments": [
+      "-X",
+      "utf8",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "scripts/tests"
+    ],
+    "sha256": "96d6a615687375892acef2c8a2f676259921628ceb19c6cc339e0624b714e44a",
+    "finished": "2026-10-26T23:26:11.4176136Z",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-file\\builder-python.log",
+    "exit_code": 0,
+    "started": "2026-10-26T23:26:07.2317317Z",
+    "expected_exit": 0,
+    "name": "builder-python"
+  },
+  {
+    "program": "python",
+    "arguments": [
+      "-X",
+      "utf8",
+      "scripts/check-upstream-sync.py",
+      "--report",
+      "local-artifacts/upstream-file/builder-source.json"
+    ],
+    "sha256": "5232fe5541b4dcc7bc1ec2e5b61845b67c5cef463a4820bdb43731839494c03f",
+    "finished": "2026-10-26T23:26:16.4940764Z",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-file\\builder-source.log",
+    "exit_code": 0,
+    "started": "2026-10-26T23:26:11.4201833Z",
+    "expected_exit": 0,
+    "name": "builder-source"
+  },
+  {
+    "program": "python",
+    "arguments": [
+      "-X",
+      "utf8",
+      "scripts/check-upstream-sync.py",
+      "--require-device-parity",
+      "--report",
+      "local-artifacts/upstream-file/builder-device-gate.json"
+    ],
+    "sha256": "5232fe5541b4dcc7bc1ec2e5b61845b67c5cef463a4820bdb43731839494c03f",
+    "finished": "2026-10-26T23:26:16.9254446Z",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-file\\builder-device-gate.log",
+    "exit_code": 1,
+    "started": "2026-10-26T23:26:16.4968145Z",
+    "expected_exit": 1,
+    "name": "builder-device-gate"
+  },
+  {
+    "program": "cargo",
+    "arguments": [
+      "run",
+      "-p",
+      "as-framework",
+      "--features",
+      "host",
+      "--bin",
+      "as-conformance",
+      "--locked",
+      "--",
+      "local-artifacts/conformance-io-qualified/AndroSwitchConformance.apk",
+      "local-artifacts/conformance-io-qualified/catalog.json",
+      "local-artifacts/upstream-file/builder-sdk-storage",
+      "local-artifacts/upstream-file/builder-sdk-report.json"
+    ],
+    "sha256": "081dcb44fb4737476b9f2cd1d80ceadb5d3fdb18bf946d4ab91ee8bef0caa428",
+    "finished": "2026-10-26T23:26:59.4467794Z",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-file\\builder-sdk.log",
+    "exit_code": 0,
+    "started": "2026-10-26T23:26:16.9272975Z",
+    "expected_exit": 0,
+    "name": "builder-sdk"
+  }
+]

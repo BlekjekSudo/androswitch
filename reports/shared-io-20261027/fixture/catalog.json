@@ -1,0 +1,2474 @@
+{
+  "schema_version": 1,
+  "reference_api": 26,
+  "sensor_tests": false,
+  "coverage_scope": "Declared cases only, not all Android behavior or CTS certification",
+  "cases": [
+    {
+      "id": "dex.overflow",
+      "group": "DEX",
+      "index": 0,
+      "local_index": 0,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "-2147483648"
+    },
+    {
+      "id": "dex.division",
+      "group": "DEX",
+      "index": 1,
+      "local_index": 1,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "-5:-2"
+    },
+    {
+      "id": "dex.shift",
+      "group": "DEX",
+      "index": 2,
+      "local_index": 2,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "2147483647:2"
+    },
+    {
+      "id": "dex.long",
+      "group": "DEX",
+      "index": 3,
+      "local_index": 3,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "-9223372036854775808"
+    },
+    {
+      "id": "dex.loop",
+      "group": "DEX",
+      "index": 4,
+      "local_index": 4,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "4950"
+    },
+    {
+      "id": "dex.switch",
+      "group": "DEX",
+      "index": 5,
+      "local_index": 5,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "seven"
+    },
+    {
+      "id": "dex.double",
+      "group": "DEX",
+      "index": 6,
+      "local_index": 6,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "3.75"
+    },
+    {
+      "id": "dex.nan",
+      "group": "DEX",
+      "index": 7,
+      "local_index": 7,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true"
+    },
+    {
+      "id": "dex.signed-zero",
+      "group": "DEX",
+      "index": 8,
+      "local_index": 8,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true"
+    },
+    {
+      "id": "dex.cast",
+      "group": "DEX",
+      "index": 9,
+      "local_index": 9,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "-3"
+    },
+    {
+      "id": "dex.bounds",
+      "group": "DEX",
+      "index": 10,
+      "local_index": 10,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "bounds"
+    },
+    {
+      "id": "dex.division-zero",
+      "group": "DEX",
+      "index": 11,
+      "local_index": 11,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "arithmetic"
+    },
+    {
+      "id": "text.utf16-length",
+      "group": "Text",
+      "index": 12,
+      "local_index": 12,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "4"
+    },
+    {
+      "id": "text.substring",
+      "group": "Text",
+      "index": 13,
+      "local_index": 13,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "bc"
+    },
+    {
+      "id": "text.char-at",
+      "group": "Text",
+      "index": 14,
+      "local_index": 14,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "8364"
+    },
+    {
+      "id": "text.equals",
+      "group": "Text",
+      "index": 15,
+      "local_index": 15,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true"
+    },
+    {
+      "id": "text.builder-char",
+      "group": "Text",
+      "index": 16,
+      "local_index": 16,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "x,true42"
+    },
+    {
+      "id": "text.buffer",
+      "group": "Text",
+      "index": 17,
+      "local_index": 17,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "one2"
+    },
+    {
+      "id": "text.utf8",
+      "group": "Text",
+      "index": 18,
+      "local_index": 18,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "4:226"
+    },
+    {
+      "id": "text.ascii",
+      "group": "Text",
+      "index": 19,
+      "local_index": 19,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "3:67"
+    },
+    {
+      "id": "text.format",
+      "group": "Text",
+      "index": 20,
+      "local_index": 20,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "x:0007:%"
+    },
+    {
+      "id": "text.index",
+      "group": "Text",
+      "index": 21,
+      "local_index": 21,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "2:4"
+    },
+    {
+      "id": "text.replace",
+      "group": "Text",
+      "index": 22,
+      "local_index": 22,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "a+b+c"
+    },
+    {
+      "id": "text.starts-ends",
+      "group": "Text",
+      "index": 23,
+      "local_index": 23,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:true"
+    },
+    {
+      "id": "text.null-append",
+      "group": "Text",
+      "index": 24,
+      "local_index": 24,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "null"
+    },
+    {
+      "id": "text.surrogate",
+      "group": "Text",
+      "index": 25,
+      "local_index": 25,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "128512"
+    },
+    {
+      "id": "collections.arraylist",
+      "group": "Collections",
+      "index": 26,
+      "local_index": 26,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "b:1"
+    },
+    {
+      "id": "collections.list-null",
+      "group": "Collections",
+      "index": 27,
+      "local_index": 27,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true"
+    },
+    {
+      "id": "collections.list-iterator",
+      "group": "Collections",
+      "index": 28,
+      "local_index": 28,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "8"
+    },
+    {
+      "id": "collections.map",
+      "group": "Collections",
+      "index": 29,
+      "local_index": 29,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "1:7"
+    },
+    {
+      "id": "collections.set",
+      "group": "Collections",
+      "index": 30,
+      "local_index": 30,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "1"
+    },
+    {
+      "id": "collections.cow-snapshot",
+      "group": "Collections",
+      "index": 31,
+      "local_index": 31,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "a:false:2"
+    },
+    {
+      "id": "collections.cow-array-copy",
+      "group": "Collections",
+      "index": 32,
+      "local_index": 32,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "a"
+    },
+    {
+      "id": "collections.cow-remove-unsupported",
+      "group": "Collections",
+      "index": 33,
+      "local_index": 33,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "unsupported"
+    },
+    {
+      "id": "collections.boxed-equals",
+      "group": "Collections",
+      "index": 34,
+      "local_index": 34,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:false"
+    },
+    {
+      "id": "collections.arraycopy",
+      "group": "Collections",
+      "index": 35,
+      "local_index": 35,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "1:1:2:3"
+    },
+    {
+      "id": "collections.array-clone",
+      "group": "Collections",
+      "index": 36,
+      "local_index": 36,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "1:9"
+    },
+    {
+      "id": "collections.abstract-subclass",
+      "group": "Collections",
+      "index": 37,
+      "local_index": 37,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "false:true"
+    },
+    {
+      "id": "timeunit.ordinal.0",
+      "group": "TimeUnit",
+      "index": 38,
+      "local_index": 38,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "NANOSECONDS:0"
+    },
+    {
+      "id": "timeunit.ordinal.1",
+      "group": "TimeUnit",
+      "index": 39,
+      "local_index": 39,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "MICROSECONDS:1"
+    },
+    {
+      "id": "timeunit.ordinal.2",
+      "group": "TimeUnit",
+      "index": 40,
+      "local_index": 40,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "MILLISECONDS:2"
+    },
+    {
+      "id": "timeunit.ordinal.3",
+      "group": "TimeUnit",
+      "index": 41,
+      "local_index": 41,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "SECONDS:3"
+    },
+    {
+      "id": "timeunit.ordinal.4",
+      "group": "TimeUnit",
+      "index": 42,
+      "local_index": 42,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "MINUTES:4"
+    },
+    {
+      "id": "timeunit.ordinal.5",
+      "group": "TimeUnit",
+      "index": 43,
+      "local_index": 43,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "HOURS:5"
+    },
+    {
+      "id": "timeunit.ordinal.6",
+      "group": "TimeUnit",
+      "index": 44,
+      "local_index": 44,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "DAYS:6"
+    },
+    {
+      "id": "timeunit.convert.nanoseconds.nanoseconds",
+      "group": "TimeUnit",
+      "index": 45,
+      "local_index": 45,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "123456789"
+    },
+    {
+      "id": "timeunit.convert.nanoseconds.seconds",
+      "group": "TimeUnit",
+      "index": 46,
+      "local_index": 46,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "0"
+    },
+    {
+      "id": "timeunit.convert.nanoseconds.days",
+      "group": "TimeUnit",
+      "index": 47,
+      "local_index": 47,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "0"
+    },
+    {
+      "id": "timeunit.convert.microseconds.nanoseconds",
+      "group": "TimeUnit",
+      "index": 48,
+      "local_index": 48,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "123456789000"
+    },
+    {
+      "id": "timeunit.convert.microseconds.seconds",
+      "group": "TimeUnit",
+      "index": 49,
+      "local_index": 49,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "123"
+    },
+    {
+      "id": "timeunit.convert.microseconds.days",
+      "group": "TimeUnit",
+      "index": 50,
+      "local_index": 50,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "0"
+    },
+    {
+      "id": "timeunit.convert.milliseconds.nanoseconds",
+      "group": "TimeUnit",
+      "index": 51,
+      "local_index": 51,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "123456789000000"
+    },
+    {
+      "id": "timeunit.convert.milliseconds.seconds",
+      "group": "TimeUnit",
+      "index": 52,
+      "local_index": 52,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "123456"
+    },
+    {
+      "id": "timeunit.convert.milliseconds.days",
+      "group": "TimeUnit",
+      "index": 53,
+      "local_index": 53,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "1"
+    },
+    {
+      "id": "timeunit.convert.seconds.nanoseconds",
+      "group": "TimeUnit",
+      "index": 54,
+      "local_index": 54,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "123456789000000000"
+    },
+    {
+      "id": "timeunit.convert.seconds.seconds",
+      "group": "TimeUnit",
+      "index": 55,
+      "local_index": 55,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "123456789"
+    },
+    {
+      "id": "timeunit.convert.seconds.days",
+      "group": "TimeUnit",
+      "index": 56,
+      "local_index": 56,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "1428"
+    },
+    {
+      "id": "timeunit.convert.minutes.nanoseconds",
+      "group": "TimeUnit",
+      "index": 57,
+      "local_index": 57,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "7407407340000000000"
+    },
+    {
+      "id": "timeunit.convert.minutes.seconds",
+      "group": "TimeUnit",
+      "index": 58,
+      "local_index": 58,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "7407407340"
+    },
+    {
+      "id": "timeunit.convert.minutes.days",
+      "group": "TimeUnit",
+      "index": 59,
+      "local_index": 59,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "85733"
+    },
+    {
+      "id": "timeunit.convert.hours.nanoseconds",
+      "group": "TimeUnit",
+      "index": 60,
+      "local_index": 60,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "9223372036854775807"
+    },
+    {
+      "id": "timeunit.convert.hours.seconds",
+      "group": "TimeUnit",
+      "index": 61,
+      "local_index": 61,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "444444440400"
+    },
+    {
+      "id": "timeunit.convert.hours.days",
+      "group": "TimeUnit",
+      "index": 62,
+      "local_index": 62,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "5144032"
+    },
+    {
+      "id": "timeunit.convert.days.nanoseconds",
+      "group": "TimeUnit",
+      "index": 63,
+      "local_index": 63,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "9223372036854775807"
+    },
+    {
+      "id": "timeunit.convert.days.seconds",
+      "group": "TimeUnit",
+      "index": 64,
+      "local_index": 64,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "10666666569600"
+    },
+    {
+      "id": "timeunit.convert.days.days",
+      "group": "TimeUnit",
+      "index": 65,
+      "local_index": 65,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "123456789"
+    },
+    {
+      "id": "timeunit.saturation",
+      "group": "TimeUnit",
+      "index": 66,
+      "local_index": 66,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "9223372036854775807"
+    },
+    {
+      "id": "exceptions.throw-catch",
+      "group": "Exceptions",
+      "index": 67,
+      "local_index": 67,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "detail"
+    },
+    {
+      "id": "exceptions.finally",
+      "group": "Exceptions",
+      "index": 68,
+      "local_index": 68,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "5"
+    },
+    {
+      "id": "exceptions.null",
+      "group": "Exceptions",
+      "index": 69,
+      "local_index": 69,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "null"
+    },
+    {
+      "id": "exceptions.cast",
+      "group": "Exceptions",
+      "index": 70,
+      "local_index": 70,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "cast"
+    },
+    {
+      "id": "exceptions.message",
+      "group": "Exceptions",
+      "index": 71,
+      "local_index": 71,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true"
+    },
+    {
+      "id": "reflection.name",
+      "group": "Reflection",
+      "index": 72,
+      "local_index": 72,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "org.androswitch.conformance.PureCases"
+    },
+    {
+      "id": "reflection.interface",
+      "group": "Reflection",
+      "index": 73,
+      "local_index": 73,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true"
+    },
+    {
+      "id": "reflection.assignable",
+      "group": "Reflection",
+      "index": 74,
+      "local_index": 74,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:false"
+    },
+    {
+      "id": "reflection.field-static",
+      "group": "Reflection",
+      "index": 75,
+      "local_index": 75,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "61"
+    },
+    {
+      "id": "reflection.field-instance",
+      "group": "Reflection",
+      "index": 76,
+      "local_index": 76,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "field"
+    },
+    {
+      "id": "reflection.private",
+      "group": "Reflection",
+      "index": 77,
+      "local_index": 77,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "47"
+    },
+    {
+      "id": "reflection.missing",
+      "group": "Reflection",
+      "index": 78,
+      "local_index": 78,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "missing"
+    },
+    {
+      "id": "reflection.widening",
+      "group": "Reflection",
+      "index": 79,
+      "local_index": 79,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "12"
+    },
+    {
+      "id": "reflection.method",
+      "group": "Reflection",
+      "index": 80,
+      "local_index": 80,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "hi you"
+    },
+    {
+      "id": "threads.initial",
+      "group": "Threads",
+      "index": 81,
+      "local_index": 81,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "7"
+    },
+    {
+      "id": "threads.stored-null",
+      "group": "Threads",
+      "index": 82,
+      "local_index": 82,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true"
+    },
+    {
+      "id": "threads.remove",
+      "group": "Threads",
+      "index": 83,
+      "local_index": 83,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "7"
+    },
+    {
+      "id": "threads.monitor",
+      "group": "Threads",
+      "index": 84,
+      "local_index": 84,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "reentrant"
+    },
+    {
+      "id": "threads.atomic",
+      "group": "Threads",
+      "index": 85,
+      "local_index": 85,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:true"
+    },
+    {
+      "id": "math.abs.-3",
+      "group": "Math",
+      "index": 86,
+      "local_index": 86,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "3"
+    },
+    {
+      "id": "math.abs.-1",
+      "group": "Math",
+      "index": 87,
+      "local_index": 87,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "1"
+    },
+    {
+      "id": "math.abs.0",
+      "group": "Math",
+      "index": 88,
+      "local_index": 88,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "0"
+    },
+    {
+      "id": "math.abs.1",
+      "group": "Math",
+      "index": 89,
+      "local_index": 89,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "1"
+    },
+    {
+      "id": "math.abs.3",
+      "group": "Math",
+      "index": 90,
+      "local_index": 90,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "3"
+    },
+    {
+      "id": "numbers.hex.0",
+      "group": "Numbers",
+      "index": 91,
+      "local_index": 91,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "0"
+    },
+    {
+      "id": "numbers.hex.1",
+      "group": "Numbers",
+      "index": 92,
+      "local_index": 92,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "1"
+    },
+    {
+      "id": "numbers.hex.127",
+      "group": "Numbers",
+      "index": 93,
+      "local_index": 93,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "7f"
+    },
+    {
+      "id": "numbers.hex.128",
+      "group": "Numbers",
+      "index": 94,
+      "local_index": 94,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "80"
+    },
+    {
+      "id": "numbers.hex.255",
+      "group": "Numbers",
+      "index": 95,
+      "local_index": 95,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "ff"
+    },
+    {
+      "id": "numbers.hex.32767",
+      "group": "Numbers",
+      "index": 96,
+      "local_index": 96,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "7fff"
+    },
+    {
+      "id": "collections.copy-set-dedup",
+      "group": "Collections",
+      "index": 97,
+      "local_index": 97,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "2:true:true"
+    },
+    {
+      "id": "collections.copy-list-variants",
+      "group": "Collections",
+      "index": 98,
+      "local_index": 98,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "2:2:2:2"
+    },
+    {
+      "id": "collections.self-add-all",
+      "group": "Collections",
+      "index": 99,
+      "local_index": 99,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:[a, b, a, b]"
+    },
+    {
+      "id": "collections.bulk-filter",
+      "group": "Collections",
+      "index": 100,
+      "local_index": 100,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:true:true"
+    },
+    {
+      "id": "collections.typed-array",
+      "group": "Collections",
+      "index": 101,
+      "local_index": 101,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:[a, b, null, x]"
+    },
+    {
+      "id": "collections.nested-sublist-gc",
+      "group": "Collections",
+      "index": 102,
+      "local_index": 102,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "[a, z, d]:[z, d]"
+    },
+    {
+      "id": "collections.list-iterator-gc",
+      "group": "Collections",
+      "index": 103,
+      "local_index": 103,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "a:0:b:false:[b]"
+    },
+    {
+      "id": "collections.iterator-remove-state",
+      "group": "Collections",
+      "index": 104,
+      "local_index": 104,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "a"
+    },
+    {
+      "id": "collections.abstract-list",
+      "group": "Collections",
+      "index": 105,
+      "local_index": 105,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "2:true:1:2"
+    },
+    {
+      "id": "collections.abstract-collection",
+      "group": "Collections",
+      "index": 106,
+      "local_index": 106,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "[a, b, a]:true:false"
+    },
+    {
+      "id": "collections.object-contracts",
+      "group": "Collections",
+      "index": 107,
+      "local_index": 107,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:true:[a, b]"
+    },
+    {
+      "id": "collections.sort-reverse-minmax",
+      "group": "Collections",
+      "index": 108,
+      "local_index": 108,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "a:c:[c, b, a]"
+    },
+    {
+      "id": "collections.singleton-map-immutable",
+      "group": "Collections",
+      "index": 109,
+      "local_index": 109,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "b"
+    },
+    {
+      "id": "collections.readonly-bulk",
+      "group": "Collections",
+      "index": 110,
+      "local_index": 110,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "0"
+    },
+    {
+      "id": "collections.static-add-all",
+      "group": "Collections",
+      "index": 111,
+      "local_index": 111,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:[a, b]"
+    },
+    {
+      "id": "collections.indexed-add-all-bounds",
+      "group": "Collections",
+      "index": 112,
+      "local_index": 112,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "0"
+    },
+    {
+      "id": "collections.constructor-null",
+      "group": "Collections",
+      "index": 113,
+      "local_index": 113,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "null"
+    },
+    {
+      "id": "collections.sublist-bounds",
+      "group": "Collections",
+      "index": 114,
+      "local_index": 114,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "2"
+    },
+    {
+      "id": "collections.indexed-add-all",
+      "group": "Collections",
+      "index": 115,
+      "local_index": 115,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "[a, c, d, b]"
+    },
+    {
+      "id": "collections.comparator-gc",
+      "group": "Collections",
+      "index": 116,
+      "local_index": 116,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "[c, b, a]"
+    },
+    {
+      "id": "text.compare-utf16",
+      "group": "Text",
+      "index": 117,
+      "local_index": 117,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "-24:-1:-1987"
+    },
+    {
+      "id": "text.compare-ignore-case",
+      "group": "Text",
+      "index": 118,
+      "local_index": 118,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "0:true"
+    },
+    {
+      "id": "text.regions",
+      "group": "Text",
+      "index": 119,
+      "local_index": 119,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:true"
+    },
+    {
+      "id": "text.content-sequence",
+      "group": "Text",
+      "index": 120,
+      "local_index": 120,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:bc"
+    },
+    {
+      "id": "text.join-dex-iterable",
+      "group": "Text",
+      "index": 121,
+      "local_index": 121,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "a/b/a"
+    },
+    {
+      "id": "text.trim-codepoint",
+      "group": "Text",
+      "index": 122,
+      "local_index": 122,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "abc:128512"
+    },
+    {
+      "id": "text.regex-flags",
+      "group": "Text",
+      "index": 123,
+      "local_index": 123,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "2:ab:true"
+    },
+    {
+      "id": "text.regex-named-lookahead-utf16",
+      "group": "Text",
+      "index": 124,
+      "local_index": 124,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:ok:2:4"
+    },
+    {
+      "id": "text.regex-match-result-gc",
+      "group": "Text",
+      "index": 125,
+      "local_index": 125,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "aa:0:2:false"
+    },
+    {
+      "id": "text.regex-use-pattern-gc",
+      "group": "Text",
+      "index": 126,
+      "local_index": 126,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:b:0:2"
+    },
+    {
+      "id": "text.regex-replace-groups",
+      "group": "Text",
+      "index": 127,
+      "local_index": 127,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "ba-ba:ba-ab"
+    },
+    {
+      "id": "text.regex-append-gc",
+      "group": "Text",
+      "index": 128,
+      "local_index": 128,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "x b x"
+    },
+    {
+      "id": "text.regex-split",
+      "group": "Text",
+      "index": 129,
+      "local_index": 129,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "[a, b, ]"
+    },
+    {
+      "id": "text.regex-result-state",
+      "group": "Text",
+      "index": 130,
+      "local_index": 130,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "state"
+    },
+    {
+      "id": "text.regex-syntax-error",
+      "group": "Text",
+      "index": 131,
+      "local_index": 131,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "syntax"
+    },
+    {
+      "id": "text.regex-string-shared",
+      "group": "Text",
+      "index": 132,
+      "local_index": 132,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "true:11-22"
+    },
+    {
+      "id": "collections.cycle-string-unwind",
+      "group": "Collections",
+      "index": 133,
+      "local_index": 133,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "[]"
+    },
+    {
+      "id": "collections.cycle-equals-hash-unwind",
+      "group": "Collections",
+      "index": 134,
+      "local_index": 134,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "2:true:1"
+    },
+    {
+      "id": "io.reader-line-endings",
+      "group": "I/O",
+      "index": 135,
+      "local_index": 135,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "a:b:c:null"
+    },
+    {
+      "id": "io.reader-mark-reset",
+      "group": "I/O",
+      "index": 136,
+      "local_index": 136,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "2:98:true"
+    },
+    {
+      "id": "io.reader-closed",
+      "group": "I/O",
+      "index": 137,
+      "local_index": 137,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "closed:true"
+    },
+    {
+      "id": "io.writer-surrogates",
+      "group": "I/O",
+      "index": 138,
+      "local_index": 138,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "\ud83d\ude42"
+    },
+    {
+      "id": "io.writer-buffered-chain",
+      "group": "I/O",
+      "index": 139,
+      "local_index": 139,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "ell"
+    },
+    {
+      "id": "io.writer-append",
+      "group": "I/O",
+      "index": 140,
+      "local_index": 140,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "acdnull"
+    },
+    {
+      "id": "io.byte-output-reset",
+      "group": "I/O",
+      "index": 141,
+      "local_index": 141,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "AB:1:C"
+    },
+    {
+      "id": "io.byte-input-mark",
+      "group": "I/O",
+      "index": 142,
+      "local_index": 142,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "2:20:2"
+    },
+    {
+      "id": "io.writer-encoding-split",
+      "group": "I/O",
+      "index": 143,
+      "local_index": 143,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "\ud83d\ude42"
+    },
+    {
+      "id": "io.writer-dex-template",
+      "group": "I/O",
+      "index": 144,
+      "local_index": 144,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "ABDE"
+    },
+    {
+      "id": "io.reader-dex-template",
+      "group": "I/O",
+      "index": 145,
+      "local_index": 145,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "97:2:bc"
+    },
+    {
+      "id": "io.side-state-gc",
+      "group": "I/O",
+      "index": 146,
+      "local_index": 146,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "state"
+    },
+    {
+      "id": "io.writer-dex-raw-utf16",
+      "group": "I/O",
+      "index": 147,
+      "local_index": 147,
+      "family": "jvm",
+      "kind": "contract",
+      "expected": "\ud83d\ude42"
+    },
+    {
+      "id": "cpu.available",
+      "group": "CPU",
+      "kind": "observation",
+      "index": 148,
+      "local_index": 0,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "cpu.singleton-gc",
+      "group": "CPU",
+      "kind": "contract",
+      "index": 149,
+      "local_index": 1,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "host.cpu.allowed_mask",
+      "group": "Horizon",
+      "kind": "observation",
+      "index": 150,
+      "local_index": 2,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "host.cpu.clock_hz",
+      "group": "Horizon",
+      "kind": "observation",
+      "index": 151,
+      "local_index": 3,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "host.gpu.clock_hz",
+      "group": "Horizon",
+      "kind": "observation",
+      "index": 152,
+      "local_index": 4,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "host.memory.clock_hz",
+      "group": "Horizon",
+      "kind": "observation",
+      "index": 153,
+      "local_index": 5,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "host.tick.frequency_hz",
+      "group": "Horizon",
+      "kind": "observation",
+      "index": 154,
+      "local_index": 6,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "host.os.name",
+      "group": "Horizon",
+      "kind": "observation",
+      "index": 155,
+      "local_index": 7,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "host.os.version",
+      "group": "Horizon",
+      "kind": "observation",
+      "index": 156,
+      "local_index": 8,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "host.renderer.backend",
+      "group": "Horizon",
+      "kind": "observation",
+      "index": 157,
+      "local_index": 9,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.model",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 158,
+      "local_index": 10,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.manufacturer",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 159,
+      "local_index": 11,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.brand",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 160,
+      "local_index": 12,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.device",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 161,
+      "local_index": 13,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.product",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 162,
+      "local_index": 14,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.board",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 163,
+      "local_index": 15,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.hardware",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 164,
+      "local_index": 16,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.id",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 165,
+      "local_index": 17,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.display",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 166,
+      "local_index": 18,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.fingerprint",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 167,
+      "local_index": 19,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.type",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 168,
+      "local_index": 20,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.tags",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 169,
+      "local_index": 21,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.user",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 170,
+      "local_index": 22,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.host",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 171,
+      "local_index": 23,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.time",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 172,
+      "local_index": 24,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.abis",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 173,
+      "local_index": 25,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.version.release",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 174,
+      "local_index": 26,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.version.incremental",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 175,
+      "local_index": 27,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.version.codename",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 176,
+      "local_index": 28,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.version.base_os",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 177,
+      "local_index": 29,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.version.security_patch",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 178,
+      "local_index": 30,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.version.sdk",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 179,
+      "local_index": 31,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "build.version.preview",
+      "group": "Android identity",
+      "kind": "observation",
+      "index": 180,
+      "local_index": 32,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "clock.wall",
+      "group": "Clock",
+      "kind": "observation",
+      "index": 181,
+      "local_index": 33,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "clock.nano",
+      "group": "Clock",
+      "kind": "contract",
+      "index": 182,
+      "local_index": 34,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "clock.elapsed",
+      "group": "Clock",
+      "kind": "observation",
+      "index": 183,
+      "local_index": 35,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "clock.uptime",
+      "group": "Clock",
+      "kind": "observation",
+      "index": 184,
+      "local_index": 36,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "display.metrics",
+      "group": "Display",
+      "kind": "observation",
+      "index": 185,
+      "local_index": 37,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "display.configuration",
+      "group": "Display",
+      "kind": "observation",
+      "index": 186,
+      "local_index": 38,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "display.rotation",
+      "group": "Display",
+      "kind": "observation",
+      "index": 187,
+      "local_index": 39,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "display.requested-orientation",
+      "group": "Display",
+      "kind": "observation",
+      "index": 188,
+      "local_index": 40,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "display.landscape",
+      "group": "Display",
+      "kind": "contract",
+      "index": 189,
+      "local_index": 41,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "display.portrait",
+      "group": "Display",
+      "kind": "contract",
+      "index": 190,
+      "local_index": 42,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "display.window",
+      "group": "Display",
+      "kind": "contract",
+      "index": 191,
+      "local_index": 43,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "display.keep-screen-on",
+      "group": "Display",
+      "kind": "contract",
+      "index": 192,
+      "local_index": 44,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "package.identity",
+      "group": "Package",
+      "kind": "observation",
+      "index": 193,
+      "local_index": 45,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "package.info",
+      "group": "Package",
+      "kind": "observation",
+      "index": 194,
+      "local_index": 46,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "package.apk-stream",
+      "group": "Package",
+      "kind": "contract",
+      "index": 195,
+      "local_index": 47,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "package.missing",
+      "group": "Package",
+      "kind": "contract",
+      "index": 196,
+      "local_index": 48,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "package.assets",
+      "group": "Package",
+      "kind": "contract",
+      "index": 197,
+      "local_index": 49,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "storage.write-read",
+      "group": "Storage",
+      "kind": "contract",
+      "index": 198,
+      "local_index": 50,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "storage.append",
+      "group": "Storage",
+      "kind": "contract",
+      "index": 199,
+      "local_index": 51,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "storage.name-parent",
+      "group": "Storage",
+      "kind": "contract",
+      "index": 200,
+      "local_index": 52,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "storage.mkdir",
+      "group": "Storage",
+      "kind": "contract",
+      "index": 201,
+      "local_index": 53,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "storage.delete",
+      "group": "Storage",
+      "kind": "contract",
+      "index": 202,
+      "local_index": 54,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "storage.random-access",
+      "group": "Storage",
+      "kind": "contract",
+      "index": 203,
+      "local_index": 55,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "preferences.int",
+      "group": "Preferences",
+      "kind": "contract",
+      "index": 204,
+      "local_index": 56,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "preferences.long",
+      "group": "Preferences",
+      "kind": "contract",
+      "index": 205,
+      "local_index": 57,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "preferences.boolean",
+      "group": "Preferences",
+      "kind": "contract",
+      "index": 206,
+      "local_index": 58,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "preferences.float",
+      "group": "Preferences",
+      "kind": "contract",
+      "index": 207,
+      "local_index": 59,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "preferences.string",
+      "group": "Preferences",
+      "kind": "contract",
+      "index": 208,
+      "local_index": 60,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "preferences.remove",
+      "group": "Preferences",
+      "kind": "contract",
+      "index": 209,
+      "local_index": 61,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "preferences.clear",
+      "group": "Preferences",
+      "kind": "contract",
+      "index": 210,
+      "local_index": 62,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.int",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 211,
+      "local_index": 63,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.long",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 212,
+      "local_index": 64,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.boolean",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 213,
+      "local_index": 65,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.float",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 214,
+      "local_index": 66,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.double",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 215,
+      "local_index": 67,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.byte",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 216,
+      "local_index": 68,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.short",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 217,
+      "local_index": 69,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.char",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 218,
+      "local_index": 70,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.string",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 219,
+      "local_index": 71,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.default",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 220,
+      "local_index": 72,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "bundle.nested",
+      "group": "Bundle",
+      "kind": "contract",
+      "index": 221,
+      "local_index": 73,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "ui.view-context",
+      "group": "UI",
+      "kind": "contract",
+      "index": 222,
+      "local_index": 74,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "ui.textview",
+      "group": "UI",
+      "kind": "contract",
+      "index": 223,
+      "local_index": 75,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "ui.button",
+      "group": "UI",
+      "kind": "contract",
+      "index": 224,
+      "local_index": 76,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "ui.input-connection",
+      "group": "Input",
+      "kind": "contract",
+      "index": 225,
+      "local_index": 77,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "ui.editable-utf16",
+      "group": "Input",
+      "kind": "contract",
+      "index": 226,
+      "local_index": 78,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "sqlite.insert",
+      "group": "SQLite",
+      "kind": "contract",
+      "index": 227,
+      "local_index": 79,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "sqlite.rollback",
+      "group": "SQLite",
+      "kind": "contract",
+      "index": 228,
+      "local_index": 80,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "sqlite.commit",
+      "group": "SQLite",
+      "kind": "contract",
+      "index": 229,
+      "local_index": 81,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "sqlite.bind",
+      "group": "SQLite",
+      "kind": "contract",
+      "index": 230,
+      "local_index": 82,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "audio.minimum-buffer",
+      "group": "Audio",
+      "kind": "observation",
+      "index": 231,
+      "local_index": 83,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "audio.pcm-write",
+      "group": "Audio",
+      "kind": "contract",
+      "index": 232,
+      "local_index": 84,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "activity.roundtrip",
+      "group": "Lifecycle",
+      "kind": "integration",
+      "index": 233,
+      "local_index": 85,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "activity.application",
+      "group": "Lifecycle",
+      "kind": "contract",
+      "index": 234,
+      "local_index": 86,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "activity.intent",
+      "group": "Lifecycle",
+      "kind": "contract",
+      "index": 235,
+      "local_index": 87,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "activity.handler-order",
+      "group": "Lifecycle",
+      "kind": "integration",
+      "index": 236,
+      "local_index": 88,
+      "family": "android",
+      "expected": null
+    },
+    {
+      "id": "storage.file-exclusive",
+      "group": "I/O",
+      "index": 237,
+      "local_index": 89,
+      "family": "android",
+      "kind": "contract",
+      "expected": null
+    },
+    {
+      "id": "storage.character-stream",
+      "group": "I/O",
+      "index": 238,
+      "local_index": 90,
+      "family": "android",
+      "kind": "contract",
+      "expected": null
+    },
+    {
+      "id": "storage.channel-owner",
+      "group": "I/O",
+      "index": 239,
+      "local_index": 91,
+      "family": "android",
+      "kind": "contract",
+      "expected": null
+    },
+    {
+      "id": "storage.atomic-file",
+      "group": "I/O",
+      "index": 240,
+      "local_index": 92,
+      "family": "android",
+      "kind": "contract",
+      "expected": null
+    },
+    {
+      "id": "jni.pointer-width",
+      "group": "JNI",
+      "kind": "contract",
+      "index": 241,
+      "local_index": 0,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "jni.mixed-abi",
+      "group": "JNI",
+      "kind": "contract",
+      "index": 242,
+      "local_index": 1,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "jni.string-utf8",
+      "group": "JNI",
+      "kind": "contract",
+      "index": 243,
+      "local_index": 2,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "jni.array-copyback",
+      "group": "JNI",
+      "kind": "contract",
+      "index": 244,
+      "local_index": 3,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "jni.exception",
+      "group": "JNI",
+      "kind": "contract",
+      "index": 245,
+      "local_index": 4,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "jni.callback-gc",
+      "group": "JNI",
+      "kind": "contract",
+      "index": 246,
+      "local_index": 5,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "jni.local-frame",
+      "group": "JNI",
+      "kind": "contract",
+      "index": 247,
+      "local_index": 6,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "jni.thread-attach",
+      "group": "JNI",
+      "kind": "contract",
+      "index": 248,
+      "local_index": 7,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "jni.native-file-sharing",
+      "group": "JNI",
+      "kind": "contract",
+      "index": 249,
+      "local_index": 8,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "native.monotonic",
+      "group": "Native",
+      "kind": "contract",
+      "index": 250,
+      "local_index": 9,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "native.clock-resolution",
+      "group": "Native",
+      "kind": "observation",
+      "index": 251,
+      "local_index": 10,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "native.process-cpu-count",
+      "group": "Native",
+      "kind": "observation",
+      "index": 252,
+      "local_index": 11,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "native.errno",
+      "group": "Native",
+      "kind": "contract",
+      "index": 253,
+      "local_index": 12,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "native.tls",
+      "group": "Native",
+      "kind": "contract",
+      "index": 254,
+      "local_index": 13,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "native.malloc-realloc",
+      "group": "Native",
+      "kind": "contract",
+      "index": 255,
+      "local_index": 14,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "native.locale-c",
+      "group": "Native",
+      "kind": "contract",
+      "index": 256,
+      "local_index": 15,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "native.process-clock",
+      "group": "Native",
+      "kind": "contract",
+      "index": 257,
+      "local_index": 16,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "native.abi",
+      "group": "Native",
+      "kind": "observation",
+      "index": 258,
+      "local_index": 17,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "gles.vendor",
+      "group": "OpenGL ES",
+      "kind": "observation",
+      "index": 259,
+      "local_index": 18,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "gles.renderer",
+      "group": "OpenGL ES",
+      "kind": "observation",
+      "index": 260,
+      "local_index": 19,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "gles.version",
+      "group": "OpenGL ES",
+      "kind": "observation",
+      "index": 261,
+      "local_index": 20,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "gles.extensions",
+      "group": "OpenGL ES",
+      "kind": "observation",
+      "index": 262,
+      "local_index": 21,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "gles.clear-readback",
+      "group": "OpenGL ES",
+      "kind": "contract",
+      "index": 263,
+      "local_index": 22,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "gles.shader-valid",
+      "group": "OpenGL ES",
+      "kind": "contract",
+      "index": 264,
+      "local_index": 23,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "gles.shader-invalid",
+      "group": "OpenGL ES",
+      "kind": "contract",
+      "index": 265,
+      "local_index": 24,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "gles.buffer-roundtrip",
+      "group": "OpenGL ES",
+      "kind": "contract",
+      "index": 266,
+      "local_index": 25,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "gles.texture-framebuffer",
+      "group": "OpenGL ES",
+      "kind": "contract",
+      "index": 267,
+      "local_index": 26,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "vulkan.loader",
+      "group": "Vulkan",
+      "kind": "observation",
+      "index": 268,
+      "local_index": 27,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "vulkan.instance",
+      "group": "Vulkan",
+      "kind": "observation",
+      "index": 269,
+      "local_index": 28,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "vulkan.physical-device",
+      "group": "Vulkan",
+      "kind": "observation",
+      "index": 270,
+      "local_index": 29,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "vulkan.queue-families",
+      "group": "Vulkan",
+      "kind": "observation",
+      "index": 271,
+      "local_index": 30,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "vulkan.logical-device",
+      "group": "Vulkan",
+      "kind": "observation",
+      "index": 272,
+      "local_index": 31,
+      "family": "native",
+      "expected": null
+    },
+    {
+      "id": "vulkan.memory-heaps",
+      "group": "Vulkan",
+      "kind": "observation",
+      "index": 273,
+      "local_index": 32,
+      "family": "native",
+      "expected": null
+    }
+  ]
+}

@@ -1,0 +1,305 @@
+{
+  "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-hle-fixed-20261025\\Ryujinx.exe",
+  "root_stop_wait_ms": 554,
+  "host_storage_preflight": {
+    "volume": "C:\\",
+    "scope": "Host staging estimate, separate from guest/Horizon memory admission",
+    "available_bytes": 12017111040,
+    "required_bytes": 566995388
+  },
+  "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+  "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+  "visual_review": "required",
+  "native_trace_requested": false,
+  "latest_session_report": {
+    "error": "API_UNAVAILABLE [rd-vm]: builder contains an isolated UTF-16 surrogate [pc 0xb: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 280, regs: [0, 1, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/Files;->slice(Ljava/lang/String;II)Ljava/lang/String;\n  at Lorg/androswitch/conformance/MainActivity$1;->run()V",
+    "identity_status": "known",
+    "package": "org.androswitch.conformance",
+    "revision": 1,
+    "schema_version": 1,
+    "session_id": "b27b076cfe4545218ba6a95dc1121311-1",
+    "status": "failed"
+  },
+  "latest_memory_admission": {
+    "allocator_available_after_load": 1600048256,
+    "allocator_available_before_load": 1601096656,
+    "estimated_parser_bytes": 1379710,
+    "package": "org.androswitch.conformance",
+    "parser_budget_bytes": 268435456,
+    "raw_dex_bytes": 77396,
+    "revision": 1,
+    "schema_version": 1,
+    "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+    "session_id": "b27b076cfe4545218ba6a95dc1121311-1",
+    "status": "vm_ready"
+  },
+  "startup_wait_ms": 10000,
+  "execution_attempted": true,
+  "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+  "inputs": [
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\AndroSwitchConformance.apk",
+      "bytes": 57953,
+      "sha256": "26cad05a295549bb8111ca1ea5728e3196a92a3ea07b20c4d5b934ded1414054",
+      "staged_name": "0000-external.apk",
+      "install_snapshot_step": 3,
+      "index": 0
+    }
+  ],
+  "schema_version": 1,
+  "root_handle_pinned": true,
+  "backend": "ryujinx",
+  "launches": [
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\AndroSwitchConformance.apk",
+      "sha256": "26cad05a295549bb8111ca1ea5728e3196a92a3ea07b20c4d5b934ded1414054",
+      "index": 0,
+      "staged_name": "0000-external.apk",
+      "bytes": 57953,
+      "expected_session_id": "b27b076cfe4545218ba6a95dc1121311-1",
+      "attempt": 0,
+      "install_snapshot_step": 3
+    }
+  ],
+  "custom_session_events": true,
+  "completed_sessions": 1,
+  "userdata_seed": [
+    {
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "frozen": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\b27b076cfe4545218ba6a95dc1121311\\userdata-seed\\org.androswitch.conformance\\files\\autorun.txt",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\seeds-91b1ca622e804ac094866d486fb53b4f\\org.androswitch.conformance\\files\\autorun.txt",
+      "relative": "org.androswitch.conformance/files/autorun.txt",
+      "bytes": 1
+    },
+    {
+      "sha256": "eb748e3e71e4bb3fe45e07d0e114e9399eaad56ad1ae7794f4659ba3bbc547b2",
+      "frozen": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\b27b076cfe4545218ba6a95dc1121311\\userdata-seed\\org.androswitch.conformance\\files\\filter.txt",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\seeds-91b1ca622e804ac094866d486fb53b4f\\org.androswitch.conformance\\files\\filter.txt",
+      "relative": "org.androswitch.conformance/files/filter.txt",
+      "bytes": 3
+    }
+  ],
+  "capture_ownership_contract": "Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.",
+  "commands": 5,
+  "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-b27b076cfe4545218ba6a95dc1121311",
+  "latest_teardown": [
+    {
+      "phase": "stop_requested",
+      "tick": 281355452
+    },
+    {
+      "phase": "native_activity_stop",
+      "tick": 281514681
+    },
+    {
+      "phase": "java_activity_stop",
+      "tick": 281536247
+    },
+    {
+      "phase": "worker_admission_closed",
+      "tick": 475614144
+    },
+    {
+      "phase": "background_worker_quiesce",
+      "tick": 475642473
+    },
+    {
+      "phase": "media_thread_quiesce",
+      "tick": 475679581
+    },
+    {
+      "phase": "guest_thread_quiesce",
+      "tick": 475789059
+    },
+    {
+      "phase": "native_destructors",
+      "tick": 475932862
+    },
+    {
+      "phase": "media_reset",
+      "tick": 476274276
+    },
+    {
+      "phase": "media_released",
+      "tick": 476308281
+    },
+    {
+      "phase": "activity_dispose",
+      "tick": 476331644
+    },
+    {
+      "phase": "runtime_drop",
+      "tick": 476448003
+    },
+    {
+      "phase": "native_resource_reset",
+      "tick": 478857206
+    },
+    {
+      "phase": "native_reset_guest_threads",
+      "tick": 478875000
+    },
+    {
+      "phase": "native_reset_cxx",
+      "tick": 478895043
+    },
+    {
+      "phase": "native_reset_keys",
+      "tick": 478937472
+    },
+    {
+      "phase": "native_reset_sync",
+      "tick": 478965889
+    },
+    {
+      "phase": "native_reset_locale",
+      "tick": 478991256
+    },
+    {
+      "phase": "native_reset_admitted",
+      "tick": 479035539
+    },
+    {
+      "phase": "native_mapping_release",
+      "tick": 479069581
+    },
+    {
+      "phase": "native_reset_anonymous_memory",
+      "tick": 479292086
+    },
+    {
+      "phase": "native_tls_reset",
+      "tick": 479336071
+    },
+    {
+      "phase": "native_resources_released",
+      "tick": 479357099
+    },
+    {
+      "phase": "display_geometry_reset",
+      "tick": 479389893
+    },
+    {
+      "phase": "runtime_closed",
+      "tick": 479483491
+    },
+    {
+      "phase": "launcher_refresh",
+      "tick": 479587046
+    },
+    {
+      "phase": "launcher_framebuffer_open",
+      "tick": 480644219
+    },
+    {
+      "phase": "launcher_ready",
+      "tick": 481162617
+    }
+  ],
+  "latest_media_stop": [
+    {
+      "operation": "glsurface_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 475736186
+    },
+    {
+      "operation": "opensl_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 475770303
+    },
+    {
+      "operation": "glsurface_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 476178602
+    },
+    {
+      "operation": "opensl_quiesce_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 476210248
+    },
+    {
+      "operation": "cpu_capture_publish_result",
+      "result": 0,
+      "detail": 0,
+      "tick": 512146421
+    }
+  ],
+  "emulator_frontend": "headless_sdl2",
+  "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\b27b076cfe4545218ba6a95dc1121311\\androswitch.nro",
+  "physical_device": "not_run",
+  "session_id": "b27b076cfe4545218ba6a95dc1121311",
+  "emulator_version": "1.3.3+e2143d4",
+  "nro_sha256": "22462acdabe81f1d06cdaea61e77a2ae8528a285e0ac31d01e592899515677b1",
+  "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-b27b076cfe4545218ba6a95dc1121311",
+  "cases": [
+    {
+      "presented_frames": null,
+      "teardown_phases": [
+        "stop_requested",
+        "native_activity_stop",
+        "java_activity_stop",
+        "worker_admission_closed",
+        "background_worker_quiesce",
+        "media_thread_quiesce",
+        "guest_thread_quiesce",
+        "native_destructors",
+        "media_reset",
+        "media_released",
+        "activity_dispose",
+        "runtime_drop",
+        "native_resource_reset",
+        "native_reset_guest_threads",
+        "native_reset_cxx",
+        "native_reset_keys",
+        "native_reset_sync",
+        "native_reset_locale",
+        "native_reset_admitted",
+        "native_mapping_release",
+        "native_reset_anonymous_memory",
+        "native_tls_reset",
+        "native_resources_released",
+        "display_geometry_reset",
+        "runtime_closed",
+        "launcher_refresh"
+      ],
+      "returned_to_launcher": true,
+      "input": {
+        "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\AndroSwitchConformance.apk",
+        "sha256": "26cad05a295549bb8111ca1ea5728e3196a92a3ea07b20c4d5b934ded1414054",
+        "index": 0,
+        "staged_name": "0000-external.apk",
+        "bytes": 57953,
+        "expected_session_id": "b27b076cfe4545218ba6a95dc1121311-1",
+        "attempt": 0,
+        "install_snapshot_step": 3
+      },
+      "captures": [],
+      "error": "API_UNAVAILABLE [rd-vm]: builder contains an isolated UTF-16 surrogate [pc 0xb: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 280, regs: [0, 1, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/Files;->slice(Ljava/lang/String;II)Ljava/lang/String;\n  at Lorg/androswitch/conformance/MainActivity$1;->run()V",
+      "installed_identity_matches": true,
+      "runtime_status": "failed",
+      "status": "blocked_or_unreported",
+      "snapshots": [],
+      "first_screen": "not_visually_verified"
+    }
+  ],
+  "sd_original_restore": "restored",
+  "observed_sessions": [
+    {
+      "completed_case_verified": false,
+      "revision": 1,
+      "session_id": "b27b076cfe4545218ba6a95dc1121311-1",
+      "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+      "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\b27b076cfe4545218ba6a95dc1121311\\sessions\\b27b076cfe4545218ba6a95dc1121311-1\\session-report.json",
+      "error": "API_UNAVAILABLE [rd-vm]: builder contains an isolated UTF-16 surrogate [pc 0xb: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 280, regs: [0, 1, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/Files;->slice(Ljava/lang/String;II)Ljava/lang/String;\n  at Lorg/androswitch/conformance/MainActivity$1;->run()V",
+      "package": "org.androswitch.conformance",
+      "runtime_status": "failed"
+    }
+  ],
+  "pid": 281568,
+  "root_stop_wait_attempts": 1,
+  "status": "blocked_runtime"
+}

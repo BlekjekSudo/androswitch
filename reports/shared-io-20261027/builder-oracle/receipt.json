@@ -1,0 +1,10 @@
+{
+  "source_sha256": "5dbf2d4792657f65b9da8aff17396eced95e1d04f24a551ad03a5a6523b2af61",
+  "scope": "Independent JVM raw UTF-16 buffer contracts; no additional device APK",
+  "oracle_sha256": "29441d1dabe37e732bc1e3b4213d148682c765fe392213f8dea10d943bac9042",
+  "java": [
+    "openjdk version \"21.0.12.1\" 2026-08-18 LTS",
+    "OpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)",
+    "OpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)"
+  ]
+}

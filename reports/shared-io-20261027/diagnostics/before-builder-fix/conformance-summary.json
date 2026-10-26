@@ -1,0 +1,1125 @@
+{
+  "schema_version": 1,
+  "acceptance_passed": false,
+  "remaining_cases": [
+    {
+      "id": "dex.overflow",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.division",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.shift",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.long",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.loop",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.switch",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.double",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.nan",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.signed-zero",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.cast",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.bounds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "dex.division-zero",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.utf16-length",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.substring",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.char-at",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.equals",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.builder-char",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.buffer",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.utf8",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.ascii",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.format",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.index",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.replace",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.starts-ends",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.null-append",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.surrogate",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.arraylist",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.list-null",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.list-iterator",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.map",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.set",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.cow-snapshot",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.cow-array-copy",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.cow-remove-unsupported",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.boxed-equals",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.arraycopy",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.array-clone",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.abstract-subclass",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.ordinal.0",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.ordinal.1",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.ordinal.2",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.ordinal.3",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.ordinal.4",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.ordinal.5",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.ordinal.6",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.nanoseconds.nanoseconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.nanoseconds.seconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.nanoseconds.days",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.microseconds.nanoseconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.microseconds.seconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.microseconds.days",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.milliseconds.nanoseconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.milliseconds.seconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.milliseconds.days",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.seconds.nanoseconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.seconds.seconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.seconds.days",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.minutes.nanoseconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.minutes.seconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.minutes.days",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.hours.nanoseconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.hours.seconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.hours.days",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.days.nanoseconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.days.seconds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.convert.days.days",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "timeunit.saturation",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "exceptions.throw-catch",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "exceptions.finally",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "exceptions.null",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "exceptions.cast",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "exceptions.message",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "reflection.name",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "reflection.interface",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "reflection.assignable",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "reflection.field-static",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "reflection.field-instance",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "reflection.private",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "reflection.missing",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "reflection.widening",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "reflection.method",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "threads.initial",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "threads.stored-null",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "threads.remove",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "threads.monitor",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "threads.atomic",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "math.abs.-3",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "math.abs.-1",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "math.abs.0",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "math.abs.1",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "math.abs.3",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "numbers.hex.0",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "numbers.hex.1",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "numbers.hex.127",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "numbers.hex.128",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "numbers.hex.255",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "numbers.hex.32767",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.copy-set-dedup",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.copy-list-variants",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.self-add-all",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.bulk-filter",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.typed-array",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.nested-sublist-gc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.list-iterator-gc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.iterator-remove-state",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.abstract-list",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.abstract-collection",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.object-contracts",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.sort-reverse-minmax",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.singleton-map-immutable",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.readonly-bulk",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.static-add-all",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.indexed-add-all-bounds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.constructor-null",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.sublist-bounds",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.indexed-add-all",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.comparator-gc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.compare-utf16",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.compare-ignore-case",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regions",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.content-sequence",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.join-dex-iterable",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.trim-codepoint",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regex-flags",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regex-named-lookahead-utf16",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regex-match-result-gc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regex-use-pattern-gc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regex-replace-groups",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regex-append-gc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regex-split",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regex-result-state",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regex-syntax-error",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "text.regex-string-shared",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.cycle-string-unwind",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "collections.cycle-equals-hash-unwind",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "io.writer-surrogates",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "io.writer-buffered-chain",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "io.writer-append",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "io.byte-output-reset",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "io.byte-input-mark",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "io.writer-encoding-split",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "io.writer-dex-template",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "io.reader-dex-template",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "io.side-state-gc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "io.writer-dex-raw-utf16",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "cpu.available",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "cpu.singleton-gc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.cpu.allowed_mask",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.cpu.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.gpu.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.memory.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.tick.frequency_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.os.name",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.os.version",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.renderer.backend",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.model",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.manufacturer",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.brand",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.device",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.product",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.board",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.hardware",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.id",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.display",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.fingerprint",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.type",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.tags",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.user",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.host",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.time",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.abis",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.version.release",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.version.incremental",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.version.codename",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.version.base_os",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.version.security_patch",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.version.sdk",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "build.version.preview",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "clock.wall",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "clock.nano",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "clock.elapsed",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "clock.uptime",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.metrics",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.configuration",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.rotation",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.requested-orientation",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.landscape",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.portrait",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.window",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.keep-screen-on",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "package.identity",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "package.info",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "package.apk-stream",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "package.missing",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "package.assets",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.write-read",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.append",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.name-parent",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.mkdir",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.delete",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.random-access",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.int",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.long",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.boolean",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.float",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.string",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.remove",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.clear",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.int",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.long",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.boolean",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.float",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.double",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.byte",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.short",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.char",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.string",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.default",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.nested",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "ui.view-context",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "ui.textview",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "ui.button",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "ui.input-connection",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "ui.editable-utf16",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "sqlite.insert",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "sqlite.rollback",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "sqlite.commit",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "sqlite.bind",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "audio.minimum-buffer",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "audio.pcm-write",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "activity.roundtrip",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "activity.application",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "activity.intent",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "activity.handler-order",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.file-exclusive",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.character-stream",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.channel-owner",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.atomic-file",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.pointer-width",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.mixed-abi",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.string-utf8",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.array-copyback",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.exception",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.callback-gc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.local-frame",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.thread-attach",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.native-file-sharing",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.monotonic",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.clock-resolution",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.process-cpu-count",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.errno",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.tls",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.malloc-realloc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.locale-c",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.process-clock",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.abi",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.vendor",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.renderer",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.version",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.extensions",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.clear-readback",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.shader-valid",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.shader-invalid",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.buffer-roundtrip",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.texture-framebuffer",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.loader",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.instance",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.physical-device",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.queue-families",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.logical-device",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.memory-heaps",
+      "status": "NOT_RUN"
+    }
+  ],
+  "status": "observed_catalog_not_compatibility_pass",
+  "catalog_completed": false,
+  "selected_group": "I/O",
+  "selected_total": 17,
+  "selected_counts": {
+    "PASS": 3,
+    "NOT_RUN": 14
+  },
+  "selected_completed": false,
+  "selected_passed": false,
+  "backend": "Horizon via diagnostic Ryujinx; not physical hardware or stock Ryujinx",
+  "catalog_sha256": "42ffa0db209a949be58e9c4e6c01a2a913264e1e737483b160d954fb85379437",
+  "explicit_exclusions": [],
+  "total": 274,
+  "counts": {
+    "NOT_RUN": 271,
+    "PASS": 3
+  },
+  "apk_sha256": "26cad05a295549bb8111ca1ea5728e3196a92a3ea07b20c4d5b934ded1414054",
+  "nro_sha256": "22462acdabe81f1d06cdaea61e77a2ae8528a285e0ac31d01e592899515677b1",
+  "external_status": "blocked_runtime",
+  "original_sd_restore": "restored",
+  "launcher_completed": true,
+  "sessions": [
+    {
+      "session_id": "b27b076cfe4545218ba6a95dc1121311-1",
+      "status": "failed",
+      "pending_case": "io.writer-surrogates",
+      "error": "API_UNAVAILABLE [rd-vm]: builder contains an isolated UTF-16 surrogate [pc 0xb: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 280, regs: [0, 1, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/Files;->slice(Ljava/lang/String;II)Ljava/lang/String;\n  at Lorg/androswitch/conformance/MainActivity$1;->run()V",
+      "raw_report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\b27b076cfe4545218ba6a95dc1121311\\sessions\\b27b076cfe4545218ba6a95dc1121311-1\\session-report.json"
+    }
+  ],
+  "android_reference": "not_run",
+  "physical_hardware": "not_run",
+  "scope": "An interrupted case remains INTERRUPTED; matching raw runtime errors explain it without inventing success."
+}

@@ -1,0 +1,133 @@
+{
+  "build_tools": "35.0.0",
+  "ndk": "28.2.13676358",
+  "sources": [
+    {
+      "path": "fixtures/conformance/android-cases.json",
+      "sha256": "db180277db46d8067cf4ea45d5645c92d5d30eb59f4594f05f0a52f44052b742"
+    },
+    {
+      "path": "fixtures/conformance/AndroidManifest.xml",
+      "sha256": "3997dbed1f343bb0944af097658a09dd429aa68bd15d19a05d018f6c6df031e9"
+    },
+    {
+      "path": "fixtures/conformance/build.ps1",
+      "sha256": "dcebb9b1e5e7c08386ebd738ac681be2ae451c0ef69df9c90d260d45a11d86f6"
+    },
+    {
+      "path": "fixtures/conformance/catalog.py",
+      "sha256": "c7941e1a25802600496a7bdbdd58386fbb192df2d3a41e5e1e6d56a03b764200"
+    },
+    {
+      "path": "fixtures/conformance/native-cases.json",
+      "sha256": "6f7a389bb3a4a41fe6ebea810910dab6f43cba09289d3dd70af20f3e091920d3"
+    },
+    {
+      "path": "fixtures/conformance/pure-cases.json",
+      "sha256": "bcdb23091a8ebb2ccdebb385c2771fd6eaf2f7920d7357c99917cb9cd2b61198"
+    },
+    {
+      "path": "fixtures/conformance/README.md",
+      "sha256": "b6991bbb3086a32d8f737490727812e5c459047fadcf1e3ae3f1cd2a62699bac"
+    },
+    {
+      "path": "fixtures/conformance/assets/probe.txt",
+      "sha256": "b22531c0b3e13a0bf1d5a1ff7c3b0abc227aaae40eaf9d63dc7fa4eb23abf1a7"
+    },
+    {
+      "path": "fixtures/conformance/java/org/androswitch/conformance/AndroidCases.java",
+      "sha256": "72fd086d1a256b0834e4b4aefe4e343f8f1892dc8d0590cf086f5cf1427932e8"
+    },
+    {
+      "path": "fixtures/conformance/java/org/androswitch/conformance/ChildActivity.java",
+      "sha256": "4d87087a23ec9cfda7d3c4d62ae6cd791ecfa0a080ebee6d0ac66f189ff631e9"
+    },
+    {
+      "path": "fixtures/conformance/java/org/androswitch/conformance/Files.java",
+      "sha256": "1a1cfb81b7f2c9ae905c646c04b59ba28c960bccd4233935f257aeadb4132a43"
+    },
+    {
+      "path": "fixtures/conformance/java/org/androswitch/conformance/Journal.java",
+      "sha256": "4a2a81f545adbb0b97eb358cabd471d6e2f823f4491a02f236ccdd96bdcc3eec"
+    },
+    {
+      "path": "fixtures/conformance/java/org/androswitch/conformance/MainActivity.java",
+      "sha256": "c202cf39d7f3b3c2010e22ea024ee178b5987e01b04c9fd0fe54570b0cb40ec6"
+    },
+    {
+      "path": "fixtures/conformance/java/org/androswitch/conformance/NativeCases.java",
+      "sha256": "a29476aa5decaacbd9cac32b61a36400416b81287501c0af3fe427515d420136"
+    },
+    {
+      "path": "fixtures/conformance/java/org/androswitch/conformance/PureCases.java",
+      "sha256": "d4b996c03de4fdbfdeb024e2d946bb01a510d8ad24dea6e99e0a96dec94f1d2b"
+    },
+    {
+      "path": "fixtures/conformance/java/org/androswitch/conformance/Recorder.java",
+      "sha256": "717e7d0d53e1fd18e230846103248dc8ef6e3390783ff141710040e4498bb6e6"
+    },
+    {
+      "path": "fixtures/conformance/java/org/androswitch/conformance/RunBook.java",
+      "sha256": "4260fd6973b4daa7e79ba363fafacd042781ba93404abeda047a48028ef11a7b"
+    },
+    {
+      "path": "fixtures/conformance/native/graphics.c",
+      "sha256": "2420e4095ea60ecf63343556b397def4a648409e096cb6961037adc000639cbf"
+    },
+    {
+      "path": "fixtures/conformance/native/probe.c",
+      "sha256": "8e493c90cf457bd6436d54df156f45967b8d9b410adff11421a0b452a2c8b4b6"
+    },
+    {
+      "path": "fixtures/conformance/native/vulkan.c",
+      "sha256": "3d49ba1f5b4838bd54363b8348e03a6663dd08cf201e35aaaecba3b10879e2dd"
+    },
+    {
+      "path": "fixtures/conformance/selftest/JournalSelfTest.java",
+      "sha256": "033b2fb1395797ea561f3d80f1378c73578c9bbb21ebb71c5814cf08680e2ea0"
+    }
+  ],
+  "api_reference": 26,
+  "sensor_tests": false,
+  "artifacts": [
+    {
+      "sha256": "26cad05a295549bb8111ca1ea5728e3196a92a3ea07b20c4d5b934ded1414054",
+      "bytes": 57953,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\AndroSwitchConformance.apk"
+    },
+    {
+      "sha256": "42ffa0db209a949be58e9c4e6c01a2a913264e1e737483b160d954fb85379437",
+      "bytes": 53959,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\catalog.json"
+    },
+    {
+      "sha256": "4e9839f02e55d5e692f4f8d55c34414c7e80212e84361e0e0c9c392949a0088d",
+      "bytes": 1841,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\jvm-oracle.tsv"
+    },
+    {
+      "sha256": "69b75c1ff96abb867e20870ed6eeef9a0be73e9fb63d76bea010d40d6fea330b",
+      "bytes": 77396,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\dex\\classes.dex"
+    },
+    {
+      "sha256": "39fee9cb7bfd1b44fd29fb8ef9e5da6d3d64dc1c9b7fa75a1f31ff3064aeedcf",
+      "bytes": 20784,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\lib\\arm64-v8a\\libasconformance.so"
+    },
+    {
+      "sha256": "b9c6879e48d25a9786d2beb8a15738c06edce7d06f2722dd860894618592bd09",
+      "bytes": 351,
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-io-qualified\\signature-verification.log"
+    }
+  ],
+  "source_commit": "28f380c79c06044106b668afa2e2a433ca2201d2",
+  "scope": "Declared catalog of original contracts and observations; not complete Android coverage or official CTS certification",
+  "project": "AndroSwitch Conformance",
+  "schema_version": 1,
+  "java": [
+    "openjdk version \"21.0.12.1\" 2026-08-18 LTS",
+    "OpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)",
+    "OpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)"
+  ]
+}

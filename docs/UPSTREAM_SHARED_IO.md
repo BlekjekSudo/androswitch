@@ -103,6 +103,23 @@ qualification are recorded separately in the associated execution receipt.
 The earlier 219-case physical result and GC-only NRO evidence do not qualify
 this binary or the larger APK. No game first frame is established here.
 
+The [final retained execution report](../reports/shared-io-20261027.json)
+identifies source `652426d82c631f501c62e6192320d8e19cf391d0` and NRO SHA-256
+`44feb57b226c9be55b69e6ad1328ce7abeb921e1d9b8fa89f3d7e713326f5456`.
+After the builder correction, product regression passes **1,012**, the complete
+reference command passes **718**, and the default std VM passes **54** unit/I/O
+cases plus the five shared GC contracts. All fifty original suite routes remain
+present; zero-case native/JIT targets are still unverified. Strict workspace and
+reference Clippy, core checking, formatting and 26 Python tests pass.
+
+The unchanged 274-case APK passes **17/17 I/O** in pinned headless Ryujinx.
+Its complete available baseline finishes **271 PASS / 3 NOT_RUN**, with only
+the explicit CPU/GPU/memory PCV clock queries excluded because that emulator
+does not supply them. Both workflows return to the launcher and restore the
+original test SD. Captured pixels were reviewed; the full run's final UI retains
+the orientation exercised by the APK. This is not full-catalog acceptance or
+physical-device qualification. The same binary has not been tested on hardware.
+
 ## Open boundaries
 
 This work does not close the complete I/O row or upstream parity:

@@ -1,0 +1,15 @@
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+   Compiling as-vm-render-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-render-testsupport)
+   Compiling as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+    Finished `test` profile [unoptimized] target(s) in 14.27s
+     Running tests\shipping_gc_generations.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\shipping_gc_generations-6316dd82eeea64f3.exe)
+
+running 5 tests
+test cleared_weak_refs_are_enqueued ... ok
+test fuel_window_is_bounded_but_not_a_session_lifetime_limit ... ok
+test minor_remembers_old_fields_arrays_and_promotes_survivors ... ok
+test one_java_call_allocates_many_times_its_heap_budget ... ok
+test weak_references_are_cleared ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+
