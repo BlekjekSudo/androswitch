@@ -1,0 +1,31 @@
+    Updating crates.io index
+     Locking 1 package to highest compatible version
+      Adding libc v0.2.189 (available: v0.2.191)
+   Compiling compiler_builtins v0.1.160 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins)
+   Compiling core v0.0.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\core)
+   Compiling rustc-std-workspace-core v1.99.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\rustc-std-workspace-core)
+   Compiling alloc v0.0.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\alloc)
+   Compiling rustc-std-workspace-alloc v1.99.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\rustc-std-workspace-alloc)
+   Compiling libc v0.2.189
+   Compiling object v0.39.1
+   Compiling unwind v0.0.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\unwind)
+   Compiling gimli v0.34.0
+   Compiling adler2 v2.0.1
+   Compiling memchr v2.8.3
+   Compiling std v0.0.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\std)
+   Compiling miniz_oxide v0.9.1
+   Compiling addr2line v0.27.1
+   Compiling panic_unwind v0.0.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\panic_unwind)
+   Compiling std_detect v0.1.5 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\std_detect)
+   Compiling hashbrown v0.17.1
+   Compiling panic_abort v0.0.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\panic_abort)
+   Compiling cfg-if v1.0.4
+   Compiling rustc-demangle v0.1.28
+error[E0425]: cannot find value `AT_FDCWD` in crate `libc`
+    --> C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\std\src\sys\fs\unix.rs:1911:53
+     |
+1911 |         _ => cvt_r(|| unsafe { libc::fchmodat(libc::AT_FDCWD, p.as_ptr(), perm.mode, 0) }).map(|_| ()),
+     |                                                     ^^^^^^^^ not found in `libc`
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `std` (lib) due to 1 previous error

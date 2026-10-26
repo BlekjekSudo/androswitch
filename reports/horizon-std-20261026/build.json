@@ -1,0 +1,44 @@
+{
+  "toolchain_selector": "nightly",
+  "libc": {
+    "url": "https://static.crates.io/crates/libc/libc-0.2.189.crate",
+    "sha256": "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\libc-0.2.189\\src\\unix\\newlib\\mod.rs",
+    "adapted_sha256": "98109e05ba241c215139398dc1f8d9bfbd181adf6b36834978939983309f8dd0",
+    "scope": "standalone experiment only; not the product dependency graph"
+  },
+  "libc_patch_sha256": "4ab1914f85ab095a458687f5533b0d14f0eda3895add26f59f0fd30ae59d4ac6",
+  "status": "built_not_executed",
+  "nro_bytes": 569400,
+  "panic": "abort",
+  "target": "aarch64-androswitch-newlib",
+  "source_commit": "01ec6e4fddd45d36656937af4e2730e49ceae768",
+  "nro_sha256": "6bd37061d88fada2ec5a106404e4d4640cbc90969e14fe4edf1a9721828c4c1a",
+  "c_compiler": "15.2.0",
+  "sdk_inputs": [
+    {
+      "path": "libnx/lib/libnx.a",
+      "sha256": "12a59cdfdceab83e39ee129b0275dd803e393e83f19de3922a3b6cc95c767edd"
+    },
+    {
+      "path": "devkitA64/aarch64-none-elf/lib/pic/libsysbase.a",
+      "sha256": "6e616a27169f07402bfd1a2df0693778b248c84597d1220a912b3a21f91f8026"
+    },
+    {
+      "path": "devkitA64/aarch64-none-elf/lib/pic/libc.a",
+      "sha256": "9bf41282aadf7957fe18b8c1fc71394bf255fca6175c8b449fd3f23ff387a362"
+    },
+    {
+      "path": "devkitA64/aarch64-none-elf/lib/pic/libm.a",
+      "sha256": "e9d2e4ae3376222d8cac21f6f5143481e4ef5b58f51ba48c6d4b24b9e2c7bad7"
+    },
+    {
+      "path": "libnx/switch.specs",
+      "sha256": "a6bb2d0c1eaaff3e6c568d372c562b48b079e94bafb431f8169e21d7d9ed8c02"
+    }
+  ],
+  "rustc_verbose": "rustc 1.100.0-nightly (787af2b8c 2026-08-25)\r\nbinary: rustc\r\ncommit-hash: 787af2b8c80638c51a4fc8e44f84e6891f243ec7\r\ncommit-date: 2026-08-25\r\nhost: x86_64-pc-windows-gnu\r\nrelease: 1.100.0-nightly\r\nLLVM version: 23.1.0",
+  "rust_std_source": "installed matching rust-src; no Rust source patches",
+  "source_manifest_sha256": "f35e92ae9f9fd9c5efd6a02bfed1f526ee11300d38cb5d46da1ead0a3bc34501",
+  "schema_version": 1
+}

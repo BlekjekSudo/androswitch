@@ -1,0 +1,9 @@
+    Updating crates.io index
+   Compiling libc v0.2.189 (D:\Dev\Switch\AndroSwitch\local-artifacts\horizon-std\libc-0.2.189)
+   Compiling unwind v0.0.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\unwind)
+   Compiling panic_unwind v0.0.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\panic_unwind)
+   Compiling std_detect v0.1.5 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\std_detect)
+   Compiling std v0.0.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\std)
+   Compiling proc_macro v0.0.0 (C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\proc_macro)
+   Compiling androswitch-std-probe v0.1.0 (D:\Dev\Switch\AndroSwitch\experiments\horizon-std)
+    Finished `release` profile [optimized + debuginfo] target(s) in 27.68s

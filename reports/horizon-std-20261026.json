@@ -1,0 +1,396 @@
+{
+  "schema_version": 1,
+  "session_id": "f7cb236e1c7d408f98e8fd7a1ccf2909",
+  "status": "complete_with_gaps",
+  "summary": {
+    "pass": 29,
+    "fail": 3,
+    "not_run": 0
+  },
+  "cases": [
+    {
+      "id": "abi.sdk_layouts",
+      "status": "pass",
+      "detail": "rust=[2, 2, 2, 2, 8, 8, 8, 104, 8, 16, 24, 72, 260, 3, 1, 4, 512, 2048, 1024, 8, 18446744073709551614, 24, 8, 12, 4, 4, 4, 16, 8, 8, 8, 8, 8]; sdk=[2, 2, 2, 2, 8, 8, 8, 104, 8, 16, 24, 72, 260, 3, 1, 4, 512, 2048, 1024, 8, 18446744073709551614, 24, 8, 12, 4, 4, 4, 16, 8, 8, 8, 8, 8]"
+    },
+    {
+      "id": "alloc.vec_string",
+      "status": "pass",
+      "detail": "Horizon🦀:33550336"
+    },
+    {
+      "id": "alloc.aligned",
+      "status": "pass",
+      "detail": "4096-byte aligned Box"
+    },
+    {
+      "id": "hashmap.entropy",
+      "status": "pass",
+      "detail": "1024 randomized HashMap entries"
+    },
+    {
+      "id": "io.write_read",
+      "status": "pass",
+      "detail": "128 KiB binary round trip"
+    },
+    {
+      "id": "io.seek_metadata",
+      "status": "pass",
+      "detail": "seek and native stat"
+    },
+    {
+      "id": "io.c_shared_file",
+      "status": "pass",
+      "detail": "Rust -> C -> Rust shared bytes"
+    },
+    {
+      "id": "io.rename",
+      "status": "pass",
+      "detail": "renamed with exact contents"
+    },
+    {
+      "id": "io.copy",
+      "status": "fail",
+      "detail": "Function not implemented (os error 88)"
+    },
+    {
+      "id": "io.directory",
+      "status": "pass",
+      "detail": "native dirent decoded"
+    },
+    {
+      "id": "io.not_found",
+      "status": "pass",
+      "detail": "kind=NotFound, errno=Some(2)"
+    },
+    {
+      "id": "io.exclusive_create",
+      "status": "pass",
+      "detail": "kind=AlreadyExists"
+    },
+    {
+      "id": "io.sync_all",
+      "status": "pass",
+      "detail": "actual fsync succeeded"
+    },
+    {
+      "id": "time.monotonic_sleep",
+      "status": "pass",
+      "detail": "elapsed_ms=44"
+    },
+    {
+      "id": "time.system_clock",
+      "status": "pass",
+      "detail": "epoch_seconds=1792999685"
+    },
+    {
+      "id": "thread.spawn_join",
+      "status": "pass",
+      "detail": "distinct real thread returns 42"
+    },
+    {
+      "id": "thread.tls_destructors",
+      "status": "pass",
+      "detail": "isolated=true; main=99; drops=8"
+    },
+    {
+      "id": "thread.repeated_join_tls",
+      "status": "pass",
+      "detail": "workers=64; isolated=true; destructors=64"
+    },
+    {
+      "id": "thread.detached_handle",
+      "status": "fail",
+      "detail": "SDK pthread_detach=88; harness recovery join=0"
+    },
+    {
+      "id": "sync.mutex_contention",
+      "status": "pass",
+      "detail": "counter=8000"
+    },
+    {
+      "id": "sync.condvar_notify",
+      "status": "pass",
+      "detail": "notification before deadline"
+    },
+    {
+      "id": "sync.condvar_timeout",
+      "status": "pass",
+      "detail": "timeout=true; elapsed_ms=40"
+    },
+    {
+      "id": "sync.rwlock_once",
+      "status": "pass",
+      "detail": "RwLock and shared OnceLock"
+    },
+    {
+      "id": "sync.channel_timeout",
+      "status": "pass",
+      "detail": "cross-thread channel message"
+    },
+    {
+      "id": "sync.park_unpark",
+      "status": "pass",
+      "detail": "park_ms=22"
+    },
+    {
+      "id": "env.set_get_remove",
+      "status": "pass",
+      "detail": "process environment"
+    },
+    {
+      "id": "thread.available_parallelism",
+      "status": "fail",
+      "detail": "getting the number of hardware threads is not supported on the target platform"
+    },
+    {
+      "id": "process.unsupported",
+      "status": "pass",
+      "detail": "kind=Unsupported; operation not supported on this platform"
+    },
+    {
+      "id": "io.fresh_process_persistence",
+      "status": "pass",
+      "detail": "persisted=\"f7cb236e1c7d408f98e8fd7a1ccf2909\\n\""
+    },
+    {
+      "id": "shutdown.suite",
+      "status": "pass",
+      "detail": "fresh completion, actual Rust return and C atexit must agree"
+    },
+    {
+      "id": "shutdown.restart",
+      "status": "pass",
+      "detail": "fresh completion, actual Rust return and C atexit must agree"
+    },
+    {
+      "id": "panic.abort",
+      "status": "pass",
+      "detail": "hook recorded intentional panic, guest exited, C return/atexit not reached"
+    }
+  ],
+  "build": {
+    "toolchain_selector": "nightly",
+    "libc": {
+      "url": "https://static.crates.io/crates/libc/libc-0.2.189.crate",
+      "sha256": "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\libc-0.2.189\\src\\unix\\newlib\\mod.rs",
+      "adapted_sha256": "98109e05ba241c215139398dc1f8d9bfbd181adf6b36834978939983309f8dd0",
+      "scope": "standalone experiment only; not the product dependency graph"
+    },
+    "libc_patch_sha256": "4ab1914f85ab095a458687f5533b0d14f0eda3895add26f59f0fd30ae59d4ac6",
+    "status": "built_not_executed",
+    "nro_bytes": 569400,
+    "panic": "abort",
+    "target": "aarch64-androswitch-newlib",
+    "source_commit": "01ec6e4fddd45d36656937af4e2730e49ceae768",
+    "nro_sha256": "6bd37061d88fada2ec5a106404e4d4640cbc90969e14fe4edf1a9721828c4c1a",
+    "c_compiler": "15.2.0",
+    "sdk_inputs": [
+      {
+        "path": "libnx/lib/libnx.a",
+        "sha256": "12a59cdfdceab83e39ee129b0275dd803e393e83f19de3922a3b6cc95c767edd"
+      },
+      {
+        "path": "devkitA64/aarch64-none-elf/lib/pic/libsysbase.a",
+        "sha256": "6e616a27169f07402bfd1a2df0693778b248c84597d1220a912b3a21f91f8026"
+      },
+      {
+        "path": "devkitA64/aarch64-none-elf/lib/pic/libc.a",
+        "sha256": "9bf41282aadf7957fe18b8c1fc71394bf255fca6175c8b449fd3f23ff387a362"
+      },
+      {
+        "path": "devkitA64/aarch64-none-elf/lib/pic/libm.a",
+        "sha256": "e9d2e4ae3376222d8cac21f6f5143481e4ef5b58f51ba48c6d4b24b9e2c7bad7"
+      },
+      {
+        "path": "libnx/switch.specs",
+        "sha256": "a6bb2d0c1eaaff3e6c568d372c562b48b079e94bafb431f8169e21d7d9ed8c02"
+      }
+    ],
+    "rustc_verbose": "rustc 1.100.0-nightly (787af2b8c 2026-08-25)\r\nbinary: rustc\r\ncommit-hash: 787af2b8c80638c51a4fc8e44f84e6891f243ec7\r\ncommit-date: 2026-08-25\r\nhost: x86_64-pc-windows-gnu\r\nrelease: 1.100.0-nightly\r\nLLVM version: 23.1.0",
+    "rust_std_source": "installed matching rust-src; no Rust source patches",
+    "source_manifest_sha256": "f35e92ae9f9fd9c5efd6a02bfed1f526ee11300d38cb5d46da1ead0a3bc34501",
+    "schema_version": 1
+  },
+  "execution": {
+    "schema_version": 1,
+    "session_id": "f7cb236e1c7d408f98e8fd7a1ccf2909",
+    "status": "executed_requires_contract_review",
+    "backend": "ryujinx_headless_sdl2",
+    "physical_device": "not_run",
+    "nro_sha256": "6bd37061d88fada2ec5a106404e4d4640cbc90969e14fe4edf1a9721828c4c1a",
+    "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+    "emulator_version": "1.3.3+e2143d4",
+    "phases": [
+      {
+        "mode": "suite",
+        "status": "observed",
+        "started_utc": "2026-10-26T07:27:59.7919649Z",
+        "pid": 198344,
+        "marker_observed": true,
+        "live_after_grace": 1
+      },
+      {
+        "mode": "restart",
+        "status": "observed",
+        "started_utc": "2026-10-26T07:28:12.4344087Z",
+        "pid": 272600,
+        "marker_observed": true,
+        "live_after_grace": 1
+      },
+      {
+        "mode": "panic",
+        "status": "observed",
+        "started_utc": "2026-10-26T07:28:22.2894891Z",
+        "pid": 194592,
+        "marker_observed": true,
+        "live_after_grace": 1
+      }
+    ],
+    "source_commit": "94c26c8aa26120b478da7f6b894a7b7547175bb5",
+    "sd_restore": "restored"
+  },
+  "physical_device": "not_run",
+  "product_runner_changed": false,
+  "android_api_parity": "not_established_by_this_probe",
+  "scope": "real std standalone libnx NRO; finite smoke contracts, not complete std certification",
+  "recommendation": "continue_current_core_alloc_integration; retain std prototype for later qualification",
+  "retained_evidence": [
+    {
+      "path": "reports/horizon-std-20261026/build.json",
+      "sha256": "67da375b8ad6fc342a93dc467060297a91f49b2c7a8382795f16403d7cc3753a",
+      "original_sha256": "67da375b8ad6fc342a93dc467060297a91f49b2c7a8382795f16403d7cc3753a"
+    },
+    {
+      "path": "reports/horizon-std-20261026/source.json",
+      "sha256": "f35e92ae9f9fd9c5efd6a02bfed1f526ee11300d38cb5d46da1ead0a3bc34501",
+      "original_sha256": "f35e92ae9f9fd9c5efd6a02bfed1f526ee11300d38cb5d46da1ead0a3bc34501"
+    },
+    {
+      "path": "reports/horizon-std-20261026/libc-adaptation.patch",
+      "sha256": "65efb500ca1c87d103a85512d5a605d397dc5cb7f90a0265aecd763071b3d394",
+      "original_sha256": "4ab1914f85ab095a458687f5533b0d14f0eda3895add26f59f0fd30ae59d4ac6"
+    },
+    {
+      "path": "reports/horizon-std-20261026/build.log",
+      "sha256": "e7aede67eeb973e4d02fe89551890e912ed6ee6b1e6bf7abda7b023e3e64730a",
+      "original_sha256": "8abe48d449ce81a439ecb12903c2d50a6848530f857838d3c758b95536cd716a"
+    },
+    {
+      "path": "reports/horizon-std-20261026/link.log",
+      "sha256": "7dace5b5e3a72309c3198f9e5dd3d54c1674854acb0ca4c8b0875fa4718f2e65",
+      "original_sha256": "9f2bd3e58da5b321bb87ce22f2b2f6969e4df7cc867c9882a51bea4b9b29b652"
+    },
+    {
+      "path": "reports/horizon-std-20261026/emulator-verification.json",
+      "sha256": "0e9fbed53ea85bd1705ec68e9a98257ef53334d41b7445d180f3e6e1ab11cc7f",
+      "original_sha256": "58e29e266ee063314ed3b98b9b4e3f701926eb848a9db8c954180af2618413ee"
+    },
+    {
+      "path": "reports/horizon-std-20261026/suite.stdout.log",
+      "sha256": "4cdd433cc585f37d725ec29da19122736b1a0ee8e95618d07e25d2a770eeb94d",
+      "original_sha256": "9e5c3a4c27181af06c72b28aee38179d45a451cd453051511b610506a99e22e4"
+    },
+    {
+      "path": "reports/horizon-std-20261026/suite.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "reports/horizon-std-20261026/restart.stdout.log",
+      "sha256": "50fbc0cd756caf96a3828950102df77ef6c50b8d0d342e487bd92ff7f3da1700",
+      "original_sha256": "c863ae71c7047622d54679f7ce818521149f916912602a68e1a772b7606adfb3"
+    },
+    {
+      "path": "reports/horizon-std-20261026/restart.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "reports/horizon-std-20261026/panic.stdout.log",
+      "sha256": "1add0b2745a3ab3cb2236ebea16cfb98414b3e4b75329b773967f0de46c1fd7f",
+      "original_sha256": "05489b62966de291c4158d96275806793c3a86e14d492f864a908e41769c9089"
+    },
+    {
+      "path": "reports/horizon-std-20261026/panic.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "reports/horizon-std-20261026/results.tsv",
+      "sha256": "02706db62411c0b98aec52d597990c126564a2c997cf9a3b3aa62312d41cd198",
+      "original_sha256": "02706db62411c0b98aec52d597990c126564a2c997cf9a3b3aa62312d41cd198"
+    },
+    {
+      "path": "reports/horizon-std-20261026/complete-suite.txt",
+      "sha256": "f188d939abccc38ad3c78620bd3309b6b8767d11b5e5805d1095f7686ebf463d",
+      "original_sha256": "f188d939abccc38ad3c78620bd3309b6b8767d11b5e5805d1095f7686ebf463d"
+    },
+    {
+      "path": "reports/horizon-std-20261026/complete-restart.txt",
+      "sha256": "31beef95ef23cbe20cb8171b6fb56b439f2b5006a79c25372c070231f8a60a9e",
+      "original_sha256": "31beef95ef23cbe20cb8171b6fb56b439f2b5006a79c25372c070231f8a60a9e"
+    },
+    {
+      "path": "reports/horizon-std-20261026/returned-suite.txt",
+      "sha256": "1121cfccd5913f0a63fec40a6ffd44ea64f9dc135c66634ba001d10bcf4302a2",
+      "original_sha256": "1121cfccd5913f0a63fec40a6ffd44ea64f9dc135c66634ba001d10bcf4302a2"
+    },
+    {
+      "path": "reports/horizon-std-20261026/returned-restart.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "original_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "reports/horizon-std-20261026/shutdown-suite.txt",
+      "sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4",
+      "original_sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4"
+    },
+    {
+      "path": "reports/horizon-std-20261026/shutdown-restart.txt",
+      "sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4",
+      "original_sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4"
+    },
+    {
+      "path": "reports/horizon-std-20261026/panic.txt",
+      "sha256": "c8f69ac06852272edb48943dd041d10d191844049df5894a9c8e7710bb162f76",
+      "original_sha256": "c8f69ac06852272edb48943dd041d10d191844049df5894a9c8e7710bb162f76"
+    },
+    {
+      "path": "reports/horizon-std-20261026/initial-compile-error.log",
+      "sha256": "661203ebd5c2db5d20dd141c4e43900fe964d856924952ae40a12f4867613df6",
+      "original_sha256": "dda4646391775f8aec3ebec507c814a79fe0faa09fabd75dc3f9bad32aff8b27"
+    },
+    {
+      "path": "reports/horizon-std-20261026/initial-link-error.log",
+      "sha256": "375878c067d0ab94371ecb19f8ba0e916059dd3bae2cfeebae9f8f2cb70fd770",
+      "original_sha256": "6d6c587b71f095c38891dfcf1e3673606642a9b9c40b18c51e304de18266a21f"
+    },
+    {
+      "path": "reports/horizon-std-20261026/initial-abi-rejected.tsv",
+      "sha256": "afdaf52364ca4eb3a6cc4cc9c38a7796a107c00ff43f753ff7476f55abe01290",
+      "original_sha256": "afdaf52364ca4eb3a6cc4cc9c38a7796a107c00ff43f753ff7476f55abe01290"
+    }
+  ],
+  "evidence_normalization": "UTF-8 without BOM, LF, trailing line whitespace removed; original and retained byte hashes recorded separately",
+  "decision_rationale": [
+    "Real std works for the required joined-thread, TLS, synchronization, storage and clock smoke contracts.",
+    "SDK pthread_detach returns ENOSYS, hidden by release std JoinHandle drop; harness recovery does not count as support.",
+    "std filesystem copy and hardware parallelism discovery remain unsupported in this prototype.",
+    "Existing full portable reference already compiles on Horizon. Guest state, VFS, UI, lifecycle and JNI integration remain necessary under either Rust library profile.",
+    "Upstream desktop SQLite process transport still needs a device adapter; std process spawn is explicitly unsupported."
+  ],
+  "verification": {
+    "python_report_tests": {
+      "pass": 6
+    },
+    "rustfmt": "passed using installed 1.97.1 formatter",
+    "rust_warnings": "-Dwarnings target build passed",
+    "c_warnings": "-Wall -Wextra -Werror link inputs passed",
+    "clippy": "not_run: pinned nightly has no clippy component; global toolchains unchanged",
+    "upstream_audit": "passed: 427 paths; device API parity remains unverified",
+    "full_rust_std_test_suite": "not_run",
+    "hardware": "not_run"
+  }
+}

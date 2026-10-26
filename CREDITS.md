@@ -1,12 +1,5 @@
 # Credits and source provenance
 
-The isolated [Horizon std experiment](experiments/horizon-std/README.md) uses the
-Rust project's real standard library and rust-lang/libc 0.2.189
-(MIT OR Apache-2.0), plus devkitPro/newlib and switchbrew/libnx. The std Rust
-sources are unmodified; the verified libc adaptation and SDK transport glue are
-AndroSwitch experiment work. This does not change RustyDroid's foundation credit
-or establish device parity for its Android APIs.
-
 ## RustyDroid — the foundation
 
 **AndroSwitch is built on RustyDroid, not a runtime written from scratch.**
@@ -133,6 +126,13 @@ that APK is not bundled in the AndroSwitch distribution.
 | [Khronos](https://www.khronos.org/) / AOSP OpenSL ES contributors | Public OpenSL ES interface layouts and identifiers; original headers/notices retained |
 | GCC / GNU libstdc++ / newlib contributors | Device C/C++ runtime; redistribution notices and the GCC Runtime Library Exception are included in packaged dependencies |
 | Unicode / ICU / IBM contributors | Pinned API 26 charset-name recognition data; original [license and provenance](third_party/android-charset/SOURCE.md) retained and packaged. Encoder implementations are original AndroSwitch code. |
+
+The isolated [Horizon std experiment](experiments/horizon-std/README.md) uses the
+Rust project's real standard library and rust-lang/libc 0.2.189
+(MIT OR Apache-2.0), plus devkitPro/newlib and switchbrew/libnx. The std Rust
+sources are unmodified; the verified libc adaptation and SDK transport glue are
+AndroSwitch experiment work. This does not establish device parity for
+RustyDroid's Android APIs.
 
 These acknowledgements do not change the components' individual licenses.
 Tools, external APKs and proprietary game assets are not bundled in the

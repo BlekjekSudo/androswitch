@@ -1,0 +1,104 @@
+--- libc-0.2.189/src/unix/newlib/mod.rs
++++ libc-0.2.189/src/unix/newlib/mod.rs
+@@ -1,7 +1,7 @@
+ use crate::prelude::*;
+
+-pub type blkcnt_t = i32;
+-pub type blksize_t = i32;
++pub type blkcnt_t = c_long;
++pub type blksize_t = c_long;
+
+ pub type clockid_t = c_ulong;
+
+@@ -15,8 +15,8 @@
+         pub type ino_t = c_ushort;
+         pub type off_t = c_int;
+     } else {
+-        pub type dev_t = u32;
+-        pub type ino_t = u32;
++        pub type dev_t = c_short;
++        pub type ino_t = c_ushort;
+         pub type off_t = i64;
+     }
+ }
+@@ -222,6 +222,7 @@
+         bits: [u32; 32],
+     }
+
++    #[repr(align(8))]
+     pub struct pthread_attr_t {
+         // Unverified
+         #[cfg(not(target_os = "espidf"))]
+@@ -249,20 +250,7 @@
+         __size: [u8; __SIZEOF_PTHREAD_RWLOCKATTR_T],
+     }
+
+-    #[cfg_attr(
+-        all(
+-            target_pointer_width = "32",
+-            any(target_arch = "mips", target_arch = "arm", target_arch = "powerpc")
+-        ),
+-        repr(align(4))
+-    )]
+-    #[cfg_attr(
+-        any(
+-            target_pointer_width = "64",
+-            not(any(target_arch = "mips", target_arch = "arm", target_arch = "powerpc"))
+-        ),
+-        repr(align(8))
+-    )]
++    #[repr(align(4))]
+     pub struct pthread_mutex_t {
+         // Unverified
+         size: [u8; crate::__SIZEOF_PTHREAD_MUTEX_T],
+@@ -298,17 +286,7 @@
+         ),
+         repr(align(4))
+     )]
+-    #[cfg_attr(
+-        not(any(
+-            target_pointer_width = "32",
+-            target_arch = "x86_64",
+-            target_arch = "powerpc64",
+-            target_arch = "mips64",
+-            target_arch = "s390x",
+-            target_arch = "sparc64"
+-        )),
+-        repr(align(8))
+-    )]
++    #[repr(align(4))]
+     pub struct pthread_mutexattr_t {
+         // Unverified
+         size: [u8; crate::__SIZEOF_PTHREAD_MUTEXATTR_T],
+@@ -320,7 +298,7 @@
+         size: [u8; crate::__SIZEOF_PTHREAD_COND_T],
+     }
+
+-    #[repr(align(4))]
++    #[repr(align(8))]
+     pub struct pthread_condattr_t {
+         // Unverified
+         size: [u8; crate::__SIZEOF_PTHREAD_CONDATTR_T],
+@@ -379,11 +357,11 @@
+         pub const __SIZEOF_PTHREAD_BARRIER_T: usize = 32;
+     } else {
+         const __PTHREAD_INITIALIZER_BYTE: u8 = 0;
+-        pub const __SIZEOF_PTHREAD_ATTR_T: usize = 56;
+-        pub const __SIZEOF_PTHREAD_MUTEX_T: usize = 40;
++        pub const __SIZEOF_PTHREAD_ATTR_T: usize = 24;
++        pub const __SIZEOF_PTHREAD_MUTEX_T: usize = 12;
+         pub const __SIZEOF_PTHREAD_MUTEXATTR_T: usize = 4;
+-        pub const __SIZEOF_PTHREAD_COND_T: usize = 48;
+-        pub const __SIZEOF_PTHREAD_CONDATTR_T: usize = 4;
++        pub const __SIZEOF_PTHREAD_COND_T: usize = 16;
++        pub const __SIZEOF_PTHREAD_CONDATTR_T: usize = 8;
+         pub const __SIZEOF_PTHREAD_RWLOCK_T: usize = 56;
+         pub const __SIZEOF_PTHREAD_RWLOCKATTR_T: usize = 8;
+         pub const __SIZEOF_PTHREAD_BARRIER_T: usize = 32;
+@@ -973,3 +951,6 @@
+         pub use self::rtems::*;
+     }
+ }
++
++// Standalone devkitA64/newlib std experiment only.
++pub const AT_FDCWD: c_int = -2;

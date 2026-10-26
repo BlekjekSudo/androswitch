@@ -1,0 +1,12 @@
+make: Entering directory 'D:/Dev/Switch/AndroSwitch/experiments/horizon-std'
+mkdir -p "D:/Dev/Switch/AndroSwitch/local-artifacts/horizon-std/suite"
+C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -O2 -Wall -Wextra -Werror -IC:/devkitPro/libnx/include -c "main.c" -o "D:/Dev/Switch/AndroSwitch/local-artifacts/horizon-std/suite/main.o"
+C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -O2 -Wall -Wextra -Werror -c "abi.c" -o "D:/Dev/Switch/AndroSwitch/local-artifacts/horizon-std/suite/abi.o"
+C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -specs=C:/devkitPro/libnx/switch.specs -LC:/devkitPro/libnx/lib D:/Dev/Switch/AndroSwitch/local-artifacts/horizon-std/suite/main.o D:/Dev/Switch/AndroSwitch/local-artifacts/horizon-std/suite/abi.o -Wl,--start-group "C:/Users/Administrator/.cache/androswitch/std-probe-target/aarch64-androswitch-newlib/release/libandroswitch_std_probe.a" -lnx -lm -Wl,--end-group -Wl,-Map,D:/Dev/Switch/AndroSwitch/local-artifacts/horizon-std/suite/probe.map -o "D:/Dev/Switch/AndroSwitch/local-artifacts/horizon-std/suite/androswitch-std-probe.elf"
+C:/devkitPro/devkitA64/bin/../lib/gcc/aarch64-none-elf/15.2.0/../../../../aarch64-none-elf/bin/ld.exe: C:/Users/Administrator/.cache/androswitch/std-probe-target/aarch64-androswitch-newlib/release/libandroswitch_std_probe.a(std-6d9e9e57764dca1e.std.5d78bd30bc4d8825-cgu.06.rcgu.o): in function `std::sys::pal::unix::conf::page_size':
+C:\Users\Administrator\.rustup\toolchains\nightly-x86_64-pc-windows-gnu\lib\rustlib\src\rust\library\std/src\sys\pal\unix/conf.rs:6:(.text._RNvMs0_NtNtNtCs81xVVVZflsf_3std3sys6thread4unixNtB5_6Thread3new+0x50): undefined reference to `sysconf'
+C:/devkitPro/devkitA64/bin/../lib/gcc/aarch64-none-elf/15.2.0/../../../../aarch64-none-elf/bin/ld.exe: C:/devkitPro/devkitA64/bin/../lib/gcc/aarch64-none-elf/15.2.0/../../../../aarch64-none-elf/lib/pic\libc.a(libc_a-sysgetentropy.o): in function `getentropy':
+sysgetentropy.c:(.text.getentropy+0x28): undefined reference to `_getentropy_r'
+collect2.exe: error: ld returned 1 exit status
+make: Leaving directory 'D:/Dev/Switch/AndroSwitch/experiments/horizon-std'
+make: *** [Makefile:21: D:/Dev/Switch/AndroSwitch/local-artifacts/horizon-std/suite/androswitch-std-probe.elf] Error 1

@@ -25,6 +25,7 @@ binary identities unrecorded. New changes need their own hardware verification.
 | [M6/M7 E2E](M6_M7_E2E.md) | Native media, console workflow, quiescent teardown and exact evidence scope |
 | [Getting started](GETTING_STARTED.md) | Clone, prerequisites and first APK inspection |
 | [Building](BUILDING.md) | Host tools, pinned device Rust, libnx and Java fixture builds |
+| [Horizon std feasibility](HORIZON_STD_REPORT.md) | Actual standalone std NRO: 29/32 contracts passed, gaps and architecture decision |
 | [CLI reference](CLI.md) | Actual `asctl` commands, JSON, preflight and the separate method probe |
 | [Testing](TESTING.md) | Focused host gates, feature isolation, CI and evidence requirements |
 | [M1 Ryujinx E2E](M1_E2E.md) | Reproduce the actual APK/interpreter emulator proof |

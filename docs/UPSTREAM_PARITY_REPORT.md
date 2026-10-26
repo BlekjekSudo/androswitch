@@ -124,3 +124,8 @@ Host fixture locations/toolchains are documented in [testing](TESTING.md) and
 checkpoint. The next gate is the common runtime bound to Horizon storage,
 state and services, followed by the product corpus through an actual NRO and
 Ryujinx. This checkpoint does not mark complete upstream parity or M9 complete.
+
+The separate [Horizon std feasibility probe](HORIZON_STD_REPORT.md) subsequently
+ran a real std/libnx NRO: 29 of 32 finite contracts passed. It does not exercise
+this full Android framework path. The decision remains to integrate the common
+portable runtime; upstream API behavior on the product runner is still not 1:1.
