@@ -1,0 +1,1020 @@
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+   Compiling as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+   Compiling as-vm-render-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-render-testsupport)
+    Finished `test` profile [unoptimized] target(s) in 3m 59s
+     Running unittests ..\rd-vm\src\lib.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\rd_vm-164c188f90c56ddd.exe)
+
+running 159 tests
+test accessibility_node::tests::oversized_child_list_reports_a_structured_limit ... ok
+test accessibility_node::tests::real_dex_provider_traversal_names_nodes_and_deduplicates_cycles ... ok
+test activity_callbacks::tests::events ... ok
+test activity_extras::tests::context_wrapper_delegates_package_query_to_real_base_dex_override ... ok
+test activity_extras::tests::wrapper_delegates_inherited_platform_method_and_rejects_cycles ... ok
+test android_build::tests::release_names ... ok
+test android_colorspace::tests::srgb_matrix_matches_reference ... ok
+test android_drawable::tests::state_set_matching_follows_aosp ... ok
+test android_env::tests::environment_directory_constants_match_android_names ... ok
+test android_motion::tests::action_constants_match_aosp ... ok
+test android_pm::tests::phone_profile_excludes_tv ... ok
+test android_region::tests::adjacent_union_is_rect_and_invalid_rect_replacement_is_empty ... ok
+test android_region::tests::all_boolean_ops_follow_platform_ordinals_and_half_open_bounds ... ok
+test android_region::tests::subtraction_preserves_hole ... ok
+test android_region::tests::work_limit_reports_error_before_mutating_region ... ok
+test android_res::tests::tags ... ok
+test android_spannable::tests::splice_shifts_spans ... ok
+test android_uri::tests::builder_string ... ok
+test android_uri::tests::codec ... ok
+test android_uri::tests::parses_hierarchical_and_opaque ... ok
+test android_util::tests::android_base64_decode_skips_garbage_and_validates_padding ... ok
+test android_util::tests::android_base64_flags_and_wrapping_match_aosp ... ok
+test android_util::tests::android_base64_static_dispatch_uses_offsets_and_constants ... ok
+test android_util::tests::array_map_and_array_set_keep_signed_hash_order ... ok
+test android_util::tests::array_set_collection_add_all_keeps_signed_hash_order ... ok
+test android_util::tests::array_set_object_forms_and_array_map_empty_follow_aosp ... ok
+test android_util::tests::array_set_typed_to_array_preserves_component_and_reuses_large_array ... ok
+test android_util::tests::lru_cache_access_order_eviction_and_stats_match_aosp ... ok
+test android_velocity::tests::a_single_sample_has_no_velocity ... ok
+test android_velocity::tests::action_constants_match_aosp ... ok
+test android_velocity::tests::linear_motion_gives_its_speed ... ok
+test android_velocity::tests::quadratic_motion_recovers_the_instant_speed ... ok
+test android_velocity::tests::samples_older_than_the_horizon_are_ignored ... ok
+test android_velocity::tests::two_samples_use_the_line_through_them ... ok
+test boxes::tests::float_double_semantics_match_jdk ... ok
+test bundle::tests::signature_parsing ... ok
+test classpath::tests::android_activity_is_android_context ... ok
+test classpath::tests::android_scroll_and_container_widgets_are_views ... ok
+test classpath::tests::array_subtyping_is_covariant_for_reference_elements ... ok
+test classpath::tests::borrowed_method_name_matches_owned_predicate_including_invalid_ids ... ok
+test classpath::tests::borrowed_subtype_walk_matches_legacy_with_cycles_interfaces_and_depth_caps ... ok
+test classpath::tests::host_collections_subtype_their_interfaces ... ok
+test classpath::tests::jutil_calendar_and_timezone_have_jdk_type_relations ... ok
+test collection_factories::tests::bound_framework_never_falls_back_to_reference_collection_storage ... ok
+test collection_factories::tests::malformed_factory_call_does_not_index_missing_arguments ... ok
+test content::tests::uri_parts ... ok
+test framework::point_hit_tests::actual_hit_test_uses_safe_bounds_and_respects_z_order ... ok
+test framework::point_hit_tests::android_visibility_constants_extend_without_changing_legacy_ordinals ... ok
+test framework::point_hit_tests::bounded_snapshots_preserve_small_trees_and_mark_wide_cuts ... ok
+test framework::point_hit_tests::bounded_windows_include_dialogs_without_activity_content ... ok
+test framework::point_hit_tests::view_bounds_match_wide_integer_oracle_at_all_i32_edges ... ok
+test gc::tests::host_temporary_from_guest_return_survives_another_guest_callback ... ok
+test gc::tests::nested_host_scope_returns_stay_rooted_until_the_outer_callback_returns ... ok
+test gc::tests::scan_finds_only_valid_refs ... ok
+test gc::tests::slot_pressure_does_not_recollect_unchanged_pinned_heap_each_instruction ... ok
+test gc::tests::streaming_collector_matches_legacy_root_and_graph_oracle_across_seeded_heaps ... ok
+test gc::tests::streaming_engine_roots_equal_buffered_roots_and_restore_host_tables ... ok
+test gc::tests::streaming_scanner_differential_random_chunks_and_overflow ... ok
+test gc::tests::streaming_scanner_exhausts_short_tokens_and_all_write_partitions ... ok
+test gc::tests::streaming_scanner_matches_buffered_scanner_at_every_utf8_boundary ... ok
+test gc::tests::unpinned_boundary_rechecks_a_pinned_watermark_once_with_a_major_collection ... ok
+test gc_policy::tests::an_unpinned_watermark_recheck_happens_once_and_never_drops_active_frames ... ok
+test gc_policy::tests::byte_pressure_uses_remaining_headroom_with_saturating_watermarks ... ok
+test gc_policy::tests::pinned_slot_pressure_backs_off_but_a_tool_boundary_can_reclaim ... ok
+test gms::narrow_bytes_250::make_bytes_is_signed ... ok
+test graphics::screen_model_tests::fingerprint_tracks_content ... ok
+test graphics::screen_model_tests::items_under_a_later_opaque_surface_are_hidden ... ok
+test graphics::screen_model_tests::merges_runs_and_finds_targets ... ok
+test graphics::screen_model_tests::side_by_side_labels_make_a_container_not_a_target ... ok
+test graphics::screen_model_tests::stacked_lines_in_one_card_stay_one_target ... ok
+test graphics::screen_model_tests::stroked_outline_drawn_after_label_does_not_hide_it ... ok
+test graphics::tests::atlas_loads_and_measures ... ok
+test graphics::tests::matrix_compose_and_invert ... ok
+test graphics::tests::raster_fills_rect_and_text ... ok
+test heap::tests::array_elem_kinds ... ok
+test heap::tests::budget_is_enforced_with_typed_oom ... ok
+test heap::tests::fields_roundtrip ... ok
+test heap::tests::objects_are_indexed_from_one ... ok
+test heap::tests::peak_is_high_water_mark_of_used ... ok
+test heap::tests::primitive_array_runtime_descriptors_are_preserved ... ok
+test interp::fetch_tests::sequential_cursor_differential_random_walk ... ok
+test interp::fetch_tests::sequential_cursor_matches_binary_lookup_for_branches_handlers_and_bad_pcs ... ok
+test jannotations::tests::annotation_instances_are_owned_by_each_engine ... ok
+test jbigdecimal::tests::decimal_text_and_rounding ... ok
+test jbreakiter::tests::word_line_char_boundaries ... ok
+test jfile::tests::clear_package_data_isolates_packages_and_reset_all_clears ... ok
+test jfile::tests::paths_and_vfs ... ok
+test jlclass::tests::get_modifiers_returns_class_flags_without_acc_super ... ok
+test jlclass::tests::name_shapes ... ok
+test jlstring::tests::grouping_and_padding ... ok
+test jlstring::tests::replacement_syntax ... ok
+test jlstring::tests::split_follows_jdk ... ok
+test jlstring::tests::utf16_search ... ok
+test jnormalizer::tests::decompose_and_recompose ... ok
+test jrandom::tests::matches_jdk_sequence ... ok
+test jregex::tests::java_split_semantics ... ok
+test jregex::tests::replacement_groups ... ok
+test jregex::tests::translates_java_syntax ... ok
+test jregex::tests::utf16_offsets ... ok
+test jsb::tests::search ... ok
+test jsb::tests::sig_params ... ok
+test jsqlite::tests::base64_roundtrip ... ok
+test jsqlite::tests::persistence_classification ... ok
+test jsqlite::tests::select_builder ... ok
+test jtext_format::tests::affixes_and_percent ... ok
+test jtext_format::tests::digit_clamps_are_jdk_bounds ... ok
+test jtext_format::tests::integer_padding_is_linear_and_exact ... ok
+test jtext_format::tests::long_format_is_exact_beyond_2pow53 ... ok
+test jtext_format::tests::parse_round_trips_negatives_and_currency ... ok
+test jtext_format::tests::pt_br_money ... ok
+test jtime::tests::civil_roundtrip_and_format ... ok
+test jtime::tests::date_format_symbols_en_us_arrays ... ok
+test jtime::tests::date_time_formatter_with_zone_preserves_formatter_and_zone ... ok
+test jtime::tests::java_util_timezone_and_calendar_support_utc_rollover ... ok
+test jtime::tests::simple_date_format_formats_date_with_locale_constructor ... ok
+test juuid::tests::reset_all_restarts_sequence ... ok
+test juuid::tests::roundtrip_and_md5 ... ok
+test jxml::tests::attributes_copy_and_lookup_follow_sax_contract ... ok
+test jxml::tests::locator_impl_copies_standard_locator_values ... ok
+test jxml::tests::parses_nested_tags_attributes_entities_and_cdata ... ok
+test jxml::tests::rejects_external_entities_and_malformed_document_structure ... ok
+test numerics::tests::compare_orders_zero_and_nan ... ok
+test numerics::tests::java_double_formatting ... ok
+test numerics::tests::java_identifier_start_and_part_follow_java_categories ... ok
+test numerics::tests::radix ... ok
+test parcel::tests::array_map_and_array_set_roundtrip_through_parcel ... ok
+test parcel::tests::bundle_and_binder_handles_survive_parcel_bytes ... ok
+test parcel::tests::bundle_parcel_uses_aosp_length_magic_and_null_length ... ok
+test parcel::tests::bundle_parcel_uses_aosp_length_magic_and_nullable_marker ... ok
+test parcel::tests::exception_codes_match_aosp_status_table ... ok
+test parcel::tests::length_prefixed_values_backpatch_payload_length ... ok
+test parcel::tests::parcel_compare_enforce_binders_sparse_int_and_string8 ... ok
+test parcel::tests::parcel_public_surface_roundtrips_through_marshalled_bytes ... ok
+test parcel::tests::primitive_and_string_layout_is_android_shaped ... ok
+test parcel::tests::sparse_arrays_roundtrip_through_value_and_direct_methods ... ok
+test parcel::tests::underrun_is_typed_not_a_panic ... ok
+test parcel::tests::value_tags_and_primitive_array_forms_match_aosp ... ok
+test portable::execution::contracts::guest_allocations_do_not_leak_into_another_owners_host_scope ... ok
+test portable::execution::contracts::heap_restore_and_allocation_pins_use_their_own_actual_owner ... ok
+test portable::execution::contracts::independent_frames_resume_and_unwind_in_non_lifo_order ... ok
+test portable::execution::contracts::owner_bound_is_checked_and_completed_owners_do_not_accumulate ... ok
+test portable::execution::contracts::real_gc_retains_suspended_owner_after_older_owner_publishes_and_unwinds ... ok
+test portable::execution::contracts::same_owner_nested_callbacks_keep_distinct_frame_tickets ... ok
+test prefs::tests::malformed_and_oversized_files_recover_as_none ... ok
+test prefs::tests::preference_names_cannot_escape_shared_prefs ... ok
+test prefs::tests::xml_roundtrip_preserves_types_entities_and_sets ... ok
+test reflect::tests::splits_params ... ok
+test repr::tests::double_matches_java_tostring ... ok
+test repr::tests::float_matches_java_tostring ... ok
+test sdk_types::tests::every_generated_declaration_is_reachable_by_exact_descriptor ... ok
+test tests::arg_parsing_matches_types ... ok
+test tests::stub_contract_gone_vm_has_real_api ... ok
+test upstream_intrinsics::utf16_optimization_tests::allocation_free_char_at_differential_unicode_sequences ... ok
+test upstream_intrinsics::utf16_optimization_tests::allocation_free_char_at_matches_all_utf16_units_and_invalid_indices ... ok
+test value::tests::accessors_are_typed ... ok
+test value::tests::narrowing_follows_dalvik ... ok
+test value::tests::primitive_accessors_reinterpret_untyped_dalvik_bits ... ok
+test view_props::tests::defaults_follow_aosp ... ok
+test vto::tests::listener_kind_from_signature ... ok
+
+test result: ok. 159 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.63s
+
+     Running ..\rd-vm\tests\accessibility_virtual.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_accessibility_virtual-ba576916f398162a.exe)
+
+running 2 tests
+test accessibility_action_carries_platform_id_and_label ... ok
+test virtual_description_bounds_children_and_copy_are_stateful ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running ..\rd-vm\tests\activity_history.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_activity_history-38d2f65f092d63e1.exe)
+
+running 5 tests
+test explicit_root_relaunch_replaces_history_and_finish_is_idempotent ... ok
+test finishing_a_suspended_activity_does_not_finish_the_foreground ... ok
+test missing_and_failed_launch_restore_previous_task_without_fake_success ... ok
+test suspended_activity_survives_gc_and_back_restores_window_and_focus ... ok
+test task_history_has_an_enforced_depth_limit ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\alloc_budget_311.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_alloc_budget_311-760e6e2a3e6c2fff.exe)
+
+running 4 tests
+test audio_record_read_bytebuffer_caps_to_capacity_without_gib_vec_311 ... ok
+test audio_track_write_out_of_bounds_returns_bad_value_without_slice_panic_311 ... ok
+test sqlite_program_bind_validates_parameter_range_without_gib_resize_311 ... ok
+test string_builder_set_length_enforces_heap_budget_and_throws_catchable_oome_311 ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\android_array_containers.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_array_containers-41256a76061d1fc5.exe)
+
+running 2 tests
+test array_containers_consult_guest_hash_code_and_equals ... ok
+test dex_subclasses_inherit_array_container_operations ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running ..\rd-vm\tests\android_assets.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_assets-1814341859f994a3.exe)
+
+running 12 tests
+test activity_get_assets_returns_canonical_manager ... ok
+test application_info_serves_every_context_receiver ... ok
+test asset_manager_close_is_noop_and_ctor_allows_bare_new ... ok
+test asset_manager_list_reports_first_level_only ... ok
+test asset_manager_open_fd_throws_file_not_found ... ok
+test asset_manager_open_missing_file_throws_file_not_found ... ok
+test asset_manager_open_null_name_throws_npe ... ok
+test asset_manager_open_rejects_hostile_paths_before_zip ... ok
+test asset_manager_open_returns_bais_with_exact_bytes ... ok
+test asset_manager_open_streams_real_bytes_through_dex_invoke_chain ... ok
+test context_get_application_info_serves_manifest_facts ... ok
+test get_assets_answers_for_every_context_receiver ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running ..\rd-vm\tests\android_atomic_file.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_atomic_file-7723a1dbcac944fa.exe)
+
+running 1 test
+test atomic_file_finish_fail_and_interrupted_writes_follow_aosp_backup_protocol ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\android_base64_streams.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_base64_streams-7ed13a54c805a6ca.exe)
+
+running 2 tests
+test base64_input_stream_decodes_wrapped_bytes_with_offsets ... ok
+test base64_output_stream_incrementally_encodes_and_finishes_on_close ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running ..\rd-vm\tests\android_bitset.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_bitset-7c74c35417b75a07.exe)
+
+running 15 tests
+test ctor_sizes_and_initial_state ... ok
+test equals_hashcode_jdk_algorithm ... ok
+test flip_and_clear_keep_capacity ... ok
+test growth_beyond_initial_capacity ... ok
+test guest_subclass_dispatches_and_equals_uses_instanceof ... ok
+test host_budget_fails_fast_and_ranges_operate_by_word ... ok
+test logical_ops_clone_and_get_range_jdk_semantics ... ok
+test long_array_ctor_and_to_long_array_round_trip ... ok
+test negative_indices_throw_iobe ... ok
+test next_clear_bit_never_returns_below_from_index ... ok
+test next_set_and_clear_bit ... ok
+test ranges_set_and_clear ... ok
+test set_get_and_invariants ... ok
+test to_long_array_trims_trailing_zero_words ... ok
+test value_of_factories_pack_and_private_ctor_stays_closed ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running ..\rd-vm\tests\android_display.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_display-cdce685098ce152c.exe)
+
+running 3 tests
+test display_listener_callbacks_event_masks_dedup_and_gc_reachability ... ok
+test display_manager_null_and_empty_mask_throw_aosp_illegal_argument_exceptions ... ok
+test flutter_vsync_waiter_boot_registers_listener_and_queries_display_mode ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\android_inherited_dispatch.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_inherited_dispatch-ec39818fdf297e63.exe)
+
+running 55 tests
+test activity_window_callback_returns_default_null_panel_view ... ok
+test androidx_fragment_super_constructor_executes_dex_initialization ... ok
+test app_custom_views_can_extend_scroll_container_platform_views ... ok
+test broadcast_receiver_subclass_calls_platform_super_constructor ... ok
+test collections_empty_list_field_is_non_null_and_iterable ... ok
+test cyclic_nonplatform_hierarchy_fails_closed ... ok
+test data_set_observable_calls_dex_observers_and_unregisters_them ... ok
+test decelerate_interpolator_uses_default_and_explicit_factor ... ok
+test dex_abstract_list_iterator_dispatches_through_iterable_interface ... ok
+test fits_system_windows_defaults_false_and_round_trips_on_custom_views ... ok
+test frame_layout_measures_and_positions_children_with_padding_and_margins ... ok
+test gravity_apply_positions_and_fills_rects_in_ltr_and_rtl ... ok
+test gravity_get_absolute_gravity_resolves_start_and_end_for_layout_direction ... ok
+test imagebutton_subclass_uses_view_host_and_platform_super_constructor ... ok
+test inherited_activity_layout_inflater_uses_context_service ... ok
+test inherited_android_view_nullable_property_defaults_apply_to_dex_subclasses ... ok
+test inherited_attach_queries_work_for_dex_owned_view_subclasses ... ok
+test inherited_ids_and_text_use_concrete_models_not_generic_properties ... ok
+test linear_interpolator_returns_input_fraction ... ok
+test linear_layout_distributes_weights_before_measuring_zero_width_children ... ok
+test linear_layout_gravity_is_stored_on_custom_subclasses ... ok
+test linear_layout_measures_and_stacks_children_on_its_orientation_axis ... ok
+test link_movement_method_is_canonical_and_round_trips_through_textview ... ok
+test objects_equals_uses_guest_equals_and_handles_null_references ... ok
+test objects_require_non_null_returns_identity_and_preserves_optional_message ... ok
+test platform_edge_effect_tracks_pull_and_release ... ok
+test platform_graphics_insets_factory_and_value_operations_work ... ok
+test platform_scroller_constructor_and_start_scroll_are_modelled ... ok
+test platform_underline_span_constructor_is_available_and_has_character_style_type ... ok
+test pointer_icon_get_system_icon_returns_a_platform_object ... ok
+test progressbar_wrap_content_respects_at_most_measure_specs ... ok
+test reflect_modifier_predicates_and_string_use_java_flag_bits ... ok
+test reflection_invokes_platform_static_main_looper_method ... ok
+test scroll_view_measures_content_beyond_its_viewport ... ok
+test string_tokenizer_handles_returned_delimiters_and_enumeration ... ok
+test textview_charsequence_null_is_not_treated_as_resource_zero ... ok
+test textview_wrap_content_respects_at_most_measure_specs ... ok
+test typed_value_apply_dimension_uses_display_metrics_units ... ok
+test view_activated_state_round_trips_independently_of_selected_and_enabled ... ok
+test view_clickable_state_round_trips_independently_of_listeners ... ok
+test view_compute_system_window_insets_clears_local_rect_and_returns_consumed_insets ... ok
+test view_group_add_view_generates_default_and_preserves_explicit_layout_params ... ok
+test view_group_default_check_layout_params_accepts_only_non_null ... ok
+test view_group_measure_child_with_margins_derives_android_measure_specs ... ok
+test view_layout_direction_defaults_to_ltr_and_round_trips ... ok
+test view_minimum_dimensions_round_trip_without_changing_measured_bounds ... ok
+test view_on_touch_listener_is_registered_dispatched_and_cleared ... ok
+test view_overscroll_mode_defaults_and_round_trips ... ok
+test view_scroll_offsets_round_trip_through_scroll_to_and_by ... ok
+test view_selected_state_round_trips_independently ... ok
+test view_static_measure_helpers_accept_custom_subclass_owners ... ok
+test viewgroup_static_get_child_measure_spec_handles_inherited_owners ... ok
+test virtual_dex_override_wins_and_invoke_super_does_not_recurse ... ok
+test virtual_platform_base_callback_dispatches_to_dex_override ... ok
+test will_not_draw_uses_viewgroup_default_and_explicit_override ... ok
+
+test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running ..\rd-vm\tests\android_json.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_json-6ef0c13e4a6cbdd9.exe)
+
+running 4 tests
+test json_reader_lenient_mode_and_typed_errors ... ok
+test json_reader_strict_streaming_tokens_paths_and_skip_value ... ok
+test json_writer_boxed_values_and_json_token_enum_statics ... ok
+test json_writer_pretty_prints_html_safe_output_and_skips_null_names ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\android_json_274.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_json_274-11712426b4d20213.exe)
+
+running 4 tests
+test hash_code_equals_and_subclass_methods_before_parse_preserve_stream ... ok
+test reader_text_allocated_once_and_large_document_streams_under_tight_heap ... ok
+test unbounded_reader_hits_capturable_oom_within_heap_budget ... ok
+test utf16_surrogate_pairs_across_4096_boundary_and_1_char_reads_are_preserved ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+     Running ..\rd-vm\tests\android_stub_surfaces.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_stub_surfaces-8c35719a52d3646b.exe)
+
+running 109 tests
+test android_system_constants_structs_and_errno_values_are_guest_visible ... ok
+test android_system_interoperates_with_java_io_environment_and_statvfs ... ok
+test android_system_os_files_descriptors_and_metadata_use_the_vfs ... ok
+test audiofx_descriptors_and_no_effect_engine_are_guest_visible ... ok
+test autofill_dataset_builder_replaces_ids_and_enforces_build_contract ... ok
+test autofill_ids_and_values_have_aosp_value_semantics ... ok
+test autofill_requests_callbacks_classifications_and_service_base_are_visible ... ok
+test autofill_response_saveinfo_and_user_data_builders_validate_state ... ok
+test backup_without_a_backup_service_is_guest_visible ... ok
+test batch36i_manager_no_service_lists_are_guest_visible ... ok
+test batch36i_source_audit_edge_semantics_are_guest_visible ... ok
+test biometrics_absent_service_prompt_and_crypto_are_guest_visible ... ok
+test bluetooth_le_scan_settings_and_filters_are_guest_visible ... ok
+test bluetooth_without_a_service_and_device_values_are_guest_visible ... ok
+test camera_manager_has_no_cameras_and_access_exception_messages_are_exact ... ok
+test camera_metadata_keys_characteristics_requests_and_results_use_explicit_data ... ok
+test camera_params_values_and_stream_map_compute_from_explicit_configs ... ok
+test carrier_identifier_and_service_binding_are_guest_visible ... ok
+test change_bounds_interpolates_captured_view_bounds_linearly ... ok
+test child_session_params_builders_are_guest_visible ... ok
+test chooser_target_validation_and_service_binding_are_guest_visible ... ok
+test color_drawable_alpha_opacity_and_csl_default_follow_aosp ... ok
+test companion_absent_service_values_filters_and_mac_are_guest_visible ... ok
+test credential_option_public_constructor_is_guest_visible ... ok
+test credentials_entries_responses_and_service_binding_are_guest_visible ... ok
+test credentials_request_and_option_values_are_guest_visible ... ok
+test delayed_fade_transition_animates_transition_alpha_on_virtual_frames ... ok
+test device_policy_no_service_and_system_update_policy_are_guest_visible ... ok
+test documents_contract_builds_parses_and_models_paths_without_a_provider ... ok
+test drafted_stub_surface_classpath_subtypes_are_visible ... ok
+test dream_service_unattached_state_and_finish_are_guest_visible ... ok
+test euicc_info_and_disabled_manager_are_guest_visible ... ok
+test fingerprint_absent_service_and_values_are_guest_visible ... ok
+test freeze_periods_and_update_policy_validation_are_guest_visible ... ok
+test gateway_info_value_is_guest_visible ... ok
+test graphics_matrix_audit_fixes_are_guest_visible ... ok
+test gsm_cell_location_values_are_guest_visible ... ok
+test hdmi_no_device_profile_and_values_are_guest_visible ... ok
+test hotword_result_builders_are_guest_visible ... ok
+test identity_without_credstore_is_guest_visible ... ok
+test ike_sa_proposal_builders_validate_like_aosp ... ok
+test ike_traffic_selectors_and_identifications_are_guest_visible ... ok
+test input_no_device_profile_and_device_values_are_guest_visible ... ok
+test intent_parse_uri_selector_and_android_app_are_guest_visible ... ok
+test intent_to_uri_and_parse_uri_round_trip_is_guest_visible ... ok
+test intent_to_uri_with_data_and_intent_scheme_is_guest_visible ... ok
+test keyframes_property_holders_and_evaluators_compute_values ... ok
+test keystore_specs_protection_and_key_info_preserve_explicit_values ... ok
+test legacy_camera_without_a_camera_and_values_are_guest_visible ... ok
+test location_and_criteria_values_are_guest_visible ... ok
+test location_bearings_round_atan2_to_float_before_scaling ... ok
+test location_deep_audit_fixes_are_guest_visible ... ok
+test mbms_download_request_and_file_info_are_guest_visible ... ok
+test mbms_download_request_app_intent_round_trip_is_guest_visible ... ok
+test media_browser_disconnected_state_and_media_items_are_guest_visible ... ok
+test media_browser_root_result_and_unconnected_service_are_guest_visible ... ok
+test media_metadata_description_and_rating_values_are_guest_visible ... ok
+test media_projection_without_a_token_or_service_is_guest_visible ... ok
+test midi_no_device_profile_values_and_receiver_are_guest_visible ... ok
+test mtp_object_info_and_unopened_device_are_guest_visible ... ok
+test nfc_card_emulation_without_hce_and_aid_groups_are_guest_visible ... ok
+test nfc_mock_tag_and_nfc_a_values_are_guest_visible ... ok
+test nfc_without_nfc_feature_or_service_is_guest_visible ... ok
+test no_keystore_security_defaults_and_keychain_results_match_aosp ... ok
+test nsd_manager_validation_and_listener_bookkeeping_are_guest_visible ... ok
+test nsd_service_info_txt_records_and_unpublished_service_are_guest_visible ... ok
+test object_animator_applies_values_and_pauses_resumes_on_virtual_frames ... ok
+test omapi_without_a_secure_element_service_is_guest_visible ... ok
+test opengl_matrix_math_is_guest_visible ... ok
+test pdf_document_lifecycle_and_page_info_are_guest_visible ... ok
+test pdf_renderer_without_pdfium_fails_before_any_document_exists ... ok
+test phone_account_handle_two_arg_ctor_and_tm_service_state_are_guest_visible ... ok
+test playback_state_queue_and_empty_session_manager_are_guest_visible ... ok
+test print_values_rotation_and_no_service_manager_are_guest_visible ... ok
+test quicksettings_tile_and_unbound_service_are_guest_visible ... ok
+test renderscript_disabled_context_and_element_state_are_guest_visible ... ok
+test renderscript_matrix4f_multiply_and_rotate_audit_is_guest_visible ... ok
+test renderscript_vectors_and_matrices_are_guest_visible ... ok
+test service_state_and_cell_broadcast_id_range_values_are_guest_visible ... ok
+test sip_without_sip_features_or_service_is_guest_visible ... ok
+test slice_deep_audit_fixes_are_guest_visible ... ok
+test slice_values_builder_and_missing_manager_are_guest_visible ... ok
+test soundtrigger_models_and_metadata_are_guest_visible ... ok
+test speech_and_textservice_deep_audit_fixes_are_guest_visible ... ok
+test speech_recognition_value_builders_are_guest_visible ... ok
+test speech_recognizer_and_recognition_service_without_a_recognizer_are_guest_visible ... ok
+test spell_checker_service_session_defaults_are_guest_visible ... ok
+test ssl_certificate_and_error_values_are_guest_visible ... ok
+test ssl_certificate_deep_audit_fixes_are_guest_visible ... ok
+test telecom_call_control_no_service_behaviour_is_guest_visible ... ok
+test telecom_values_and_no_service_manager_are_guest_visible ... ok
+test telephony_cell_defaults_and_subscription_id_caches_are_guest_visible ... ok
+test telephony_no_radio_profile_and_phone_number_utils_are_guest_visible ... ok
+test text_to_speech_without_an_engine_and_values_are_guest_visible ... ok
+test textclassifier_values_normalize_entities_and_no_op_returns_defaults ... ok
+test textservice_values_params_and_no_checker_manager_are_guest_visible ... ok
+test transition_configuration_sets_and_values_are_guest_visible ... ok
+test transition_values_scenes_and_manager_mappings_are_modeled ... ok
+test translation_values_context_and_no_service_manager_are_guest_visible ... ok
+test tts_and_voice_deep_audit_fixes_are_guest_visible ... ok
+test tv_no_input_profile_ratings_and_tracks_are_guest_visible ... ok
+test usage_empty_history_events_and_stats_merge_are_guest_visible ... ok
+test usb_explicit_descriptors_and_no_device_manager_are_guest_visible ... ok
+test value_animator_runs_on_virtual_clock_and_seeks_with_repeats ... ok
+test voice_interaction_service_and_session_before_ready_are_guest_visible ... ok
+test wallpaper_engine_unattached_state_and_defaults_are_guest_visible ... ok
+test webview_history_and_websettings_state_are_guest_visible ... ok
+test wifi_disabled_profile_and_value_classes_are_guest_visible ... ok
+test wifi_ipsec_value_identity_audit_is_guest_visible ... ok
+
+test result: ok. 109 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running ..\rd-vm\tests\android_sysservices_batch1.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_sysservices_batch1-f9654612e2406c1e.exe)
+
+running 4 tests
+test account_manager_explicit_accounts_passwords_userdata_and_tokens ... ok
+test formatter_and_android_date_format_use_aosp_rounding_and_patterns ... ok
+test rfc822_tokenizer_parses_names_addresses_and_comments ... ok
+test view_animation_interpolators_match_aosp_formulas ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\android_sysservices_batch6.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_sysservices_batch6-7c921dc5ab54fc21.exe)
+
+running 2 tests
+test gesture_geometry_clones_ids_and_obb_follow_aosp ... ok
+test sensorless_hardware_profile_and_sensor_math_follow_aosp ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\android_touch.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_touch-3860e5007afce3b1.exe)
+
+running 7 tests
+test cancel_releases_press_so_up_does_not_perform_click ... ok
+test clickable_view_consumes_tap_and_performs_click_on_up ... ok
+test host_click_listener_fires_when_no_dex_perform_click_override ... ok
+test porter_duff_xfermode_stores_the_mode_for_the_rasterizer ... ok
+test touch_app_on_clickable_view_performs_click_end_to_end ... ok
+test unclickable_view_returns_false_and_never_performs_click ... ok
+test up_without_down_does_not_perform_click ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running ..\rd-vm\tests\android_uri_267.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_uri_267-ac626fd8e1252c61.exe)
+
+running 3 tests
+test from_parts_null_checks_and_encode_unicode_allow_match_aosp ... ok
+test uri_decode_and_getters_never_panic_on_percent_before_multibyte_utf8 ... ok
+test with_appended_path_preserves_query_and_fragment_and_enforces_npe ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running ..\rd-vm\tests\android_util_lru.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_android_util_lru-5d683b498f65aa38.exe)
+
+running 1 test
+test dex_lru_cache_callbacks_drive_creation_sizing_and_eviction ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\androidx.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_androidx-e7911f017aa97514.exe)
+
+running 14 tests
+test dex_biometric_programmable_and_custom_tabs ... ok
+test dex_body_wins_over_host_shim ... ok
+test dex_collection_array_map_set_sparse_lru ... ok
+test dex_datastore_preferences_value_layer ... ok
+test dex_lifecycle_observer_dex_callback_counts_events ... ok
+test dex_lifecycle_state_machine ... ok
+test dex_listenable_future_state_machine ... ok
+test dex_livedata_forever_and_inactive_observers ... ok
+test dex_livedata_owner_lifecycle_gates_delivery ... ok
+test dex_navigation_stack_model ... ok
+test dex_startup_multidex_fileprovider_permissions_cancellation ... ok
+test dex_viewmodel_store_provider_and_saved_state ... ok
+test dex_work_data_builder_roundtrip ... ok
+test livedata_observer_setting_value_in_callback_is_bounded ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running ..\rd-vm\tests\androidx_hierarchy.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_androidx_hierarchy-4726dbd232f7f157.exe)
+
+running 5 tests
+test androidx_widgets_are_framework_subtypes ... ok
+test appcompat_activity_chain_and_lifecycle_interfaces ... ok
+test attach_host_state_recognizes_androidx_views_and_activities ... ok
+test inflate_androidx_widgets_and_onclick ... ok
+test inflate_constraint_root_generates_androidx_layout_params ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\app.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_app-f9dea0c32189dc0a.exe)
+
+running 10 tests
+test app_handler_post_delayed_runs_on_clock ... ok
+test app_start_activity_navigates ... ok
+test app_trivial_lifecycle_and_touch ... ok
+test launch_app_rejects_activity_missing_from_dex ... ok
+test linear_horizontal_gone_child_does_not_consume_slot ... ok
+test linear_horizontal_two_visible_split_with_gone_middle ... ok
+test looper_drains_earliest_deadline_first ... ok
+test looper_thread_host_single_thread ... ok
+test post_delayed_i64_max_does_not_wrap ... ok
+test system_clock_host_statics ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running ..\rd-vm\tests\app_xml.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_app_xml-e7bb5ec0e1a87066.exe)
+
+running 25 tests
+test android_attrs_carry_res_id_from_resource_map ... ok
+test appcompat_viewgroup_children_receive_their_dex_layout_params_subclass ... ok
+test arsc_two_configs_parse_and_resolve ... ok
+test coordinator_layout_children_receive_coordinator_layout_params ... ok
+test dimen_and_bool_references_resolve_from_arsc ... ok
+test dimension_cap_is_per_axis ... ok
+test find_by_id_set_text_resid_and_get_string ... ok
+test hostile_deep_axml_is_typed_error_not_abort ... ok
+test hostile_wide_layout_is_typed_error ... ok
+test image_view_short_tag_inflates_as_platform_view ... ok
+test inflate_builds_host_tree_shape ... ok
+test inflater_preserves_linear_layout_child_weights ... ok
+test inflation_supports_custom_layout_params_with_noarg_constructor ... ok
+test layout_config_selection_prefers_matching_device ... ok
+test layout_dimension_overflow_is_typed_error ... ok
+test layout_inflater_expands_include_and_merge_roots ... ok
+test layout_inflater_inflate_resource_attaches_only_when_requested ... ok
+test layout_land_fallback_resolves ... ok
+test layout_xml_inflates_and_touch_fires_onclick ... ok
+test m4_screenshot_renders_real_tree ... ok
+test m4_view_tree_has_ids_and_bounds ... ok
+test scroll_progress_and_radio_shorthands_inflate_as_host_views ... ok
+test set_content_view_resid_without_resources_is_typed_error ... ok
+test unsupported_view_class_is_typed_error ... ok
+test xml_visibility_and_enabled_reach_host_state ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.77s
+
+     Running ..\rd-vm\tests\arrays_303.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_arrays_303-f4ec0bccd53e6953.exe)
+
+running 4 tests
+test issue_303_arrays_deep_to_string_handles_self_and_mutual_cycles_and_shared_siblings ... ok
+test issue_303_copy_of_copy_of_range_and_vector_set_size_enforce_heap_budget ... ok
+test issue_303_host_classes_equals_and_hash_code_work_across_arrays_lists_sets_and_maps ... ok
+test issue_303_indirect_collection_and_map_cycles_throw_catchable_stack_overflow ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\bigdecimal_272.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_bigdecimal_272-b3da1c5e2a2db24a.exe)
+
+running 4 tests
+test biginteger_radix_out_of_range_throws_nfe_without_host_panic ... ok
+test extreme_exponent_double_float_and_engineering_are_o1_and_plain_string_respects_heap_budget ... ok
+test i128_min_and_scale_overflows_throw_arithmetic_exception_without_panic ... ok
+test null_arguments_throw_null_pointer_exception ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running ..\rd-vm\tests\camera_305.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_camera_305-7c1f47753946e12a.exe)
+
+running 4 tests
+test byte_buffer_allocate_respects_heap_budget_and_self_aliasing_305 ... ok
+test byte_buffer_put_negative_and_overflow_bounds_305 ... ok
+test byte_buffer_wrap_and_get_overflow_bounds_305 ... ok
+test bytecode_byte_buffer_oom_and_put_bounds_catchable_in_guest_305 ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running ..\rd-vm\tests\collections_gc.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_collections_gc-b1145eed43c2931a.exe)
+
+running 6 tests
+test cow_and_unmodifiable_iterators_still_reject_removal ... ok
+test iterator_remove_updates_source_and_cursor ... ok
+test list_iterator_previous_remove_does_not_skip ... ok
+test map_view_iterators_remove_the_correct_entry_even_for_duplicate_values ... ok
+test stale_map_view_remove_is_atomic ... ok
+test weak_map_keys_are_weak_but_values_and_null_keys_are_strong ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running ..\rd-vm\tests\file_300.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_file_300-7874f319547afb8f.exe)
+
+running 3 tests
+test issue_300_absolute_normalization_realpath_empty_file_npe_and_rename_subtree ... ok
+test issue_300_fis_read_and_fos_write_reject_null_and_bad_bounds_without_panic_or_corruption ... ok
+test issue_300_os_ftruncate_pwrite_and_lseek_write_enforce_efbig_and_enospc ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+     Running ..\rd-vm\tests\gc.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_gc-a2b4c13a91fba47d.exe)
+
+running 6 tests
+test cleared_weak_refs_are_enqueued ... ok
+test collects_unreachable_and_keeps_reachable ... ok
+test host_object_table_is_ephemeron ... ok
+test long_session_stays_under_budget ... ok
+test maybe_gc_waits_for_threshold ... ok
+test weak_references_are_cleared ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running ..\rd-vm\tests\gc_generations.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_gc_generations-cbe4109b15d2f73f.exe)
+
+running 4 tests
+test fuel_window_is_bounded_but_not_a_session_lifetime_limit ... ok
+test minor_remembers_old_fields_arrays_and_promotes_survivors ... ok
+test old_host_list_writes_do_not_need_a_heap_write_barrier ... ok
+test one_java_call_allocates_many_times_its_heap_budget ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.04s
+
+     Running ..\rd-vm\tests\gms.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_gms-89556bfc682c657c.exe)
+
+running 33 tests
+test ads_banner_success_failure_and_rewarded ... ok
+test availability_programmable_codes ... ok
+test billing_listener_relaunching_flow_is_bounded ... ok
+test billing_product_details_modern_path ... ok
+test billing_purchase_flow_and_cancel ... ok
+test cast_states_follow_programmed_session ... ok
+test crashlytics_records_and_uncaught_bridge ... ok
+test dex_bytecode_calls_gms_through_full_dispatch ... ok
+test firebase_auth_full_flow ... ok
+test firebase_auth_state_listener_fires_on_add_and_signin ... ok
+test firebase_autoinit_and_strict_mode ... ok
+test firestore_query_filter_and_snapshot_listener ... ok
+test firestore_set_get_query_and_seed ... ok
+test fit_steps_programmable ... ok
+test gms_logs_are_capped_with_dropped_counter ... ok
+test gms_tasks_are_observed_correctly_from_bytecode ... ok
+test google_signin_silent_requires_host_completion ... ok
+test integrity_and_safetynet_deterministic_tokens ... ok
+test location_fix_and_callback_delivery ... ok
+test maps_ready_camera_and_markers ... ok
+test messaging_token_topics_and_delivery ... ok
+test nearby_discovery_reports_programmed_endpoint ... ok
+test remoteconfig_fetch_activate_semantics ... ok
+test rtdb_listener_writing_in_callback_is_bounded_not_recursive ... ok
+test rtdb_set_resolve_and_listener ... ok
+test storage_seed_download_and_missing ... ok
+test task_listener_readding_itself_is_bounded_not_recursive ... ok
+test tasks_completion_source_roundtrip_with_dex_listener ... ok
+test tasks_continue_with_executes_dex_continuation ... ok
+test tasks_failure_surfaces_exception ... ok
+test tasks_for_result_from_bytecode_lives_in_the_gms_engine ... ok
+test tasks_when_all_success_failure_and_complete ... ok
+test unknown_gms_surface_returns_none ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+
+     Running ..\rd-vm\tests\graphics_301.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_graphics_301-879ed8584d4f3bfb.exe)
+
+running 6 tests
+test bitmap_overflow_and_get_pixels_bounds_301 ... ok
+test canvas_and_paint_char_array_bounds_overflow_301 ... ok
+test matrix_map_points_overflow_throws_aioobe_301 ... ok
+test path_and_canvas_unbounded_growth_capped_301 ... ok
+test render_node_dag_traversal_budget_bounds_hang_301 ... ok
+test render_node_saturating_bounds_arithmetic_301 ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running ..\rd-vm\tests\inflate_263.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_inflate_263-cea3cd82ab662cd4.exe)
+
+running 4 tests
+test horizontal_scrollview_allows_1000dp_wide_child ... ok
+test integer_resource_i32_max_rejected_with_typed_inflate_error ... ok
+test scrollview_allows_1000dp_tall_children_and_layout_params ... ok
+test scrollview_still_rejects_dimension_above_anti_overflow_cap ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running ..\rd-vm\tests\io_chars_266.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_io_chars_266-97b463436e0bd833.exe)
+
+running 6 tests
+test closed_reader_and_null_pointer_contracts_enforced ... ok
+test load_clamps_oversized_return_counts_from_dex_reader_and_input_stream ... ok
+test reader_and_bais_read_reject_negative_and_overflowing_bounds ... ok
+test runaway_infinite_reader_hits_io_exception_ceiling_without_heap_leak ... ok
+test utf16_surrogate_pairs_preserved_across_writers_and_print_streams ... ok
+test writer_append_and_slice_reject_overflowing_indices ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+     Running ..\rd-vm\tests\jit.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_jit-7ee1377a0aad6b4a.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running ..\rd-vm\tests\jtext_format_295.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_jtext_format_295-46d57a14631ff37f.exe)
+
+running 5 tests
+test issue_295_digit_setters_clamp_to_jdk_bounds ... ok
+test issue_295_format_at_jdk_digit_ceiling_is_exact ... ok
+test issue_295_format_long_is_exact_and_object_is_gated ... ok
+test issue_295_null_contracts_throw_typed ... ok
+test issue_295_parse_round_trips_negative_subpattern_and_currency ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\m10.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_m10-4249560bcb1d9a8d.exe)
+
+running 9 tests
+test audio_focus_pcm_mediaplayer_mediasession_and_projection ... ok
+test biometrics_framework_and_androidx_callbacks ... ok
+test camera2_session_imagereader_and_bytebuffer_pipeline ... ok
+test connectivity_telephony_sms_ble_and_nfc_end_to_end ... ok
+test denied_permissions_raise_security_exception_cleanly ... ok
+test guest_dex_invokes_virtual_devices_through_interpreter ... ok
+test location_manager_fused_client_haversine_and_route_playback ... ok
+test sysconfig_battery_wakelock_darkmode_locale_orientation_and_clipboard ... ok
+test virtual_sensors_deliver_dex_events_and_survive_gc ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running ..\rd-vm\tests\m8.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_m8-0b74a7bf649ea36c.exe)
+
+running 14 tests
+test m8_alert_dialog_builder_show ... ok
+test m8_androidx_fragments ... ok
+test m8_dex_callbacks_fire ... ok
+test m8_okhttp_execute_and_enqueue ... ok
+test m8_recyclerview_populates_from_dex_adapter ... ok
+test m8_room_builder_builds_database ... ok
+test m8_services_broadcasts_deep_links ... ok
+test m8_shared_preferences_change_listener_notifies_only_changed_keys ... ok
+test m8_shared_preferences_stateful ... ok
+test m8_sqlite_crud_cursor ... ok
+test m8_workmanager_enqueue_cancel ... ok
+test prefs_clear_notifies_null_once_and_null_keys_tolerated ... ok
+test shared_preferences_named_stores_persist_across_engine_launches ... ok
+test sqlite_named_database_persists_across_engine_launches ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running ..\rd-vm\tests\m9.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_m9-2eb639322c4933ec.exe)
+
+running 8 tests
+test accessibility_observes_same_editor_and_delivers_dex_events ... ok
+test channel_constructor_is_not_registration_and_importance_is_immutable ... ok
+test clipboard_editorinfo_and_non_edittext_ime_target ... ok
+test focused_ime_selection_composition_and_unicode ... ok
+test input_connection_and_real_ime_lifecycle ... ok
+test notifications_permissions_channels_update_timeout_listener ... ok
+test remote_views_render_and_widget_provider_dex_lifecycle ... ok
+test unknown_component_apis_are_not_fabricated_success ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running ..\rd-vm\tests\narrow_arrays_250.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_narrow_arrays_250-60744c86dc4aa749.exe)
+
+running 5 tests
+test fill_array_data_boolean_normalizes_to_zero_or_one ... ok
+test fill_array_data_byte_keeps_sign_extension ... ok
+test filled_new_array_int_still_works ... ok
+test filled_new_array_narrow_primitives_throw_internal_error_like_art ... ok
+test filled_new_array_wide_primitives_throw_runtime_exception_like_art ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\native.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_native-f76c2004682ecf68.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running ..\rd-vm\tests\numerics_319.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_numerics_319-1c7d105551ebf764.exe)
+
+running 5 tests
+test issue_319_character_digit_rejects_out_of_range_radix ... ok
+test issue_319_character_to_chars_validates_code_point_null_dst_and_negative_dst_index ... ok
+test issue_319_code_point_before_and_at_handle_min_value_and_null_sequence ... ok
+test issue_319_math_ulp_handles_infinity_max_value_nan_and_zero ... ok
+test issue_319_parse_float_and_double_reject_duplicate_and_nonfinite_suffixes ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running ..\rd-vm\tests\parcel_261.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_parcel_261-8b2a498c2c43c089.exe)
+
+running 4 tests
+test checked_arithmetic_and_val_sizef_nan_infinity_validation ... ok
+test cyclic_and_deeply_nested_containers_throw_instead_of_overflowing_stack ... ok
+test huge_element_counts_fail_fast_on_data_avail_without_host_oom ... ok
+test set_data_size_and_parcel_growth_enforce_max_parcel_bytes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running ..\rd-vm\tests\parcel_binder.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_parcel_binder-4549cfd756f37571.exe)
+
+running 5 tests
+test dex_binder_stub_on_transact_runs_through_transact ... ok
+test dex_bundle_dump_debug_and_dump_stats_use_guest_writers ... ok
+test dex_interface_containers_use_function_callbacks ... ok
+test dex_parcelable_creator_materializes_from_bytes ... ok
+test dex_typed_list_uses_the_supplied_creator ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running ..\rd-vm\tests\regex_262.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_regex_262-852c446890ace56d.exe)
+
+running 4 tests
+test issue_262_comments_mode_without_newline_and_64kib_ceiling_work_in_matches_and_looking_at ... ok
+test issue_262_expand_rejects_trailing_backslash_unclosed_or_unknown_named_groups ... ok
+test issue_262_null_arguments_throw_npe_and_use_pattern_null_throws_iae ... ok
+test issue_262_to_match_result_preserves_immutable_snapshots_across_find_and_reset ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running ..\rd-vm\tests\regex_lookaround.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_regex_lookaround-23487d5813e45845.exe)
+
+running 4 tests
+test pathological_backtracking_is_a_structured_error_not_false ... ok
+test positive_negative_lookahead_and_lookbehind ... ok
+test string_replacement_and_whole_match_use_same_engine ... ok
+test utf16_offsets_repeated_find_and_reset ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running ..\rd-vm\tests\sqlite_prefs_257.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_sqlite_prefs_257-d626f41e0e810b1a.exe)
+
+running 3 tests
+test shared_preferences_self_closing_empty_set_and_comment_gt_preserve_all_entries ... ok
+test sqlite_nonfinite_floats_infinity_and_nan_roundtrip_without_json_error ... ok
+test sqlite_recycled_objref_after_gc_is_not_phantom_cursor_and_close_frees_rows ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\string_270.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_string_270-a4d493113625c86c.exe)
+
+running 4 tests
+test issue_270_format_rejects_zero_arg_index_and_string_matches_handles_comments ... ok
+test issue_270_repeat_and_format_enforce_heap_budget_without_host_oom_or_panic ... ok
+test issue_270_string_ctors_and_starts_with_do_not_panic_on_i32_overflow ... ok
+test issue_270_utf16_be_le_and_bom_roundtrip_cleanly ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\view_hierarchy_316.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_view_hierarchy_316-7cf66c2cba4f9df8.exe)
+
+running 5 tests
+test issue_316_add_view_and_add_view_in_layout_honor_index_and_width_height_overload ... ok
+test issue_316_null_non_view_duplicate_parent_and_diamond_dag_rejected ... ok
+test issue_316_self_and_mutual_cycles_rejected_without_host_sigabrt_or_infinite_loop ... ok
+test issue_316_self_cycle_remove_all_views_rejects_cycle_without_host_sigabrt ... ok
+test issue_316_view_layout_saturates_extreme_coordinates_and_wraps_generate_view_id ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running ..\rd-vm\tests\vm_exec.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_vm_exec-99ace8113b35fe44.exe)
+
+running 103 tests
+test access_controller_runs_dex_privileged_actions_inline ... ok
+test activity_component_name_uses_package_and_runtime_class ... ok
+test activity_get_fragment_manager_canonical ... ok
+test alloc_oom_is_oome_throwable ... ok
+test android_environment_exposes_deterministic_virtual_external_storage ... ok
+test aput_object_unrelated_still_ase ... ok
+test aput_object_zero_register_is_null_reference ... ok
+test arith_int_2addr_and_lits ... ok
+test array_clone_e_shallow_copy_com_descritor ... ok
+test array_covariance_aput_and_instanceof ... ok
+test array_deque_host_intrinsics ... ok
+test array_list_collection_ctor_snapshots_source ... ok
+test array_list_host_intrinsics ... ok
+test arrays_aput_aget_bounds ... ok
+test atomic_field_updater_host_intrinsics ... ok
+test atomic_integer_field_updater_host_intrinsics ... ok
+test atomic_integer_intrinsics ... ok
+test atomic_reference_intrinsics ... ok
+test boxed_equals_hashcode_by_value ... ok
+test branches_and_loop ... ok
+test checkcast_to_interface_succeeds ... ok
+test class_get_class_loader_host ... ok
+test class_loader_get_resources_without_attached_apk_returns_empty_enumeration ... ok
+test class_loader_reads_resource_entries_from_attached_apk ... ok
+test clinit_failure_semantics_and_super_first ... ok
+test clinit_runs_once_per_class_in_hierarchy ... ok
+test clinit_runs_super_before_sub ... ok
+test clinit_super_failure_no_double_wrap ... ok
+test collection_views_and_iterators ... ok
+test collections_synchronized_wrappers_are_identity ... ok
+test concurrent_hash_map_host_intrinsics ... ok
+test context_open_file_streams_use_the_app_private_vfs ... ok
+test coverage_snapshot_counts_executed_method_bodies ... ok
+test cow_collections_host_intrinsics ... ok
+test dex_subclass_of_copy_on_write_list_gets_host_constructor_and_methods ... ok
+test div_rem_wrapping_and_exceptions ... ok
+test eiie_first_access_catchable_on_fresh_engine ... ok
+test eiie_is_catchable_and_second_access_is_ncdfe ... ok
+test enum_clone_lanca_clone_not_supported ... ok
+test enum_host_intrinsics ... ok
+test enum_inherited_methods_and_compareto ... ok
+test exception_trace_anota_frames_ao_desempilhar ... ok
+test exceptions_try_catch ... ok
+test executors_host_inline_execution ... ok
+test fill_array_data_char_unsigned ... ok
+test fill_array_data_float_and_double ... ok
+test float_double_java_semantics ... ok
+test floor_div_mod_java_semantics ... ok
+test fork_join_common_pool_is_canonical_and_executes_inline ... ok
+test fragment_init_e_subtipagem ... ok
+test fragment_manager_execute_pending_sempre_false ... ok
+test fragment_manager_vazio_find_devolve_null ... ok
+test fragment_transaction_commits_registered ... ok
+test fuel_limit_stops_runaway_loop ... ok
+test get_application_devolve_application_canonica_do_manifest ... ok
+test get_class_and_class_host ... ok
+test hash_map_host_intrinsics ... ok
+test hashset_init_collection_snapshot_dedup_encontrado ... ok
+test heap_budget_enforced_via_string_ops ... ok
+test if_eq_mixed_int_obj_is_false_not_killer ... ok
+test instances_fields_and_constructors ... ok
+test integer_boxing_roundtrip ... ok
+test invoke_range_direct_ao_declarado_e_virtual_com_dispatch ... ok
+test invoke_super_comeca_na_super_da_classe_definidora ... ok
+test invoke_super_object_equals_uses_reference_identity ... ok
+test iput_oom_is_catchable_oome ... ok
+test layout_inflater_from_returns_context_service_and_tracks_factory ... ok
+test linked_blocking_queue_drain_to_host ... ok
+test linked_blocking_queue_host_intrinsics ... ok
+test linked_hash_map_access_order_constructor_and_validation ... ok
+test linked_hash_map_host_intrinsics ... ok
+test linked_hash_set_host_intrinsics ... ok
+test long_and_double_wide_flow ... ok
+test long_parse_null_is_nfe ... ok
+test nested_try_selects_innermost_handler ... ok
+test nop_is_executable_real_opcode ... ok
+test oom_from_new_array_is_catchable ... ok
+test packed_switch ... ok
+test preference_manager_prefs_padrao_comecam_vazias_devolvem_default ... ok
+test print_stream_println_writes_to_its_output_stream ... ok
+test runtime_permission_constructor_and_access_controller_check_permission_work ... ok
+test sax_input_source_retains_input_stream_and_system_id ... ok
+test service_loader_descobre_provider_de_meta_inf_services ... ok
+test service_loader_host_is_empty_and_iterable ... ok
+test singleton_list_um_elemento_le_e_bloqueia_mutacoes ... ok
+test static_field_missing_is_catchable_nosuchfielderror ... ok
+test static_field_resolution_walks_superclasses ... ok
+test statics_clinit_and_static_values ... ok
+test stringbuilder_append_null_appends_literal ... ok
+test strings_length_and_hashcode ... ok
+test subclasse_dex_de_abstractlist_chama_super_init_noop ... ok
+test system_get_property_host ... ok
+test system_get_security_manager_is_null ... ok
+test system_out_println_executes ... ok
+test thread_local_host_intrinsics ... ok
+test unmodifiable_map_snapshot_le_e_bloqueia_mutacoes ... ok
+test unmodifiable_set_snapshot_set_le_e_bloqueia_mutacoes ... ok
+test unop_conversions_follow_java ... ok
+test user_tostring_used_by_append_object_and_value_of ... ok
+test vector_and_stack_host_intrinsics_cover_legacy_collection_apis ... ok
+test virtual_dispatch_and_inheritance ... ok
+test weak_soft_reference_host_intrinsics ... ok
+test window_callback_defaults_to_activity_and_can_be_replaced ... ok
+
+test result: ok. 103 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running ..\rd-vm\tests\xml_269.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_xml_269-934937ecd964269c.exe)
+
+running 4 tests
+test issue_269_cdata_with_double_brackets_parses_cleanly ... ok
+test issue_269_incremental_line_column_handles_many_events_linearly ... ok
+test issue_269_namespaces_resolve_on_elements_and_attributes_get_value_uri_local ... ok
+test issue_269_truncated_odd_byte_utf16_is_rejected_with_sax_exception ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+

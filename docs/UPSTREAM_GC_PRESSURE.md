@@ -1,5 +1,9 @@
 # Shared RustyDroid allocation-pressure policy
 
+Implementation: `5876341023e171d531d59583720907f740b16875`.
+The [retained checkpoint](../reports/gc-pressure-20261027.json) contains raw
+logs, frozen fixture/build receipts, journals and captured completion screens.
+
 AndroSwitch retains RustyDroid by nadabgfccvd and contributors as its source.
 This integration extracts the byte/slot pressure calculation from original
 `gc.rs` at pinned upstream `3761815dc6a2a1427e9fc66b66e8471b78d1b170`
@@ -60,3 +64,23 @@ framework-side-table and state-owner integration remain in the
 Ryujinx execution and physical-device evidence must be reported independently.
 Earlier user-reported 219/219 physical results apply to their original binary.
 Full upstream 1:1 API behavior and independent game first frames remain unverified.
+
+## Horizon execution of this checkpoint
+
+The std/Mesa NRO has SHA-256
+`1177016b8c28b7724bfb227c3d1bdc2c5b5f01227f8f89d63dcd1b5d92deae73`.
+Two pinned headless Ryujinx runs complete the ordinary SDK APK: Collections
+34/34 and Text 30/30. Both finish journal writes, present the completion screen,
+return to the launcher without a runtime error and restore the original SD tree.
+The actual captured completion framebuffers were visually reviewed. These are
+two selected groups, not full 257-case acceptance or physical-device evidence.
+
+Both runs use `scripts/test-conformance-ryujinx.ps1` with the frozen fixture
+directory `local-artifacts/conformance-collections-text-final`, `-Baseline`,
+one launch, eight 30-second wait segments and a 900-second outer timeout.
+The exact emulator path, executable hash, settings, session requests, frame
+observations, journal rows, cleanup phases and restored-SD receipt are retained.
+
+Replacing the separate product collector with the original generational
+collector is the next integration slice. Its work does not change this frozen
+binary or retroactively qualify later sources.

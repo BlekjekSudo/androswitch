@@ -57,7 +57,10 @@ The subsequent [shared GC pressure work](docs/UPSTREAM_GC_PRESSURE.md) reuses
 the original adaptive policy and rechecks pinned live watermarks after callbacks
 unwind. The ordinary SDK APK's UI/journal now completes **34/34 Collections**
 and **30/30 Text** host cases at the unchanged 64 MiB heap. These scoped results
-do not qualify complete upstream behavior or physical hardware.
+also pass in two completed headless Ryujinx runs of NRO `5876341`, including
+return to the launcher and original SD restoration. See the
+[retained checkpoint](reports/gc-pressure-20261027.json). These results do not
+qualify complete upstream behavior or physical hardware.
 
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
 257 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,

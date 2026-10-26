@@ -1,0 +1,57 @@
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+   Compiling as-vm-render-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-render-testsupport)
+   Compiling as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+    Finished `test` profile [unoptimized] target(s) in 18.42s
+     Running unittests ..\rd-vm\src\lib.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\rd_vm-2af28540702107e9.exe)
+
+running 47 tests
+test boxes::tests::float_double_semantics_match_jdk ... ok
+test classpath::tests::android_activity_is_android_context ... ok
+test classpath::tests::android_scroll_and_container_widgets_are_views ... ok
+test classpath::tests::array_subtyping_is_covariant_for_reference_elements ... ok
+test classpath::tests::borrowed_method_name_matches_owned_predicate_including_invalid_ids ... ok
+test classpath::tests::borrowed_subtype_walk_matches_legacy_with_cycles_interfaces_and_depth_caps ... ok
+test classpath::tests::host_collections_subtype_their_interfaces ... ok
+test classpath::tests::jutil_calendar_and_timezone_have_jdk_type_relations ... ok
+test collection_factories::tests::bound_framework_never_falls_back_to_reference_collection_storage ... ok
+test collection_factories::tests::malformed_factory_call_does_not_index_missing_arguments ... ok
+test gc::tests::an_unpinned_boundary_reclaims_a_heap_retained_by_the_previous_callback ... ok
+test gc::tests::live_heap_above_half_budget_waits_for_growth_before_recollecting ... ok
+test gc_policy::tests::an_unpinned_watermark_recheck_happens_once_and_never_drops_active_frames ... ok
+test gc_policy::tests::byte_pressure_uses_remaining_headroom_with_saturating_watermarks ... ok
+test gc_policy::tests::pinned_slot_pressure_backs_off_but_a_tool_boundary_can_reclaim ... ok
+test heap::tests::array_elem_kinds ... ok
+test heap::tests::budget_is_enforced_with_typed_oom ... ok
+test heap::tests::fields_roundtrip ... ok
+test heap::tests::objects_are_indexed_from_one ... ok
+test heap::tests::peak_is_high_water_mark_of_used ... ok
+test heap::tests::primitive_array_runtime_descriptors_are_preserved ... ok
+test interp::fetch_tests::sequential_cursor_differential_random_walk ... ok
+test interp::fetch_tests::sequential_cursor_matches_binary_lookup_for_branches_handlers_and_bad_pcs ... ok
+test jlstring::tests::grouping_and_padding ... ok
+test jlstring::tests::replacement_syntax ... ok
+test jlstring::tests::split_follows_jdk ... ok
+test jlstring::tests::utf16_search ... ok
+test jregex::tests::java_split_semantics ... ok
+test jregex::tests::replacement_groups ... ok
+test jregex::tests::translates_java_syntax ... ok
+test jregex::tests::utf16_offsets ... ok
+test jsb::tests::search ... ok
+test jsb::tests::sig_params ... ok
+test portable::execution::contracts::guest_allocations_do_not_leak_into_another_owners_host_scope ... ok
+test portable::execution::contracts::heap_restore_and_allocation_pins_use_their_own_actual_owner ... ok
+test portable::execution::contracts::independent_frames_resume_and_unwind_in_non_lifo_order ... ok
+test portable::execution::contracts::owner_bound_is_checked_and_completed_owners_do_not_accumulate ... ok
+test portable::execution::contracts::real_gc_retains_suspended_owner_after_older_owner_publishes_and_unwinds ... ok
+test portable::execution::contracts::same_owner_nested_callbacks_keep_distinct_frame_tickets ... ok
+test repr::tests::double_matches_java_tostring ... ok
+test repr::tests::float_matches_java_tostring ... ok
+test sdk_types::tests::every_generated_declaration_is_reachable_by_exact_descriptor ... ok
+test tests::arg_parsing_matches_types ... ok
+test tests::stub_contract_gone_vm_has_real_api ... ok
+test value::tests::accessors_are_typed ... ok
+test value::tests::narrowing_follows_dalvik ... ok
+test value::tests::primitive_accessors_reinterpret_untyped_dalvik_bits ... ok
+
+test result: ok. 47 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+

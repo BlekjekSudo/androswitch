@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized] target(s) in 0.17s
+     Running tests\lifecycle.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\lifecycle-6fe5b68a225dd450.exe)
+
+running 1 test
+test looper_reclaims_previous_callback_garbage_before_pinning_the_next_callback ... FAILED
+
+failures:
+
+---- looper_reclaims_previous_callback_garbage_before_pinning_the_next_callback stdout ----
+
+thread 'looper_reclaims_previous_callback_garbage_before_pinning_the_next_callback' (279596) panicked at crates\as-framework\tests\lifecycle.rs:84:9:
+assertion failed: app.vm.gc_stats().collections > collections
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    looper_reclaims_previous_callback_garbage_before_pinning_the_next_callback
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.73s
+
+error: test failed, to rerun pass `-p as-framework --test lifecycle`

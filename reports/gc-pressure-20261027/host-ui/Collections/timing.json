@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "elapsed_ms": 121565,
+  "exit_code": 0,
+  "apk_sha256": "32718652d7fefd16fa8c555ae2886d3f6ef8463670b46bba72ba44675ba3fcbf",
+  "request_sha256": "2b0e68d0511216f837d2681e01de4ad99b27c65bdfcc81035effa7d60116d058",
+  "source_files": [
+    {
+      "sha256": "86c8603249605f8a34a40c06fc9a9bce9a82bfc50bda4d53bfb8bfe0169b01e9",
+      "path": "crates/rd-vm/src/gc_policy.rs"
+    },
+    {
+      "sha256": "a5c627775ca8f9c86ec149c317165bb353fe9ad74cb70677fb46ef3a66aa97a9",
+      "path": "crates/rd-vm/src/gc.rs"
+    },
+    {
+      "sha256": "998765b5c168078298eeacbfd471ed439a1d7c2dc5101c680290c5b75d5db404",
+      "path": "crates/rd-vm/src/portable/gc.rs"
+    },
+    {
+      "sha256": "18e9fdac20c87e3925947c0b45218ceed26944204bf898a0f69ec146d4186fb1",
+      "path": "crates/rd-vm/src/portable/execution.rs"
+    },
+    {
+      "sha256": "326a0801b10c46c8ce0577dd19a1a1ee5bfc3c4d7e2a6381915986efcd3990b7",
+      "path": "crates/rd-vm/src/lib.rs"
+    },
+    {
+      "sha256": "d45eaeac0a6c9a18880fa0dd3d6f329d22bffa4a3c9e5f606660c29757ad58a1",
+      "path": "crates/as-framework/src/android.rs"
+    }
+  ]
+}

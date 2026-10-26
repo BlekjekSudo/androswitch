@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "request_sha256": "2b0e68d0511216f837d2681e01de4ad99b27c65bdfcc81035effa7d60116d058",
+  "apk_sha256": "32718652d7fefd16fa8c555ae2886d3f6ef8463670b46bba72ba44675ba3fcbf",
+  "source_files": [
+    {
+      "path": "crates/rd-vm/src/gc_policy.rs",
+      "sha256": "94c976fc8f2962406a46dfeede72d9927f6f110315a002b4ac1f9407067feacb"
+    },
+    {
+      "path": "crates/rd-vm/src/gc.rs",
+      "sha256": "9807199342c48afc5a9b902b28ff6ac674b8c18f38caae419d12f1758f5df68a"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/gc.rs",
+      "sha256": "509a77330c218c474a808ea34e8970e2bda4815a8e32cfdb38363947a47d86c4"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/execution.rs",
+      "sha256": "18e9fdac20c87e3925947c0b45218ceed26944204bf898a0f69ec146d4186fb1"
+    },
+    {
+      "path": "crates/rd-vm/src/lib.rs",
+      "sha256": "326a0801b10c46c8ce0577dd19a1a1ee5bfc3c4d7e2a6381915986efcd3990b7"
+    }
+  ],
+  "elapsed_ms": 58536,
+  "exit_code": 1
+}

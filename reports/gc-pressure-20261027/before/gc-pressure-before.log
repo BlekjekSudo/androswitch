@@ -1,0 +1,25 @@
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+   Compiling serde_json v1.0.151
+   Compiling as-vm-render-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-render-testsupport)
+   Compiling as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+    Finished `test` profile [unoptimized] target(s) in 21.18s
+     Running unittests ..\rd-vm\src\lib.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\rd_vm-2af28540702107e9.exe)
+
+running 1 test
+test gc::tests::live_heap_above_half_budget_waits_for_growth_before_recollecting ... FAILED
+
+failures:
+
+---- gc::tests::live_heap_above_half_budget_waits_for_growth_before_recollecting stdout ----
+
+thread 'gc::tests::live_heap_above_half_budget_waits_for_growth_before_recollecting' (251856) panicked at crates\as-vm\..\rd-vm\src\portable\gc.rs:143:9:
+one small allocation must not recollect the same live heap
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    gc::tests::live_heap_above_half_budget_waits_for_growth_before_recollecting
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 42 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p as-vm --lib`

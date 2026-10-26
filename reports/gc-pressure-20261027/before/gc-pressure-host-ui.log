@@ -1,0 +1,4 @@
+exception java.lang.OutOfMemoryError: alocação de 337840 bytes excede o heap de 67108864 bytes (piso E5)
+  at Lorg/androswitch/conformance/Files;->write(Ljava/io/File;Ljava/lang/String;)V
+  at Lorg/androswitch/conformance/Journal;->save()V
+  at Lorg/androswitch/conformance/MainActivity$1;->run()V
