@@ -24,7 +24,7 @@ try {
     $paths=@(Get-ChildItem -LiteralPath experiments/horizon-std -Recurse -File|Where-Object {$_.Name -ne 'README.md'}|ForEach-Object {[IO.Path]::GetRelativePath($root,$_.FullName).Replace('\','/')})
     $paths+=@('scripts/prepare-horizon-std.py','scripts/build-horizon-std.ps1','scripts/test-horizon-std-ryujinx.ps1')
     $source=@($paths|Sort-Object|ForEach-Object {@{path=$_;sha256=(Get-FileHash -LiteralPath $_).Hash.ToLowerInvariant()}})
-    $source|ConvertTo-Json -Depth 4|Set-Content -LiteralPath "$output/source.json" -Encoding utf8NoBOM
+    [IO.File]::WriteAllText("$output/source.json",($source|ConvertTo-Json -Depth 4).Replace("`r`n","`n")+"`n",[Text.UTF8Encoding]::new($false))
     $patch='patch.crates-io.libc.path="'+$root.Replace('\','/')+'/local-artifacts/horizon-std/libc-0.2.189"'
     & cargo "+$Toolchain" rustc --manifest-path experiments/horizon-std/Cargo.toml --release --locked --target experiments/horizon-std/aarch64-androswitch-newlib.json --target-dir $target '-Zbuild-std=core,alloc,std,panic_abort' -Zjson-target-spec --config $patch -- -Dwarnings *> "$output/build.log"
     if($LASTEXITCODE){throw "std build failed; see $output/build.log"}
@@ -45,7 +45,7 @@ try {
         c_compiler=(& "$DevkitPro/devkitA64/bin/aarch64-none-elf-gcc.exe" -dumpfullversion|Out-String).Trim()
         sdk_inputs=@($sdk|ForEach-Object {@{path=$_;sha256=(Get-FileHash -LiteralPath "$DevkitPro/$_").Hash.ToLowerInvariant()}})
     }
-    $receipt|ConvertTo-Json -Depth 7|Set-Content -LiteralPath "$output/build.json" -Encoding utf8NoBOM
+    [IO.File]::WriteAllText("$output/build.json",($receipt|ConvertTo-Json -Depth 7).Replace("`r`n","`n")+"`n",[Text.UTF8Encoding]::new($false))
     Copy-Item -LiteralPath local-artifacts/horizon-std/libc-adaptation.patch -Destination "$output/libc-adaptation.patch"
     Write-Output "std proof built: $nro"
 }finally{$env:DEVKITPRO=$oldDevkit;$env:CARGO_BUILD_JOBS=$oldJobs;Pop-Location}
