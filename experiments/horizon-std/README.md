@@ -11,6 +11,11 @@ Rust's `aarch64-nintendo-switch-freestanding` definition and adds Unix/newlib
 selection. Standard library Rust sources are unmodified. Selecting these cfgs
 does not make Horizon a Linux guest.
 
+The build script defaults to the locally installed `nightly` selector, verifies
+that exact compiler commit and requires matching `rust-src`. It does not install
+components or change the global default. A differently named matching toolchain
+can be selected with `-Toolchain`.
+
 `prepare-horizon-std.py` verifies the libc 0.2.189 archive checksum, extracts it
 under ignored `local-artifacts`, then adapts the actual devkitA64 file/pthread
 ABI. `abi.c` compares 33 sizes, alignments, offsets and constants with Rust at

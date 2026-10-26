@@ -1,5 +1,5 @@
 param(
-    [string]$Toolchain='nightly-2026-08-26',
+    [string]$Toolchain='nightly',
     [string]$TargetDirectory='C:/Users/Administrator/.cache/androswitch/std-probe-target',
     [string]$DevkitPro='C:/devkitPro',
     [string]$Make='C:/w64devkit/bin/make.exe',
@@ -19,6 +19,8 @@ try {
     if($LASTEXITCODE){throw 'Pinned libc preparation failed.'}
     $version=(& rustc "+$Toolchain" --version --verbose|Out-String).Trim()
     if($LASTEXITCODE -or $version -notmatch '787af2b8c80638c51a4fc8e44f84e6891f243ec7'){throw 'Use the pinned 2026-08-26 nightly.'}
+    $sysroot=(& rustc "+$Toolchain" --print sysroot|Out-String).Trim()
+    if(-not(Test-Path -LiteralPath "$sysroot/lib/rustlib/src/rust/library/Cargo.lock")){throw 'Matching rust-src must already be available in the selected toolchain; this experiment does not change global toolchains.'}
     $paths=@(Get-ChildItem -LiteralPath experiments/horizon-std -Recurse -File|Where-Object {$_.Name -ne 'README.md'}|ForEach-Object {[IO.Path]::GetRelativePath($root,$_.FullName).Replace('\','/')})
     $paths+=@('scripts/prepare-horizon-std.py','scripts/build-horizon-std.ps1','scripts/test-horizon-std-ryujinx.ps1')
     $source=@($paths|Sort-Object|ForEach-Object {@{path=$_;sha256=(Get-FileHash -LiteralPath $_).Hash.ToLowerInvariant()}})
@@ -33,7 +35,7 @@ try {
     $nro=Join-Path $output 'androswitch-std-probe.nro'
     $sdk=@('libnx/lib/libnx.a','devkitA64/aarch64-none-elf/lib/pic/libsysbase.a','devkitA64/aarch64-none-elf/lib/pic/libc.a','devkitA64/aarch64-none-elf/lib/pic/libm.a','libnx/switch.specs')
     $receipt=@{
-        schema_version=1;status='built_not_executed';rustc_verbose=$version
+        schema_version=1;status='built_not_executed';rustc_verbose=$version;toolchain_selector=$Toolchain
         source_commit=(& 'C:/Program Files/Git/cmd/git.exe' -c core.fsmonitor=false rev-parse HEAD|Out-String).Trim()
         source_manifest_sha256=(Get-FileHash -LiteralPath "$output/source.json").Hash.ToLowerInvariant()
         nro_sha256=(Get-FileHash -LiteralPath $nro).Hash.ToLowerInvariant();nro_bytes=(Get-Item -LiteralPath $nro).Length
