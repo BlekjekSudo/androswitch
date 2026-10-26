@@ -1,8 +1,8 @@
 //! Full `StringBuilder` / `StringBuffer` surface.
 //!
-//! **State.** Both classes keep their text in the `buf` heap-string field
-//! (the layout of the original StringBuilder intrinsics), so the two
-//! implementations interoperate. Indices are UTF-16 code units, as in Java.
+//! **State.** Both classes use the original `buf` heap field. Complete text
+//! uses a heap String; raw/unpaired UTF-16 uses a managed char[] in that same
+//! field. No separate builder store exists. Indices are UTF-16 code units.
 //!
 //! **Construction and append:**
 //! - Constructors: `()`, `(int)`, `(String)`, `(CharSequence)`.
@@ -125,28 +125,53 @@ fn sioobe(msg: String) -> VmExit {
 
 fn get(vm: &Engine, r: ObjRef) -> Vec<u16> {
     match vm.heap.get_field(r, "buf") {
-        Ok(Value::Obj(s)) => vm
-            .heap
-            .as_str(s)
-            .map(|s| s.encode_utf16().collect())
-            .unwrap_or_default(),
+        Ok(Value::Obj(s)) => match vm.heap.as_str(s) {
+            Ok(text) => text.encode_utf16().collect(),
+            Err(_) if vm.heap.class_of(s).is_ok_and(|c| c == "[C") => vm
+                .heap
+                .as_array_elems(s)
+                .map(|(values, _)| {
+                    values
+                        .iter()
+                        .map(|v| v.as_int().unwrap_or(0) as u16)
+                        .collect()
+                })
+                .unwrap_or_default(),
+            Err(_) => Vec::new(),
+        },
         _ => Vec::new(),
     }
 }
 fn set(vm: &mut Engine, r: ObjRef, u: &[u16]) -> Result<(), VmExit> {
-    // internal buffer growth: a budget overrun is VM_OOM (as with the former SB arms)
-    let text = if vm.framework_host().is_some() {
-        String::from_utf16(u).map_err(|_| {
-            crate::err::vm_error(
-                "API_UNAVAILABLE",
-                "builder contains an isolated UTF-16 surrogate",
-            )
-        })?
-    } else {
-        String::from_utf16_lossy(u)
+    let s = match String::from_utf16(u) {
+        Ok(text) => vm
+            .heap
+            .alloc_string(text)
+            .map_err(crate::err::oom_throwable)?,
+        Err(_) => {
+            // Java permits an incomplete surrogate while a buffer is being
+            // edited. Charge the real managed Value-array storage before any
+            // reserve, and let ordinary heap edges/barriers retain it.
+            let chars = vm
+                .heap
+                .alloc_array_zeroed(crate::heap::ElemKind::Int, u.len(), "[C")
+                .map_err(crate::err::oom_throwable)?;
+            for (slot, unit) in vm.heap.array_elems_mut(chars)?.iter_mut().zip(u) {
+                *slot = Value::Int(i32::from(*unit));
+            }
+            chars
+        }
     };
-    let s = vm.heap.alloc_string(text)?;
     crate::err::put_field_result(vm.heap.put_field(r, "buf", Value::Obj(s)))
+}
+fn string_text(units: &[u16]) -> Result<String, VmExit> {
+    String::from_utf16(units).map_err(|_| {
+        crate::err::vm_error(
+            "API_UNAVAILABLE",
+            "an isolated surrogate String requires the UTF-16 String heap",
+        )
+        .into()
+    })
 }
 fn int(args: &[Value], i: usize) -> i32 {
     args.get(i).and_then(|v| v.as_int().ok()).unwrap_or(0)
@@ -339,14 +364,20 @@ pub fn instance_intrinsic(
             Value::Obj(recv)
         }
         "appendCodePoint" => {
-            let c = char::from_u32(int(args, 0) as u32).ok_or_else(|| {
-                VmExit::Exception(Throwable::new(
+            let cp = int(args, 0);
+            if !(0..=0x10ffff).contains(&cp) {
+                return Err(VmExit::Exception(Throwable::new(
                     "Ljava/lang/IllegalArgumentException;",
                     "Not a valid Unicode code point",
-                ))
-            })?;
-            let mut b = [0u16; 2];
-            u.extend_from_slice(c.encode_utf16(&mut b));
+                )));
+            }
+            if cp < 0x10000 {
+                u.push(cp as u16);
+            } else {
+                let cp = cp as u32 - 0x10000;
+                u.push((0xd800 + (cp >> 10)) as u16);
+                u.push((0xdc00 + (cp & 0x3ff)) as u16);
+            }
             set(vm, recv, &u)?;
             Value::Obj(recv)
         }
@@ -407,8 +438,17 @@ pub fn instance_intrinsic(
             Value::Obj(recv)
         }
         "reverse" => {
-            let s: String = String::from_utf16_lossy(&u).chars().rev().collect();
-            set(vm, recv, &s.encode_utf16().collect::<Vec<_>>())?;
+            u.reverse();
+            let mut at = 0;
+            while at + 1 < u.len() {
+                if (0xdc00..=0xdfff).contains(&u[at]) && (0xd800..=0xdbff).contains(&u[at + 1]) {
+                    u.swap(at, at + 1);
+                    at += 2;
+                } else {
+                    at += 1;
+                }
+            }
+            set(vm, recv, &u)?;
             Value::Obj(recv)
         }
         "setLength" => {
@@ -430,11 +470,7 @@ pub fn instance_intrinsic(
                 }
             }
             u.resize(target, 0);
-            let s = vm
-                .heap
-                .alloc_string(String::from_utf16_lossy(&u))
-                .map_err(crate::err::oom_throwable)?;
-            crate::err::put_field_result(vm.heap.put_field(recv, "buf", Value::Obj(s)))?;
+            set(vm, recv, &u)?;
             Value::Null
         }
         "setCharAt" => {
@@ -458,8 +494,17 @@ pub fn instance_intrinsic(
             if i < 0 || i as usize >= len {
                 return Err(sioobe(format!("index {i},length {len}")));
             }
-            let s = String::from_utf16_lossy(&u[i as usize..]);
-            Value::Int(s.chars().next().map(|c| c as i32).unwrap_or(0))
+            let at = i as usize;
+            let high = u[at];
+            Value::Int(
+                if (0xd800..=0xdbff).contains(&high)
+                    && u.get(at + 1).is_some_and(|u| (0xdc00..=0xdfff).contains(u))
+                {
+                    0x10000 + ((i32::from(high) - 0xd800) << 10) + i32::from(u[at + 1]) - 0xdc00
+                } else {
+                    i32::from(high)
+                },
+            )
         }
         "indexOf" | "lastIndexOf" => {
             let needle = text_of(vm, args.first())?;
@@ -489,10 +534,7 @@ pub fn instance_intrinsic(
                 len as i32
             };
             let (a, b) = check_range(start, end, len)?;
-            Value::Obj(crate::intrinsics::alloc_string(
-                vm,
-                String::from_utf16_lossy(&u[a..b]),
-            )?)
+            Value::Obj(crate::intrinsics::alloc_string(vm, string_text(&u[a..b])?)?)
         }
         "getChars" => {
             let (a, b) = check_range(int(args, 0), int(args, 1), len)?;
@@ -523,10 +565,7 @@ pub fn instance_intrinsic(
         "isEmpty" => Value::Int((len == 0) as i32),
         "capacity" => Value::Int((len + 16) as i32),
         "ensureCapacity" | "trimToSize" => Value::Null,
-        "toString" => Value::Obj(crate::intrinsics::alloc_string(
-            vm,
-            String::from_utf16_lossy(&u),
-        )?),
+        "toString" => Value::Obj(crate::intrinsics::alloc_string(vm, string_text(&u)?)?),
         "compareTo" => {
             let other = text_of(vm, args.first())?;
             Value::Int(match u.cmp(&other) {
@@ -550,6 +589,47 @@ mod tests {
     #[cfg(not(feature = "std"))]
     #[allow(unused_imports)]
     use crate::port_prelude::*;
+    #[test]
+    fn raw_utf16_growth_checks_real_array_charge_and_keeps_previous_buffer_on_oom() {
+        let mut vm = Engine::new(
+            vec![],
+            crate::VmConfig {
+                heap_budget: 2048,
+                ..Default::default()
+            },
+        );
+        let builder = vm.heap.alloc_instance(SB.into(), vec![]).unwrap();
+        vm.invoke_instance(builder, "<init>", "()V", &[]).unwrap();
+        vm.invoke_instance(
+            builder,
+            "append",
+            "(C)Ljava/lang/StringBuilder;",
+            &[Value::Int(0xd83d)],
+        )
+        .unwrap();
+        let input = vm.heap.alloc_string("x".repeat(128)).unwrap();
+        let used = vm.heap.used();
+        let error = vm.invoke_instance(
+            builder,
+            "append",
+            "(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+            &[Value::Obj(input)],
+        );
+        assert!(
+            matches!(error,Err(VmExit::Exception(ref e)) if e.class == "Ljava/lang/OutOfMemoryError;"),
+            "{error:?}"
+        );
+        assert_eq!(vm.heap.used(), used);
+        assert_eq!(
+            vm.invoke_instance(builder, "length", "()I", &[]).unwrap(),
+            Value::Int(1)
+        );
+        assert_eq!(
+            vm.invoke_instance(builder, "charAt", "(I)C", &[Value::Int(0)])
+                .unwrap(),
+            Value::Int(0xd83d)
+        );
+    }
     #[test]
     fn sig_params() {
         assert_eq!(

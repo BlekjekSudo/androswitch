@@ -159,7 +159,7 @@ confirmation is not transferred. See the
 [actual checkpoint](../reports/collections-text-20261026.json).
 
 The source-route audit now evaluates the actual shipping `std` feature
-declarations, including nested `all`/`any`/`not` guards. **85 original VM files
+declarations, including nested `all`/`any`/`not` guards. **83 original VM files
 remain excluded** in the default device profile. A compiled std source is still
 reported as behavior-unverified. This count is not an API percentage, and the
 full upstream dispatcher is still not enabled for the product's bound framework.

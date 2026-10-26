@@ -111,7 +111,11 @@ the negative JNI check for a builtin object with no active provider state.
 - CopyOnWriteArrayList/Set keep the product's existing generation/lock model.
   Missing bulk/equality behavior is not replaced by an unsafe reference fallback.
 - Builder capacity and comparison policies retain inherited limitations.
-  Isolated UTF-16 surrogate mutations still fail explicitly on the product path;
+  This checkpoint rejected isolated UTF-16 surrogate mutations. The later
+  [shared I/O integration](UPSTREAM_SHARED_IO.md) preserves raw builder units in
+  a managed char array in the same `buf` field; it supports edits that complete a
+  pair without a second store. Producing a String with an isolated surrogate
+  still requires the UTF-16 String heap;
   the Rust-string heap cannot claim to preserve those code units. Monitor
   contention retains the existing explicit scheduling limitation.
 - Native/JIT zero-case oracle targets and physical verification of this changed

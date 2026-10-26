@@ -49,7 +49,7 @@ The unchanged original six-case `io_chars_266` suite also runs through the
 shipping VM in `as-vm/tests/shipping_io_chars.rs`. The original reference target
 and all fifty upstream suite registrations remain separate.
 
-SDK tests exposed and corrected three general integration defects:
+SDK tests exposed and corrected general integration defects:
 
 - A superclass-template search could consume a DEX subclass constructor and
   skip its field initializers. Constructors now stay at their declared class.
@@ -67,6 +67,19 @@ SDK tests exposed and corrected three general integration defects:
 The JVM oracle is now written directly to a UTF-8 file. The earlier Windows
 console could turn an emoji into `?`; those initial mismatches are retained as
 diagnostics, not promoted to API failures or passes by changing expectations.
+
+The first headless Ryujinx I/O run at `28f380c` stopped after three passes:
+ordinary UI journal slicing appended an emoji's two UTF-16 units separately,
+and the builder rejected the intermediate high surrogate. The APK and expected
+values were retained. The shared builder now stores raw units in a managed
+`char[]` through its existing `buf` field, switching to a heap String when
+complete. Both states use normal heap tracing and budget checks. Reverse,
+appendCodePoint, codePointAt and setLength preserve Java code-unit semantics.
+Eleven independent JVM edit scenarios are compared on both builder classes;
+an OOM regression checks that failed growth preserves the previous buffer.
+Producing an actual String with an isolated surrogate is still explicitly
+unavailable pending the shared UTF-16 String representation. The ordinary host
+UI now completes all 17 I/O cases with the unchanged 274-case APK.
 
 ## Verification scope
 

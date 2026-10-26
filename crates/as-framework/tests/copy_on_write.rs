@@ -118,7 +118,7 @@ fn enum_map_reuses_map_storage_and_matches_jvm_before_and_after_gc() {
 }
 
 #[test]
-fn builder_scalar_overloads_use_the_descriptor_and_reject_unrepresentable_units() {
+fn builder_scalar_overloads_keep_raw_units_until_a_surrogate_pair_is_complete() {
     let mut test = Test::new("original", false);
     for class in ["Ljava/lang/StringBuilder;", "Ljava/lang/StringBuffer;"] {
         let vm = &mut test.app.vm;
@@ -140,23 +140,205 @@ fn builder_scalar_overloads_use_the_descriptor_and_reject_unrepresentable_units(
             vm.invoke_instance(builder, "length", "()I", &[]).unwrap(),
             Value::Int(12)
         );
-        let failure = vm.invoke_instance(
+        vm.invoke_instance(
             builder,
             "append",
             &format!("(C){class}"),
             &[Value::Int(0xd800)],
+        )
+        .unwrap();
+        assert_eq!(
+            vm.invoke_instance(builder, "length", "()I", &[]).unwrap(),
+            Value::Int(13)
         );
-        assert!(matches!(failure, Err(VmExit::Error(ref e)) if e.code == "API_UNAVAILABLE"));
+        assert_eq!(
+            vm.invoke_instance(builder, "charAt", "(I)C", &[Value::Int(12)])
+                .unwrap(),
+            Value::Int(0xd800)
+        );
+        assert_eq!(
+            vm.invoke_instance(builder, "codePointAt", "(I)I", &[Value::Int(12)])
+                .unwrap(),
+            Value::Int(0xd800)
+        );
+        let incomplete = vm.invoke_instance(builder, "toString", "()Ljava/lang/String;", &[]);
+        assert!(matches!(incomplete, Err(VmExit::Error(ref e)) if e.code == "API_UNAVAILABLE"));
+        vm.statics.insert(
+            ("Ltests/Builders;".into(), "pending".into()),
+            Value::Obj(builder),
+        );
+        vm.gc_minor();
+        vm.gc_minor();
+        vm.invoke_instance(
+            builder,
+            "append",
+            &format!("(C){class}"),
+            &[Value::Int(0xdc00)],
+        )
+        .unwrap();
         let result = vm
             .invoke_instance(builder, "toString", "()Ljava/lang/String;", &[])
             .unwrap()
             .as_ref()
             .unwrap()
             .unwrap();
-        assert_eq!(vm.heap.as_str(result).unwrap(), ",truefalse\0é");
+        assert_eq!(vm.heap.as_str(result).unwrap(), ",truefalse\0é\u{10000}");
     }
 }
 impl Test {
+    fn builder_case(&mut self, class: &str, which: i32) -> String {
+        let vm = &mut self.app.vm;
+        let r = vm.heap.alloc_instance(class.into(), vec![]).unwrap();
+        vm.attach_host_state(class, r).unwrap();
+        vm.invoke_instance(r, "<init>", "()V", &[]).unwrap();
+        let chain = format!("(C){class}");
+        let codepoint = format!("(I){class}");
+        let string = format!("(Ljava/lang/String;){class}");
+        let call = |vm: &mut Engine, n: &str, s: &str, a: &[Value]| {
+            vm.invoke_instance(r, n, s, a).unwrap()
+        };
+        let number = |vm: &mut Engine, n: &str, i: i32| {
+            call(
+                vm,
+                n,
+                if n == "charAt" { "(I)C" } else { "(I)I" },
+                &[Value::Int(i)],
+            )
+            .as_int()
+            .unwrap()
+        };
+        let append = |vm: &mut Engine, u: i32| {
+            call(vm, "append", &chain, &[Value::Int(u)]);
+        };
+        let high = 0xd83d;
+        let low = 0xde42;
+        match which {
+            0 => {
+                append(vm, high);
+                format!(
+                    "{}:{}:{}",
+                    call(vm, "length", "()I", &[]).as_int().unwrap(),
+                    number(vm, "charAt", 0),
+                    number(vm, "codePointAt", 0)
+                )
+            }
+            1 => {
+                append(vm, high);
+                append(vm, low);
+                format!(
+                    "{}:{}",
+                    call(vm, "length", "()I", &[]).as_int().unwrap(),
+                    number(vm, "codePointAt", 0)
+                )
+            }
+            2 => {
+                let text = Value::Obj(vm.heap.alloc_string("ab".into()).unwrap());
+                call(vm, "append", &string, &[text]);
+                call(
+                    vm,
+                    "insert",
+                    &format!("(IC){class}"),
+                    &[Value::Int(1), Value::Int(high)],
+                );
+                call(
+                    vm,
+                    "insert",
+                    &format!("(IC){class}"),
+                    &[Value::Int(2), Value::Int(low)],
+                );
+                format!(
+                    "{}:{}:{}",
+                    call(vm, "length", "()I", &[]).as_int().unwrap(),
+                    number(vm, "codePointAt", 1),
+                    number(vm, "charAt", 3)
+                )
+            }
+            3 => {
+                let text = Value::Obj(vm.heap.alloc_string("ab".into()).unwrap());
+                call(vm, "append", &string, &[text]);
+                call(vm, "setCharAt", "(IC)V", &[Value::Int(0), Value::Int(high)]);
+                call(vm, "setCharAt", "(IC)V", &[Value::Int(1), Value::Int(low)]);
+                number(vm, "codePointAt", 0).to_string()
+            }
+            4 => {
+                append(vm, low);
+                append(vm, high);
+                call(vm, "reverse", &format!("(){class}"), &[]);
+                number(vm, "codePointAt", 0).to_string()
+            }
+            5 => {
+                call(vm, "appendCodePoint", &codepoint, &[Value::Int(high)]);
+                call(vm, "appendCodePoint", &codepoint, &[Value::Int(low)]);
+                number(vm, "codePointAt", 0).to_string()
+            }
+            6 => {
+                call(vm, "appendCodePoint", &codepoint, &[Value::Int(0x1f642)]);
+                call(vm, "setLength", "(I)V", &[Value::Int(1)]);
+                append(vm, low);
+                number(vm, "codePointAt", 0).to_string()
+            }
+            7 => {
+                append(vm, high);
+                call(vm, "setLength", "(I)V", &[Value::Int(3)]);
+                let array = vm
+                    .heap
+                    .alloc_array_zeroed(rd_vm::heap::ElemKind::Int, 3, "[C")
+                    .unwrap();
+                call(
+                    vm,
+                    "getChars",
+                    "(II[CI)V",
+                    &[
+                        Value::Int(0),
+                        Value::Int(3),
+                        Value::Obj(array),
+                        Value::Int(0),
+                    ],
+                );
+                vm.heap
+                    .as_array_elems(array)
+                    .unwrap()
+                    .0
+                    .iter()
+                    .map(|v| v.as_int().unwrap().to_string())
+                    .collect::<Vec<_>>()
+                    .join(":")
+            }
+            8 => {
+                append(vm, high);
+                append(vm, 120);
+                call(vm, "deleteCharAt", &codepoint, &[Value::Int(1)]);
+                append(vm, low);
+                number(vm, "codePointAt", 0).to_string()
+            }
+            9 => {
+                append(vm, high);
+                append(vm, 120);
+                append(vm, low);
+                let empty = Value::Obj(vm.heap.alloc_string("".into()).unwrap());
+                call(
+                    vm,
+                    "replace",
+                    &format!("(IILjava/lang/String;){class}"),
+                    &[Value::Int(1), Value::Int(2), empty],
+                );
+                number(vm, "codePointAt", 0).to_string()
+            }
+            10 => {
+                append(vm, 97);
+                call(vm, "appendCodePoint", &codepoint, &[Value::Int(0x1f642)]);
+                append(vm, 98);
+                call(vm, "reverse", &format!("(){class}"), &[]);
+                format!(
+                    "{}:{}:{}",
+                    number(vm, "charAt", 0),
+                    number(vm, "codePointAt", 1),
+                    number(vm, "charAt", 3)
+                )
+            }
+            _ => unreachable!(),
+        }
+    }
     #[allow(clippy::assertions_on_constants)]
     fn new(variant: &str, proof: bool) -> Self {
         assert!(rd_vm::PORTABLE_CORE);
@@ -235,6 +417,25 @@ impl Test {
     }
     fn freed(&self, r: ObjRef) -> bool {
         self.app.vm.heap.class_of(r).unwrap() == rd_vm::gc::FREED_CLASS
+    }
+}
+#[test]
+fn builder_raw_edits_match_independent_jvm_rows_for_both_shared_classes() {
+    let rows = std::fs::read_to_string(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local-artifacts/builder-utf16/jvm.tsv"),
+    )
+    .expect("run fixtures/builder-utf16/build.ps1");
+    let mut t = Test::new("original", false);
+    for class in ["Ljava/lang/StringBuilder;", "Ljava/lang/StringBuffer;"] {
+        for row in rows.lines() {
+            let (which, expected) = row.split_once('\t').unwrap();
+            assert_eq!(
+                t.builder_case(class, which.parse().unwrap()),
+                expected,
+                "{class} case {which}"
+            );
+        }
     }
 }
 #[test]
