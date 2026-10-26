@@ -244,7 +244,7 @@ pub(crate) fn obj_equals(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, 
     if crate::java_values::values_equal(&vm.heap, a, b)? {
         return Ok(true);
     }
-    let (Value::Obj(x), Value::Obj(_)) = (a, b) else {
+    let (Value::Obj(x), Value::Obj(y)) = (a, b) else {
         return Ok(false);
     };
     // Fast-reject String and primitive boxes that already ran through values_equal
@@ -255,14 +255,16 @@ pub(crate) fn obj_equals(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, 
     if crate::boxes::kind(&class).is_some() {
         return Ok(false);
     }
-    with_host_reentrant(vm, |vm| {
-        let res = vm.invoke_instance(
-            *x,
-            "equals",
-            "(Ljava/lang/Object;)Z",
-            core::slice::from_ref(b),
-        )?;
-        Ok(matches!(res, Value::Int(v) if v != 0))
+    crate::value_recursion::with(vm, crate::value_recursion::Key::Equals(*x, *y), |vm| {
+        with_host_reentrant(vm, |vm| {
+            let res = vm.invoke_instance(
+                *x,
+                "equals",
+                "(Ljava/lang/Object;)Z",
+                core::slice::from_ref(b),
+            )?;
+            Ok(matches!(res, Value::Int(v) if v != 0))
+        })
     })
 }
 
@@ -279,11 +281,13 @@ pub(crate) fn obj_hash(vm: &mut Engine, v: &Value) -> Result<i32, VmExit> {
         let inner = vm.heap.get_field(*r, "value").unwrap_or(Value::Int(0));
         return Ok(prim_hash(k, &inner));
     }
-    with_host_reentrant(vm, |vm| {
-        Ok(vm
-            .invoke_instance(*r, "hashCode", "()I", &[])?
-            .as_int()
-            .unwrap_or(0))
+    crate::value_recursion::with(vm, crate::value_recursion::Key::Hash(*r), |vm| {
+        with_host_reentrant(vm, |vm| {
+            Ok(vm
+                .invoke_instance(*r, "hashCode", "()I", &[])?
+                .as_int()
+                .unwrap_or(0))
+        })
     })
 }
 

@@ -21,7 +21,7 @@ disconnected Android environment inside the Switch runner.
 in the upstream Git tree, rather than selected class families. Each entry has
 the original Git blob ID. A changed file also records its reviewed adaptation
 reason and canonical SHA-256. Text canonicalization only normalizes CRLF to LF.
-The 40 added core files, including extracted shared helpers, have their own
+The 44 added core files, including extracted shared helpers, have their own
 reviewed hashes and provenance where applicable. Missing files, duplicate
 entries, an incomplete manifest, an unreviewed change,
 or drift after review fail the gate.
@@ -34,6 +34,12 @@ python -X utf8 scripts/check-upstream-sync.py --require-device-parity
 ```
 
 The last command is **expected to fail** while device parity is unverified.
+
+The shipping source selector uses the real `std` profile independently of the
+desktop execution backend. Current shared collections/text work leaves 85
+original VM sources outside the default product profile. See the
+[integration boundary record](UPSTREAM_COLLECTIONS_TEXT.md). Source selection
+and host reference tests do not verify those APIs on Horizon.
 The ordinary source gate can pass while the device gate fails; this prevents
 source synchronization from being reported as runtime compatibility. The report
 enumerates every original VM source excluded from device compilation. A shared

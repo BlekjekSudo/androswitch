@@ -284,6 +284,9 @@ impl Collections {
             .current = Some(snapshot);
         Ok(())
     }
+    pub(super) fn cow_replace(&self, vm: &mut Engine, r: ObjRef, values: Vec<Value>) -> Result<()> {
+        self.cow_locked(vm, r, |_| self.cow_publish(r, values))
+    }
     fn cow_locked<T>(
         &self,
         vm: &mut Engine,

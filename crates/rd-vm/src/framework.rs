@@ -935,8 +935,6 @@ pub struct HostState {
     pub objects: HashMap<ObjRef, HostObj>,
     /// `List.subList` views: view → (parent, offset, len). See
     /// `jcollections::sublist_*` (write-through semantics).
-    pub(crate) sublists: HashMap<ObjRef, (ObjRef, usize, usize)>,
-    pub(crate) sublist_order: alloc::collections::VecDeque<ObjRef>,
     /// Engine-local Binder handle table for `Parcel.writeStrongBinder`:
     /// the marshalled int handle is `index + 1` (0 is null). This models
     /// local Binder transport inside one Engine; it is not a kernel Binder

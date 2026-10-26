@@ -41,6 +41,14 @@ pub(super) struct Services {
     fs: Rc<dyn as_platform::fs::FileSystem>,
 }
 impl Services {
+    pub(super) fn collection_replace(
+        &self,
+        vm: &mut Engine,
+        object: ObjRef,
+        contents: rd_vm::collection_factories::Contents,
+    ) -> Result<()> {
+        self.collections.replace(vm, object, contents)
+    }
     pub(super) fn collection_snapshot(
         &self,
         vm: &Engine,

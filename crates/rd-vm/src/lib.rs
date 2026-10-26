@@ -18,14 +18,18 @@ use alloc::{
 mod app_output;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 mod collection_clock;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+mod local_table;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 mod module_tables;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 mod port_env;
 #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
 mod port_float;
-#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[cfg(not(feature = "std"))]
 mod port_prelude;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+pub mod shared_text;
 pub use app_output::AppOutput;
 #[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
 mod reference_filesystem;
@@ -116,8 +120,7 @@ pub(crate) mod choreographer;
 pub mod classpath;
 pub mod collection_factories;
 pub mod collection_values;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-pub(crate) mod collections;
+pub mod collections;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod content;
 pub mod engine;
@@ -154,8 +157,7 @@ pub(crate) mod jbigdecimal;
 pub mod jbitset;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jbreakiter;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-pub(crate) mod jcollections;
+pub mod jcollections;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jfile;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
@@ -163,14 +165,13 @@ pub(crate) mod jio_chars;
 #[cfg(feature = "jit")]
 #[cfg(feature = "desktop-runtime")]
 pub mod jit;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jiterator;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jlclass;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jlocks;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-pub(crate) mod jlstring;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+pub mod jlstring;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jlsystem;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
@@ -179,12 +180,12 @@ pub(crate) mod jnormalizer;
 pub(crate) mod jpriorityqueue;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jrandom;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-pub(crate) mod jregex;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+pub mod jregex;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jresources;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-pub(crate) mod jsb;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+pub mod jsb;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jsecurity;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
@@ -233,6 +234,7 @@ pub(crate) mod throwable;
 #[path = "intrinsics.rs"]
 pub(crate) mod upstream_intrinsics;
 pub mod value;
+mod value_recursion;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod view_attach;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]

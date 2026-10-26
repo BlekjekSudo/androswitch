@@ -44,12 +44,12 @@ class UpstreamAudit(unittest.TestCase):
         with self.assertRaises(ValueError):
             AUDIT.verify_entries(self.root, [{**self.entry, "local_path": "../outside"}])
 
-    def test_host_cfg_does_not_become_device_parity(self):
+    def test_std_cfg_selects_source_without_claiming_device_behavior(self):
         vm = self.root / "crates/rd-vm/src"
         vm.mkdir(parents=True)
         (vm / "lib.rs").write_text('#[cfg(feature = "std")]\npub mod arrays;\npub mod heap;\n', encoding="utf-8")
         routes = AUDIT.vm_routes(self.root, {"crates/rd-vm/src/arrays.rs", "crates/rd-vm/src/heap.rs"})
-        self.assertEqual(routes[0]["device_route"], "host-only-original")
+        self.assertEqual(routes[0]["device_route"], "shared-source-with-adapters")
         self.assertEqual(routes[1]["device_route"], "shared-source-with-adapters")
         self.assertTrue(all(r["behavior_parity"] == "unverified" for r in routes))
 
@@ -57,15 +57,23 @@ class UpstreamAudit(unittest.TestCase):
         vm = self.root / "crates/rd-vm/src"
         vm.mkdir(parents=True)
         (vm / "lib.rs").write_text(
-            '#[cfg(feature = "std")]\npub mod intrinsics;\n'
+            '#[cfg(feature = "desktop-runtime")]\npub mod intrinsics;\n'
             '#[cfg(feature = "upstream-runtime")]\n#[path = "intrinsics.rs"]\npub(crate) mod shared_intrinsics;\n'
-            '#[cfg(not(feature = "std"))]\n#[path = "portable/intrinsics.rs"]\npub mod intrinsics;\n',
+            '#[cfg(not(feature = "desktop-runtime"))]\n#[path = "portable/intrinsics.rs"]\npub mod intrinsics;\n',
             encoding="utf-8")
         routes = AUDIT.vm_routes(self.root, {"crates/rd-vm/src/intrinsics.rs"})
         self.assertEqual(len(routes), 1)
         self.assertEqual(routes[0]["device_route"], "host-only-original")
         self.assertTrue(routes[0]["experimental_original_declared"])
         self.assertEqual(routes[0]["behavior_parity"], "unverified")
+
+    def test_shipping_cfg_preserves_nested_feature_and_unknown_predicate_guards(self):
+        self.assertTrue(AUDIT.shipping_cfg('any(feature = "std", feature = "upstream-runtime")'))
+        self.assertTrue(AUDIT.shipping_cfg('all(feature = "std", not(feature = "desktop-runtime"))'))
+        self.assertFalse(AUDIT.shipping_cfg('all(feature = "std", feature = "upstream-runtime")'))
+        self.assertFalse(AUDIT.shipping_cfg('feature = "desktop-runtime"'))
+        self.assertFalse(AUDIT.shipping_cfg('target_os = "linux"'))
+        self.assertFalse(AUDIT.shipping_cfg('any(feature = "std"'))
 
     def test_shortened_lock_does_not_hide_omission_from_actual_git_tree(self):
         # A real local Git tree, not an expected-array mirror of the checker.

@@ -386,5 +386,157 @@
   {
     "id": "numbers.hex.32767",
     "group": "Numbers"
+  },
+  {
+    "id": "collections.copy-set-dedup",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.copy-list-variants",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.self-add-all",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.bulk-filter",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.typed-array",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.nested-sublist-gc",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.list-iterator-gc",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.iterator-remove-state",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.abstract-list",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.abstract-collection",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.object-contracts",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.sort-reverse-minmax",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.singleton-map-immutable",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.readonly-bulk",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.static-add-all",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.indexed-add-all-bounds",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.constructor-null",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.sublist-bounds",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.indexed-add-all",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.comparator-gc",
+    "group": "Collections"
+  },
+  {
+    "id": "text.compare-utf16",
+    "group": "Text"
+  },
+  {
+    "id": "text.compare-ignore-case",
+    "group": "Text"
+  },
+  {
+    "id": "text.regions",
+    "group": "Text"
+  },
+  {
+    "id": "text.content-sequence",
+    "group": "Text"
+  },
+  {
+    "id": "text.join-dex-iterable",
+    "group": "Text"
+  },
+  {
+    "id": "text.trim-codepoint",
+    "group": "Text"
+  },
+  {
+    "id": "text.regex-flags",
+    "group": "Text"
+  },
+  {
+    "id": "text.regex-named-lookahead-utf16",
+    "group": "Text"
+  },
+  {
+    "id": "text.regex-match-result-gc",
+    "group": "Text"
+  },
+  {
+    "id": "text.regex-use-pattern-gc",
+    "group": "Text"
+  },
+  {
+    "id": "text.regex-replace-groups",
+    "group": "Text"
+  },
+  {
+    "id": "text.regex-append-gc",
+    "group": "Text"
+  },
+  {
+    "id": "text.regex-split",
+    "group": "Text"
+  },
+  {
+    "id": "text.regex-result-state",
+    "group": "Text"
+  },
+  {
+    "id": "text.regex-syntax-error",
+    "group": "Text"
+  },
+  {
+    "id": "text.regex-string-shared",
+    "group": "Text"
+  },
+  {
+    "id": "collections.cycle-string-unwind",
+    "group": "Collections"
+  },
+  {
+    "id": "collections.cycle-equals-hash-unwind",
+    "group": "Collections"
   }
 ]

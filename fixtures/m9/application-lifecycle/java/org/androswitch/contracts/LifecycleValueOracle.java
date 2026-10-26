@@ -43,8 +43,8 @@ public final class LifecycleValueOracle {
       case 23:{Object a=new PlainChild();return a.equals(a)&&!a.equals(new PlainChild())?1:0;}
       case 24:{Inherited a=new Inherited();Object b=a;return b.equals(null)&&a.calls==1?1:0;}
       case 25:{Inherited a=new Inherited();return a.identity(a)&&a.calls==0?1:0;}
-      // Real JVM results are true. The runtime must reject unsupported
-      // collection equality explicitly instead of fabricating identity false.
+      // Real JVM results are true. Ported collection value methods must match
+      // them; unported families must fail explicitly, never identity-fallback.
       case 26:{Object a=new ArrayList<Object>(),b=new ArrayList<Object>();return a.equals(b)?1:0;}
       case 27:{Object a=new HashMap<Object,Object>(),b=new HashMap<Object,Object>();return a.equals(b)?1:0;}
       case 28:{Object a=new ListChild(),b=new ListChild();return a.equals(b)?1:0;}

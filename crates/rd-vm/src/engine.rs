@@ -56,6 +56,10 @@ impl Default for VmConfig {
 /// Motor interpretador. O heap é coletado por mark-sweep em safe points
 /// (`Engine::gc` / `maybe_gc`, ver `gc.rs`) e descartado quando o Engine cai.
 pub struct Engine {
+    pub(crate) value_recursion: HashMap<u64, Vec<crate::value_recursion::Key>>,
+    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    pub(crate) regex_tables: crate::jregex::Tables,
+    pub(crate) collection_views: crate::jcollections::Views,
     pub(crate) output: alloc::rc::Rc<crate::app_output::Output>,
     #[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
     pub(crate) parity_vfs: crate::module_tables::Local<core::cell::RefCell<crate::jfile::Vfs>>,
@@ -212,6 +216,9 @@ impl Engine {
         crate::reset_host_thread_state();
         let budget = config.heap_budget;
         Engine {
+            value_recursion: HashMap::new(),
+            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            regex_tables: Default::default(),
             output: Default::default(),
             #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             module_tables: Default::default(),
@@ -229,6 +236,7 @@ impl Engine {
             config,
             statics: HashMap::new(),
             boxed_cache: HashMap::new(),
+            collection_views: Default::default(),
             clinit_done: HashSet::new(),
             clinit_running: Default::default(),
             clinit_failed: HashSet::new(),

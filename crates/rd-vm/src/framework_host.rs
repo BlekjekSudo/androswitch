@@ -10,6 +10,19 @@ pub enum HostMethodKind {
     Constructor,
 }
 pub trait FrameworkHost {
+    /// Publish a staged collection operation to the same owner used by Java,
+    /// JNI and GC. An adapter must not create reference-only fallback state.
+    fn collection_replace(
+        &self,
+        _vm: &mut Engine,
+        _object: ObjRef,
+        _contents: crate::collection_factories::Contents,
+    ) -> Result<(), VmExit> {
+        Err(
+            crate::err::vm_error("API_UNAVAILABLE", "collection owner has no update adapter")
+                .into(),
+        )
+    }
     fn collection_snapshot(
         &self,
         _vm: &Engine,

@@ -571,7 +571,7 @@ fn member_ids_deleted_and_wrong_class_objects_never_become_jobjects() {
 }
 
 #[test]
-fn production_virtual_object_method_id_honors_host_overrides_and_rejects_unknown_builtin_equals() {
+fn production_virtual_object_method_id_honors_shared_values_and_rejects_unbacked_builtins() {
     let mut h = Harness::new("objects");
     let object_class = h.find("java/lang/Object");
     let equals = h.method(object_class, "equals", "(Ljava/lang/Object;)Z", false);
@@ -627,11 +627,26 @@ fn production_virtual_object_method_id_honors_host_overrides_and_rejects_unknown
         let b = h.refs.borrow_mut().local(10, Handle::Object(b)).unwrap();
         for other in [a, b] {
             let result = h.call(a, equals, false, &[other]);
-            assert!(
-                matches!(result, Err(VmExit::Error(ref e)) if e.code=="API_UNAVAILABLE" && e.cause.contains("Object.equals")),
-                "{class}: {result:?}"
+            assert_eq!(
+                result.unwrap(),
+                1,
+                "{class}: empty collections compare by value"
             );
         }
+        assert_eq!(h.call(a, equals, false, &[0]).unwrap(), 0);
+        // A heap label without the active provider's state cannot claim a
+        // collection implementation or quietly fall back to identity.
+        let unbacked = h.app.vm.heap.alloc_instance(class.into(), vec![]).unwrap();
+        let unbacked = h
+            .refs
+            .borrow_mut()
+            .local(10, Handle::Object(unbacked))
+            .unwrap();
+        let result = h.call(unbacked, equals, false, &[unbacked]);
+        assert!(
+            matches!(result, Err(VmExit::Error(ref e)) if e.code=="API_UNAVAILABLE" && e.cause.contains("Object.equals")),
+            "{class}: {result:?}"
+        );
     }
     // This contract exercises virtual invocation, not the separate constructor
     // path. Object has no instance fields requiring initialization.

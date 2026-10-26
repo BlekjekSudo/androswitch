@@ -1,6 +1,6 @@
 # Unified Android conformance catalog
 
-The API26 development suite consolidates **219 cases in one APK**: 97 Java/DEX,
+The API26 development suite consolidates **257 cases in one APK**: 135 Java/DEX,
 89 Android/platform and 33 JNI/native/graphics. It excludes sensors. Its
 manifest, Activity, Application, Java and NDK code use public Android contracts.
 It is not CTS, CTS Verifier, complete Android coverage or Android certification.
@@ -13,7 +13,7 @@ tests. Upstream attribution and licenses remain in [CREDITS](../CREDITS.md).
 
 ## Runtime acceptance target
 
-All **219 declared cases are runtime repair targets**. Producing an APK, visiting
+All **257 declared cases are runtime repair targets**. Producing an APK, visiting
 every case or collecting a complete journal does not satisfy this target. Every
 `FAIL`, `ERROR`, `INTERRUPTED`, `UNSUPPORTED`, `BLOCKED` and `NOT_RUN` remains open;
 explicit emulator exclusions do not count as coverage. The collector records
@@ -37,7 +37,10 @@ explicit errors. Android `sysconf` CPU counts describe the cores visible to this
 runtime's guest, matching its process-allowed Horizon mask. The missing-file
 errno case uses a nonexistent child of `getFilesDir`; `/data/local/tmp` was an
 invalid ENOENT assertion because Android permissions may instead return EACCES.
-The assertion still requires ENOENT, and the catalog still contains 219 cases.
+The assertion still requires ENOENT. The earlier catalog contained 219 cases;
+the development catalog now also exercises twenty-two additional Collections and sixteen text/regex
+contracts against an actual JVM oracle. The earlier hardware result remains
+scoped to its original 219-case APK and NRO.
 
 ## Facts and compatibility identity
 

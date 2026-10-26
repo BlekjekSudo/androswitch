@@ -37,7 +37,7 @@ rd-testsupport = { package = "as-vm-testsupport", path = "../as-vm-testsupport" 
 
 [features]
 default = ["std"]
-std = ["as-platform/std", "rd-dex/std", "rd-apk/std", "serde/std"]
+std = ["as-platform/std", "rd-dex/std", "rd-apk/std", "serde/std", "dep:regex", "dep:fancy-regex"]
 portable-test-support = []
 upstream-runtime = ["dep:as-sqlite", "dep:serde_json", "dep:regex", "dep:fancy-regex", "dep:libm", "dep:siphasher"]
 

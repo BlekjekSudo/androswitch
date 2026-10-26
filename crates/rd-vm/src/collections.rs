@@ -12,38 +12,44 @@
 //! backed by `m`. The universal idiom passes an empty, freshly created map,
 //! where the two behave the same: a documented deviation.
 
+use crate::collection_factories::{self as state, Contents};
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
-use crate::framework::HostObj;
-#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[cfg(not(feature = "std"))]
 #[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
 use crate::port_prelude::*;
 use crate::value::Value;
 
-fn host_elems(vm: &Engine, v: Option<&Value>) -> Option<Vec<Value>> {
-    match v {
-        Some(Value::Obj(r)) => match vm.fw.objects.get(r) {
-            Some(HostObj::List { elems }) | Some(HostObj::Iter { elems, .. }) => {
-                Some(elems.clone())
-            }
-            Some(HostObj::Map { entries }) => {
-                Some(entries.iter().map(|(k, _)| k.clone()).collect())
-            }
-            _ => None,
-        },
-        _ => None,
+fn host_elems(vm: &mut Engine, v: Option<&Value>) -> Result<Option<Vec<Value>>, VmExit> {
+    let Some(Value::Obj(r)) = v else {
+        return Ok(None);
+    };
+    let values = match state::snapshot(vm, *r)? {
+        Some(Contents::List(elems) | Contents::Set(elems) | Contents::Iterator { elems, .. }) => {
+            Some(elems)
+        }
+        Some(Contents::Map(entries)) => Some(entries.into_iter().map(|(k, _)| k).collect()),
+        None => None,
+    };
+    if let Some(values) = &values {
+        crate::shared_call::pin(vm, values);
     }
+    Ok(values)
 }
 
 pub(crate) fn new_list(vm: &mut Engine, class: &str, elems: Vec<Value>) -> Result<Value, VmExit> {
-    let r = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
-    vm.fw.objects.insert(r, HostObj::List { elems });
-    Ok(Value::Obj(r))
+    let contents = if class.contains("Set") {
+        Contents::Set(elems)
+    } else {
+        Contents::List(elems)
+    };
+    Ok(Value::Obj(state::create(vm, class, contents)?))
 }
 
 /// Materialize JDK `Collections.EMPTY_*` fields on first `sget-object`.
 /// AndroidX FragmentStore uses EMPTY_LIST as the no-fragments result; a null
 /// fallback is not equivalent because callers immediately iterate it.
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) fn host_static(
     vm: &mut Engine,
     class: &str,
@@ -58,22 +64,19 @@ pub(crate) fn host_static(
     let (class, state) = match name {
         "EMPTY_LIST" => (
             "Ljava/util/Collections$SingletonList;",
-            HostObj::List { elems: Vec::new() },
+            Contents::List(Vec::new()),
         ),
         "EMPTY_SET" | "EMPTY_SORTED_SET" => (
             "Ljava/util/Collections$UnmodifiableSet;",
-            HostObj::List { elems: Vec::new() },
+            Contents::List(Vec::new()),
         ),
         "EMPTY_MAP" | "EMPTY_SORTED_MAP" => (
             "Ljava/util/Collections$UnmodifiableMap;",
-            HostObj::Map {
-                entries: Vec::new(),
-            },
+            Contents::Map(Vec::new()),
         ),
         _ => return Ok(None),
     };
-    let r = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
-    vm.fw.objects.insert(r, state);
+    let r = state::create(vm, class, state)?;
     Ok(Some(Value::Obj(r)))
 }
 
@@ -89,11 +92,11 @@ pub(crate) fn static_intrinsic(
     }
     match (name, sig) {
         ("newSetFromMap", "(Ljava/util/Map;)Ljava/util/Set;") => {
-            let init = host_elems(vm, args.first()).unwrap_or_default();
+            let init = host_elems(vm, args.first())?.unwrap_or_default();
             Ok(Some(new_list(vm, "Ljava/util/LinkedHashSet;", init)?))
         }
         ("max", _) | ("min", _) => {
-            let Some(items) = host_elems(vm, args.first()) else {
+            let Some(items) = host_elems(vm, args.first())? else {
                 return Ok(None);
             };
             if items.is_empty() {
@@ -121,49 +124,43 @@ pub(crate) fn static_intrinsic(
                     "Collections.sort(null)",
                 )));
             };
-            let Some(HostObj::List { elems }) = vm.fw.objects.get(r) else {
+            let Some(Contents::List(items)) = state::snapshot(vm, *r)? else {
                 return Ok(None);
             };
-            let items = elems.clone();
+            crate::shared_call::pin(vm, &items);
             let cmp = args.get(1).filter(|v| !matches!(v, Value::Null)).cloned();
             let sorted = crate::arrays::merge_sort(vm, items, cmp.as_ref())?;
-            if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(r) {
-                *elems = sorted;
-            }
+            crate::jcollections::put_list(vm, *r, sorted)?;
             Ok(Some(Value::Null))
         }
         ("reverse", "(Ljava/util/List;)V") => {
             if let Some(Value::Obj(r)) = args.first() {
-                if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(r) {
+                if let Some(Contents::List(mut elems)) = state::snapshot(vm, *r)? {
                     elems.reverse();
+                    crate::jcollections::put_list(vm, *r, elems)?;
                     return Ok(Some(Value::Null));
                 }
             }
             Ok(None)
         }
         ("singletonMap", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/util/Map;") => {
-            let r = vm
-                .heap
-                .alloc_instance("Ljava/util/HashMap;".to_string(), Vec::new())?;
             let e = vec![(args[0].clone(), args[1].clone())];
-            vm.fw.objects.insert(r, HostObj::Map { entries: e });
+            let r = state::create(vm, state::MAP, Contents::Map(e))?;
             Ok(Some(Value::Obj(r)))
         }
         ("emptyIterator", "()Ljava/util/Iterator;") => {
-            let r = vm
-                .heap
-                .alloc_instance("Ljava/util/Iterator;".to_string(), Vec::new())?;
-            vm.fw.objects.insert(
-                r,
-                HostObj::Iter {
+            let r = state::create(
+                vm,
+                "Ljava/util/Iterator;",
+                Contents::Iterator {
                     elems: Vec::new(),
                     pos: 0,
                 },
-            );
+            )?;
             Ok(Some(Value::Obj(r)))
         }
         ("list", "(Ljava/util/Enumeration;)Ljava/util/ArrayList;") => {
-            let Some(items) = host_elems(vm, args.first()) else {
+            let Some(items) = host_elems(vm, args.first())? else {
                 return Ok(None);
             };
             Ok(Some(new_list(vm, "Ljava/util/ArrayList;", items)?))
@@ -180,8 +177,8 @@ pub(crate) fn static_intrinsic(
                 .unwrap_or(false);
             let heap_snapshot: Vec<Value>;
             let mut changed = false;
-            if let Some(HostObj::List { elems }) = vm.fw.objects.get(c) {
-                heap_snapshot = elems.clone();
+            if let Some(Contents::List(elems) | Contents::Set(elems)) = state::snapshot(vm, *c)? {
+                heap_snapshot = elems;
             } else {
                 return Ok(None);
             }
@@ -190,16 +187,90 @@ pub(crate) fn static_intrinsic(
                 if is_set
                     && out
                         .iter()
-                        .any(|x| crate::intrinsics::values_equal(&vm.heap, x, &v).unwrap_or(false))
+                        .any(|x| crate::java_values::values_equal(&vm.heap, x, &v).unwrap_or(false))
                 {
                     continue;
                 }
                 out.push(v);
                 changed = true;
             }
-            vm.fw.objects.insert(*c, HostObj::List { elems: out });
+            crate::jcollections::put_list(vm, *c, out)?;
             Ok(Some(Value::Int(changed as i32)))
         }
         _ => Ok(None),
     }
+}
+
+pub fn method_metadata(
+    class: &str,
+    name: &str,
+    sig: &str,
+) -> Option<crate::framework_host::HostMethodKind> {
+    if class != state::CLASS {
+        return None;
+    }
+    matches!(
+        (name, sig),
+        (
+            "max" | "min",
+            "(Ljava/util/Collection;)Ljava/lang/Object;"
+                | "(Ljava/util/Collection;Ljava/util/Comparator;)Ljava/lang/Object;"
+        ) | (
+            "sort",
+            "(Ljava/util/List;)V" | "(Ljava/util/List;Ljava/util/Comparator;)V"
+        ) | ("reverse", "(Ljava/util/List;)V")
+            | (
+                "singletonMap",
+                "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/util/Map;"
+            )
+            | ("emptyIterator", "()Ljava/util/Iterator;")
+            | ("list", "(Ljava/util/Enumeration;)Ljava/util/ArrayList;")
+            | ("addAll", "(Ljava/util/Collection;[Ljava/lang/Object;)Z")
+    )
+    .then_some(crate::framework_host::HostMethodKind::Static)
+}
+
+pub fn call_static(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if method_metadata(class, name, sig).is_none() {
+        return Ok(None);
+    }
+    let expected = match name {
+        "emptyIterator" => 0,
+        "singletonMap" | "addAll" => 2,
+        _ if sig.contains("Comparator;") => 2,
+        _ => 1,
+    };
+    if args.len() != expected {
+        return Err(
+            crate::err::vm_error("INVALID_ARG", "Collections utility argument count").into(),
+        );
+    }
+    crate::shared_call::with_values(vm, args, |vm| {
+        if matches!(name, "sort" | "reverse" | "addAll") {
+            let Some(Value::Obj(owner)) = args.first() else {
+                return Err(Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "collection is null",
+                )
+                .into());
+            };
+            if state::rejects_mutation(vm.heap.class_of(*owner)?, "clear", "()V") {
+                return Err(Throwable::new(
+                    "Ljava/lang/UnsupportedOperationException;",
+                    "immutable collection utility",
+                )
+                .into());
+            }
+            return crate::jcollections::with_product_call(vm, *owner, args, |vm| {
+                static_intrinsic(vm, class, name, sig, args)
+            });
+        }
+        static_intrinsic(vm, class, name, sig, args)
+    })
 }

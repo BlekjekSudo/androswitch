@@ -69,6 +69,46 @@ def verify_entries(root: Path, entries: list[dict]) -> tuple[list[dict], list[st
     return result, errors
 
 
+def shipping_cfg(expression: str, features: frozenset[str] = frozenset({"std"})) -> bool:
+    """Evaluate declaration feature cfgs for the actual shipping std profile.
+
+    Unknown predicates stay excluded. This is source selection only, never an
+    execution/behavior verification result.
+    """
+    tokens = re.findall(r'"[^"\\]*"|[A-Za-z_][A-Za-z_0-9]*|[=(),]', expression)
+    position = 0
+
+    def parse():
+        nonlocal position
+        if position >= len(tokens):
+            raise ValueError("incomplete cfg")
+        name = tokens[position]
+        position += 1
+        if position < len(tokens) and tokens[position] == "=":
+            position += 1
+            value = tokens[position].strip('"')
+            position += 1
+            return name == "feature" and value in features
+        if position < len(tokens) and tokens[position] == "(":
+            position += 1
+            values = []
+            while tokens[position] != ")":
+                values.append(parse())
+                if tokens[position] == ",":
+                    position += 1
+            position += 1
+            if name == "all": return all(values)
+            if name == "any": return any(values)
+            if name == "not" and len(values) == 1: return not values[0]
+        return False
+
+    try:
+        result = parse()
+        return result and position == len(tokens)
+    except (ValueError, IndexError):
+        return False
+
+
 def vm_routes(root: Path, upstream_paths: set[str]) -> list[dict]:
     """Read cfg declarations, not class-name presence or an API coverage claim."""
     text = (root / "crates/rd-vm/src/lib.rs").read_text(encoding="utf-8")
@@ -90,7 +130,9 @@ def vm_routes(root: Path, upstream_paths: set[str]) -> list[dict]:
         relative = path[len(prefix):]
         name = relative.split("/", 1)[0].removesuffix(".rs")
         attrs = declarations.get(name, [])
-        shared = name == "lib" or any("#[cfg(" not in a for a in attrs)
+        shared = name == "lib" or any(all(
+            shipping_cfg(expression) for expression in re.findall(r'#\[cfg\((.*?)\)\]', a)
+        ) for a in attrs)
         status = "shared-source-with-adapters" if shared else "host-only-original"
         routes.append({"path": path, "device_route": status,
                        "cfg": attrs,

@@ -26,21 +26,154 @@
 //! `VM_TYPE_ERROR`.
 //!
 //! **Deviations (documented).**
-//! - `subList` returns a copy, not a live view.
+//! - `subList` writes through for the most recent bounded set of host views.
 //! - Host `ListIterator`s iterate a snapshot; `add`/`set` through
 //!   them throw `UnsupportedOperationException` rather than silently
 //!   diverging.
 
+use crate::collection_factories::{self as state, Contents};
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
-use crate::framework::HostObj;
 use crate::heap::{ElemKind, ObjRef};
-#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[cfg(not(feature = "std"))]
 #[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
 use crate::port_prelude::*;
 use crate::value::Value;
 
 const ACC_ABSTRACT: u32 = 0x0400;
+
+#[derive(Default)]
+pub(crate) struct Views {
+    pub(crate) sublists: alloc::collections::BTreeMap<ObjRef, (ObjRef, usize, usize)>,
+    pub(crate) order: alloc::collections::VecDeque<ObjRef>,
+}
+impl Views {
+    pub(crate) fn collect(&mut self, marked: &[bool]) {
+        self.sublists
+            .retain(|r, _| marked.get(*r as usize).copied().unwrap_or(false));
+        self.order.retain(|r| self.sublists.contains_key(r));
+    }
+}
+
+/// Exact inherited overloads connected to the active collection owner.
+/// Class discovery alone never grants unrelated methods or signatures.
+pub fn method_metadata(
+    class: &str,
+    name: &str,
+    sig: &str,
+) -> Option<crate::framework_host::HostMethodKind> {
+    use crate::framework_host::HostMethodKind::{Constructor, Instance};
+    if matches!(class, "Ljava/util/Iterator;" | "Ljava/util/ListIterator;") {
+        return matches!(
+            (name, sig),
+            ("hasNext" | "hasPrevious", "()Z")
+                | ("next" | "previous", "()Ljava/lang/Object;")
+                | ("nextIndex" | "previousIndex", "()I")
+                | ("remove", "()V")
+                | ("add", "(Ljava/lang/Object;)V")
+                | ("set", "(Ljava/lang/Object;)V")
+        )
+        .then_some(Instance);
+    }
+    if !COLLECTION_TYPES.contains(&class) && !matches!(class, state::LIST | state::SET) {
+        return None;
+    }
+    let concrete = matches!(
+        class,
+        "Ljava/util/ArrayList;"
+            | "Ljava/util/LinkedList;"
+            | "Ljava/util/Vector;"
+            | "Ljava/util/HashSet;"
+            | "Ljava/util/LinkedHashSet;"
+    );
+    if name == "<init>" && sig == "(Ljava/util/Collection;)V" && concrete {
+        return Some(Constructor);
+    }
+    let list = matches!(
+        class,
+        "Ljava/util/List;"
+            | "Ljava/util/ArrayList;"
+            | "Ljava/util/LinkedList;"
+            | "Ljava/util/Vector;"
+            | "Ljava/util/AbstractList;"
+            | "Ljava/util/AbstractSequentialList;"
+            | state::LIST
+    );
+    (matches!(
+        (name, sig),
+        (
+            "addAll" | "removeAll" | "retainAll" | "containsAll",
+            "(Ljava/util/Collection;)Z"
+        ) | ("toArray", "()[Ljava/lang/Object;")
+            | ("toArray", "([Ljava/lang/Object;)[Ljava/lang/Object;")
+            | ("equals", "(Ljava/lang/Object;)Z")
+            | ("hashCode", "()I")
+            | ("toString", "()Ljava/lang/String;")
+    ) || (list
+        && matches!(
+            (name, sig),
+            ("addAll", "(ILjava/util/Collection;)Z")
+                | ("subList", "(II)Ljava/util/List;")
+                | ("lastIndexOf", "(Ljava/lang/Object;)I")
+                | (
+                    "listIterator",
+                    "()Ljava/util/ListIterator;" | "(I)Ljava/util/ListIterator;"
+                )
+        )))
+    .then_some(Instance)
+}
+
+pub fn with_product_call(
+    vm: &mut Engine,
+    recv: ObjRef,
+    args: &[Value],
+    operation: impl FnOnce(&mut Engine) -> Result<Option<Value>, VmExit>,
+) -> Result<Option<Value>, VmExit> {
+    let mut roots = Vec::with_capacity(args.len() + 1);
+    roots.push(Value::Obj(recv));
+    roots.extend_from_slice(args);
+    crate::shared_call::with_values(vm, &roots, |vm| {
+        sublist_refresh(vm, recv)?;
+        let result = operation(vm);
+        let published = sublist_write_back(vm, recv);
+        match result {
+            Err(error) => Err(error),
+            Ok(value) => {
+                published?;
+                Ok(value)
+            }
+        }
+    })
+}
+
+pub fn call(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    let mut inherited = class.to_string();
+    // Engine/interpreter already select concrete DEX overrides first. This
+    // walk resolves only inherited platform template methods on a DEX class.
+    if !COLLECTION_TYPES.contains(&class) && vm.cp.find_class(class).is_some() {
+        for _ in 0..64 {
+            let Some(parent) = vm.cp.superclass_of(&inherited) else {
+                break;
+            };
+            inherited = parent;
+            if COLLECTION_TYPES.contains(&inherited.as_str()) {
+                break;
+            }
+        }
+    }
+    if let Some(value) = instance_intrinsic(vm, &inherited, name, sig, recv, args)? {
+        return Ok(Some(value));
+    }
+    let actual = vm.heap.class_of(recv)?.to_string();
+    host_object_method(vm, &actual, recv, name, sig, args)
+}
 
 fn exc(c: &str, m: impl Into<String>) -> VmExit {
     VmExit::Exception(Throwable::new(c, m.into()))
@@ -68,16 +201,37 @@ pub(crate) fn guest_call(
     Ok(Some(vm.call(d, def, &m, a)?))
 }
 
-fn host_list(vm: &Engine, r: ObjRef) -> Option<Vec<Value>> {
-    match vm.fw.objects.get(&r) {
-        Some(HostObj::List { elems }) => Some(elems.clone()),
-        Some(HostObj::Iter { elems, pos }) => Some(elems[(*pos).min(elems.len())..].to_vec()),
+fn host_list(vm: &mut Engine, r: ObjRef) -> Result<Option<Vec<Value>>, VmExit> {
+    let values = match state::snapshot(vm, r)? {
+        Some(Contents::List(elems) | Contents::Set(elems)) => Some(elems),
+        Some(Contents::Iterator { elems, pos }) => Some(elems[pos.min(elems.len())..].to_vec()),
         _ => None,
+    };
+    if let Some(values) = &values {
+        crate::shared_call::pin(vm, values);
     }
+    Ok(values)
 }
 
-fn is_host_state(vm: &Engine, r: ObjRef) -> bool {
-    vm.fw.objects.contains_key(&r)
+fn is_host_state(vm: &Engine, r: ObjRef) -> Result<bool, VmExit> {
+    if vm.framework_host().is_some() {
+        return Ok(state::snapshot(vm, r)?.is_some());
+    }
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+    {
+        Ok(vm.fw.objects.contains_key(&r))
+    }
+    #[cfg(not(any(feature = "desktop-runtime", feature = "upstream-runtime")))]
+    Ok(false)
+}
+
+pub(crate) fn put_list(vm: &mut Engine, r: ObjRef, elems: Vec<Value>) -> Result<(), VmExit> {
+    let contents = if is_set(vm, r) {
+        Contents::Set(elems)
+    } else {
+        Contents::List(elems)
+    };
+    state::replace(vm, r, contents)
 }
 
 /// Elements of any Java `Collection`/`Iterable`: host or app-defined.
@@ -91,7 +245,7 @@ pub(crate) fn elems_of(vm: &mut Engine, v: &Value) -> Result<Vec<Value>, VmExit>
             ))
         }
     };
-    if let Some(e) = host_list(vm, r) {
+    if let Some(e) = host_list(vm, r)? {
         return Ok(e);
     }
     if vm.heap.as_array_elems(r).is_ok() {
@@ -116,7 +270,10 @@ pub(crate) fn elems_of(vm: &mut Engine, v: &Value) -> Result<Vec<Value>, VmExit>
                 ));
             }
             match guest_call(vm, r, "get", "(I)Ljava/lang/Object;", &[Value::Int(i)])? {
-                Some(e) => out.push(e),
+                Some(e) => {
+                    crate::shared_call::pin(vm, core::slice::from_ref(&e));
+                    out.push(e)
+                }
                 None => break,
             }
         }
@@ -134,19 +291,18 @@ fn drain_iterator(vm: &mut Engine, it: Value) -> Result<Vec<Value>, VmExit> {
     let Value::Obj(it) = it else {
         return Ok(Vec::new());
     };
-    if let Some(e) = host_list(vm, it) {
+    if let Some(e) = host_list(vm, it)? {
         return Ok(e);
     }
+    crate::shared_call::pin(vm, &[Value::Obj(it)]);
     let mut out = Vec::new();
     loop {
-        let has = guest_call(vm, it, "hasNext", "()Z", &[])?.map(|v| v.as_int().unwrap_or(0) != 0);
-        match has {
-            Some(true) => match guest_call(vm, it, "next", "()Ljava/lang/Object;", &[])? {
-                Some(e) => out.push(e),
-                None => break,
-            },
-            _ => break,
+        if vm.invoke_instance(it, "hasNext", "()Z", &[])?.as_int()? == 0 {
+            break;
         }
+        let e = vm.invoke_instance(it, "next", "()Ljava/lang/Object;", &[])?;
+        crate::shared_call::pin(vm, core::slice::from_ref(&e));
+        out.push(e);
         if out.len() > 10_000_000 {
             return Err(exc(
                 "Ljava/lang/OutOfMemoryError;",
@@ -169,7 +325,7 @@ fn contains(vm: &mut Engine, items: &[Value], x: &Value) -> Result<bool, VmExit>
 fn is_set(vm: &Engine, r: ObjRef) -> bool {
     vm.heap
         .class_of(r)
-        .map(|c| c.contains("Set"))
+        .map(|c| vm.cp.is_subtype(c, "Ljava/util/Set;"))
         .unwrap_or(false)
 }
 
@@ -177,63 +333,75 @@ fn is_set(vm: &Engine, r: ObjRef) -> bool {
 /// back to snapshot semantics).
 const MAX_SUBLIST_VIEWS: usize = 1024;
 
-fn register_sublist(vm: &mut Engine, view: &Value, parent: ObjRef, offset: usize, len: usize) {
-    let Value::Obj(v) = view else { return };
-    vm.fw.sublists.insert(*v, (parent, offset, len));
-    vm.fw.sublist_order.push_back(*v);
-    while vm.fw.sublist_order.len() > MAX_SUBLIST_VIEWS {
-        if let Some(old) = vm.fw.sublist_order.pop_front() {
-            vm.fw.sublists.remove(&old);
+fn register_sublist(
+    vm: &mut Engine,
+    view: &Value,
+    parent: ObjRef,
+    offset: usize,
+    len: usize,
+) -> Result<(), VmExit> {
+    let Value::Obj(v) = view else { return Ok(()) };
+    crate::err::put_field_result(
+        vm.heap
+            .put_field(*v, "rd$sublistParent", Value::Obj(parent)),
+    )?;
+    vm.collection_views
+        .sublists
+        .insert(*v, (parent, offset, len));
+    vm.collection_views.order.push_back(*v);
+    while vm.collection_views.order.len() > MAX_SUBLIST_VIEWS {
+        if let Some(old) = vm.collection_views.order.pop_front() {
+            vm.collection_views.sublists.remove(&old);
         }
     }
+    Ok(())
 }
 
 /// `List.subList` is a *view* (JDK): before an operation on it, re-read
 /// its window of the parent so parent writes are visible through the view.
-pub(crate) fn sublist_refresh(vm: &mut Engine, view: ObjRef) {
-    let Some(&(parent, off, len)) = vm.fw.sublists.get(&view) else {
-        return;
+pub(crate) fn sublist_refresh(vm: &mut Engine, view: ObjRef) -> Result<(), VmExit> {
+    let Some(&(parent, off, len)) = vm.collection_views.sublists.get(&view) else {
+        return Ok(());
     };
-    sublist_refresh(vm, parent);
-    let window = match vm.fw.objects.get(&parent) {
-        Some(HostObj::List { elems }) if off + len <= elems.len() => elems[off..off + len].to_vec(),
-        _ => return,
+    sublist_refresh(vm, parent)?;
+    let Some(elems) = host_list(vm, parent)? else {
+        return Ok(());
     };
-    if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&view) {
-        *elems = window;
+    if let Some(window) = elems.get(off..off.saturating_add(len)) {
+        put_list(vm, view, window.to_vec())?;
     }
+    Ok(())
 }
 
-/// After an operation on a `subList` view, write its contents back into
-/// the parent's window (and up the chain for nested views), so idioms such
-/// as `list.subList(a, b).clear()`, `Collections.sort(list.subList(..))`
-/// or `subList.set(i, x)` modify the backing list as on the JDK.
-pub(crate) fn sublist_write_back(vm: &mut Engine, view: ObjRef) {
+/// The inherited bounded subList graph, with writes published to its active owner.
+pub(crate) fn sublist_write_back(vm: &mut Engine, view: ObjRef) -> Result<(), VmExit> {
     let mut cur = view;
-    while let Some(&(parent, off, len)) = vm.fw.sublists.get(&cur) {
-        let now = match vm.fw.objects.get(&cur) {
-            Some(HostObj::List { elems }) => elems.clone(),
-            _ => return,
+    while let Some(&(parent, off, len)) = vm.collection_views.sublists.get(&cur) {
+        let Some(now) = host_list(vm, cur)? else {
+            return Ok(());
         };
         let new_len = now.len();
-        match vm.fw.objects.get_mut(&parent) {
-            Some(HostObj::List { elems }) if off + len <= elems.len() => {
-                if new_len == len && elems[off..off + len] == now[..] {
-                    return;
-                }
-                elems.splice(off..off + len, now);
-            }
-            _ => return,
+        let Some(mut elems) = host_list(vm, parent)? else {
+            return Ok(());
+        };
+        if off.saturating_add(len) > elems.len() {
+            return Ok(());
         }
-        vm.fw.sublists.insert(cur, (parent, off, new_len));
+        if new_len == len && elems[off..off + len] == now[..] {
+            return Ok(());
+        }
+        elems.splice(off..off + len, now);
+        put_list(vm, parent, elems)?;
+        vm.collection_views
+            .sublists
+            .insert(cur, (parent, off, new_len));
         cur = parent;
     }
+    Ok(())
 }
 
 fn new_host(vm: &mut Engine, class: &str, elems: Vec<Value>) -> Result<Value, VmExit> {
-    let r = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
-    vm.fw.objects.insert(r, HostObj::List { elems });
-    Ok(Value::Obj(r))
+    Ok(Value::Obj(state::create(vm, class, Contents::List(elems))?))
 }
 
 fn new_iter(
@@ -242,10 +410,11 @@ fn new_iter(
     elems: Vec<Value>,
     pos: usize,
 ) -> Result<Value, VmExit> {
-    let r = vm
-        .heap
-        .alloc_instance("Ljava/util/ListIterator;".to_string(), Vec::new())?;
-    vm.fw.objects.insert(r, HostObj::Iter { elems, pos });
+    let r = state::create(
+        vm,
+        "Ljava/util/ListIterator;",
+        Contents::Iterator { elems, pos },
+    )?;
     crate::jiterator::bind(vm, r, owner)?;
     Ok(Value::Obj(r))
 }
@@ -327,8 +496,11 @@ fn map_val_to_string(vm: &mut Engine, me: ObjRef, v: &Value) -> Result<String, V
 }
 
 fn map_entries_of(vm: &mut Engine, other: ObjRef) -> Result<Option<Vec<(Value, Value)>>, VmExit> {
-    if let Some(HostObj::Map { entries }) = vm.fw.objects.get(&other) {
-        return Ok(Some(entries.clone()));
+    if let Some(Contents::Map(entries)) = state::snapshot(vm, other)? {
+        for (key, value) in &entries {
+            crate::shared_call::pin(vm, &[key.clone(), value.clone()]);
+        }
+        return Ok(Some(entries));
     }
     let oc = vm.heap.class_of(other)?.to_string();
     if !vm.cp.is_subtype(&oc, "Ljava/util/Map;") {
@@ -347,12 +519,15 @@ fn map_entries_of(vm: &mut Engine, other: ObjRef) -> Result<Option<Vec<(Value, V
 }
 
 const COLLECTION_TYPES: &[&str] = &[
+    state::LIST,
+    state::SET,
     "Ljava/lang/Iterable;",
     "Ljava/util/Collection;",
     "Ljava/util/List;",
     "Ljava/util/Set;",
     "Ljava/util/ArrayList;",
     "Ljava/util/LinkedList;",
+    "Ljava/util/Vector;",
     "Ljava/util/HashSet;",
     "Ljava/util/LinkedHashSet;",
     "Ljava/util/AbstractCollection;",
@@ -376,6 +551,9 @@ pub(crate) fn instance_intrinsic(
         mref_class,
         "Ljava/util/ListIterator;" | "Ljava/util/Iterator;"
     ) {
+        if method_metadata(mref_class, name, sig).is_none() {
+            return Ok(None);
+        }
         return crate::jiterator::navigate(vm, recv, name);
     }
 
@@ -401,8 +579,8 @@ pub(crate) fn instance_intrinsic(
             return Ok(None);
         }
     }
-    let host = match vm.fw.objects.get(&recv) {
-        Some(HostObj::List { elems }) => Some(elems.clone()),
+    let host = match state::snapshot(vm, recv)? {
+        Some(Contents::List(elems) | Contents::Set(elems)) => Some(elems),
         None if name == "<init>"
             && sig == "(Ljava/util/Collection;)V"
             && !mref_class.contains("Abstract")
@@ -416,6 +594,7 @@ pub(crate) fn instance_intrinsic(
         _ => None,
     };
     if let Some(mut items) = host {
+        crate::shared_call::pin(vm, &items);
         let set = is_set(vm, recv);
         let r = match (name, sig) {
             ("<init>", "(Ljava/util/Collection;)V") => {
@@ -427,7 +606,7 @@ pub(crate) fn instance_intrinsic(
                     }
                     out.push(e);
                 }
-                vm.fw.objects.insert(recv, HostObj::List { elems: out });
+                put_list(vm, recv, out)?;
                 return Ok(Some(Value::Null));
             }
             ("addIfAbsent", "(Ljava/lang/Object;)Z") => {
@@ -507,7 +686,7 @@ pub(crate) fn instance_intrinsic(
             ("subList", "(II)Ljava/util/List;") => {
                 let (a, b) = range(items.len(), args[0].as_int()?, args[1].as_int()?)?;
                 let view = new_host(vm, "Ljava/util/ArrayList;", items[a..b].to_vec())?;
-                register_sublist(vm, &view, recv, a, b - a);
+                register_sublist(vm, &view, recv, a, b - a)?;
                 return Ok(Some(view));
             }
             ("lastIndexOf", "(Ljava/lang/Object;)I") => {
@@ -536,11 +715,11 @@ pub(crate) fn instance_intrinsic(
             }
             _ => return Ok(None),
         };
-        vm.fw.objects.insert(recv, HostObj::List { elems: items });
+        put_list(vm, recv, items)?;
         return Ok(Some(r));
     }
     // ── DEX subclasses inheriting the JDK template methods ──────────────
-    if is_host_state(vm, recv) {
+    if is_host_state(vm, recv)? {
         return Ok(None);
     }
     let rc = vm.heap.class_of(recv)?.to_string();
@@ -550,7 +729,7 @@ pub(crate) fn instance_intrinsic(
     let is_list = matches!(
         mref_class,
         "Ljava/util/AbstractList;" | "Ljava/util/List;" | "Ljava/util/AbstractSequentialList;"
-    ) || crate::jlclass::assignable(vm, "Ljava/util/AbstractList;", &rc);
+    ) || vm.cp.is_subtype(&rc, "Ljava/util/AbstractList;");
     let me = Value::Obj(recv);
     Ok(Some(match (name, sig) {
         ("<init>", "()V") if mref_class.starts_with("Ljava/util/Abstract") => Value::Null,
@@ -729,8 +908,8 @@ pub(crate) fn instance_intrinsic(
             let (a, b) = range(items.len(), args[0].as_int()?, args[1].as_int()?)?;
             let view = new_host(vm, "Ljava/util/ArrayList;", items[a..b].to_vec())?;
             if let Value::Obj(parent) = me {
-                if vm.fw.objects.contains_key(&parent) {
-                    register_sublist(vm, &view, parent, a, b - a);
+                if is_host_state(vm, parent)? {
+                    register_sublist(vm, &view, parent, a, b - a)?;
                 }
             }
             view
@@ -814,8 +993,10 @@ pub(crate) fn host_object_method(
     }
     crate::arrays::with_host_reentrant(vm, |vm| {
         if recv_class.starts_with("Ljava/") {
-            if let Some(HostObj::Map { entries }) = vm.fw.objects.get(&recv) {
-                let entries = entries.clone();
+            if let Some(Contents::Map(entries)) = state::snapshot(vm, recv)? {
+                for (key, value) in &entries {
+                    crate::shared_call::pin(vm, &[key.clone(), value.clone()]);
+                }
                 return Ok(Some(match name {
                     "hashCode" => {
                         let mut h: i32 = 0;
@@ -878,10 +1059,11 @@ pub(crate) fn host_object_method(
                 }));
             }
         }
-        let items = match vm.fw.objects.get(&recv) {
-            Some(HostObj::List { elems }) => elems.clone(),
+        let items = match state::snapshot(vm, recv)? {
+            Some(Contents::List(elems) | Contents::Set(elems)) => elems,
             _ => return Ok(None),
         };
+        crate::shared_call::pin(vm, &items);
         let is_set = vm.cp.is_subtype(recv_class, "Ljava/util/Set;");
         Ok(Some(match name {
             "hashCode" => {

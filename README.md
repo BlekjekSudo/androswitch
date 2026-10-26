@@ -27,9 +27,11 @@ execution-owner and persistent-storage contracts. See the
 emulator and hardware evidence.
 The std probe now passes **32/32 in three consecutive runs**; the combined
 NRO passes the available **216 conformance cases**, eleven console sessions,
-and normal process exit after graphics/audio. Three emulator PCV queries and
-new std hardware verification remain unrun. This does not complete upstream
-Android API parity or the independent-game first-screen gate.
+and normal process exit after graphics/audio. Three emulator PCV queries remain
+unrun. The user confirmed **219/219 on physical Switch for the prior std
+candidate**; its [receipt](reports/conformance-std-hardware-20261026.json) records
+the package context and missing raw device journal/hash. It does not qualify
+subsequent binaries, complete API parity or the independent-game first-screen gate.
 Latest upstream Arrays/BitSet code and lazy parser improvements now share the
 portable path; source synchronization is kept separate from execution evidence.
 
@@ -43,13 +45,19 @@ See the [complete port plan](docs/UPSTREAM_PARITY_PLAN.md) and
 [parity checkpoint report](docs/UPSTREAM_PARITY_REPORT.md). SDK declaration
 metadata is supplemental type information, not implementation coverage.
 
+The [shared collections/text port](docs/UPSTREAM_COLLECTIONS_TEXT.md) connects
+six inherited modules to the product's collection owner, shared heap and
+Engine-owned regex state. The duplicate product builder map was removed.
+Eighty-five original VM sources remain outside the default device profile;
+this is a source inventory, not an API percentage.
+
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
-219 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,
+257 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,
 inspect results and export JSON from one installation. See [scope and actual
 platform observations](docs/CONFORMANCE_SUITE.md); this is not official CTS or
 complete Android coverage.
 
-Latest unified-SDK Ryujinx baseline: **216 PASS, 3 NOT_RUN** across 20 sessions.
+Earlier 219-case unified-SDK Ryujinx baseline: **216 PASS, 3 NOT_RUN** across 20 sessions.
 The user subsequently confirmed **219/219 PASS on a physical Switch**; see the
 [hardware feedback record](reports/conformance-hardware-20261025.json). The emulator
 keeps three clock queries NOT_RUN because its PCV command is absent. All nine GLES and six Vulkan
@@ -106,7 +114,7 @@ Actual submitted console framebuffer from the M7 Ryujinx test.
 | Native ARM64 | Program-header ELF loader, dependencies, constructors, supported relocations/TLS and real libnx execution |
 | JNI | Native registration, callbacks/reentry, strings, primitive arrays, exception/reference/GC and pthread callback proof |
 | Ryujinx E2E | DEX semantics, persistent storage, native CPU oracle and mixed Java/Kotlin JNI fixtures; see milestone evidence |
-| Merged upstream VM regression | 704 active std-reference tests pass; the earlier core/alloc checkpoint had three additional adapter-only unit tests; device API parity remains a separate gate |
+| Merged upstream VM regression | 706 std-reference tests pass, with all 50 original integration routes; native/JIT zero-case targets remain unverified; device API parity is separate |
 | Android lifecycle/UI | Supported M5 subset; 14 Java/Kotlin UI snapshots pass in Ryujinx |
 | Native graphics/audio | NativeActivity, incremental assets, input queue, EGL/GLES2; Java AudioTrack, AAudio writes and OpenSL ES PCM queue callbacks |
 | Console launcher | Scan/install/update/launch/return/uninstall; persistent saves, named failures and one NRO |
@@ -150,7 +158,7 @@ See [M7 storage improvements](docs/M7_STORAGE_E2E.md) for the new I/O path and l
   adding package-name branches, game profiles or title-specific hooks.
 - DEX interpretation and native ARM64 libraries connected
   through real JNI objects, methods and references.
-- A portable `no_std + alloc` core with explicit libnx platform adapters.
+- A portable core with core/alloc interfaces, real Horizon std and explicit libnx adapters.
 - Offline, one-app-at-a-time operation for the first release; no Python,
   Unicorn or guest Linux kernel in the device build.
 - A console launcher with an installed-app list and persistent Android-style

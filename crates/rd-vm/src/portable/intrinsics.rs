@@ -62,6 +62,9 @@ pub fn call_static_intrinsic(
     if let Some(value) = crate::collection_factories::call_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
+    if let Some(value) = crate::collections::call_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
     if let Some(value) = crate::jbitset::static_intrinsic(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
@@ -82,6 +85,10 @@ pub fn call_static_intrinsic(
         return Ok(Some(value));
     }
     if let Some(value) = crate::portable::file::call_static(vm, class, name, sig, args)? {
+        return Ok(Some(value));
+    }
+    #[cfg(feature = "std")]
+    if let Some(value) = crate::shared_text::call_static(vm, class, name, sig, args)? {
         return Ok(Some(value));
     }
     if let Some(host) = vm.framework_host() {
@@ -192,10 +199,13 @@ pub fn call_instance_intrinsic_mref(
     )? {
         return Ok(Some(value));
     }
-    // String is final. Virtual Object/CharSequence calls must select its
-    // existing value-method implementation, just like direct String calls.
+    // These text classes are final. Virtual Object/CharSequence calls must
+    // select the same implementation and heap buffer as direct calls.
     // Keep declaring-class dispatch for file constructors and other receivers.
-    let value_class = if receiver_class == "Ljava/lang/String;" {
+    let value_class = if matches!(
+        receiver_class,
+        "Ljava/lang/String;" | "Ljava/lang/StringBuilder;" | "Ljava/lang/StringBuffer;"
+    ) {
         receiver_class
     } else {
         declaring_class
@@ -203,10 +213,13 @@ pub fn call_instance_intrinsic_mref(
     if let Some(value) = crate::portable::file::call(vm, value_class, name, sig, receiver, args)? {
         return Ok(Some(value));
     }
+    #[cfg(feature = "std")]
+    if let Some(value) = crate::shared_text::call(vm, value_class, name, sig, receiver, args)? {
+        return Ok(Some(value));
+    }
     Ok(None)
 }
 
-#[cfg(feature = "upstream-runtime")]
 pub(crate) use crate::java_values::object_to_string;
 #[cfg(feature = "upstream-runtime")]
 pub use crate::upstream_intrinsics::{

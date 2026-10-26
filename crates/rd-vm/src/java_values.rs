@@ -69,44 +69,55 @@ pub(crate) fn object_to_string(vm: &mut Engine, r: crate::heap::ObjRef) -> Resul
     if let Ok(HeapObj::Str(s)) = vm.heap.get(r) {
         return Ok(s.clone());
     }
-    crate::arrays::with_host_reentrant(vm, |vm| {
-        let cls = vm.heap.class_of(r)?.to_string();
-        match crate::intrinsics::call_instance_intrinsic_mref(
-            vm,
-            &cls,
-            &cls,
-            "toString",
-            "()Ljava/lang/String;",
-            r,
-            &[],
-        )? {
-            Some(Value::Obj(sref)) => Ok(vm.heap.as_str(sref)?.to_string()),
-            Some(Value::Null) => Ok("null".to_string()),
-            Some(_) => Err(crate::err::vm_error(
-                "INVALID_FORMAT",
-                format!("{cls}->toString() retornou não-string"),
-            )
-            .into()),
-            None => {
-                // classe declara toString no DEX: executa de verdade
-                if let Some((dex_idx, def, m)) =
-                    vm.cp
-                        .resolve_method(&cls, "toString", "()Ljava/lang/String;")
-                {
-                    match vm.call(dex_idx, def, &m, vec![Value::Obj(r)])? {
-                        Value::Obj(sref) => Ok(vm.heap.as_str(sref)?.to_string()),
-                        Value::Null => Ok("null".to_string()),
-                        _ => Err(crate::err::vm_error(
-                            "INVALID_FORMAT",
-                            format!("{cls}->toString() retornou não-string"),
-                        )
-                        .into()),
-                    }
-                } else {
-                    Ok(default_to_string(&cls, r))
+    crate::value_recursion::with(vm, crate::value_recursion::Key::String(r), |vm| {
+        crate::arrays::with_host_reentrant(vm, |vm| {
+            let cls = vm.heap.class_of(r)?.to_string();
+            let mut result = crate::intrinsics::call_instance_intrinsic_mref(
+                vm,
+                &cls,
+                &cls,
+                "toString",
+                "()Ljava/lang/String;",
+                r,
+                &[],
+            )?;
+            if result.is_none() {
+                // Product objects keep their state in the bound framework owner.
+                // Resolve its value method before the inherited Object identity
+                // fallback, without consulting a disconnected reference store.
+                if let Some(host) = vm.framework_host() {
+                    result = host.call(vm, &cls, "toString", "()Ljava/lang/String;", r, &[])?;
                 }
             }
-        }
+            match result {
+                Some(Value::Obj(sref)) => Ok(vm.heap.as_str(sref)?.to_string()),
+                Some(Value::Null) => Ok("null".to_string()),
+                Some(_) => Err(crate::err::vm_error(
+                    "INVALID_FORMAT",
+                    format!("{cls}->toString() retornou não-string"),
+                )
+                .into()),
+                None => {
+                    // classe declara toString no DEX: executa de verdade
+                    if let Some((dex_idx, def, m)) =
+                        vm.cp
+                            .resolve_method(&cls, "toString", "()Ljava/lang/String;")
+                    {
+                        match vm.call(dex_idx, def, &m, vec![Value::Obj(r)])? {
+                            Value::Obj(sref) => Ok(vm.heap.as_str(sref)?.to_string()),
+                            Value::Null => Ok("null".to_string()),
+                            _ => Err(crate::err::vm_error(
+                                "INVALID_FORMAT",
+                                format!("{cls}->toString() retornou não-string"),
+                            )
+                            .into()),
+                        }
+                    } else {
+                        Ok(default_to_string(&cls, r))
+                    }
+                }
+            }
+        })
     })
 }
 

@@ -25,9 +25,8 @@
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
-use crate::framework::HostObj;
 use crate::heap::{ElemKind, ObjRef};
-#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[cfg(not(feature = "std"))]
 #[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
 use crate::port_prelude::*;
 use crate::value::Value;
@@ -656,13 +655,7 @@ pub(crate) fn static_intrinsic(
         }
         ("join", "(Ljava/lang/CharSequence;Ljava/lang/Iterable;)Ljava/lang/String;") => {
             let d = charseq(vm, &args[0])?;
-            let elems = match &args[1] {
-                Value::Obj(r) => match vm.fw.get(*r) {
-                    Some(HostObj::List { elems }) => elems.clone(),
-                    _ => return Ok(None), // DEX Iterable: explicit gap
-                },
-                _ => return Err(npe("String.join(_, null)")),
-            };
+            let elems = crate::jcollections::elems_of(vm, &args[1])?;
             let mut parts = Vec::new();
             for e in elems {
                 parts.push(match e {
@@ -677,14 +670,16 @@ pub(crate) fn static_intrinsic(
 }
 
 fn obj_array(vm: &mut Engine, v: Option<&Value>) -> Result<Vec<Value>, VmExit> {
-    match v {
-        Some(Value::Obj(r)) => Ok(vm
+    let values = match v {
+        Some(Value::Obj(r)) => vm
             .heap
             .array_elems_mut(*r)
             .map_err(|e| VmExit::from(crate::err::vm_error("VM_TYPE_ERROR", e)))?
-            .clone()),
-        _ => Ok(Vec::new()),
-    }
+            .clone(),
+        _ => Vec::new(),
+    };
+    crate::shared_call::pin(vm, &values);
+    Ok(values)
 }
 
 /// (decimal separator, grouping separator) for a Locale argument.
@@ -1139,7 +1134,7 @@ fn sign_pad(digits: String, neg: bool, width: usize, flags: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[cfg(not(feature = "std"))]
     #[allow(unused_imports)]
     use crate::port_prelude::*;
 

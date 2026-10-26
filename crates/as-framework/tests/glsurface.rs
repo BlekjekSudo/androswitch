@@ -317,7 +317,7 @@ fn negotiated_portrait_updates_real_framework_state_and_active_rotation_fails_cl
         assert_eq!(backend.rotations.borrow().len(), before);
         assert_eq!(requested_orientation(&mut app), 1);
         app.android.touch(&mut app.vm, 0, 680., 1200.).unwrap();
-        assert!(status(&mut app).contains("T0:1:680:1200;"));
+        assert!(status(&mut app).contains("T0:1:680.0:1200.0;"));
     }
 }
 #[test]
@@ -469,10 +469,7 @@ fn dex_custom_egl_chooser_renderer_gc_queue_dirty_pause_and_recreation_share_con
         assert!(status(&mut app).ends_with("C16;S;Z1280:720;D;"));
         app.android.touch(&mut app.vm, 0, 1100., 600.).unwrap();
         let touch = status(&mut app);
-        assert!(
-            touch.contains("T0:1:1100") && touch.ends_with("600;"),
-            "{touch}"
-        );
+        assert!(touch.ends_with("T0:1:1100.0:600.0;"), "{touch}");
         app.vm
             .invoke_static(ACTIVITY, "consumeTouches", "()V", &[])
             .unwrap();

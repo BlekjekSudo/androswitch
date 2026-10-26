@@ -131,7 +131,7 @@ hashes. Binary qualification uses **NRO52** from `ed59460`, SHA-256
 | Console workflow | **11 completed sessions** | Java/Kotlin UI, persistence/update/uninstall, mixed/native media and display handoffs; original unknown-service fixture now completes normally |
 | Normal product exit | **586 native frames, two inputs, 12,000 audio frames; std shutdown 0** | Actual C return/atexit and guest OS exit observed after native graphics/audio |
 | Combined std/native observations | **3 cores versus kernel 3; wall clocks within 9 ms** | Actual observed process values, not fixed hardware assumptions |
-| Physical Switch | **Not run for this std binary** | Earlier user-reported 219/219 applies only to its original artifact |
+| Physical Switch | **219/219 PASS, user reported 2026-10-26** | Prior std candidate NRO `a3a34bab...`; raw device journal/hash not supplied; [receipt](../reports/conformance-std-hardware-20261026.json) |
 
 Two short conformance batches retained one genuinely interrupted lifecycle
 observation. A subsequent session used the unchanged APK's ordinary Previous

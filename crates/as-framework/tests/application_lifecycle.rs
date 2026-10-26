@@ -424,14 +424,9 @@ fn suffix_and_object_equality_preserve_jvm_null_unicode_override_and_super_behav
                 "(I)I",
                 &[Value::Int(case)],
             );
-            if (26..=29).contains(&case) {
-                assert_eq!(expected, "1", "JVM collection equality is value based");
-                assert!(
-                    matches!(actual, Err(VmExit::Error(ref e)) if e.code=="API_UNAVAILABLE" && e.cause.contains("Object.equals")),
-                    "{fixture} case {index}: {actual:?}"
-                );
-                continue;
-            }
+            // Collection value methods now share the active product store.
+            // Cases 26..29 (including DEX subclasses) must match the JVM,
+            // rather than retaining the earlier API_UNAVAILABLE expectation.
             assert_eq!(
                 actual.unwrap(),
                 Value::Int(expected.parse().unwrap()),

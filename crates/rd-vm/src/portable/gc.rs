@@ -34,6 +34,8 @@ impl Engine {
                 continue;
             }
             marked[object as usize] = true;
+            #[cfg(feature = "std")]
+            roots.extend(crate::jregex::references(self, object));
             if let Some(framework) = self.framework_host() {
                 roots.extend(framework.references(object));
             }
@@ -48,6 +50,9 @@ impl Engine {
             }
         }
         let mut freed = 0;
+        self.collection_views.collect(&marked);
+        #[cfg(feature = "std")]
+        crate::jregex::gc_purge(self, &|r| marked.get(r as usize).copied().unwrap_or(false));
         if let Some(framework) = self.framework_host() {
             framework.collect(&marked);
         }

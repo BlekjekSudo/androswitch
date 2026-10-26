@@ -193,3 +193,9 @@ the direct aggregate report and the absence of an archived raw journal/device
 binary hash. The hardware bundle contains all 219 cases and no exclusion files.
 This closes the suite target at the user-reported hardware evidence level; the
 independent-game and Android-reference gates remain separate.
+
+The std candidate with NRO `a3a34bab...` has a separate
+[user-reported hardware result](../reports/conformance-std-hardware-20261026.json):
+**219/219 PASS on 2026-10-26**. Later collection-port binaries remain unqualified
+by that report. Complete upstream behavior parity is the active requirement;
+external-game retesting follows that integration work.

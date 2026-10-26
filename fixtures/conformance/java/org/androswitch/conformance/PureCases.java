@@ -1,5 +1,18 @@
 package org.androswitch.conformance;
 public final class PureCases {
+  private static final class ReadList extends java.util.AbstractList<String> {
+    public int size() { return 3; }
+    public String get(int index) {
+      if (index < 0 || index >= 3) throw new IndexOutOfBoundsException();
+      return index == 1 ? "b" : "a";
+    }
+  }
+  private static final class ReadCollection extends java.util.AbstractCollection<String> {
+    public int size() { return 3; }
+    public java.util.Iterator<String> iterator() {
+      return java.util.Arrays.asList("a", "b", "a").iterator();
+    }
+  }
   public static final class Fields {
     public static final int number = 61;
     public String label = "field";
@@ -464,11 +477,197 @@ public final class PureCases {
       case 96: {
         return Integer.toHexString(32767);
       }
+      case 97: {
+        java.util.Set<String> s = new java.util.HashSet<String>(java.util.Arrays.asList("a", new String("a"), null));
+        return s.size() + ":" + s.contains("a") + ":" + s.contains(null);
+      }
+      case 98: {
+        java.util.Collection<String> src = java.util.Arrays.asList("a", "b");
+        return new java.util.ArrayList<String>(src).size() + ":"
+            + new java.util.LinkedList<String>(src).size() + ":" + new java.util.Vector<String>(src).size()
+            + ":" + new java.util.LinkedHashSet<String>(src).size();
+      }
+      case 99: {
+        java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+        return l.addAll(l) + ":" + l.toString();
+      }
+      case 100: {
+        java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b", "a"));
+        boolean kept = l.retainAll(java.util.Collections.singleton("a"));
+        boolean removed = l.removeAll(java.util.Collections.singleton("a"));
+        return kept + ":" + removed + ":" + l.isEmpty();
+      }
+      case 101: {
+        java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+        String[] dest = new String[] {"x", "x", "x", "x"};
+        return (l.toArray(dest) == dest) + ":" + java.util.Arrays.toString(dest);
+      }
+      case 102: {
+        java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b", "c", "d"));
+        java.util.List<String> v = l.subList(1, 4);
+        java.util.List<String> n = v.subList(1, 2);
+        System.gc(); n.clear();
+        l.set(1, "z");
+        return l.toString() + ":" + v.toString();
+      }
+      case 103: {
+        java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+        java.util.ListIterator<String> it = l.listIterator(1);
+        String before = it.previous(); it.remove(); System.gc();
+        return before + ":" + it.nextIndex() + ":" + it.next() + ":" + it.hasNext() + ":" + l;
+      }
+      case 104: {
+        java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+        java.util.ListIterator<String> it = l.listIterator();
+        try { it.remove(); return "missing exception"; }
+        catch (IllegalStateException expected) { return it.next(); }
+      }
+      case 105: {
+        ReadList src = new ReadList();
+        java.util.Set<String> set = new java.util.HashSet<String>(src);
+        return set.size() + ":" + set.containsAll(src) + ":" + src.indexOf("b") + ":" + src.lastIndexOf("a");
+      }
+      case 106: {
+        ReadCollection src = new ReadCollection();
+        java.util.List<String> dst = new java.util.ArrayList<String>(src);
+        return dst.toString() + ":" + src.contains("b") + ":" + src.isEmpty();
+      }
+      case 107: {
+        java.util.List<String> a = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+        java.util.List<String> b = new java.util.LinkedList<String>(a);
+        return a.equals(b) + ":" + (a.hashCode() == b.hashCode()) + ":" + a;
+      }
+      case 108: {
+        java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("b", "a", "c"));
+        String range = java.util.Collections.min(l) + ":" + java.util.Collections.max(l);
+        java.util.Collections.sort(l); java.util.Collections.reverse(l);
+        return range + ":" + l;
+      }
+      case 109: {
+        java.util.Map<String,String> m = java.util.Collections.singletonMap("a", "b");
+        try { m.put("x", "y"); return "mutable"; }
+        catch (UnsupportedOperationException expected) { return m.get("a"); }
+      }
+      case 110: {
+        java.util.List<String> l = java.util.Collections.unmodifiableList(new java.util.ArrayList<String>());
+        try { l.addAll(java.util.Arrays.asList("a")); return "mutable"; }
+        catch (UnsupportedOperationException expected) { return Integer.toString(l.size()); }
+      }
+      case 111: {
+        java.util.List<String> l = new java.util.ArrayList<String>();
+        boolean changed = java.util.Collections.addAll(l, "a", "b");
+        return changed + ":" + l;
+      }
+      case 112: {
+        java.util.List<String> l = new java.util.ArrayList<String>();
+        try { l.addAll(1, java.util.Arrays.asList("a")); return "bad index"; }
+        catch (IndexOutOfBoundsException expected) { return Integer.toString(l.size()); }
+      }
+      case 113: {
+        try { new java.util.HashSet<String>((java.util.Collection<String>) null); return "bad null"; }
+        catch (NullPointerException expected) { return "null"; }
+      }
+      case 114: {
+        java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+        try { l.subList(-1, 1); return "bad range"; }
+        catch (IndexOutOfBoundsException expected) { return Integer.toString(l.size()); }
+      }
+      case 115: {
+        java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "b"));
+        l.addAll(1, java.util.Arrays.asList("c", "d"));
+        return l.toString();
+      }
+      case 116: {
+        java.util.List<String> l = new java.util.ArrayList<String>(java.util.Arrays.asList("a", "c", "b"));
+        java.util.Collections.sort(l, new java.util.Comparator<String>() {
+          public int compare(String a, String b) { System.gc(); return b.compareTo(a); }
+        });
+        return l.toString();
+      }
+      case 117: {
+        return "ab".compareTo("az") + ":" + "a".compareTo("aa") + ":" + "\uD83D\uDE00".compareTo("\uE000");
+      }
+      case 118: {
+        return "AbC".compareToIgnoreCase("abc") + ":" + "aBc".equalsIgnoreCase("ABC");
+      }
+      case 119: {
+        return "AbCd".regionMatches(true, 1, "bC", 0, 2) + ":" + "abcd".startsWith("bc", 1);
+      }
+      case 120: {
+        return "abc".contentEquals(new StringBuffer("abc")) + ":" + "abcd".subSequence(1, 3);
+      }
+      case 121: {
+        return String.join("/", new ReadCollection());
+      }
+      case 122: {
+        return "  abc \n".trim() + ":" + "A\uD83D\uDE00Z".codePointAt(1);
+      }
+      case 123: {
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile("ab", java.util.regex.Pattern.CASE_INSENSITIVE);
+        return p.flags() + ":" + p.pattern() + ":" + p.matcher("AB").matches();
+      }
+      case 124: {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?<name>[a-z]+)(?=!)").matcher("\uD83D\uDE00ok!");
+        return m.find() + ":" + m.group("name") + ":" + m.start() + ":" + m.end();
+      }
+      case 125: {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(a+)").matcher("aa b");
+        m.find(); java.util.regex.MatchResult saved = m.toMatchResult();
+        m.reset("b"); System.gc();
+        return saved.group(1) + ":" + saved.start(1) + ":" + saved.end(1) + ":" + m.find();
+      }
+      case 126: {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("a").matcher("ab");
+        m.usePattern(java.util.regex.Pattern.compile("b")); System.gc();
+        return m.find() + ":" + m.group() + ":" + m.regionStart() + ":" + m.regionEnd();
+      }
+      case 127: {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(a)(b)").matcher("ab-ab");
+        return m.replaceAll("$2$1") + ":" + m.replaceFirst("$2$1");
+      }
+      case 128: {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("a+").matcher("aa b a");
+        StringBuffer buffer = new StringBuffer();
+        while (m.find()) { System.gc(); m.appendReplacement(buffer, "x"); }
+        m.appendTail(buffer); return buffer.toString();
+      }
+      case 129: {
+        return java.util.Arrays.toString(java.util.regex.Pattern.compile(",").split("a,b,", -1));
+      }
+      case 130: {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("a").matcher("a");
+        try { m.group(); return "bad state"; }
+        catch (IllegalStateException expected) { return "state"; }
+      }
+      case 131: {
+        try { java.util.regex.Pattern.compile("["); return "bad pattern"; }
+        catch (java.util.regex.PatternSyntaxException expected) { return "syntax"; }
+      }
+      case 132: {
+        return "aa-bb".matches("[a-z]+-[a-z]+") + ":" + "1-2".replaceAll("(\\d)", "$1$1");
+      }
+      case 133: {
+        java.util.List<Object> a = new java.util.ArrayList<Object>();
+        java.util.List<Object> b = new java.util.ArrayList<Object>();
+        a.add(b); b.add(a);
+        try { a.toString(); return "missing cycle error"; }
+        catch (StackOverflowError expected) { a.clear(); b.clear(); return a.toString(); }
+      }
+      case 134: {
+        java.util.List<Object> a = new java.util.ArrayList<Object>();
+        java.util.List<Object> b = new java.util.ArrayList<Object>();
+        a.add(b); b.add(a);
+        int caught=0;
+        try { a.hashCode(); } catch (StackOverflowError expected) { caught++; }
+        try { a.equals(b); } catch (StackOverflowError expected) { caught++; }
+        a.clear(); b.clear();
+        return caught + ":" + a.equals(b) + ":" + a.hashCode();
+      }
       default:
         throw new IllegalArgumentException("unknown pure case");
     }
   }
   public static void main(String[] args) throws Exception {
-    for (int i = 0; i < 97; i++) System.out.println(i + "\t" + run(i));
+    for (int i = 0; i < 135; i++) System.out.println(i + "\t" + run(i));
   }
 }

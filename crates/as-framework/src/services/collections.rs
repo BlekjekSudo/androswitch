@@ -8,6 +8,10 @@ enum Container {
     List(Vec<Value>),
     Set(Vec<Value>),
     Map(Vec<(Value, Value)>),
+    SnapshotIterator {
+        elems: Vec<Value>,
+        pos: usize,
+    },
     Iterator {
         owner: ObjRef,
         position: usize,
@@ -80,6 +84,10 @@ impl Collections {
             Some(Container::List(values)) => Some(Contents::List(values.clone())),
             Some(Container::Set(values)) => Some(Contents::Set(values.clone())),
             Some(Container::Map(values)) => Some(Contents::Map(values.clone())),
+            Some(Container::SnapshotIterator { elems, pos }) => Some(Contents::Iterator {
+                elems: elems.clone(),
+                pos: *pos,
+            }),
             _ => None,
         })
     }
@@ -96,6 +104,18 @@ impl Collections {
             (MAP, Contents::Map(values)) => {
                 (values.len().saturating_mul(2), Container::Map(values))
             }
+            ("Ljava/util/ArrayList;", Contents::List(values)) => {
+                (values.len(), Container::List(values))
+            }
+            ("Ljava/util/ListIterator;", Contents::Iterator { elems, pos }) => {
+                (elems.len(), Container::SnapshotIterator { elems, pos })
+            }
+            ("Ljava/util/Iterator;", Contents::Iterator { elems, pos }) => {
+                (elems.len(), Container::SnapshotIterator { elems, pos })
+            }
+            ("Ljava/util/LinkedHashSet;", Contents::Set(elems)) => {
+                (elems.len(), Container::Set(elems))
+            }
             _ => return Err(error("INVALID_COLLECTION_FACTORY", class)),
         };
         self.budget(slots)?;
@@ -103,11 +123,66 @@ impl Collections {
         self.objects.borrow_mut().insert(object, container);
         Ok(object)
     }
+    pub(super) fn replace(
+        &self,
+        vm: &mut Engine,
+        object: ObjRef,
+        contents: rd_vm::collection_factories::Contents,
+    ) -> Result<()> {
+        use rd_vm::collection_factories::Contents;
+        if self.cow_items(object).is_some() {
+            let (Contents::List(values) | Contents::Set(values)) = contents else {
+                return Err(error(
+                    "INVALID_COLLECTION_STATE",
+                    "COW owner needs elements",
+                ));
+            };
+            return self.cow_replace(vm, object, values);
+        }
+        let previous = self
+            .objects
+            .borrow()
+            .get(&object)
+            .cloned()
+            .ok_or_else(|| error("API_UNAVAILABLE", "collection update owner"))?;
+        let container = match (previous, contents) {
+            (Container::List(_), Contents::List(values)) => Container::List(values),
+            (Container::Set(_), Contents::Set(values) | Contents::List(values)) => {
+                Container::Set(values)
+            }
+            (Container::Map(_), Contents::Map(values)) => Container::Map(values),
+            (Container::SnapshotIterator { .. }, Contents::Iterator { elems, pos }) => {
+                Container::SnapshotIterator { elems, pos }
+            }
+            _ => return Err(error("INVALID_COLLECTION_STATE", "collection update kind")),
+        };
+        let slots = match &container {
+            Container::List(v) | Container::Set(v) => v.len(),
+            Container::Map(v) => v.len().saturating_mul(2),
+            Container::SnapshotIterator { elems, .. } => elems.len(),
+            Container::Iterator { .. } => 1,
+        };
+        self.budget(slots)?;
+        let changed = match (self.objects.borrow().get(&object), &container) {
+            (Some(Container::List(a)), Container::List(b))
+            | (Some(Container::Set(a)), Container::Set(b)) => a != b,
+            (Some(Container::Map(a)), Container::Map(b)) => a != b,
+            _ => false,
+        };
+        self.objects.borrow_mut().insert(object, container);
+        if changed {
+            self.change(object);
+        }
+        Ok(())
+    }
     pub(super) fn metadata(
         class: &str,
         name: &str,
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
+        if let Some(kind) = rd_vm::jcollections::method_metadata(class, name, sig) {
+            return Some(kind);
+        }
         if class == "Ljava/util/AbstractCollection;" {
             use rd_vm::framework_host::HostMethodKind::{Constructor, Instance};
             match (name, sig) {
@@ -138,6 +213,7 @@ impl Collections {
             .map(|c| match c {
                 Container::List(v) | Container::Set(v) => v.len(),
                 Container::Map(v) => v.len() * 2,
+                Container::SnapshotIterator { elems, .. } => elems.len(),
                 Container::Iterator { .. } => 1,
             })
             .sum()
@@ -149,6 +225,7 @@ impl Collections {
             .map(|c| match c {
                 Container::List(v) | Container::Set(v) => v.len(),
                 Container::Map(v) => v.len() * 2,
+                Container::SnapshotIterator { elems, .. } => elems.len(),
                 Container::Iterator { .. } => 1,
             })
             .sum::<usize>();
@@ -355,40 +432,15 @@ impl Collections {
             };
             return Ok(Some(value));
         }
-        if vm.cp.is_subtype(&actual, "Ljava/util/AbstractCollection;")
-            && !self.objects.borrow().contains_key(&r)
-        {
-            match (name, sig) {
-                ("<init>", "()V") => return Ok(Some(Value::Null)),
-                ("isEmpty", "()Z") => {
-                    let size = vm.invoke_instance(r, "size", "()I", &[])?.as_int()?;
-                    return Ok(Some(Value::Int(i32::from(size == 0))));
-                }
-                ("contains", "(Ljava/lang/Object;)Z") => {
-                    let pin = self.cow_pin(r, args)?;
-                    let iter =
-                        obj(&vm.invoke_instance(r, "iterator", "()Ljava/util/Iterator;", &[])?)?;
-                    pin.extend(core::iter::once(iter))?;
-                    for _ in 0..10000 {
-                        if vm.invoke_instance(iter, "hasNext", "()Z", &[])?.as_int()? == 0 {
-                            return Ok(Some(Value::Int(0)));
-                        }
-                        let value =
-                            vm.invoke_instance(iter, "next", "()Ljava/lang/Object;", &[])?;
-                        pin.extend(value.as_ref()?)?;
-                        if equals(vm, &args[0], &value)? {
-                            return Ok(Some(Value::Int(1)));
-                        }
-                    }
-                    return Err(error("COLLECTION_BUDGET", "10000 iterator steps"));
-                }
-                _ => {}
-            }
-        }
         if primitive(&actual).is_some() {
             return rd_vm::boxes::instance_intrinsic(vm, &actual, name, sig, r, args);
         }
-        self.regular_call(vm, name, sig, r, args)
+        rd_vm::jcollections::with_product_call(vm, r, args, |vm| {
+            if let Some(value) = rd_vm::jcollections::call(vm, _class, name, sig, r, args)? {
+                return Ok(Some(value));
+            }
+            self.regular_call(vm, name, sig, r, args)
+        })
     }
     fn regular_call(
         &self,
@@ -678,6 +730,7 @@ impl Collections {
         let values = match self.objects.borrow().get(&r) {
             Some(Container::List(v) | Container::Set(v)) => v.clone(),
             Some(Container::Map(v)) => v.iter().flat_map(|(a, b)| [a.clone(), b.clone()]).collect(),
+            Some(Container::SnapshotIterator { elems, .. }) => elems.clone(),
             Some(Container::Iterator { owner, .. }) => return vec![*owner],
             None => return Vec::new(),
         };

@@ -80,6 +80,7 @@ unhandled call must not switch to another independent object store.
 | Lifecycle/UI/resources | `HostState.objects`, views, graphics and upstream lifecycle | Android adapter view tree, resources and platform display | One tree and callback/lifecycle graph presented by actual Horizon graphics/input |
 | Threading/scheduling | Cooperative reference threads and virtual looper/clock | Actual execution owners, platform workers, timers and synchronization | Preserve real ownership/TLS/reentry and supply real clocks to the common algorithms |
 | Classes/enums/metadata | Upstream lookup algorithms, type facts and static caches | Portable canonical Class cache, loader/enum and JNI metadata adapters | Reconcile all identities and exact overload declarations; type discovery never grants a method |
+| Java collections/text/regex | Original collection algorithms, heap builder text and Matcher tables | Active collection provider, shared heap `buf`, Engine-owned regex state | Shared modules now connected; remaining collection families, metadata/semantic and platform verification still gate parity |
 | Device/build/native services | Upstream reference device profile and optional native/JIT oracles | Actual Horizon observations, Bionic/JNI/native ARM64 backend | Use measured/profile-declared platform values and tested ABI replacements; no fictitious physical service |
 
 The first post-std integration slice extracts the immutable Collections
@@ -106,9 +107,9 @@ admission closed); it did not prove a missing worker API. A longer run reached
 `HashSet(Collection)`, whose inherited constructor is not yet connected to the
 product store. Both attempts returned to the console and restored the test SD;
 the constructor failure also appeared during Activity stop. No first frame is
-claimed. Candy Crush was not rerun in this checkpoint. Constructor/element-reader
-integration is the next collection boundary, using the original algorithms and
-common ownership rather than a package-specific exception. The hardware ZIP
+claimed. Candy Crush was not rerun in this checkpoint. It established the need
+for constructor/element-reader integration, addressed by the later common-owner
+port below. No new game execution is implied by those API tests. The hardware ZIP
 with NRO `a3a34bab...` remains its separately identified std qualification build.
 
 Compilation of both stores is not completion of any row. The default runner
@@ -116,6 +117,24 @@ stays on its verified subset until the replacement can run the complete
 inherited and product corpus without selecting disconnected state. Native/JIT
 oracles remain alternative host backends, rather than dependencies shipped in
 the NRO.
+
+The subsequent [collections/text integration](UPSTREAM_COLLECTIONS_TEXT.md)
+connects the inherited collection constructors, bulk/template operations,
+sublist/ListIterator graph, collection object methods and eleven additional
+Collections static overloads to the product owner. Original String, builder and
+regex modules now compile under the shipping std profile; the duplicate product
+builder map was removed. StringBuffer uses the actual VM monitor; Matcher and
+MatchResult references participate in GC. The Conformance source grows from the
+frozen 219-case hardware baseline to 257 development cases, with 135 actual JVM
+oracle rows. Full product DEX execution of those 135 pure cases passes at this
+checkpoint. The new catalog and source still require their own target and
+emulator receipts; the earlier hardware confirmation is not transferred.
+
+The source-route audit now evaluates the actual shipping `std` feature
+declarations, including nested `all`/`any`/`not` guards. **85 original VM files
+remain excluded** in the default device profile. A compiled std source is still
+reported as behavior-unverified. This count is not an API percentage, and the
+full upstream dispatcher is still not enabled for the product's bound framework.
 
 ## Required final report
 

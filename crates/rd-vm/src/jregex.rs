@@ -18,7 +18,7 @@
 //!   DOTALL (32); UNICODE_CASE/UNICODE_CHARACTER_CLASS are accepted (the
 //!   regex crate is Unicode-aware by default).
 
-#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[cfg(not(feature = "std"))]
 #[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
 use crate::port_prelude::*;
 
@@ -27,6 +27,26 @@ use crate::err::{Throwable, VmExit};
 use crate::heap::ObjRef;
 use crate::value::Value;
 
+type CompiledPatterns = crate::maps::HashMap<(alloc::string::String, i32, u8), fancy_regex::Regex>;
+pub(crate) struct Tables {
+    cache: crate::local_table::Local<core::cell::RefCell<CompiledPatterns>>,
+    matchers: crate::local_table::Local<core::cell::RefCell<crate::maps::HashMap<ObjRef, MState>>>,
+}
+impl Default for Tables {
+    fn default() -> Self {
+        Self {
+            cache: crate::local_table::Local::new(core::cell::RefCell::new(Default::default())),
+            matchers: crate::local_table::Local::new(core::cell::RefCell::new(Default::default())),
+        }
+    }
+}
+#[cfg(not(any(feature = "desktop-runtime", feature = "upstream-runtime")))]
+pub(crate) fn references(vm: &Engine, object: ObjRef) -> Option<ObjRef> {
+    vm.regex_tables
+        .matchers
+        .clone()
+        .with(|m| m.borrow().get(&object).map(|s| s.pattern))
+}
 const PATTERN: &str = "Ljava/util/regex/Pattern;";
 const MATCHER: &str = "Ljava/util/regex/Matcher;";
 const MATCH_RESULT: &str = "Ljava/util/regex/MatchResult;";
@@ -54,16 +74,18 @@ pub(crate) struct MState {
 
 /// GC: objects that have state here (marking consults `gc_entry` only
 /// for these).
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) fn gc_keys(vm: &Engine, out: &mut Vec<ObjRef>) {
-    vm.module_tables
-        .jregex_matchers
+    vm.regex_tables
+        .matchers
         .clone()
         .with(|m| out.extend(m.borrow().keys().copied()));
 }
 
 /// GC ephemeron: state of a reachable object (holds heap refs).
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) fn gc_entry(vm: &Engine, r: ObjRef, out: &mut impl core::fmt::Write) {
-    vm.module_tables.jregex_matchers.clone().with(|m| {
+    vm.regex_tables.matchers.clone().with(|m| {
         if let Some(v) = m.borrow().get(&r) {
             let _ = write!(out, "|{v:?}");
         }
@@ -72,13 +94,13 @@ pub(crate) fn gc_entry(vm: &Engine, r: ObjRef, out: &mut impl core::fmt::Write) 
 
 /// GC: drop state of collected objects (slots are reused).
 pub(crate) fn gc_purge(vm: &Engine, alive: &dyn Fn(ObjRef) -> bool) {
-    vm.module_tables
-        .jregex_matchers
+    vm.regex_tables
+        .matchers
         .clone()
         .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
-// Issue #230: this state now belongs to Engine.module_tables and dies with its heap.
+// Issue #230: this state now belongs to Engine.regex_tables and dies with its heap.
 
 fn exc(class: &str, msg: impl Into<String>) -> VmExit {
     VmExit::Exception(Throwable::new(class, msg))
@@ -185,8 +207,8 @@ fn compile_with_anchor(
     }
     let key = (src.to_string(), flags, anchor as u8);
     if let Some(r) = vm
-        .module_tables
-        .jregex_cache
+        .regex_tables
+        .cache
         .clone()
         .with(|c| c.borrow().get(&key).cloned())
     {
@@ -232,7 +254,7 @@ fn compile_with_anchor(
             format!("{src}: not supported by RustyDroid's regex engine ({e})"),
         )
     })?;
-    vm.module_tables.jregex_cache.clone().with(|c| {
+    vm.regex_tables.cache.clone().with(|c| {
         let mut c = c.borrow_mut();
         // Bound retained native compilation state across transient Java Patterns.
         if c.len() >= 128 {
@@ -322,7 +344,7 @@ fn new_matcher(vm: &mut Engine, pattern: ObjRef, input: String) -> Result<Value,
         .heap
         .alloc_instance(MATCHER.to_string(), Vec::new())
         .map_err(crate::err::oom_throwable)?;
-    vm.module_tables.jregex_matchers.clone().with(|m| {
+    vm.regex_tables.matchers.clone().with(|m| {
         m.borrow_mut().insert(
             r,
             MState {
@@ -349,7 +371,7 @@ fn new_match_result(vm: &mut Engine, st: &MState) -> Result<Value, VmExit> {
         matched: st.matched,
         hit_end: st.hit_end,
     };
-    vm.module_tables.jregex_matchers.clone().with(|m| {
+    vm.regex_tables.matchers.clone().with(|m| {
         m.borrow_mut().insert(r, snap);
     });
     Ok(Value::Obj(r))
@@ -656,8 +678,8 @@ pub fn instance_intrinsic(
     }
     if recv_class == MATCH_RESULT {
         let Some(st) = vm
-            .module_tables
-            .jregex_matchers
+            .regex_tables
+            .matchers
             .clone()
             .with(|m| m.borrow().get(&recv).cloned())
         else {
@@ -687,8 +709,8 @@ pub fn instance_intrinsic(
         return Ok(None);
     }
     let Some(mut st) = vm
-        .module_tables
-        .jregex_matchers
+        .regex_tables
+        .matchers
         .clone()
         .with(|m| m.borrow().get(&recv).cloned())
     else {
@@ -846,8 +868,8 @@ pub fn instance_intrinsic(
         )?,
         _ => return Ok(None),
     };
-    vm.module_tables
-        .jregex_matchers
+    vm.regex_tables
+        .matchers
         .clone()
         .with(|m| m.borrow_mut().insert(recv, st));
     Ok(Some(out))
@@ -864,7 +886,7 @@ fn next_char(s: &str, b: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[cfg(not(feature = "std"))]
     #[allow(unused_imports)]
     use crate::port_prelude::*;
     #[test]

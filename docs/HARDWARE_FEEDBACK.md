@@ -210,3 +210,13 @@ journal, individual measured clock values and an independently read device
 binary hash were not supplied with this confirmation. The result applies to
 the declared suite; independent Mekorama/Candy Crush first-screen compatibility
 and Android reference testing remain separate gates.
+
+## Std candidate: user-reported 219/219 (2026-10-26)
+
+The user confirmed **219/219 PASS on physical Switch** after testing the std
+candidate delivered before the shared-collection integration. The
+[receipt](../reports/conformance-std-hardware-20261026.json) identifies the package
+context (NRO `a3a34bab32cf31e182fb72efe524bad1e06b5a69107853e9a0aba893aaef2bf8`).
+No device binary hash or raw per-case journal was supplied; the aggregate result
+is recorded as reported. It does not qualify subsequent collection builds,
+complete RustyDroid API parity, or Mekorama/Candy Crush first frames.

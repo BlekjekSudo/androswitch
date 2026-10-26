@@ -17,6 +17,7 @@ pub enum Contents {
     List(Vec<Value>),
     Set(Vec<Value>),
     Map(Vec<(Value, Value)>),
+    Iterator { elems: Vec<Value>, pos: usize },
 }
 
 pub fn method_metadata(class: &str, name: &str, sig: &str) -> Option<HostMethodKind> {
@@ -53,7 +54,7 @@ pub fn static_field_descriptor(class: &str, name: &str) -> Option<&'static str> 
     }
 }
 
-fn snapshot(vm: &Engine, object: ObjRef) -> Result<Option<Contents>, VmExit> {
+pub(crate) fn snapshot(vm: &Engine, object: ObjRef) -> Result<Option<Contents>, VmExit> {
     if let Some(host) = vm.framework_host() {
         return host.collection_snapshot(vm, object);
     }
@@ -63,6 +64,10 @@ fn snapshot(vm: &Engine, object: ObjRef) -> Result<Option<Contents>, VmExit> {
         Ok(match vm.fw.objects.get(&object) {
             Some(HostObj::List { elems }) => Some(Contents::List(elems.clone())),
             Some(HostObj::Map { entries }) => Some(Contents::Map(entries.clone())),
+            Some(HostObj::Iter { elems, pos }) => Some(Contents::Iterator {
+                elems: elems.clone(),
+                pos: *pos,
+            }),
             _ => None,
         })
     }
@@ -80,6 +85,7 @@ pub(crate) fn create(vm: &mut Engine, class: &str, contents: Contents) -> Result
         let state = match contents {
             Contents::List(elems) | Contents::Set(elems) => HostObj::List { elems },
             Contents::Map(entries) => HostObj::Map { entries },
+            Contents::Iterator { elems, pos } => HostObj::Iter { elems, pos },
         };
         let object = vm.heap.alloc_instance(class.to_string(), Vec::new())?;
         vm.fw.objects.insert(object, state);
@@ -88,6 +94,28 @@ pub(crate) fn create(vm: &mut Engine, class: &str, contents: Contents) -> Result
     #[cfg(not(any(feature = "desktop-runtime", feature = "upstream-runtime")))]
     {
         let _ = (class, contents);
+        Err(crate::err::vm_error("API_UNAVAILABLE", "collection owner is not bound").into())
+    }
+}
+
+pub(crate) fn replace(vm: &mut Engine, object: ObjRef, contents: Contents) -> Result<(), VmExit> {
+    if let Some(host) = vm.framework_host() {
+        return host.collection_replace(vm, object, contents);
+    }
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+    {
+        use crate::framework::HostObj;
+        let state = match contents {
+            Contents::List(elems) | Contents::Set(elems) => HostObj::List { elems },
+            Contents::Map(entries) => HostObj::Map { entries },
+            Contents::Iterator { elems, pos } => HostObj::Iter { elems, pos },
+        };
+        vm.fw.objects.insert(object, state);
+        Ok(())
+    }
+    #[cfg(not(any(feature = "desktop-runtime", feature = "upstream-runtime")))]
+    {
+        let _ = (object, contents);
         Err(crate::err::vm_error("API_UNAVAILABLE", "collection owner is not bound").into())
     }
 }
@@ -202,7 +230,13 @@ pub fn rejects_mutation(class: &str, name: &str, sig: &str) -> bool {
             common
                 || matches!(
                     (name, sig),
-                    ("add", "(Ljava/lang/Object;)Z")
+                    (
+                        "addAll" | "removeAll" | "retainAll",
+                        "(Ljava/util/Collection;)Z"
+                    ) | ("addAll", "(ILjava/util/Collection;)Z")
+                        | ("remove", "(Ljava/lang/Object;)Z")
+                        | ("add", "(ILjava/lang/Object;)V")
+                        | ("add", "(Ljava/lang/Object;)Z")
                         | ("set", "(ILjava/lang/Object;)Ljava/lang/Object;")
                         | ("remove", "(I)Ljava/lang/Object;")
                 )

@@ -7,6 +7,8 @@ param(
     [string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',
     [string]$RyujinxProfile="$env:APPDATA/Ryujinx",
     [string]$Nro='',
+    [string]$FixtureDirectory='local-artifacts/conformance',
+    [string]$FilterGroup='All',
     [string[]]$ExcludeCases=@(),
     [string]$ResumeEvidenceDirectory='',
     [string]$RerunCategory='',
@@ -16,9 +18,11 @@ param(
 )
 $ErrorActionPreference='Stop'
 if($RerunCategory -and (-not $ResumeEvidenceDirectory -or $Launches -ne 1)){throw 'UI category rerun requires one launch and a verified resume journal'}
+if($RerunCategory -and $FilterGroup -ne 'All'){throw 'Choose category rerun or an ordinary autorun filter'}
+if($FilterGroup -ne 'All' -and -not $Baseline){throw 'Selected-group runs require -Baseline; full catalog acceptance is a separate gate'}
 $repo=Split-Path -Parent $PSScriptRoot
-if($ExcludeCases.Count -and -not $Baseline){throw 'Case exclusions are allowed only with -Baseline; full acceptance requires all 219 PASS'}
-$output=Join-Path $repo 'local-artifacts/conformance'
+if($ExcludeCases.Count -and -not $Baseline){throw 'Case exclusions are allowed only with -Baseline; full acceptance requires every catalog case to PASS'}
+$output=[IO.Path]::GetFullPath($FixtureDirectory,$repo)
 $package='org.androswitch.conformance'
 $catalogPath=Join-Path $output 'catalog.json'
 $digest=(Get-FileHash -LiteralPath $catalogPath).Hash.ToLowerInvariant()
@@ -46,6 +50,11 @@ if($ResumeEvidenceDirectory){
     @{schema_version=1;receipt=$receiptPath;receipt_sha256=(Get-FileHash $receiptPath).Hash.ToLowerInvariant();nro_sha256=$priorReceipt.nro_sha256;apk_sha256=$priorReceipt.inputs[0].sha256}|ConvertTo-Json|Set-Content "$seed/$package/files/resume-evidence.json" -Encoding utf8NoBOM
 }
 [IO.File]::WriteAllText("$seed/$package/files/autorun.txt",$(if($RerunCategory){'0'}else{'1'}))
+if($FilterGroup -ne 'All'){
+    $declaredGroups=@((Get-Content $catalogPath -Raw|ConvertFrom-Json).cases|ForEach-Object group|Sort-Object -Unique)
+    if($FilterGroup -cnotin $declaredGroups){throw 'Choose a group declared by the frozen APK catalog'}
+    [IO.File]::WriteAllText("$seed/$package/files/filter.txt",$FilterGroup)
+}
 $known=@((Get-Content $catalogPath -Raw|ConvertFrom-Json).cases|ForEach-Object id)
 foreach($caseId in $ExcludeCases){if($caseId -cnotin $known){throw "Unknown excluded case: $caseId"}}
 if($ExcludeCases.Count){[IO.File]::WriteAllText("$seed/$package/files/exclude.txt",($ExcludeCases -join "`n"))}
@@ -96,6 +105,7 @@ if($matches.Count -ne 1){throw "Missing unambiguous external receipt; $failure"}
 $receiptPath=$matches[0].FullName;$run=Split-Path -Parent $receiptPath
 if($PrepareOnly){Write-Output "Prepared unified suite: $receiptPath";if($failure){throw $failure};return}
 $acceptanceArgs=if($Baseline){@()}else{@('--require-pass')}
+if($FilterGroup -ne 'All'){$acceptanceArgs+=@('--group',$FilterGroup)}
 & python -X utf8 "$PSScriptRoot/collect-conformance.py" --receipt $receiptPath --catalog $catalogPath --package $package @acceptanceArgs
 if($LASTEXITCODE){throw "Conformance evidence collection failed; $failure"}
 Write-Output "Conformance journal and actual session errors: $run/conformance-summary.json"

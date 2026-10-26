@@ -26,13 +26,95 @@
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
 use crate::heap::ObjRef;
-#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[cfg(not(feature = "std"))]
 #[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
 use crate::port_prelude::*;
 use crate::value::Value;
 
 const SB: &str = "Ljava/lang/StringBuilder;";
 const SBUF: &str = "Ljava/lang/StringBuffer;";
+
+/// Exact descriptor surface; the implementation's name dispatch is never a
+/// license for arbitrary overloads or primitive return types.
+pub fn method_metadata(
+    class: &str,
+    name: &str,
+    sig: &str,
+) -> Option<crate::framework_host::HostMethodKind> {
+    use crate::framework_host::HostMethodKind::{Constructor, Instance};
+    if !matches!(class, SB | SBUF) {
+        return None;
+    }
+    let ps = crate::engine::parse_param_types(sig)?;
+    let ret = sig.rsplit_once(')')?.1;
+    if name == "<init>" {
+        return matches!(
+            sig,
+            "()V" | "(I)V" | "(Ljava/lang/String;)V" | "(Ljava/lang/CharSequence;)V"
+        )
+        .then_some(Constructor);
+    }
+    let chain = ret == class
+        || matches!(
+            ret,
+            "Ljava/lang/Appendable;" | "Ljava/lang/AbstractStringBuilder;"
+        );
+    let scalar = |p: &str| {
+        matches!(
+            p,
+            "Z" | "C"
+                | "I"
+                | "J"
+                | "F"
+                | "D"
+                | "Ljava/lang/Object;"
+                | "Ljava/lang/String;"
+                | "Ljava/lang/StringBuffer;"
+                | "Ljava/lang/CharSequence;"
+                | "[C"
+        )
+    };
+    let implemented = match name {
+        "append" if chain => match ps.as_slice() {
+            [p] => scalar(p),
+            [p, a, b] => {
+                matches!(p.as_str(), "[C" | "Ljava/lang/CharSequence;") && a == "I" && b == "I"
+            }
+            _ => false,
+        },
+        "insert" if chain => match ps.as_slice() {
+            [i, p] => i == "I" && scalar(p),
+            [i, p, a, b] => {
+                i == "I"
+                    && matches!(p.as_str(), "[C" | "Ljava/lang/CharSequence;")
+                    && a == "I"
+                    && b == "I"
+            }
+            _ => false,
+        },
+        "appendCodePoint" | "deleteCharAt" if chain => ps == ["I"],
+        "delete" if chain => ps == ["I", "I"],
+        "replace" if chain => ps == ["I", "I", "Ljava/lang/String;"],
+        "reverse" if chain => ps.is_empty(),
+        "length" | "capacity" => sig == "()I",
+        "isEmpty" => sig == "()Z",
+        "charAt" => sig == "(I)C",
+        "codePointAt" => sig == "(I)I",
+        "setLength" | "ensureCapacity" => sig == "(I)V",
+        "trimToSize" => sig == "()V",
+        "setCharAt" => sig == "(IC)V",
+        "indexOf" | "lastIndexOf" => {
+            matches!(sig, "(Ljava/lang/String;)I" | "(Ljava/lang/String;I)I")
+        }
+        "substring" => matches!(sig, "(I)Ljava/lang/String;" | "(II)Ljava/lang/String;"),
+        "subSequence" => sig == "(II)Ljava/lang/CharSequence;",
+        "getChars" => sig == "(II[CI)V",
+        "toString" => sig == "()Ljava/lang/String;",
+        "compareTo" => ps == [class] && ret == "I",
+        _ => false,
+    };
+    implemented.then_some(Instance)
+}
 
 fn sioobe(msg: String) -> VmExit {
     VmExit::Exception(Throwable::new(
@@ -53,7 +135,17 @@ fn get(vm: &Engine, r: ObjRef) -> Vec<u16> {
 }
 fn set(vm: &mut Engine, r: ObjRef, u: &[u16]) -> Result<(), VmExit> {
     // internal buffer growth: a budget overrun is VM_OOM (as with the former SB arms)
-    let s = vm.heap.alloc_string(String::from_utf16_lossy(u))?;
+    let text = if vm.framework_host().is_some() {
+        String::from_utf16(u).map_err(|_| {
+            crate::err::vm_error(
+                "API_UNAVAILABLE",
+                "builder contains an isolated UTF-16 surrogate",
+            )
+        })?
+    } else {
+        String::from_utf16_lossy(u)
+    };
+    let s = vm.heap.alloc_string(text)?;
     crate::err::put_field_result(vm.heap.put_field(r, "buf", Value::Obj(s)))
 }
 fn int(args: &[Value], i: usize) -> i32 {
@@ -455,7 +547,7 @@ pub fn instance_intrinsic(
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[cfg(not(feature = "std"))]
     #[allow(unused_imports)]
     use crate::port_prelude::*;
     #[test]

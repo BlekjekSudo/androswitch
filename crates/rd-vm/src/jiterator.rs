@@ -1,10 +1,10 @@
 //! Host iterator navigation and backing-collection removal.
 //! Snapshot traversal remains deterministic; removals are written through to
 //! the source, with Java's one-remove-per-next/previous state machine.
+use crate::collection_factories::{self as state, Contents};
 use crate::err::{Throwable, VmExit};
-use crate::framework::HostObj;
 use crate::heap::ObjRef;
-#[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+#[cfg(not(feature = "std"))]
 #[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
 use crate::port_prelude::*;
 use crate::{Engine, Value};
@@ -32,36 +32,36 @@ pub(crate) fn navigate(vm: &mut Engine, it: ObjRef, name: &str) -> Result<Option
     if name == "remove" {
         return remove(vm, it).map(Some);
     }
-    let Some(HostObj::Iter { elems, pos }) = vm.fw.objects.get_mut(&it) else {
+    let Some(Contents::Iterator { elems, mut pos }) = state::snapshot(vm, it)? else {
         return Ok(None);
     };
     let mut last = None;
     let out = match name {
-        "hasNext" => Value::Int((*pos < elems.len()) as i32),
-        "hasPrevious" => Value::Int((*pos > 0) as i32),
-        "nextIndex" => Value::Int(*pos as i32),
-        "previousIndex" => Value::Int(*pos as i32 - 1),
+        "hasNext" => Value::Int((pos < elems.len()) as i32),
+        "hasPrevious" => Value::Int((pos > 0) as i32),
+        "nextIndex" => Value::Int(pos as i32),
+        "previousIndex" => Value::Int(pos as i32 - 1),
         "next" => {
-            if *pos >= elems.len() {
+            if pos >= elems.len() {
                 return Err(exception(
                     "Ljava/util/NoSuchElementException;",
                     "Iterator.next",
                 ));
             }
-            last = Some(*pos);
-            *pos += 1;
-            elems[*pos - 1].clone()
+            last = Some(pos);
+            pos += 1;
+            elems[pos - 1].clone()
         }
         "previous" => {
-            if *pos == 0 {
+            if pos == 0 {
                 return Err(exception(
                     "Ljava/util/NoSuchElementException;",
                     "Iterator.previous",
                 ));
             }
-            *pos -= 1;
-            last = Some(*pos);
-            elems[*pos].clone()
+            pos -= 1;
+            last = Some(pos);
+            elems[pos].clone()
         }
         "add" | "set" => {
             return Err(exception(
@@ -71,6 +71,7 @@ pub(crate) fn navigate(vm: &mut Engine, it: ObjRef, name: &str) -> Result<Option
         }
         _ => return Ok(None),
     };
+    state::replace(vm, it, Contents::Iterator { elems, pos })?;
     if let Some(i) = last {
         crate::err::put_field_result(vm.heap.put_field(it, "rd$last", Value::Int(i as i32)))?;
     }
@@ -96,8 +97,8 @@ fn remove(vm: &mut Engine, it: ObjRef) -> Result<Value, VmExit> {
             ))
         }
     };
-    let snapshot = match vm.fw.objects.get(&it) {
-        Some(HostObj::Iter { elems, .. }) => elems.clone(),
+    let snapshot = match state::snapshot(vm, it)? {
+        Some(Contents::Iterator { elems, .. }) => elems,
         _ => return Ok(Value::Null),
     };
     let changed = || {
@@ -108,8 +109,8 @@ fn remove(vm: &mut Engine, it: ObjRef) -> Result<Value, VmExit> {
     };
     // Validate before touching the backing map, so stale iterators cannot
     // partially remove an entry and then report ConcurrentModificationException.
-    if let Some(HostObj::List { elems }) = vm.fw.objects.get(&owner) {
-        if *elems != snapshot || last >= elems.len() {
+    if let Some(Contents::List(elems) | Contents::Set(elems)) = state::snapshot(vm, owner)? {
+        if elems != snapshot || last >= elems.len() {
             return Err(changed());
         }
     }
@@ -118,17 +119,16 @@ fn remove(vm: &mut Engine, it: ObjRef) -> Result<Value, VmExit> {
             .heap
             .get_field(owner, &format!("rd$key{last}"))
             .unwrap_or(Value::Null);
-        let entries = match vm.fw.objects.get(&map) {
-            Some(HostObj::Map { entries }) => entries.clone(),
+        let mut entries = match state::snapshot(vm, map)? {
+            Some(Contents::Map(entries)) => entries,
             _ => return Err(changed()),
         };
         let idx = entries
             .iter()
             .position(|(k, _)| *k == key)
             .ok_or_else(changed)?;
-        if let Some(HostObj::Map { entries }) = vm.fw.objects.get_mut(&map) {
-            entries.remove(idx);
-        }
+        entries.remove(idx);
+        state::replace(vm, map, Contents::Map(entries))?;
         // Keep the view's parallel key list aligned after removal.
         for i in last..snapshot.len().saturating_sub(1) {
             let key = vm
@@ -143,9 +143,20 @@ fn remove(vm: &mut Engine, it: ObjRef) -> Result<Value, VmExit> {
             Value::Null,
         ))?;
     }
-    if let Some(HostObj::List { elems }) = vm.fw.objects.get_mut(&owner) {
-        elems.remove(last);
-        crate::jcollections::sublist_write_back(vm, owner);
+    if let Some(contents) = state::snapshot(vm, owner)? {
+        let contents = match contents {
+            Contents::List(mut elems) => {
+                elems.remove(last);
+                Contents::List(elems)
+            }
+            Contents::Set(mut elems) => {
+                elems.remove(last);
+                Contents::Set(elems)
+            }
+            _ => return Err(changed()),
+        };
+        state::replace(vm, owner, contents)?;
+        crate::jcollections::sublist_write_back(vm, owner)?;
     } else {
         // AbstractList template iterator over a DEX subclass.
         vm.invoke_instance(
@@ -155,11 +166,12 @@ fn remove(vm: &mut Engine, it: ObjRef) -> Result<Value, VmExit> {
             &[Value::Int(last as i32)],
         )?;
     }
-    if let Some(HostObj::Iter { elems, pos }) = vm.fw.objects.get_mut(&it) {
+    if let Some(Contents::Iterator { mut elems, mut pos }) = state::snapshot(vm, it)? {
         elems.remove(last);
-        if *pos > last {
-            *pos -= 1;
+        if pos > last {
+            pos -= 1;
         }
+        state::replace(vm, it, Contents::Iterator { elems, pos })?;
     }
     crate::err::put_field_result(vm.heap.put_field(it, "rd$last", Value::Int(-1)))?;
     Ok(Value::Null)

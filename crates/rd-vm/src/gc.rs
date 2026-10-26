@@ -547,6 +547,7 @@ impl Engine {
         }
         // purge weak side tables of freed keys
         let marked = &m.marked;
+        self.collection_views.collect(marked);
         let alive = |r: &ObjRef| marked.get(*r as usize).copied().unwrap_or(true);
         self.fw.objects.retain(|r, _| alive(r));
         self.gfx.objs.retain(|r, _| alive(r));

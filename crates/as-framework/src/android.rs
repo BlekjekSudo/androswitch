@@ -199,7 +199,6 @@ struct State {
     roots: Vec<ObjRef>,
     intents: BTreeMap<ObjRef, String>,
     bundles: BTreeMap<ObjRef, BTreeMap<Option<String>, BundleEntry>>,
-    builders: BTreeMap<ObjRef, String>,
     paints: BTreeMap<ObjRef, (u32, f32)>,
     canvases: BTreeMap<ObjRef, Vec<Draw>>,
     motion: BTreeMap<ObjRef, (i32, f32, f32, f32, f32, u64)>,
@@ -1514,7 +1513,9 @@ impl FrameworkHost for Android {
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
         rd_vm::boxes::method_metadata(class, name, sig)
+            .or_else(|| rd_vm::shared_text::method_metadata(class, name, sig))
             .or_else(|| rd_vm::collection_factories::method_metadata(class, name, sig))
+            .or_else(|| rd_vm::collections::method_metadata(class, name, sig))
             .or_else(|| rd_vm::arrays::method_metadata(class, name, sig))
             .or_else(|| rd_vm::jbitset::method_metadata(class, name, sig))
             .or_else(|| services::Services::method_metadata(class, name, sig))
@@ -1548,6 +1549,14 @@ impl FrameworkHost for Android {
         object: ObjRef,
     ) -> Result<Option<rd_vm::collection_factories::Contents>> {
         self.services.collection_snapshot(vm, object)
+    }
+    fn collection_replace(
+        &self,
+        vm: &mut Engine,
+        object: ObjRef,
+        contents: rd_vm::collection_factories::Contents,
+    ) -> Result<()> {
+        self.services.collection_replace(vm, object, contents)
     }
     fn collection_create(
         &self,
@@ -1644,7 +1653,6 @@ impl FrameworkHost for Android {
         let mut s = self.state.borrow_mut();
         s.views.retain(|r, _| live(r));
         s.bundles.retain(|r, _| live(r));
-        s.builders.retain(|r, _| live(r));
         s.paints.retain(|r, _| live(r));
         s.intents.retain(|r, _| live(r));
         s.motion.retain(|r, _| live(r));
@@ -1689,9 +1697,6 @@ impl FrameworkHost for Android {
             }
             "Landroid/os/Bundle;" => {
                 s.bundles.insert(r, BTreeMap::new());
-            }
-            "Ljava/lang/StringBuilder;" | "Ljava/lang/StringBuffer;" => {
-                s.builders.insert(r, String::new());
             }
             "Landroid/graphics/Paint;" => {
                 s.paints.insert(r, (0xff000000, 16.));
@@ -2355,54 +2360,6 @@ impl Android {
         r: ObjRef,
         args: &[Value],
     ) -> Result<Option<Value>> {
-        if self.state.borrow().builders.contains_key(&r) {
-            let v = match name {
-                "length" if sig == "()I" => {
-                    Value::Int(self.state.borrow().builders[&r].encode_utf16().count() as i32)
-                }
-                "<init>" if sig == "()V" || sig == "(I)V" => Value::Null,
-                "<init>" if sig == "(Ljava/lang/String;)V" => {
-                    self.state
-                        .borrow_mut()
-                        .builders
-                        .insert(r, text(vm, &args[0])?);
-                    Value::Null
-                }
-                "append" if args.len() == 1 => {
-                    // DEX stores char, boolean and int arguments in the same
-                    // register kind; the method descriptor selects their Java
-                    // textual representation.
-                    let s = match sig {
-                        "(C)Ljava/lang/StringBuilder;" | "(C)Ljava/lang/StringBuffer;" => {
-                            char::from_u32(int(args, 0)? as u16 as u32)
-                                .ok_or_else(|| {
-                                    error(
-                                        "API_UNAVAILABLE",
-                                        "builder append of an isolated UTF-16 surrogate",
-                                    )
-                                })?
-                                .to_string()
-                        }
-                        "(Z)Ljava/lang/StringBuilder;" | "(Z)Ljava/lang/StringBuffer;" => {
-                            (int(args, 0)? != 0).to_string()
-                        }
-                        _ => display(vm, &args[0])?,
-                    };
-                    self.state
-                        .borrow_mut()
-                        .builders
-                        .get_mut(&r)
-                        .unwrap()
-                        .push_str(&s);
-                    Value::Obj(r)
-                }
-                "toString" if sig == "()Ljava/lang/String;" => {
-                    string(vm, self.state.borrow().builders[&r].clone())?
-                }
-                _ => return Ok(None),
-            };
-            return Ok(Some(v));
-        }
         if platform.ends_with("LayoutParams;") {
             return match (name, sig) {
                 ("<init>", "(II)V") => {

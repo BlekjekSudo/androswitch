@@ -3748,10 +3748,10 @@ fn call_instance_intrinsic_mref_rooted(
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
     // `List.subList` views: refresh from / write back to the backing list.
-    if vm.fw.sublists.contains_key(&recv) {
-        crate::jcollections::sublist_refresh(vm, recv);
+    if vm.collection_views.sublists.contains_key(&recv) {
+        crate::jcollections::sublist_refresh(vm, recv)?;
         let r = instance_intrinsic_dispatch(vm, recv_class, mref_class, name, sig, recv, args);
-        crate::jcollections::sublist_write_back(vm, recv);
+        crate::jcollections::sublist_write_back(vm, recv)?;
         return r;
     }
     // ContextImpl (base of every ContextWrapper chain): platform calls are

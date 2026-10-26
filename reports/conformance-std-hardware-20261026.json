@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-26",
+  "evidence_type": "direct_user_report_of_physical_switch_execution",
+  "user_message": "btw yg tets hardware tadi udah pass 219/219 jadi lanjut smpe 1:1 dengan upstrram trus lanjut ke mekorama dan candy crush",
+  "suite": "AndroSwitch Conformance",
+  "reported_total": 219,
+  "reported_counts": {
+    "PASS": 219
+  },
+  "status": "passed_user_reported",
+  "package_context": {
+    "archive": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\releases\\androswitch-m9-candidate-20261026-112442-1c3e18e4.zip",
+    "archive_sha256": "67d16cdb4a0513ed9e6dc6a7b11cc8989a52fcfe11913dbca22986b669f82606",
+    "implementation_commit": "ed594603a15c234286efd63f29f154f0a45eb023",
+    "nro_sha256": "a3a34bab32cf31e182fb72efe524bad1e06b5a69107853e9a0aba893aaef2bf8",
+    "conformance_apk_sha256": "f77a08b2463d60fef05e2a2c0130d5126fab77eb10e4c24ff76ccdc42a279157"
+  },
+  "verification_limits": {
+    "device_binary_hash_independently_read": false,
+    "raw_device_journal_received": false,
+    "per_case_rows_received": false
+  },
+  "scope": "User confirms the prior std candidate linked in this chat; exact device hash and raw journal were not supplied. The later collection integration NRO is not qualified by this report.",
+  "all_upstream_apis_1_to_1_on_horizon": false,
+  "m9_independent_game_first_screen_gate": "open",
+  "upstream": {
+    "project": "RustyDroid",
+    "authors": "nadabgfccvd and contributors",
+    "revision": "3761815dc6a2a1427e9fc66b66e8471b78d1b170"
+  }
+}

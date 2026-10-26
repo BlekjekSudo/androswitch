@@ -10,6 +10,7 @@ parser.add_argument('--receipt', type=Path, required=True)
 parser.add_argument('--catalog', type=Path, required=True)
 parser.add_argument('--package', required=True)
 parser.add_argument('--require-pass', action='store_true', help='Fail unless every declared case actually passed, with no exclusions')
+parser.add_argument('--group', help='Validate a declared group separately; never qualifies full catalog acceptance')
 args = parser.parse_args()
 receipt = json.loads(args.receipt.read_text(encoding='utf-8-sig'))
 catalog = json.loads(args.catalog.read_bytes())
@@ -53,12 +54,18 @@ for seed in receipt.get('userdata_seed', []):
 for case_id in exclusions:
     assert next(row for row in journal['cases'] if row['id'] == case_id)['status'] == 'NOT_RUN'
 counts = collections.Counter(row['status'] for row in journal['cases'])
+if args.group and args.group not in {row['group'] for row in catalog['cases']}:
+    raise SystemExit('Unknown selected catalog group')
+selected = [row for row in journal['cases'] if not args.group or row['group'] == args.group]
+selected_completed = bool(selected) and all(row['status'] != 'NOT_RUN' or row['id'] in exclusions for row in selected)
+selected_passed = bool(selected) and all(row['status'] == 'PASS' for row in selected) and not any(row['id'] in exclusions for row in selected)
 allowed = {'PASS', 'FAIL', 'UNSUPPORTED', 'BLOCKED', 'NOT_RUN', 'INTERRUPTED', 'ERROR'}
 assert set(counts) <= allowed
 (run / 'conformance-report.json').write_bytes(journal_path.read_bytes())
 catalog_completed = journal['next'] >= len(catalog['cases']) and not any(row['status'] == 'NOT_RUN' and row['id'] not in exclusions for row in journal['cases'])
 acceptance_passed = catalog_completed and not exclusions and all(row['status'] == 'PASS' for row in journal['cases'])
 summary = dict(schema_version=1, acceptance_passed=acceptance_passed, remaining_cases=[dict(id=row['id'], status=row['status']) for row in journal['cases'] if row['status'] != 'PASS'], status='observed_catalog_not_compatibility_pass', catalog_completed=catalog_completed,
+               selected_group=args.group, selected_total=len(selected), selected_counts=dict(collections.Counter(row['status'] for row in selected)), selected_completed=selected_completed, selected_passed=selected_passed,
                backend='Horizon via diagnostic Ryujinx; not physical hardware or stock Ryujinx',
                catalog_sha256=digest, explicit_exclusions=exclusions, total=len(journal['cases']), counts=dict(counts),
                apk_sha256=receipt['inputs'][0]['sha256'], nro_sha256=receipt['nro_sha256'],
@@ -69,8 +76,8 @@ summary = dict(schema_version=1, acceptance_passed=acceptance_passed, remaining_
 (run / 'conformance-summary.json').write_text(json.dumps(summary, indent=2) + '\n', encoding='utf-8')
 print(json.dumps(dict(total=summary['total'], counts=dict(counts), sessions=len(sessions))))
 
-if not catalog_completed or not summary['launcher_completed'] or summary['original_sd_restore'] != 'restored':
+if not (selected_completed if args.group else catalog_completed) or not summary['launcher_completed'] or summary['original_sd_restore'] != 'restored':
     raise SystemExit('Incomplete catalog/workflow; partial reports retained. This is not a passed run.')
 
 if args.require_pass and not acceptance_passed:
-    raise SystemExit('219-case acceptance is incomplete: every non-PASS case still requires implementation or execution evidence.')
+    raise SystemExit('Full catalog acceptance is incomplete: every non-PASS case still requires implementation or execution evidence.')
