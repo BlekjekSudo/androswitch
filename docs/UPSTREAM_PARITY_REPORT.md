@@ -92,7 +92,7 @@ adapter, and platform profile binding remains part of the integration work.
 
 The JSON report retains every original VM source route and all **106 groups**
 in the upstream API catalog, including its original partial/stub/unimplemented
-status and **489 example API names**. Those examples are not an exhaustive list
+status and **489 example API entries (488 distinct names)**. Those examples are not an exhaustive list
 of every overload. Full-family Horizon parity remains unverified for every
 catalog row until its integration and behavior evidence are complete. This
 does not mean all existing, separately tested device subsets are absent.
