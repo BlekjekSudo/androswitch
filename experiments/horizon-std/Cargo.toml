@@ -1,0 +1,22 @@
+[package]
+name = "androswitch-std-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# A separate experiment, never a feature of the shipping runtime.
+[workspace]
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+libc = "=0.2.189"
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+debug = 1
+
+[lints.rust]
+unsafe_code = "deny"

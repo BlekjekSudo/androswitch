@@ -1,5 +1,12 @@
 # Credits and source provenance
 
+The isolated [Horizon std experiment](experiments/horizon-std/README.md) uses the
+Rust project's real standard library and rust-lang/libc 0.2.189
+(MIT OR Apache-2.0), plus devkitPro/newlib and switchbrew/libnx. The std Rust
+sources are unmodified; the verified libc adaptation and SDK transport glue are
+AndroSwitch experiment work. This does not change RustyDroid's foundation credit
+or establish device parity for its Android APIs.
+
 ## RustyDroid — the foundation
 
 **AndroSwitch is built on RustyDroid, not a runtime written from scratch.**
