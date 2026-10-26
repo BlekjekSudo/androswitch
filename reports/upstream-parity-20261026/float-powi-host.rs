@@ -1,0 +1,1 @@
+fn main() { let n=std::hint::black_box(i32::MAX); let x=std::hint::black_box(-1.0f32); println!("host_f32: {:08x}; double_oracle: {:08x}", x.powi(n).to_bits(), ((x as f64).powi(n) as f32).to_bits()); }

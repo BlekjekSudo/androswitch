@@ -1,0 +1,1 @@
+class FloatPowiOracle { public static void main(String[] args) { int n = Integer.MAX_VALUE; float x = -1.0f; System.out.printf("jvm_float: %08x%n", Float.floatToRawIntBits((float)Math.pow(x, (double)n))); } }

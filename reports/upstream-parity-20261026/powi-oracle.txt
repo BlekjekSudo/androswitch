@@ -1,0 +1,2 @@
+host_f32: 3f800000; double_oracle: bf800000
+jvm_float: bf800000

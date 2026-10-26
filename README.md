@@ -28,7 +28,8 @@ intrinsic dispatcher and GC, Engine-owned module tables, and native SQLite
 instead of a Python subprocess. All 50 original VM integration suites are
 registered against that path. **It is not enabled in the shipping runner**:
 Horizon services and canonical framework/storage state still require integration.
-See the [complete port plan](docs/UPSTREAM_PARITY_PLAN.md). SDK declaration
+See the [complete port plan](docs/UPSTREAM_PARITY_PLAN.md) and
+[parity checkpoint report](docs/UPSTREAM_PARITY_REPORT.md). SDK declaration
 metadata is supplemental type information, not implementation coverage.
 
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups

@@ -1,0 +1,4258 @@
+{
+  "schema": 1,
+  "upstream": "3761815dc6a2a1427e9fc66b66e8471b78d1b170",
+  "source_sync_pass": true,
+  "source_files": 427,
+  "identical_files": 278,
+  "adapted_files": 149,
+  "relocated_files": 9,
+  "errors": [],
+  "files": [
+    {
+      "path": ".cargo/config.toml",
+      "local_path": ".cargo/config.toml",
+      "status": "identical",
+      "sha256": "b26d4399de3cee8b80e4eaded5d643f76339777a65a597ca3ad2ea1b8b42ed2e"
+    },
+    {
+      "path": ".gitattributes",
+      "local_path": ".gitattributes",
+      "status": "adapted",
+      "sha256": "e230028449110f397fc76459d4d83d83a58c2d2e7ee2b4333eb91b697953f2a7"
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "local_path": "docs/upstream/github/CODEOWNERS",
+      "status": "identical",
+      "sha256": "e735dc0a3a13e28ec2f2811f536c0ae6423259b6bdd15430f64da509383fa9a1"
+    },
+    {
+      "path": ".github/FUNDING.yml",
+      "local_path": ".github/FUNDING.yml",
+      "status": "identical",
+      "sha256": "b4f4f29cc9a6ac95cf3eb1bbc284f57ff8acd6dda6c9dc8e359667d89da47e0b"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.yml",
+      "local_path": ".github/ISSUE_TEMPLATE/bug_report.yml",
+      "status": "adapted",
+      "sha256": "8bf2b3d47cd8e030ecebf054173e57610f4100c917faef4fcf82c9c837619577"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/compat_gap.yml",
+      "local_path": ".github/ISSUE_TEMPLATE/compat_gap.yml",
+      "status": "adapted",
+      "sha256": "053b5296d2552f055a5fc0f6dfe9184a52f69ca22fddb39b872899cc6e12085a"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/config.yml",
+      "local_path": ".github/ISSUE_TEMPLATE/config.yml",
+      "status": "adapted",
+      "sha256": "5b96b988c15fdf54a0375bde2771ce70775c3105120d1f9aaab5429dd76c72e9"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/feature_request.yml",
+      "local_path": ".github/ISSUE_TEMPLATE/feature_request.yml",
+      "status": "adapted",
+      "sha256": "9391eb671de7c81be16b87f7ab50580759e694bd0dd8570adcebff683d6f9a28"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/perf_regression.yml",
+      "local_path": ".github/ISSUE_TEMPLATE/perf_regression.yml",
+      "status": "identical",
+      "sha256": "8d441a72e42fbe3e8bfe36b5a6efc7ae7068ead94e2685892a205db27f75649e"
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "local_path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "status": "adapted",
+      "sha256": "8da467a5fb96971d02c4528b3d25e6f67ac8ca104143c8936e37a21ed9097914"
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "local_path": "docs/upstream/github/dependabot.yml",
+      "status": "identical",
+      "sha256": "dfece2db1d3bb8f8d40cd1338539c845ea6762b6d24d357eefaa60a926f9d980"
+    },
+    {
+      "path": ".github/rd-sentinel/baseline.json",
+      "local_path": ".github/rd-sentinel/baseline.json",
+      "status": "identical",
+      "sha256": "46289687916c5ed00cc88e8779a3741eb7df032ac51a40c76809f53ae8578118"
+    },
+    {
+      "path": ".github/rd-sentinel/policy.json",
+      "local_path": ".github/rd-sentinel/policy.json",
+      "status": "identical",
+      "sha256": "d583fdae2ffc961f93db9d9057274bd71f5e4976adda545e45c238501660e9a8"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "local_path": ".github/workflows/ci.yml",
+      "status": "adapted",
+      "sha256": "07091821aebec3ee32a6b4096e17556b685a098960a51406d19665387cecc9c0"
+    },
+    {
+      "path": ".github/workflows/rd-sentinel-command.yml",
+      "local_path": "docs/upstream/github/workflows/rd-sentinel-command.yml",
+      "status": "identical",
+      "sha256": "f936a44826aac95d5581e42e7fac90e7c92179a100e823890b85e7b541d3add9"
+    },
+    {
+      "path": ".github/workflows/rd-sentinel-deep.yml",
+      "local_path": "docs/upstream/github/workflows/rd-sentinel-deep.yml",
+      "status": "identical",
+      "sha256": "6181e70872a4294910519b6f35895ab8dae182c1d673d846a07ea38d05e924be"
+    },
+    {
+      "path": ".github/workflows/rd-sentinel-publish.yml",
+      "local_path": "docs/upstream/github/workflows/rd-sentinel-publish.yml",
+      "status": "identical",
+      "sha256": "3d46efd4f79e8a2d83137341e942bbffc88a3a253f973dbdebdd7df60ecf4d28"
+    },
+    {
+      "path": ".github/workflows/rd-sentinel.yml",
+      "local_path": "docs/upstream/github/workflows/rd-sentinel.yml",
+      "status": "identical",
+      "sha256": "a5c4d437052ec32f3a3e43443c52d75805b7164321eb62ceb5e80ace4c41516b"
+    },
+    {
+      "path": ".gitignore",
+      "local_path": ".gitignore",
+      "status": "adapted",
+      "sha256": "cf50096c0a200b800df81bbd53b5c6812194a41551436c491bdde95fd30e6f02"
+    },
+    {
+      "path": ".markdownlint-cli2.jsonc",
+      "local_path": ".markdownlint-cli2.jsonc",
+      "status": "identical",
+      "sha256": "884508c293798bd3398d241dc7f87f617cc56f4b49c6bda345e34b32593014b0"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "local_path": "CHANGELOG.md",
+      "status": "identical",
+      "sha256": "b2669c6d5f03d6382bb0388e442fb274761e5dcba3d57506305d574e3a278e31"
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "local_path": "CODE_OF_CONDUCT.md",
+      "status": "identical",
+      "sha256": "26c1ed4248ceb6b393c065a15ad759755cf67f233e9ec7b1a1f01c2b8c37a16c"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "local_path": "CONTRIBUTING.rustydroid.md",
+      "status": "identical",
+      "sha256": "06f582b6015dcbbdae1e217ba42bf2baada837bbc08323791632a543889c8717"
+    },
+    {
+      "path": "Cargo.lock",
+      "local_path": "Cargo.lock",
+      "status": "adapted",
+      "sha256": "b4f2cfcbd78471be956d2130895ba237e67c0201bbdb7ec80debc26dbbbea164"
+    },
+    {
+      "path": "Cargo.toml",
+      "local_path": "Cargo.toml",
+      "status": "adapted",
+      "sha256": "7949dabec6e92df1c78b1d9751c88ac072ef808fc599812a9993185aa630c68e"
+    },
+    {
+      "path": "GOVERNANCE.md",
+      "local_path": "GOVERNANCE.md",
+      "status": "identical",
+      "sha256": "7e9f2190cedd19a0f589ebac791c7f6ed7419b6cf54da08820789cc88ee3ae76"
+    },
+    {
+      "path": "LICENSE-APACHE",
+      "local_path": "LICENSE-APACHE",
+      "status": "identical",
+      "sha256": "d427a5a212ba75ced34098fdcb1b16d4e969d56ff50fec4acb21fba3e28dfbbc"
+    },
+    {
+      "path": "LICENSE-MIT",
+      "local_path": "LICENSE-MIT",
+      "status": "identical",
+      "sha256": "34e870aba7921d9a0e225cfb9551afe1a03ca9beddf2a5923d704cf55aee8fa8"
+    },
+    {
+      "path": "README.en.md",
+      "local_path": "README.en.md",
+      "status": "identical",
+      "sha256": "d321f89ca731ae270a0b732e9a6427d2b715bc5afdeecebf95a4da35c1da4e31"
+    },
+    {
+      "path": "README.md",
+      "local_path": "README.rustydroid.md",
+      "status": "identical",
+      "sha256": "67faa59580432c1175b239a46a1517c0e8d1d23cb279033ff80784b64eb23b95"
+    },
+    {
+      "path": "RustyDroid.md",
+      "local_path": "RustyDroid.md",
+      "status": "identical",
+      "sha256": "16104cfd49d403aeff0f02f81e061e0cf5f3ad9c7032d8c4bd93a118f606a836"
+    },
+    {
+      "path": "SECURITY.md",
+      "local_path": "SECURITY.rustydroid.md",
+      "status": "identical",
+      "sha256": "3f6d6d16b6610173fb20cb02de488360ee576681fd32811554fe3560f5f651a7"
+    },
+    {
+      "path": "SUPPORT.md",
+      "local_path": "SUPPORT.md",
+      "status": "identical",
+      "sha256": "fca710167368aff82e86e27af3256d113c36976fd6b8be65e76e46fe26eb4edd"
+    },
+    {
+      "path": "crates/rd-agent/Cargo.toml",
+      "local_path": "crates/rd-agent/Cargo.toml",
+      "status": "identical",
+      "sha256": "c9d4cb8fe03d42031d1e978246da6b74b6ee7363ace67d9c8a297e0fe3f3feff"
+    },
+    {
+      "path": "crates/rd-agent/src/api_usage.rs",
+      "local_path": "crates/rd-agent/src/api_usage.rs",
+      "status": "identical",
+      "sha256": "2984aedd2374e0beff20bcfb0ab38dd85286cdcdf36f345cd884e0a9ac235580"
+    },
+    {
+      "path": "crates/rd-agent/src/lib.rs",
+      "local_path": "crates/rd-agent/src/lib.rs",
+      "status": "identical",
+      "sha256": "fc22da3f704fa19e381283a9052213454a3eab571323ca3fd7cf2ff256b7e547"
+    },
+    {
+      "path": "crates/rd-agent/src/m10_tools.rs",
+      "local_path": "crates/rd-agent/src/m10_tools.rs",
+      "status": "identical",
+      "sha256": "fa1dcdc5cec70e07d0b4f98eaa3ea7dd42b7fa4fe89408d2442d5ac959dacc70"
+    },
+    {
+      "path": "crates/rd-agent/src/m9_tools.rs",
+      "local_path": "crates/rd-agent/src/m9_tools.rs",
+      "status": "identical",
+      "sha256": "efbdc7452d581bb82e54dd06dcc820a159eacfb1bdcdf4cd340c8b07841f064c"
+    },
+    {
+      "path": "crates/rd-agent/src/mcp.rs",
+      "local_path": "crates/rd-agent/src/mcp.rs",
+      "status": "identical",
+      "sha256": "ee3aab01a1cb6676fcdc14e333f72f7b93d8515c244fee7e9f4067b2b1d2974e"
+    },
+    {
+      "path": "crates/rd-agent/src/observe.rs",
+      "local_path": "crates/rd-agent/src/observe.rs",
+      "status": "identical",
+      "sha256": "059647df8ffe0487686ecfd649f404a7fd2f022e6d41ec3ef73ba4fa6896c544"
+    },
+    {
+      "path": "crates/rd-agent/src/runtime_tools.rs",
+      "local_path": "crates/rd-agent/src/runtime_tools.rs",
+      "status": "identical",
+      "sha256": "3e111321399c43a4f652290969ec529cf2f5af3990ec79dbe2bbf39a4d9b2812"
+    },
+    {
+      "path": "crates/rd-agent/src/runtime_tools_tests.rs",
+      "local_path": "crates/rd-agent/src/runtime_tools_tests.rs",
+      "status": "identical",
+      "sha256": "dd7f379be4c9a2a3ff3a12acce82be200ea7de0966cb25605ee402654ebe04f9"
+    },
+    {
+      "path": "crates/rd-agent/src/snapshot.rs",
+      "local_path": "crates/rd-agent/src/snapshot.rs",
+      "status": "identical",
+      "sha256": "73d03caaed70cbf87e30c0e562f2f6be955746da29d196a8eefd6b27b13453f1"
+    },
+    {
+      "path": "crates/rd-agent/src/suite.rs",
+      "local_path": "crates/rd-agent/src/suite.rs",
+      "status": "identical",
+      "sha256": "fe54f3d9dc60f1e92a319b5c5e26a49d951578ece0dbce3febf0415b9d8db64f"
+    },
+    {
+      "path": "crates/rd-agent/src/ui_tools.rs",
+      "local_path": "crates/rd-agent/src/ui_tools.rs",
+      "status": "identical",
+      "sha256": "902d33b3daff8a9b7e622d8af1a92dab500a880dc1f861b41f85e9805c12f820"
+    },
+    {
+      "path": "crates/rd-agent/src/ui_tools_tests.rs",
+      "local_path": "crates/rd-agent/src/ui_tools_tests.rs",
+      "status": "identical",
+      "sha256": "f63b74201120a0c4460525ee616e3497216c7ba86c51d9909f66a872256b9d00"
+    },
+    {
+      "path": "crates/rd-agent/tests/m10_mcp.rs",
+      "local_path": "crates/rd-agent/tests/m10_mcp.rs",
+      "status": "identical",
+      "sha256": "ad622f59dadf10fd716b1f141cc4975319cb90a866c02bd933f1f1a5c35edc0e"
+    },
+    {
+      "path": "crates/rd-apk/Cargo.toml",
+      "local_path": "crates/rd-apk/Cargo.toml",
+      "status": "adapted",
+      "sha256": "981136a56e8b73c46d125ba710ef4a212186842514703a8448477e643e7d612e"
+    },
+    {
+      "path": "crates/rd-apk/examples/dump_arsc.rs",
+      "local_path": "crates/rd-apk/examples/dump_arsc.rs",
+      "status": "identical",
+      "sha256": "03b7bf69b6c073dcf01d7de39579d7cb82516e0507505b89bc83dfbf6187162f"
+    },
+    {
+      "path": "crates/rd-apk/examples/dump_manifest_attrs.rs",
+      "local_path": "crates/rd-apk/examples/dump_manifest_attrs.rs",
+      "status": "identical",
+      "sha256": "aaf390eb4379f25348cb623faa421595c806afeb47df7596346f6643557d783c"
+    },
+    {
+      "path": "crates/rd-apk/examples/verify_config_apilevel.rs",
+      "local_path": "crates/rd-apk/examples/verify_config_apilevel.rs",
+      "status": "identical",
+      "sha256": "fd3392f26890afd4605f580f7e1eb6adcd0ebfeab59732b08f95753e99a5ce6f"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/Cargo.toml",
+      "local_path": "crates/rd-apk/fuzz/Cargo.toml",
+      "status": "identical",
+      "sha256": "df99a7b58b5252e2cf5ca716c4f9744e9fcaa08dec10979e0a09d97eb3413184"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/apk_full.rs",
+      "local_path": "crates/rd-apk/fuzz/fuzz_targets/apk_full.rs",
+      "status": "identical",
+      "sha256": "c7aa104ce03c50bc0c030f129c02c65866decf6d041443d3687a225cb471fbe5"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/arsc.rs",
+      "local_path": "crates/rd-apk/fuzz/fuzz_targets/arsc.rs",
+      "status": "identical",
+      "sha256": "c9d49ffb3eb50e95a991443d13149a41501a76336611f88e21ed4bea6fc6e780"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/axml.rs",
+      "local_path": "crates/rd-apk/fuzz/fuzz_targets/axml.rs",
+      "status": "identical",
+      "sha256": "e1d37157bd8d7311e379fb65ce4741e4c6b08e4513ff3d1c7311079e5fd79c5f"
+    },
+    {
+      "path": "crates/rd-apk/fuzz/fuzz_targets/zip.rs",
+      "local_path": "crates/rd-apk/fuzz/fuzz_targets/zip.rs",
+      "status": "identical",
+      "sha256": "713f269af141586aad870569526cc6e03bc2ae35d6b67cf1bdd077bf37bdccf4"
+    },
+    {
+      "path": "crates/rd-apk/src/arsc.rs",
+      "local_path": "crates/rd-apk/src/arsc.rs",
+      "status": "adapted",
+      "sha256": "26295d93775e060982bb43d1985f4f2dcc7e12cec6dcdf0cd3e20bd47858266b"
+    },
+    {
+      "path": "crates/rd-apk/src/axml.rs",
+      "local_path": "crates/rd-apk/src/axml.rs",
+      "status": "adapted",
+      "sha256": "119e03cfedf8fe145bfb6822296c557fa3626df52dd8aa3292d9ed2b11c0661e"
+    },
+    {
+      "path": "crates/rd-apk/src/error.rs",
+      "local_path": "crates/rd-apk/src/error.rs",
+      "status": "adapted",
+      "sha256": "47e43a0fe344638f6837c71e8ed1694c7e75d759619a40ca23b9f9ad6143aaae"
+    },
+    {
+      "path": "crates/rd-apk/src/lib.rs",
+      "local_path": "crates/rd-apk/src/lib.rs",
+      "status": "adapted",
+      "sha256": "3d5da10eaf192fac6bb4376225c7179b609b9635607e8cd0a43064b03a5e54e6"
+    },
+    {
+      "path": "crates/rd-apk/src/manifest.rs",
+      "local_path": "crates/rd-apk/src/manifest.rs",
+      "status": "adapted",
+      "sha256": "a0dce04da5e2eab374957a96796d5bfb48f1659ae2ff3dd5ea972f60d8a21be4"
+    },
+    {
+      "path": "crates/rd-apk/src/paged.rs",
+      "local_path": "crates/rd-apk/src/paged.rs",
+      "status": "adapted",
+      "sha256": "8eabac69625a8dd95015f857625b37e998501344645ee24863252c76639e2410"
+    },
+    {
+      "path": "crates/rd-apk/src/pool.rs",
+      "local_path": "crates/rd-apk/src/pool.rs",
+      "status": "adapted",
+      "sha256": "4c590d4cc801da96e71ec65ecd6b5aa144ae6d0fdafcfbefccafb34fc80b34f7"
+    },
+    {
+      "path": "crates/rd-apk/src/signing.rs",
+      "local_path": "crates/rd-apk/src/signing.rs",
+      "status": "adapted",
+      "sha256": "7f1fecdca1e1fb2605b515cf956828b652a6e950927a3b1b89399ff4f2c1dcf4"
+    },
+    {
+      "path": "crates/rd-apk/src/zip.rs",
+      "local_path": "crates/rd-apk/src/zip.rs",
+      "status": "adapted",
+      "sha256": "abd7d215039e537e3dbab96f2c50f8b06a32cd7af596aa2cf1e0b3e6a25b2199"
+    },
+    {
+      "path": "crates/rd-apk/tests/axml_manifest_253_254.rs",
+      "local_path": "crates/rd-apk/tests/axml_manifest_253_254.rs",
+      "status": "identical",
+      "sha256": "0ee5f5c38b0796e7af0dfa9b70ff83034576eaa047a6066fc9f86b8c738f87d9"
+    },
+    {
+      "path": "crates/rd-apk/tests/integration_apk.rs",
+      "local_path": "crates/rd-apk/tests/integration_apk.rs",
+      "status": "identical",
+      "sha256": "9b9bccffb096c0a260fe10d14d81c9bded123fb994bd7b2a03b19e8eb31946e1"
+    },
+    {
+      "path": "crates/rd-apk/tests/signing_264.rs",
+      "local_path": "crates/rd-apk/tests/signing_264.rs",
+      "status": "identical",
+      "sha256": "bfd911fa7690f96259133b2296217cd42435d034c35fb61e8faa9cb9b8d08674"
+    },
+    {
+      "path": "crates/rd-cli/Cargo.toml",
+      "local_path": "crates/rd-cli/Cargo.toml",
+      "status": "identical",
+      "sha256": "3098f1f4849af766f6acaa6898a8d0be5d6802f090ff22c49e04f0454d2f6fbc"
+    },
+    {
+      "path": "crates/rd-cli/src/api_coverage.rs",
+      "local_path": "crates/rd-cli/src/api_coverage.rs",
+      "status": "identical",
+      "sha256": "e1a3185d83636ad01b70e18c619856f280a96b394dc44e7d2d97f276bc85618a"
+    },
+    {
+      "path": "crates/rd-cli/src/engines.rs",
+      "local_path": "crates/rd-cli/src/engines.rs",
+      "status": "identical",
+      "sha256": "423c2ef1c14ce678ac5de72e8d7ae71771e6138699a25d06fe45f0a95aa46ea4"
+    },
+    {
+      "path": "crates/rd-cli/src/gms_cli.rs",
+      "local_path": "crates/rd-cli/src/gms_cli.rs",
+      "status": "identical",
+      "sha256": "5daec9b257034ea9efb75dabdb8bd2caf020d7b2e60d34a6e3f15f71ea5f197f"
+    },
+    {
+      "path": "crates/rd-cli/src/jetpack.rs",
+      "local_path": "crates/rd-cli/src/jetpack.rs",
+      "status": "identical",
+      "sha256": "92278c2acffd6e39c913d12f6ccd2b3c7ba2fd58c56ad13a05dd009f33f6c13b"
+    },
+    {
+      "path": "crates/rd-cli/src/main.rs",
+      "local_path": "crates/rd-cli/src/main.rs",
+      "status": "identical",
+      "sha256": "5029d7c9ec0cc97b8abfd973afa3585c4112b841f7e6ad9edab8d9b407e66e67"
+    },
+    {
+      "path": "crates/rd-cli/src/perf.rs",
+      "local_path": "crates/rd-cli/src/perf.rs",
+      "status": "identical",
+      "sha256": "c213e5d281ad786a85d694c78f6446c0c7df900f4430ee958f56e0983595d10d"
+    },
+    {
+      "path": "crates/rd-cli/tests/api_coverage_cli.rs",
+      "local_path": "crates/rd-cli/tests/api_coverage_cli.rs",
+      "status": "identical",
+      "sha256": "905e63829125c4c433a06bf3c3ef84589f9126cf96122cea54357c789e4e150c"
+    },
+    {
+      "path": "crates/rd-cli/tests/app_cli.rs",
+      "local_path": "crates/rd-cli/tests/app_cli.rs",
+      "status": "identical",
+      "sha256": "36d0190b245d61e13aca0f4eba93b57bd6face652949037647d62f3c2169d301"
+    },
+    {
+      "path": "crates/rd-cli/tests/engine_cli.rs",
+      "local_path": "crates/rd-cli/tests/engine_cli.rs",
+      "status": "identical",
+      "sha256": "f5b2dee8d3441ba6adef14f384d10097f9d4e0f4502b6e8f991ffb3ae5497d1c"
+    },
+    {
+      "path": "crates/rd-cli/tests/inspect_cli.rs",
+      "local_path": "crates/rd-cli/tests/inspect_cli.rs",
+      "status": "identical",
+      "sha256": "e72c0e0bc7873dbcda69874c8c549c10a30b41fe495b208a314ef1235ba0dbd7"
+    },
+    {
+      "path": "crates/rd-cli/tests/jetpack_gms_cli.rs",
+      "local_path": "crates/rd-cli/tests/jetpack_gms_cli.rs",
+      "status": "identical",
+      "sha256": "a0aea3c2a5fe21c4a5744c05ceec4ad64884c283b7ab26d2e599e1b37badc4e3"
+    },
+    {
+      "path": "crates/rd-cli/tests/mcp_cli.rs",
+      "local_path": "crates/rd-cli/tests/mcp_cli.rs",
+      "status": "identical",
+      "sha256": "28d13fc1cef179875851ab10a1fe0ba22a8cbb7a3032024108f1b39de1f66f5b"
+    },
+    {
+      "path": "crates/rd-cli/tests/perf_cli.rs",
+      "local_path": "crates/rd-cli/tests/perf_cli.rs",
+      "status": "identical",
+      "sha256": "3bfae39216a8034525301f5ae82f850d78212c297917c76d956c29509b080b0d"
+    },
+    {
+      "path": "crates/rd-cli/tests/readme_inspect.rs",
+      "local_path": "crates/rd-cli/tests/readme_inspect.rs",
+      "status": "adapted",
+      "sha256": "b2dd2c77c3050a18a3462386cc84bfb4ed6a0f880f25ef1c35c0898b3382029a"
+    },
+    {
+      "path": "crates/rd-cli/tests/test_cli.rs",
+      "local_path": "crates/rd-cli/tests/test_cli.rs",
+      "status": "identical",
+      "sha256": "22bd52e8aeeacd8f96524fc72873ecbe8e61c63458a2bb51a0cb6eec97c93bc5"
+    },
+    {
+      "path": "crates/rd-dex/Cargo.toml",
+      "local_path": "crates/rd-dex/Cargo.toml",
+      "status": "adapted",
+      "sha256": "d99f6db65f557a151aaee3b483e68f1114cc4d57ad419606e1cb62a5a32fb2b8"
+    },
+    {
+      "path": "crates/rd-dex/examples/dump_dex.rs",
+      "local_path": "crates/rd-dex/examples/dump_dex.rs",
+      "status": "identical",
+      "sha256": "da4b1a893bad5140508aad63e1c6b9f8327036e53354528513000cda08da97e7"
+    },
+    {
+      "path": "crates/rd-dex/fuzz/Cargo.toml",
+      "local_path": "crates/rd-dex/fuzz/Cargo.toml",
+      "status": "identical",
+      "sha256": "15d565add271f23627650951882973a8b5a66c1f28473ff629fc4f992cf3912e"
+    },
+    {
+      "path": "crates/rd-dex/fuzz/fuzz_targets/dex.rs",
+      "local_path": "crates/rd-dex/fuzz/fuzz_targets/dex.rs",
+      "status": "identical",
+      "sha256": "dcc3c0ebc8d59396528eeeb743e07dabb42829424c58aacf0a99e52bde7a0259"
+    },
+    {
+      "path": "crates/rd-dex/src/annotations.rs",
+      "local_path": "crates/rd-dex/src/annotations.rs",
+      "status": "adapted",
+      "sha256": "9033f5af63b5baef15e3383ac27953034c4beec60cd14b08259aeb2bb1b2e49b"
+    },
+    {
+      "path": "crates/rd-dex/src/classes.rs",
+      "local_path": "crates/rd-dex/src/classes.rs",
+      "status": "adapted",
+      "sha256": "157afc8508945aff2fafdd41a3e35b5b94b05b6070d8c0727bb4a494a91bd15c"
+    },
+    {
+      "path": "crates/rd-dex/src/code.rs",
+      "local_path": "crates/rd-dex/src/code.rs",
+      "status": "adapted",
+      "sha256": "2619f9d834e9084c54e5bbcb029cac47309fb67fd80366246ccaaa5973294371"
+    },
+    {
+      "path": "crates/rd-dex/src/debug.rs",
+      "local_path": "crates/rd-dex/src/debug.rs",
+      "status": "adapted",
+      "sha256": "6e8c6ff2f1c3f2a5a0c6f81e5fb0a7defd12a6bcbfaee1c01fd9c362e3225b37"
+    },
+    {
+      "path": "crates/rd-dex/src/dex.rs",
+      "local_path": "crates/rd-dex/src/dex.rs",
+      "status": "adapted",
+      "sha256": "79416ed09ea347f2c0eef2342debeabf27c072aa78b4516b8c14686e7d51dfff"
+    },
+    {
+      "path": "crates/rd-dex/src/disasm.rs",
+      "local_path": "crates/rd-dex/src/disasm.rs",
+      "status": "adapted",
+      "sha256": "5e226415fc26a59022c04ea16b37672462eff2d4229e3b8ca98bc067a28d5b01"
+    },
+    {
+      "path": "crates/rd-dex/src/error.rs",
+      "local_path": "crates/rd-dex/src/error.rs",
+      "status": "adapted",
+      "sha256": "3c9407c7bd24bc460c7126de97b36afd5ec259972a55b68e8de1c63099158890"
+    },
+    {
+      "path": "crates/rd-dex/src/fields.rs",
+      "local_path": "crates/rd-dex/src/fields.rs",
+      "status": "adapted",
+      "sha256": "eedb529763e1b73ab2b45ed913f759673e61bf13dc69d5887851032e82c597c4"
+    },
+    {
+      "path": "crates/rd-dex/src/lazy.rs",
+      "local_path": "crates/rd-dex/src/lazy.rs",
+      "status": "adapted",
+      "sha256": "a4a56f37e340c499a935d05cc9d0b41795ef4a0c99f8d6b769fb7713e46f5f60"
+    },
+    {
+      "path": "crates/rd-dex/src/lib.rs",
+      "local_path": "crates/rd-dex/src/lib.rs",
+      "status": "adapted",
+      "sha256": "169d0d4a955af2ed120f6423006cb5793bb3be41ebc5852dc4821d9aaf556e22"
+    },
+    {
+      "path": "crates/rd-dex/src/methods.rs",
+      "local_path": "crates/rd-dex/src/methods.rs",
+      "status": "adapted",
+      "sha256": "7bd0e026decbea36415eeadfd33560bffcdbc1a02e4639fbde329927b76ed803"
+    },
+    {
+      "path": "crates/rd-dex/src/mutf8.rs",
+      "local_path": "crates/rd-dex/src/mutf8.rs",
+      "status": "adapted",
+      "sha256": "c2858bd469307046c0d9c26a51c0cf48eed9a29df47ca3d319bf34251942f9ed"
+    },
+    {
+      "path": "crates/rd-dex/src/opcode.rs",
+      "local_path": "crates/rd-dex/src/opcode.rs",
+      "status": "identical",
+      "sha256": "363997c7f81e9a775bc0a491fe0c7f7b88f0a04ba10db6ecfde038f56d167dea"
+    },
+    {
+      "path": "crates/rd-dex/src/protos.rs",
+      "local_path": "crates/rd-dex/src/protos.rs",
+      "status": "adapted",
+      "sha256": "562e84656ca4990d2e5f2d549565cf29a380f2e2a9258d582884dd0bec60c9d2"
+    },
+    {
+      "path": "crates/rd-dex/src/read.rs",
+      "local_path": "crates/rd-dex/src/read.rs",
+      "status": "adapted",
+      "sha256": "2a32f7947661665b7af672c40fccd7c8368ae2489df79be59ca99dff5e7c9a66"
+    },
+    {
+      "path": "crates/rd-dex/src/strings.rs",
+      "local_path": "crates/rd-dex/src/strings.rs",
+      "status": "adapted",
+      "sha256": "0083c61089e707d6be573ac841a2113f41c954461d0bc7fc318fb2c74bfda219"
+    },
+    {
+      "path": "crates/rd-dex/src/types.rs",
+      "local_path": "crates/rd-dex/src/types.rs",
+      "status": "adapted",
+      "sha256": "730b595770d3ccb7bcbbd0f8778e6c5b2deb78dc60395a9148f90ccac00957d0"
+    },
+    {
+      "path": "crates/rd-dex/tests/dex_security_332.rs",
+      "local_path": "crates/rd-dex/tests/dex_security_332.rs",
+      "status": "identical",
+      "sha256": "16005fee29e625f96ffeb37b5fe854d4b91e96752d7416c972456efc9115deb8"
+    },
+    {
+      "path": "crates/rd-dex/tests/fuzz_dos_285.rs",
+      "local_path": "crates/rd-dex/tests/fuzz_dos_285.rs",
+      "status": "identical",
+      "sha256": "1c3486a490fe28cb1680c63df3a3dd90bfbee821a0dc6c6825f0657120005b34"
+    },
+    {
+      "path": "crates/rd-dex/tests/integration_dex.rs",
+      "local_path": "crates/rd-dex/tests/integration_dex.rs",
+      "status": "identical",
+      "sha256": "558c70b823c818d57d3814fd9e7001d211c9ad77028794e15959377bf51726f1"
+    },
+    {
+      "path": "crates/rd-dex/tests/lazy_dex.rs",
+      "local_path": "crates/rd-dex/tests/lazy_dex.rs",
+      "status": "identical",
+      "sha256": "a77c0f14ae2df0f8340146cb192cc4207b6e4ca3ad39ea17189f0574f34269cf"
+    },
+    {
+      "path": "crates/rd-engine-registry/Cargo.toml",
+      "local_path": "crates/rd-engine-registry/Cargo.toml",
+      "status": "identical",
+      "sha256": "089df7dcab817bf40128c31dc23380bd86ed9a0be813963c77d411165431d88f"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/contract.rs",
+      "local_path": "crates/rd-engine-registry/src/contract.rs",
+      "status": "identical",
+      "sha256": "7255aebd248cd11a6b49683243252c603f1db212e9c35119fa320427fdeea8a2"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/detect.rs",
+      "local_path": "crates/rd-engine-registry/src/detect.rs",
+      "status": "identical",
+      "sha256": "cbfb24c1c903231b0648918e9ddae34fe2098aade996ddded04e8e93ac14a3d7"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/lib.rs",
+      "local_path": "crates/rd-engine-registry/src/lib.rs",
+      "status": "identical",
+      "sha256": "3802c16ffc9a8d11913baf12193b07111bbbb1aa4a4834c2e9e6454a6bf9266e"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/native_execution.rs",
+      "local_path": "crates/rd-engine-registry/src/native_execution.rs",
+      "status": "identical",
+      "sha256": "74ba7a5a863f6f616be55fb0460221625befacecd2db982d456af32dc29c4d20"
+    },
+    {
+      "path": "crates/rd-engine-registry/src/report.rs",
+      "local_path": "crates/rd-engine-registry/src/report.rs",
+      "status": "identical",
+      "sha256": "b49a3b0fac8fedd410dbf3fad225fe209334dea1b1c616086bd4e0c6396a59bd"
+    },
+    {
+      "path": "crates/rd-engine-registry/tests/native_entry_260.rs",
+      "local_path": "crates/rd-engine-registry/tests/native_entry_260.rs",
+      "status": "identical",
+      "sha256": "5962cc93f9669e78ab9d36df10dcd1ad323e8fe9a77f4f1c06842c153203301e"
+    },
+    {
+      "path": "crates/rd-engine-registry/tests/native_execution.rs",
+      "local_path": "crates/rd-engine-registry/tests/native_execution.rs",
+      "status": "identical",
+      "sha256": "516c7ea2514201cbd64a94deb83a4694222a9af5d4d120861769fcbffece83bf"
+    },
+    {
+      "path": "crates/rd-engine-registry/tests/registry.rs",
+      "local_path": "crates/rd-engine-registry/tests/registry.rs",
+      "status": "identical",
+      "sha256": "dee466c992fbf835c4dbdd061a7219d89b20845c48ece072586d5293ec57e114"
+    },
+    {
+      "path": "crates/rd-framework/Cargo.toml",
+      "local_path": "crates/rd-framework/Cargo.toml",
+      "status": "identical",
+      "sha256": "a8df57c05f1edfeffb6bda12bd22b8ab77ea59eee0015574f97395a99a827f41"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_api_coverage.rs",
+      "local_path": "crates/rd-framework/src/fd_api_coverage.rs",
+      "status": "identical",
+      "sha256": "0bed2b703ed1bfdab8eeedaf6aa30399a485e30b59ca879e4a25181b40fb2d11"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_behavior.rs",
+      "local_path": "crates/rd-framework/src/fd_behavior.rs",
+      "status": "identical",
+      "sha256": "9678949c3a22ece3860754879357d120f66e0f4cb98a41842d6d18a8947a04a6"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_devices.rs",
+      "local_path": "crates/rd-framework/src/fd_devices.rs",
+      "status": "identical",
+      "sha256": "d21cf66c2d3bb1f605dc11aa19a621ed4d6d31fe4d96fa28c4464b3fd53aafc5"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_gms.rs",
+      "local_path": "crates/rd-framework/src/fd_gms.rs",
+      "status": "identical",
+      "sha256": "24cf6e1aa28734ae7087a59da2ead8d4c67f52a7ee2f9bc9c4534202dc2c7c8b"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_jetpack.rs",
+      "local_path": "crates/rd-framework/src/fd_jetpack.rs",
+      "status": "identical",
+      "sha256": "bb2712d6c276c3cc6064fd26ca21e49ee122a1e250adebeabc5b39e9136ae41a"
+    },
+    {
+      "path": "crates/rd-framework/src/fd_permissions.rs",
+      "local_path": "crates/rd-framework/src/fd_permissions.rs",
+      "status": "identical",
+      "sha256": "389f31a9606fdfc31c3d619f5abfc579b2ed0234bcd2a6bf71f6e23054b93399"
+    },
+    {
+      "path": "crates/rd-framework/src/lib.rs",
+      "local_path": "crates/rd-framework/src/lib.rs",
+      "status": "identical",
+      "sha256": "7893456b9b344949fd9b5961dd52c7bed21c4cbfa8619be29ffd237b9fe9b81d"
+    },
+    {
+      "path": "crates/rd-jni/Cargo.toml",
+      "local_path": "crates/rd-jni/Cargo.toml",
+      "status": "adapted",
+      "sha256": "d6a118b3c7972fa4485829cd7cafcc1c41e83fb53c976e2ee2eda3c56bc38cfd"
+    },
+    {
+      "path": "crates/rd-jni/src/jit.rs",
+      "local_path": "crates/rd-jni/src/jit.rs",
+      "status": "identical",
+      "sha256": "436f4310a866f2deab7a6bfa5e4356657a8b100016a8501a40470015cb6757d8"
+    },
+    {
+      "path": "crates/rd-jni/src/lib.rs",
+      "local_path": "crates/rd-jni/src/lib.rs",
+      "status": "adapted",
+      "sha256": "278386d518c12a11e7a9cc8cc7f6dd7b967efeb6c60b8ee90da474e1ac9a523b"
+    },
+    {
+      "path": "crates/rd-ndk/Cargo.toml",
+      "local_path": "crates/rd-ndk/Cargo.toml",
+      "status": "adapted",
+      "sha256": "1c58268490629cf669356ad592ac920c99e1b9c3dbf8b2b1754714154f9199e9"
+    },
+    {
+      "path": "crates/rd-ndk/examples/elf_campaign.rs",
+      "local_path": "crates/rd-ndk/examples/elf_campaign.rs",
+      "status": "identical",
+      "sha256": "74bca02e1a7f1c1c8e4487c3e5cfcf6986ccdcc0598dbb658668e37858f694e8"
+    },
+    {
+      "path": "crates/rd-ndk/examples/native_probe.rs",
+      "local_path": "crates/rd-ndk/examples/native_probe.rs",
+      "status": "identical",
+      "sha256": "686857e1fa3ae6f04370a02a59cd92e824a12a6a54f05abdc12ef4fc80071d84"
+    },
+    {
+      "path": "crates/rd-ndk/src/elf.rs",
+      "local_path": "crates/rd-ndk/src/elf.rs",
+      "status": "adapted",
+      "sha256": "427d2a0e5c72db796d81801155922f12bb2ab025715eb501594894a0c47c0456"
+    },
+    {
+      "path": "crates/rd-ndk/src/lib.rs",
+      "local_path": "crates/rd-ndk/src/lib.rs",
+      "status": "adapted",
+      "sha256": "e0bd68fa8f3b16149380d01727671bc093a17ba2a58fa7bd5eb58f3cb84a0332"
+    },
+    {
+      "path": "crates/rd-ndk/src/runtime.rs",
+      "local_path": "crates/rd-ndk/src/runtime.rs",
+      "status": "adapted",
+      "sha256": "d3c24fe8fccded6aaab149a992bc4593ff308c5a916f0b788bbc15439fa19236"
+    },
+    {
+      "path": "crates/rd-ndk/tests/native.rs",
+      "local_path": "crates/rd-ndk/tests/native.rs",
+      "status": "identical",
+      "sha256": "6a0ee9ca2e7560f18ce74fc49d3c900eba3bdb93801ad33897426a65fe34c9bc"
+    },
+    {
+      "path": "crates/rd-ndk/tests/ndk_p0_242_255.rs",
+      "local_path": "crates/rd-ndk/tests/ndk_p0_242_255.rs",
+      "status": "identical",
+      "sha256": "2a5e9312ae6860f1a55d18fecdbafb409ec653ba42c340fe6ae02db20ad4b913"
+    },
+    {
+      "path": "crates/rd-ndk/worker/native_worker.py",
+      "local_path": "crates/rd-ndk/worker/native_worker.py",
+      "status": "identical",
+      "sha256": "89e07c4fb89a7bba7c3ab073705972c4d47440032c6fd8590212028f4760f652"
+    },
+    {
+      "path": "crates/rd-render/Cargo.toml",
+      "local_path": "crates/rd-render/Cargo.toml",
+      "status": "identical",
+      "sha256": "c67373e2c922c4a7440680860a4fc6ba329675acb672f8c756da03e03a970337"
+    },
+    {
+      "path": "crates/rd-render/src/lib.rs",
+      "local_path": "crates/rd-render/src/lib.rs",
+      "status": "identical",
+      "sha256": "13bea0cb84c997e8e28058dbad310dd61542e3e1e3049ee25f90740e79369a4e"
+    },
+    {
+      "path": "crates/rd-render/src/shot.rs",
+      "local_path": "crates/rd-render/src/shot.rs",
+      "status": "identical",
+      "sha256": "fbdadbf489a9c88b2e0f60fffe6eba0a737d7fea8977e571d3f5d2b863b9a388"
+    },
+    {
+      "path": "crates/rd-render/src/ui_dump.rs",
+      "local_path": "crates/rd-render/src/ui_dump.rs",
+      "status": "identical",
+      "sha256": "ebfdaa7d9e0ee69922ad1cb5820c2ddea2b0b5dfb745269be5905e28c4a8a37e"
+    },
+    {
+      "path": "crates/rd-testsupport/Cargo.toml",
+      "local_path": "crates/rd-testsupport/Cargo.toml",
+      "status": "identical",
+      "sha256": "8f3436cd823a9bf7a0b5efb4ef5ae62d11ada7b87449d64054383aa61d153190"
+    },
+    {
+      "path": "crates/rd-testsupport/src/apkfix.rs",
+      "local_path": "crates/rd-testsupport/src/apkfix.rs",
+      "status": "identical",
+      "sha256": "1333fe91a28d298514127f3678a0e7fb83769d79e157086e34fe2e97f02f7c88"
+    },
+    {
+      "path": "crates/rd-testsupport/src/lib.rs",
+      "local_path": "crates/rd-testsupport/src/lib.rs",
+      "status": "identical",
+      "sha256": "0d6c1f2cb5b4e5af979c977a19d9789859710698915f1aff31baf944357c78b5"
+    },
+    {
+      "path": "crates/rd-testsupport/src/m9_app.rs",
+      "local_path": "crates/rd-testsupport/src/m9_app.rs",
+      "status": "identical",
+      "sha256": "e54dbb6e3d3dd9238df076b82ca67e81c60affbe17fe510edf636aab35c5159f"
+    },
+    {
+      "path": "crates/rd-testsupport/src/trivial_app.rs",
+      "local_path": "crates/rd-testsupport/src/trivial_app.rs",
+      "status": "identical",
+      "sha256": "7f9b550194946c5ae433f01e6afab138b6816ba175c39e747e58b3a45061cc59"
+    },
+    {
+      "path": "crates/rd-testsupport/src/vm.rs",
+      "local_path": "crates/rd-testsupport/src/vm.rs",
+      "status": "identical",
+      "sha256": "7e6a3566051377e61b8fb4a1b0a9c3aa4e5716b5c442520ecd0034bef770a43b"
+    },
+    {
+      "path": "crates/rd-vm/Cargo.toml",
+      "local_path": "crates/rd-vm/Cargo.toml",
+      "status": "adapted",
+      "sha256": "98e4863cf27ba8bcc7328c76f1a9b22f92775ebeb0af79710547aaae704e61f7"
+    },
+    {
+      "path": "crates/rd-vm/assets/glyphs.bin",
+      "local_path": "crates/rd-vm/assets/glyphs.bin",
+      "status": "identical",
+      "sha256": "f9cd0a65b8f9f872bb317770c609dea7f71bbec63a423748e06160fceafb4665"
+    },
+    {
+      "path": "crates/rd-vm/examples/efficiency_bench.rs",
+      "local_path": "crates/rd-vm/examples/efficiency_bench.rs",
+      "status": "identical",
+      "sha256": "1dae6e741bfa2bf1ce91b671d1cf7e8353d62138e0bd95557320b3573fdd8657"
+    },
+    {
+      "path": "crates/rd-vm/examples/native_gate.rs",
+      "local_path": "crates/rd-vm/examples/native_gate.rs",
+      "status": "identical",
+      "sha256": "c70e03310f3f69225ddd9c9d35f45666d3d0e184bdfcbc03b1b5759e72498dd5"
+    },
+    {
+      "path": "crates/rd-vm/examples/scan_pure_methods.rs",
+      "local_path": "crates/rd-vm/examples/scan_pure_methods.rs",
+      "status": "identical",
+      "sha256": "dd8177358f00e5e7a1c002299a8ad3b1de463df1ad63e464e9216e5b0151b191"
+    },
+    {
+      "path": "crates/rd-vm/src/accessibility_node.rs",
+      "local_path": "crates/rd-vm/src/accessibility_node.rs",
+      "status": "adapted",
+      "sha256": "a8770a5a35e32bff9b98e220f48ca99322dd4368997c8c1b4064b5636efe9471"
+    },
+    {
+      "path": "crates/rd-vm/src/activity_callbacks.rs",
+      "local_path": "crates/rd-vm/src/activity_callbacks.rs",
+      "status": "adapted",
+      "sha256": "f816eecb9cd33ae9b99a4ddea26786540fb2c0dd7f841f5907efb16e635a5f01"
+    },
+    {
+      "path": "crates/rd-vm/src/activity_extras.rs",
+      "local_path": "crates/rd-vm/src/activity_extras.rs",
+      "status": "adapted",
+      "sha256": "2f79d2bacb82386108031987b46bd9bed70cfa355eda19d1b8a4f96c1b8e36db"
+    },
+    {
+      "path": "crates/rd-vm/src/android_build.rs",
+      "local_path": "crates/rd-vm/src/android_build.rs",
+      "status": "adapted",
+      "sha256": "ec0e7bc88e36356739341606561d62e75cf73de0a28dad67baa25f1e177b842e"
+    },
+    {
+      "path": "crates/rd-vm/src/android_colorspace.rs",
+      "local_path": "crates/rd-vm/src/android_colorspace.rs",
+      "status": "adapted",
+      "sha256": "384085413a2e6cc55a3d5e723f3020a46a2e403786585e2117edd7ef29e1a90b"
+    },
+    {
+      "path": "crates/rd-vm/src/android_display.rs",
+      "local_path": "crates/rd-vm/src/android_display.rs",
+      "status": "adapted",
+      "sha256": "8e92349de21526b89ac3d2ff8f1d3742bb0b64ea800ed2ba56006d8dc383e0b6"
+    },
+    {
+      "path": "crates/rd-vm/src/android_drawable.rs",
+      "local_path": "crates/rd-vm/src/android_drawable.rs",
+      "status": "adapted",
+      "sha256": "1a21f0a0e957d70a8d5ee1359ea56ed90bff06ec4faeae00c2640b44a4b91234"
+    },
+    {
+      "path": "crates/rd-vm/src/android_env.rs",
+      "local_path": "crates/rd-vm/src/android_env.rs",
+      "status": "adapted",
+      "sha256": "8b3124faffb4acdb894ad34bf9c9de23fdcf5e85efb5cf65cb3579239d30980c"
+    },
+    {
+      "path": "crates/rd-vm/src/android_json.rs",
+      "local_path": "crates/rd-vm/src/android_json.rs",
+      "status": "adapted",
+      "sha256": "c413e44e3185a44033a0c8dea26cc88e41b231dd85aacc2af2a7ccb9708abdd8"
+    },
+    {
+      "path": "crates/rd-vm/src/android_motion.rs",
+      "local_path": "crates/rd-vm/src/android_motion.rs",
+      "status": "adapted",
+      "sha256": "23d440a2ebe645e6adff46588dd52c2336cce74813a82a8e4752acd772b377f9"
+    },
+    {
+      "path": "crates/rd-vm/src/android_observable.rs",
+      "local_path": "crates/rd-vm/src/android_observable.rs",
+      "status": "adapted",
+      "sha256": "a6b74884bda1296eac82c8473eb759cd289f79cfcb80b324f0b9c842b87bf80a"
+    },
+    {
+      "path": "crates/rd-vm/src/android_pm.rs",
+      "local_path": "crates/rd-vm/src/android_pm.rs",
+      "status": "adapted",
+      "sha256": "40d6ec48131deef6914fbd5405574c9dcbf85c801e57da244e73dad7ca9ad52b"
+    },
+    {
+      "path": "crates/rd-vm/src/android_region.rs",
+      "local_path": "crates/rd-vm/src/android_region.rs",
+      "status": "adapted",
+      "sha256": "d8691a2f92db5496e8ee906fac7552139429b51671719bcc5d0adc661c5ba907"
+    },
+    {
+      "path": "crates/rd-vm/src/android_res.rs",
+      "local_path": "crates/rd-vm/src/android_res.rs",
+      "status": "adapted",
+      "sha256": "45b5a26a9f98036f6f423e9da28decdda26714b5b9daeea4de134cd4ac260432"
+    },
+    {
+      "path": "crates/rd-vm/src/android_spannable.rs",
+      "local_path": "crates/rd-vm/src/android_spannable.rs",
+      "status": "adapted",
+      "sha256": "36d10de5771a2dadca1c2ab2db903b8440d622b792ac53dd27d133d23e41dc1a"
+    },
+    {
+      "path": "crates/rd-vm/src/android_stub_surfaces.rs",
+      "local_path": "crates/rd-vm/src/android_stub_surfaces.rs",
+      "status": "adapted",
+      "sha256": "a01df7f0c01adb4df2c00f67107f0604684a6b055ccf850eb55476506e8d0c74"
+    },
+    {
+      "path": "crates/rd-vm/src/android_sysservices.rs",
+      "local_path": "crates/rd-vm/src/android_sysservices.rs",
+      "status": "adapted",
+      "sha256": "3245ab488cc1fb2c0b01c22e192a053cfd0f1d9562fb01739e69180ae0f4d1d2"
+    },
+    {
+      "path": "crates/rd-vm/src/android_text.rs",
+      "local_path": "crates/rd-vm/src/android_text.rs",
+      "status": "adapted",
+      "sha256": "b7f16a6a1ce47cffc79c7d4cfa2b2ae0651e43ed4d29ff2d8f8735181c613503"
+    },
+    {
+      "path": "crates/rd-vm/src/android_uri.rs",
+      "local_path": "crates/rd-vm/src/android_uri.rs",
+      "status": "adapted",
+      "sha256": "2e08b12dc00ef7f99efdfb0eb8fa63a301057c5ca2e14464a503aacccf8db304"
+    },
+    {
+      "path": "crates/rd-vm/src/android_util.rs",
+      "local_path": "crates/rd-vm/src/android_util.rs",
+      "status": "adapted",
+      "sha256": "070c82cc7585a57c1ccb610880c4aa2c50dc43cdc41e07dc8d5e672dc2311806"
+    },
+    {
+      "path": "crates/rd-vm/src/android_velocity.rs",
+      "local_path": "crates/rd-vm/src/android_velocity.rs",
+      "status": "adapted",
+      "sha256": "b0290e8c50e7e5b9359daf215db6b67c7af0168d08e756c20fc575d106cadcdf"
+    },
+    {
+      "path": "crates/rd-vm/src/androidx.rs",
+      "local_path": "crates/rd-vm/src/androidx.rs",
+      "status": "adapted",
+      "sha256": "03c58231034c70482578bbd9c586b0f705a56f69f9f3e7e06ef492af3d4d1abc"
+    },
+    {
+      "path": "crates/rd-vm/src/arrays.rs",
+      "local_path": "crates/rd-vm/src/arrays.rs",
+      "status": "adapted",
+      "sha256": "fb724c320990a37c3bc562e3cbe6c10c8a38e1ad26824919c3f261d6970bb9ec"
+    },
+    {
+      "path": "crates/rd-vm/src/atomics.rs",
+      "local_path": "crates/rd-vm/src/atomics.rs",
+      "status": "adapted",
+      "sha256": "36b765904986a8bfa529d77cbb3d79bc7a77ac2cde9bd1392633734890a2bd38"
+    },
+    {
+      "path": "crates/rd-vm/src/boxes.rs",
+      "local_path": "crates/rd-vm/src/boxes.rs",
+      "status": "adapted",
+      "sha256": "4365b465d783a89c9e0d9b163ab4ad978606217e611766738cf50e56569bed26"
+    },
+    {
+      "path": "crates/rd-vm/src/bundle.rs",
+      "local_path": "crates/rd-vm/src/bundle.rs",
+      "status": "adapted",
+      "sha256": "e7d18c03f2aad62f7d3a8b01c0da38047b374e474868ee9fc8b71def0bffe421"
+    },
+    {
+      "path": "crates/rd-vm/src/choreographer.rs",
+      "local_path": "crates/rd-vm/src/choreographer.rs",
+      "status": "adapted",
+      "sha256": "05a41fce49dabad4bbd8942ccd99d621495786a0898ef9a8e327607ec38e8d86"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "local_path": "crates/rd-vm/src/classpath.rs",
+      "status": "adapted",
+      "sha256": "748736aa4f204e0efffb8a8171e92cbbe0d21b3cc5511cfe1c4caccbf1937da9"
+    },
+    {
+      "path": "crates/rd-vm/src/collections.rs",
+      "local_path": "crates/rd-vm/src/collections.rs",
+      "status": "adapted",
+      "sha256": "0bb3de095b71e57349c9af976fd03c83bb9eb9940821700b248c0244518b3668"
+    },
+    {
+      "path": "crates/rd-vm/src/content.rs",
+      "local_path": "crates/rd-vm/src/content.rs",
+      "status": "adapted",
+      "sha256": "329ef0b619c12908f6a94e9d821225edf8342038a0bb795db61b867f6ed42e06"
+    },
+    {
+      "path": "crates/rd-vm/src/engine.rs",
+      "local_path": "crates/rd-vm/src/engine.rs",
+      "status": "adapted",
+      "sha256": "f3168605097c583404a3b1bb1a00e27b07258e4dd3da9c2023462fe9d5e8f723"
+    },
+    {
+      "path": "crates/rd-vm/src/err.rs",
+      "local_path": "crates/rd-vm/src/err.rs",
+      "status": "adapted",
+      "sha256": "59205ac2d1f3e197a2a878da1305324253e1388988d69e2fd6ffeda58c2a4e93"
+    },
+    {
+      "path": "crates/rd-vm/src/framework.rs",
+      "local_path": "crates/rd-vm/src/framework.rs",
+      "status": "adapted",
+      "sha256": "f632292bcf0f025a4a13bc8b18ade06fe7f1730f2e3fe60d421796262adb1c8e"
+    },
+    {
+      "path": "crates/rd-vm/src/gc.rs",
+      "local_path": "crates/rd-vm/src/gc.rs",
+      "status": "adapted",
+      "sha256": "23a61a935a2ed4c8f321b988752156c0a8dce3f9cc7c75a2de2feb615388f6d9"
+    },
+    {
+      "path": "crates/rd-vm/src/gms.rs",
+      "local_path": "crates/rd-vm/src/gms.rs",
+      "status": "adapted",
+      "sha256": "5451a2ce7a3f127c74d20cf56a8581a84cc9dc3fa243a2980ad790785467ec78"
+    },
+    {
+      "path": "crates/rd-vm/src/graphics.rs",
+      "local_path": "crates/rd-vm/src/graphics.rs",
+      "status": "adapted",
+      "sha256": "4a1439f8a8e93db5938053b68526e387fc9464a0ac02c7ae14a66223faccfb77"
+    },
+    {
+      "path": "crates/rd-vm/src/handler_msg.rs",
+      "local_path": "crates/rd-vm/src/handler_msg.rs",
+      "status": "adapted",
+      "sha256": "06721a13b734684103b7afaa82ce1150769f427c18c3ed3bf6801d51ac0ec5bb"
+    },
+    {
+      "path": "crates/rd-vm/src/heap.rs",
+      "local_path": "crates/rd-vm/src/heap.rs",
+      "status": "adapted",
+      "sha256": "5bf429ce70e60ebcc275b1f13688d5134c7273cc83e2b15c7b5525b9b7eef870"
+    },
+    {
+      "path": "crates/rd-vm/src/inflate.rs",
+      "local_path": "crates/rd-vm/src/inflate.rs",
+      "status": "adapted",
+      "sha256": "f44dd978362c1a60134644693c44454f80275ca2dfdf6273296656856ab5c34a"
+    },
+    {
+      "path": "crates/rd-vm/src/interp.rs",
+      "local_path": "crates/rd-vm/src/interp.rs",
+      "status": "adapted",
+      "sha256": "5a7c6daced28c4799b5b74e4e25ab7333f852c684bbf3632f7e5ef47826dc6b0"
+    },
+    {
+      "path": "crates/rd-vm/src/intrinsics.rs",
+      "local_path": "crates/rd-vm/src/intrinsics.rs",
+      "status": "adapted",
+      "sha256": "0442dabf7decebfa278ad6755d2723e3f7d16d13b65d03a6d4c87f74bdcfb74c"
+    },
+    {
+      "path": "crates/rd-vm/src/jannotations.rs",
+      "local_path": "crates/rd-vm/src/jannotations.rs",
+      "status": "adapted",
+      "sha256": "f2e8a42bc6b264243c3c4190604d4bd8bfd90906f5602486dec7941680cb81d5"
+    },
+    {
+      "path": "crates/rd-vm/src/jbigdecimal.rs",
+      "local_path": "crates/rd-vm/src/jbigdecimal.rs",
+      "status": "adapted",
+      "sha256": "4700203249aec17bb4a942bf1b74b52383da0691f88996949571b66945d25e6d"
+    },
+    {
+      "path": "crates/rd-vm/src/jbitset.rs",
+      "local_path": "crates/rd-vm/src/jbitset.rs",
+      "status": "adapted",
+      "sha256": "3e5757404066148e91b0800519cf8a4dd9d7e803426665cb2a8cae91ef7c76f1"
+    },
+    {
+      "path": "crates/rd-vm/src/jbreakiter.rs",
+      "local_path": "crates/rd-vm/src/jbreakiter.rs",
+      "status": "adapted",
+      "sha256": "9f8553a7332e7c8fe913bb80b9bc984964d86e31da0ec7c8da634d8b464dd715"
+    },
+    {
+      "path": "crates/rd-vm/src/jcollections.rs",
+      "local_path": "crates/rd-vm/src/jcollections.rs",
+      "status": "adapted",
+      "sha256": "a9f819dced885f1f477b93fff69e5f53211714f0b2f45b74591f58adbd78265d"
+    },
+    {
+      "path": "crates/rd-vm/src/jfile.rs",
+      "local_path": "crates/rd-vm/src/jfile.rs",
+      "status": "adapted",
+      "sha256": "592231192828766ca5b545a4eb2397d632d1d06db904aa43c96b3026bbdef8f8"
+    },
+    {
+      "path": "crates/rd-vm/src/jio_chars.rs",
+      "local_path": "crates/rd-vm/src/jio_chars.rs",
+      "status": "adapted",
+      "sha256": "05533ea1121928071ad4220322d9e3e6a6f55cc196957e0f599184a281d71128"
+    },
+    {
+      "path": "crates/rd-vm/src/jit.rs",
+      "local_path": "crates/rd-vm/src/jit.rs",
+      "status": "identical",
+      "sha256": "8bc13ca119e3f7c4ac6de3633006fbfef5cc8f7302f941e52f611add24c92e8e"
+    },
+    {
+      "path": "crates/rd-vm/src/jiterator.rs",
+      "local_path": "crates/rd-vm/src/jiterator.rs",
+      "status": "adapted",
+      "sha256": "651071ca763b57e10be5cae4d364dd88c146b6c8c27e5e24edd0950b1e8f9c3d"
+    },
+    {
+      "path": "crates/rd-vm/src/jlclass.rs",
+      "local_path": "crates/rd-vm/src/jlclass.rs",
+      "status": "adapted",
+      "sha256": "88a02cc48a6ec1e353b7dce7ffe7335848f55f33dd276782d1ef433c678c3d5f"
+    },
+    {
+      "path": "crates/rd-vm/src/jlocks.rs",
+      "local_path": "crates/rd-vm/src/jlocks.rs",
+      "status": "adapted",
+      "sha256": "48f3e72b69ed50297e4dd7277cf39c5cc9d0748b0b083cecc6a5092c04d95c9f"
+    },
+    {
+      "path": "crates/rd-vm/src/jlstring.rs",
+      "local_path": "crates/rd-vm/src/jlstring.rs",
+      "status": "adapted",
+      "sha256": "5f1a39438aaf743eb9acf2ba83b34aeb243779b5b3da954ed86cc9b70542289d"
+    },
+    {
+      "path": "crates/rd-vm/src/jlsystem.rs",
+      "local_path": "crates/rd-vm/src/jlsystem.rs",
+      "status": "adapted",
+      "sha256": "8f4981e3a7ff45bb95d2ede2fa5dc39d2d186ba06f63724a6d4d455113c09e11"
+    },
+    {
+      "path": "crates/rd-vm/src/jnormalizer.rs",
+      "local_path": "crates/rd-vm/src/jnormalizer.rs",
+      "status": "adapted",
+      "sha256": "fdd6a26d8843ed6b6a7080e1678635155c19b128706637cb700b54ccbb7ff5ca"
+    },
+    {
+      "path": "crates/rd-vm/src/jpriorityqueue.rs",
+      "local_path": "crates/rd-vm/src/jpriorityqueue.rs",
+      "status": "adapted",
+      "sha256": "4c41434ff6004098d95580b9e5832f6a13aa18e6a9780673438ba35cf5653b12"
+    },
+    {
+      "path": "crates/rd-vm/src/jrandom.rs",
+      "local_path": "crates/rd-vm/src/jrandom.rs",
+      "status": "adapted",
+      "sha256": "2574f1f25bfcda3a2425c167624768d42b0f99be3952f4be183f60c06e682c5e"
+    },
+    {
+      "path": "crates/rd-vm/src/jregex.rs",
+      "local_path": "crates/rd-vm/src/jregex.rs",
+      "status": "adapted",
+      "sha256": "afd433e7c0bd41e7d9b878a0b643b9a171cf2b66085936fa7d5fe1577af6e5ad"
+    },
+    {
+      "path": "crates/rd-vm/src/jresources.rs",
+      "local_path": "crates/rd-vm/src/jresources.rs",
+      "status": "adapted",
+      "sha256": "3aed221569d629ede3aefcf65287ccf9ae6641d4ab952397600ce4d860583be4"
+    },
+    {
+      "path": "crates/rd-vm/src/jsb.rs",
+      "local_path": "crates/rd-vm/src/jsb.rs",
+      "status": "adapted",
+      "sha256": "458564a158263265d76f3c8efdf2da981f301d342b88765d0650bb3e3a677d61"
+    },
+    {
+      "path": "crates/rd-vm/src/jsecurity.rs",
+      "local_path": "crates/rd-vm/src/jsecurity.rs",
+      "status": "adapted",
+      "sha256": "01c827499c578ae081208088826aee51b9dd17b68a8717a421e1ef8bbe9db33f"
+    },
+    {
+      "path": "crates/rd-vm/src/jsorted.rs",
+      "local_path": "crates/rd-vm/src/jsorted.rs",
+      "status": "adapted",
+      "sha256": "210fbb00012838f978711a211a39a8e2145861b65b33115cf9438d2db9a5fead"
+    },
+    {
+      "path": "crates/rd-vm/src/jsqlite.rs",
+      "local_path": "crates/rd-vm/src/jsqlite.rs",
+      "status": "adapted",
+      "sha256": "0b4df0f6bf4c53533e4affec7c1d182907551e10bc07e0421ac191a0b0260cac"
+    },
+    {
+      "path": "crates/rd-vm/src/jstring_tokenizer.rs",
+      "local_path": "crates/rd-vm/src/jstring_tokenizer.rs",
+      "status": "adapted",
+      "sha256": "2d5a6dfa3d95cd102321a07028e9763a9926b975269ba22343a16df312a3e621"
+    },
+    {
+      "path": "crates/rd-vm/src/jtext_format.rs",
+      "local_path": "crates/rd-vm/src/jtext_format.rs",
+      "status": "adapted",
+      "sha256": "cbf8b0d8016d8ce63840382b276c45456167655eec17227a007321aff8342763"
+    },
+    {
+      "path": "crates/rd-vm/src/jtime.rs",
+      "local_path": "crates/rd-vm/src/jtime.rs",
+      "status": "adapted",
+      "sha256": "a530229eed1642b353d92162bb80e98992a20809852b8e5acdf16d94299c1564"
+    },
+    {
+      "path": "crates/rd-vm/src/juuid.rs",
+      "local_path": "crates/rd-vm/src/juuid.rs",
+      "status": "adapted",
+      "sha256": "76df73a791743572c690706ad7fbfc3c570a6ef69ea5e0980baee4e9f3052fd3"
+    },
+    {
+      "path": "crates/rd-vm/src/jxml.rs",
+      "local_path": "crates/rd-vm/src/jxml.rs",
+      "status": "adapted",
+      "sha256": "d218e7d9863bcb5e8fc699cd15d1f274345f86705a77587892f53e9119af496c"
+    },
+    {
+      "path": "crates/rd-vm/src/lib.rs",
+      "local_path": "crates/rd-vm/src/lib.rs",
+      "status": "adapted",
+      "sha256": "2d0cccfdcf94196cdace2a55bcece213d081988181f39c602e49d7a7e251dfba"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/biometrics.rs",
+      "local_path": "crates/rd-vm/src/m10/biometrics.rs",
+      "status": "adapted",
+      "sha256": "7ee09168c8bd43b9e5a8dd900797b1a931c6e253d65bada5270509ccfa3e88be"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/camera.rs",
+      "local_path": "crates/rd-vm/src/m10/camera.rs",
+      "status": "adapted",
+      "sha256": "a540069e67278c117e73e750631b96ac2e40dfd716cba823f78d600f406c44f5"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/connectivity.rs",
+      "local_path": "crates/rd-vm/src/m10/connectivity.rs",
+      "status": "adapted",
+      "sha256": "8e04c815e1cd15b3d986e1a73d3666d2a6a9fa4de2e51019dc2fc516562c44e1"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/location.rs",
+      "local_path": "crates/rd-vm/src/m10/location.rs",
+      "status": "adapted",
+      "sha256": "5e06460ee0e020c8451a1220433cdec7c976bca3ee64e1f7fc73e6b76a360c08"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/media.rs",
+      "local_path": "crates/rd-vm/src/m10/media.rs",
+      "status": "adapted",
+      "sha256": "7e9044df096fb90301b14e31a6749643e263df4cd6cff113b213b090a5deedb5"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/mod.rs",
+      "local_path": "crates/rd-vm/src/m10/mod.rs",
+      "status": "adapted",
+      "sha256": "de91dc81ba5646a9d00d4bee07fa4331b0b45bc9757187d0bde07d81da8e0151"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/sensors.rs",
+      "local_path": "crates/rd-vm/src/m10/sensors.rs",
+      "status": "adapted",
+      "sha256": "04cb9fb8a7f936225f1a2caf0c14b47e520336afefc44669ea8a89a588b1bb70"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/sysconfig.rs",
+      "local_path": "crates/rd-vm/src/m10/sysconfig.rs",
+      "status": "adapted",
+      "sha256": "4df65bfce1eaa9116890fb622543b279ce472c3c52f3b678dec3e12050cf339f"
+    },
+    {
+      "path": "crates/rd-vm/src/m8.rs",
+      "local_path": "crates/rd-vm/src/m8.rs",
+      "status": "adapted",
+      "sha256": "b292117e57c26e27a6d1df5d3cad96f23f2c659eb4dd25249d07e67f8153a36f"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/accessibility.rs",
+      "local_path": "crates/rd-vm/src/m9/accessibility.rs",
+      "status": "adapted",
+      "sha256": "d863385cdc7b5a5eda51fa5b1c611e1fdb4a06a99e69fd5c9c3271321563fe1e"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/ime.rs",
+      "local_path": "crates/rd-vm/src/m9/ime.rs",
+      "status": "adapted",
+      "sha256": "48b07dd9a02f18f467dc36a959f1b65d5d921213c69501ac64b91d6f4a95e8bc"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/mod.rs",
+      "local_path": "crates/rd-vm/src/m9/mod.rs",
+      "status": "adapted",
+      "sha256": "5eed744efe832276fcc96b04f87b00266e6f81a938638999be77bdaf756c45c3"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/notifications.rs",
+      "local_path": "crates/rd-vm/src/m9/notifications.rs",
+      "status": "adapted",
+      "sha256": "84642e10164f17fa7134358cf3419cdf0c8f2e9c66e660ad54b15d4a8c6aa355"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/shortcuts.rs",
+      "local_path": "crates/rd-vm/src/m9/shortcuts.rs",
+      "status": "adapted",
+      "sha256": "b40f9831511f7deacf2a2c1a4924cb8b1678b2a161621902cc77efafead65e7f"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/widgets.rs",
+      "local_path": "crates/rd-vm/src/m9/widgets.rs",
+      "status": "adapted",
+      "sha256": "7ab79e11a6f3aeca01d4471e9fecc908106c4837ded595c255c9fccc30c0b2ed"
+    },
+    {
+      "path": "crates/rd-vm/src/native.rs",
+      "local_path": "crates/rd-vm/src/native.rs",
+      "status": "identical",
+      "sha256": "7c91f4c8429222c65d19ea0ea19a1c9608fc59e359156e9253996989d2370346"
+    },
+    {
+      "path": "crates/rd-vm/src/numerics.rs",
+      "local_path": "crates/rd-vm/src/numerics.rs",
+      "status": "adapted",
+      "sha256": "008f3240c94ec0ea86f064e707a18a6e75d1eeffab42a09baa5a10c5b19a7ce9"
+    },
+    {
+      "path": "crates/rd-vm/src/parcel.rs",
+      "local_path": "crates/rd-vm/src/parcel.rs",
+      "status": "adapted",
+      "sha256": "c1c1ea6970301bf5430724dc4477981bc565a92269b52fae5057b8cd4371b45e"
+    },
+    {
+      "path": "crates/rd-vm/src/perms.rs",
+      "local_path": "crates/rd-vm/src/perms.rs",
+      "status": "adapted",
+      "sha256": "62087396386e3c618ad45b317be9b1607026bc53967adda2c89e6ebb8cdf8a56"
+    },
+    {
+      "path": "crates/rd-vm/src/platform_base.rs",
+      "local_path": "crates/rd-vm/src/platform_base.rs",
+      "status": "adapted",
+      "sha256": "ef2012ba81f14ca5a782e45ccb6ca91072124b879529e9b4f2f20f0981583f77"
+    },
+    {
+      "path": "crates/rd-vm/src/prefs.rs",
+      "local_path": "crates/rd-vm/src/prefs.rs",
+      "status": "adapted",
+      "sha256": "7e5ee004aa5687c9666bc78060dffa5c80c888dc462751f9eafd6de807352c7f"
+    },
+    {
+      "path": "crates/rd-vm/src/reflect.rs",
+      "local_path": "crates/rd-vm/src/reflect.rs",
+      "status": "adapted",
+      "sha256": "0ff36c857e5ebd65e131eb343e8a161db3f86f44204465ee9c01e1ef73c1ddb6"
+    },
+    {
+      "path": "crates/rd-vm/src/repr.rs",
+      "local_path": "crates/rd-vm/src/repr.rs",
+      "status": "adapted",
+      "sha256": "cef872b37c8a1045dc85175e621a0b80ba37d4dc906f69783cdc9e853133ed86"
+    },
+    {
+      "path": "crates/rd-vm/src/screen_model.rs",
+      "local_path": "crates/rd-vm/src/screen_model.rs",
+      "status": "adapted",
+      "sha256": "27dd9a5215c594356fe6c8fe7c33487449ab90edade0bab67dcafbacddd6e553"
+    },
+    {
+      "path": "crates/rd-vm/src/threads.rs",
+      "local_path": "crates/rd-vm/src/threads.rs",
+      "status": "adapted",
+      "sha256": "2cb1155e74588bb7ddf995234055e34919e2fb147702a0c691bc5fe9966a5423"
+    },
+    {
+      "path": "crates/rd-vm/src/throwable.rs",
+      "local_path": "crates/rd-vm/src/throwable.rs",
+      "status": "adapted",
+      "sha256": "ebdb940a525fcaaceb27453d3673d38d93229e10f66bdc2a5e1ccca302d0dbff"
+    },
+    {
+      "path": "crates/rd-vm/src/value.rs",
+      "local_path": "crates/rd-vm/src/value.rs",
+      "status": "adapted",
+      "sha256": "edd5287124e4a68a0474519a027c50d563c4974a96638d0bf6a4e169f32d8dbb"
+    },
+    {
+      "path": "crates/rd-vm/src/view_attach.rs",
+      "local_path": "crates/rd-vm/src/view_attach.rs",
+      "status": "adapted",
+      "sha256": "03d822f43b5402aaac31816ad3f091a04e560e56826b190df106c8780706bf73"
+    },
+    {
+      "path": "crates/rd-vm/src/view_layout.rs",
+      "local_path": "crates/rd-vm/src/view_layout.rs",
+      "status": "adapted",
+      "sha256": "a90edee5760c3e15d948f00c10e1c26f343ff6e6261d95f8dbb637b4c655f2d8"
+    },
+    {
+      "path": "crates/rd-vm/src/view_props.rs",
+      "local_path": "crates/rd-vm/src/view_props.rs",
+      "status": "adapted",
+      "sha256": "3d279a7a43b6a72b64f29435e8540c685aa12f6cd814b2e7907c44359c37158a"
+    },
+    {
+      "path": "crates/rd-vm/src/vto.rs",
+      "local_path": "crates/rd-vm/src/vto.rs",
+      "status": "adapted",
+      "sha256": "e94fa150bf4a1525e2e72e6d3f68384416a17764c333f8773ae8daf9ad7da7f2"
+    },
+    {
+      "path": "crates/rd-vm/src/window.rs",
+      "local_path": "crates/rd-vm/src/window.rs",
+      "status": "adapted",
+      "sha256": "324de639a2963de78a358c253456696c1d4c7e2bf329274aad7455ab40311e82"
+    },
+    {
+      "path": "crates/rd-vm/src/xml_res.rs",
+      "local_path": "crates/rd-vm/src/xml_res.rs",
+      "status": "adapted",
+      "sha256": "95014a6487eddb03c37c481153ac12d3882765561ffec5100ea2be4f3ecaa62e"
+    },
+    {
+      "path": "crates/rd-vm/tests/accessibility_virtual.rs",
+      "local_path": "crates/rd-vm/tests/accessibility_virtual.rs",
+      "status": "identical",
+      "sha256": "3ea92180e7c8c7acec62638c81e92cc8557e156a34691e0c16ca3ea98705ad71"
+    },
+    {
+      "path": "crates/rd-vm/tests/activity_history.rs",
+      "local_path": "crates/rd-vm/tests/activity_history.rs",
+      "status": "identical",
+      "sha256": "99bdd0768be0a118249d1627f7ed0cf6f08152b848cce875912e2de687f069fe"
+    },
+    {
+      "path": "crates/rd-vm/tests/alloc_budget_311.rs",
+      "local_path": "crates/rd-vm/tests/alloc_budget_311.rs",
+      "status": "identical",
+      "sha256": "ba035660da6009a8151ae6ad47c2094f7c4c12fb389ba1f96285c77a2d695e46"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_array_containers.rs",
+      "local_path": "crates/rd-vm/tests/android_array_containers.rs",
+      "status": "identical",
+      "sha256": "b2a1a73673b06738847b85739b49a2b7404c8070fcb9ad1d472249bbe42cb849"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_assets.rs",
+      "local_path": "crates/rd-vm/tests/android_assets.rs",
+      "status": "identical",
+      "sha256": "75249e7a64dfd225cee203d89b4d9a2e4e61b354b8d8d3a7e822331fd3922ab8"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_atomic_file.rs",
+      "local_path": "crates/rd-vm/tests/android_atomic_file.rs",
+      "status": "identical",
+      "sha256": "e80de942bf6e1e55f607f2fac50fd54376689b6c123bd24671eb4a5c78c9f2fc"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_base64_streams.rs",
+      "local_path": "crates/rd-vm/tests/android_base64_streams.rs",
+      "status": "identical",
+      "sha256": "2a3e940bd7a144558eb2683488e38c50e2171269d74d495136a72fd999165814"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_bitset.rs",
+      "local_path": "crates/rd-vm/tests/android_bitset.rs",
+      "status": "identical",
+      "sha256": "fd47f124564d19e84bdec531d5e246dd83fa391ed311572bc0265f5eee3a55dd"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_display.rs",
+      "local_path": "crates/rd-vm/tests/android_display.rs",
+      "status": "identical",
+      "sha256": "bd5c020699c5131bf10527f2ce64f285e53c96e062d35e0205b4af6b9e284917"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_inherited_dispatch.rs",
+      "local_path": "crates/rd-vm/tests/android_inherited_dispatch.rs",
+      "status": "identical",
+      "sha256": "0b348738dcddb36b52fa58dcc09ae0fbedacc3c55565547561e4436f0e267843"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_json.rs",
+      "local_path": "crates/rd-vm/tests/android_json.rs",
+      "status": "identical",
+      "sha256": "d47d84a2561d9959afdf9a8ad8f7e3eaa66373d470892f580f7dcbe57adec48b"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_json_274.rs",
+      "local_path": "crates/rd-vm/tests/android_json_274.rs",
+      "status": "identical",
+      "sha256": "13d43a83d052ce4d3de04709af594179cfc8dce43b98168fdccabba654532b57"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_stub_surfaces.rs",
+      "local_path": "crates/rd-vm/tests/android_stub_surfaces.rs",
+      "status": "identical",
+      "sha256": "2a664b9d25ec604f2c5408ce523776481642377ee74b0ea196f81ccfab2f7316"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_sysservices_batch1.rs",
+      "local_path": "crates/rd-vm/tests/android_sysservices_batch1.rs",
+      "status": "identical",
+      "sha256": "9586a49ab0dc077a92503721726d668086e5d0b9140e537cd505a8daa886ec8b"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_sysservices_batch6.rs",
+      "local_path": "crates/rd-vm/tests/android_sysservices_batch6.rs",
+      "status": "identical",
+      "sha256": "713d4155c0d3b4f41a78dc580b59de3229e843e8d0f02cdcce7e5394aae7533d"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_touch.rs",
+      "local_path": "crates/rd-vm/tests/android_touch.rs",
+      "status": "identical",
+      "sha256": "b71836795bc067846a342eb4f51dcb7dc7a6ebcb780f7bfe41e1502280666a7e"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_uri_267.rs",
+      "local_path": "crates/rd-vm/tests/android_uri_267.rs",
+      "status": "identical",
+      "sha256": "b30f74464b4948019c573b0708937cc88ffc75a354e9609c24a6a81184afe676"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_util_lru.rs",
+      "local_path": "crates/rd-vm/tests/android_util_lru.rs",
+      "status": "identical",
+      "sha256": "6cbb2783a5bc8b9457744d4fc6f917124e228a2090c441e1c305a0c943d4db42"
+    },
+    {
+      "path": "crates/rd-vm/tests/androidx.rs",
+      "local_path": "crates/rd-vm/tests/androidx.rs",
+      "status": "adapted",
+      "sha256": "9dc3227754c45e04a2fc09a8665dfb173af92b8e5ebcd42b8079095ede1472b3"
+    },
+    {
+      "path": "crates/rd-vm/tests/androidx_hierarchy.rs",
+      "local_path": "crates/rd-vm/tests/androidx_hierarchy.rs",
+      "status": "identical",
+      "sha256": "7b5717edb5e971a25c5b2430f96a66a18fde1275f059080f9ce90bd2c8523741"
+    },
+    {
+      "path": "crates/rd-vm/tests/app.rs",
+      "local_path": "crates/rd-vm/tests/app.rs",
+      "status": "identical",
+      "sha256": "558346bf230550c91b99bd160c748ceff60f94300d3177d3f290cbc2cdeb7fd8"
+    },
+    {
+      "path": "crates/rd-vm/tests/app_xml.rs",
+      "local_path": "crates/rd-vm/tests/app_xml.rs",
+      "status": "identical",
+      "sha256": "938fb4de77edf442676f5e4bdd58248cd6b363ef05507ef9a6859f1535803e17"
+    },
+    {
+      "path": "crates/rd-vm/tests/arrays_303.rs",
+      "local_path": "crates/rd-vm/tests/arrays_303.rs",
+      "status": "identical",
+      "sha256": "8fdc573f0771c8d58f9fcfe60a335ff0e9cda91d61437770c505bed90f3e7a2d"
+    },
+    {
+      "path": "crates/rd-vm/tests/bigdecimal_272.rs",
+      "local_path": "crates/rd-vm/tests/bigdecimal_272.rs",
+      "status": "identical",
+      "sha256": "d01096188385fe439fb2d4e49ef3e90252e92ef5880ede939bc29c497fff6ee2"
+    },
+    {
+      "path": "crates/rd-vm/tests/camera_305.rs",
+      "local_path": "crates/rd-vm/tests/camera_305.rs",
+      "status": "identical",
+      "sha256": "47a0fabdb38a07e607b3f9e924d769dc9a0a3275c7a20076709a72bc044b4e81"
+    },
+    {
+      "path": "crates/rd-vm/tests/collections_gc.rs",
+      "local_path": "crates/rd-vm/tests/collections_gc.rs",
+      "status": "identical",
+      "sha256": "64e8f51ec9d75bef8bfae9fb08c75d6f36390f0fd83ec3a4e4eecb61dda30447"
+    },
+    {
+      "path": "crates/rd-vm/tests/common/mod.rs",
+      "local_path": "crates/rd-vm/tests/common/mod.rs",
+      "status": "identical",
+      "sha256": "0211722728827d2e50b11625572cdcc871fbd1efadb644189b4410e2665dca10"
+    },
+    {
+      "path": "crates/rd-vm/tests/file_300.rs",
+      "local_path": "crates/rd-vm/tests/file_300.rs",
+      "status": "identical",
+      "sha256": "5b6b7375ea0de1c47f887f72205a5401cf968f475df05040e0652acc03722de9"
+    },
+    {
+      "path": "crates/rd-vm/tests/gc.rs",
+      "local_path": "crates/rd-vm/tests/gc.rs",
+      "status": "identical",
+      "sha256": "7c886ebcae4f0914d76a0a9df8281db751087d6fe5ef71babe1130768a098d90"
+    },
+    {
+      "path": "crates/rd-vm/tests/gc_generations.rs",
+      "local_path": "crates/rd-vm/tests/gc_generations.rs",
+      "status": "identical",
+      "sha256": "1b5c932e6941dd3587b4de0a3968acd3922eb3e6dc9cfb7c67d802b38686734b"
+    },
+    {
+      "path": "crates/rd-vm/tests/gms.rs",
+      "local_path": "crates/rd-vm/tests/gms.rs",
+      "status": "identical",
+      "sha256": "a3cc3a29a30a074d64fc78bbeb6137ed91f233c9ab9f59602539f34912477557"
+    },
+    {
+      "path": "crates/rd-vm/tests/graphics_301.rs",
+      "local_path": "crates/rd-vm/tests/graphics_301.rs",
+      "status": "identical",
+      "sha256": "ce4c872e343ddda7f3641da7f16a22982f295bb4bda642cb0ba90d70fedf7237"
+    },
+    {
+      "path": "crates/rd-vm/tests/inflate_263.rs",
+      "local_path": "crates/rd-vm/tests/inflate_263.rs",
+      "status": "identical",
+      "sha256": "5dbc47527a8d8b9cb5c782196f0ebd95cf8770b15f6e51d4254112eef94f5e0b"
+    },
+    {
+      "path": "crates/rd-vm/tests/io_chars_266.rs",
+      "local_path": "crates/rd-vm/tests/io_chars_266.rs",
+      "status": "identical",
+      "sha256": "04f7af8fccb550886ee467713f9e976c3e30ef3712ac598f3d3218eac9cce7a8"
+    },
+    {
+      "path": "crates/rd-vm/tests/jit.rs",
+      "local_path": "crates/rd-vm/tests/jit.rs",
+      "status": "identical",
+      "sha256": "c07eb0fe3a2b470eb3ec4f322c8098c08d9a5ffbbe80fa8a849cb3d1823f8925"
+    },
+    {
+      "path": "crates/rd-vm/tests/jtext_format_295.rs",
+      "local_path": "crates/rd-vm/tests/jtext_format_295.rs",
+      "status": "identical",
+      "sha256": "b2d9d0372e4bc41337c0d1b15ae2938de63a7d04d235c15330d23dca8516eb51"
+    },
+    {
+      "path": "crates/rd-vm/tests/m10.rs",
+      "local_path": "crates/rd-vm/tests/m10.rs",
+      "status": "identical",
+      "sha256": "af6b3797b3f8d62b375dc6fac87ace90c571a831c95360ae739a30fba9a45b3d"
+    },
+    {
+      "path": "crates/rd-vm/tests/m8.rs",
+      "local_path": "crates/rd-vm/tests/m8.rs",
+      "status": "adapted",
+      "sha256": "3b45330aabac07d079087919891b69cb20c75a690c489afff3c85704a573d79b"
+    },
+    {
+      "path": "crates/rd-vm/tests/m9.rs",
+      "local_path": "crates/rd-vm/tests/m9.rs",
+      "status": "identical",
+      "sha256": "d57e3e34b1807765c8c6ad1a576615d258e3d68636161f38ba9ac3f88891fd51"
+    },
+    {
+      "path": "crates/rd-vm/tests/narrow_arrays_250.rs",
+      "local_path": "crates/rd-vm/tests/narrow_arrays_250.rs",
+      "status": "identical",
+      "sha256": "5d9b2873108a28577357d539c02eedbf943a8011a227ff7e029f32fa9390f323"
+    },
+    {
+      "path": "crates/rd-vm/tests/native.rs",
+      "local_path": "crates/rd-vm/tests/native.rs",
+      "status": "identical",
+      "sha256": "5d91c1f288d221c679cc829c0c2c1c7316af350959262e07798996036e4ca080"
+    },
+    {
+      "path": "crates/rd-vm/tests/numerics_319.rs",
+      "local_path": "crates/rd-vm/tests/numerics_319.rs",
+      "status": "identical",
+      "sha256": "5064400fa301bfa2fc31295c371b9ed8db3512b74da0bfed4c7e2057c6379caf"
+    },
+    {
+      "path": "crates/rd-vm/tests/parcel_261.rs",
+      "local_path": "crates/rd-vm/tests/parcel_261.rs",
+      "status": "identical",
+      "sha256": "46c87268a5093cd0e1355c41fa4005af532ce96f32b39a8d7291d036fbd4275e"
+    },
+    {
+      "path": "crates/rd-vm/tests/parcel_binder.rs",
+      "local_path": "crates/rd-vm/tests/parcel_binder.rs",
+      "status": "identical",
+      "sha256": "98986217bb99c6060ec719441b2d959c25c85a43f4fa3944e919e2ea9e94dc2a"
+    },
+    {
+      "path": "crates/rd-vm/tests/regex_262.rs",
+      "local_path": "crates/rd-vm/tests/regex_262.rs",
+      "status": "identical",
+      "sha256": "ab951ad6a64dd9c4835295801cb37e42b96fa5d80b603e4cca835fd0b3e00355"
+    },
+    {
+      "path": "crates/rd-vm/tests/regex_lookaround.rs",
+      "local_path": "crates/rd-vm/tests/regex_lookaround.rs",
+      "status": "identical",
+      "sha256": "856c97ad0c6064e0b3f92cb8c35891236210a3d8bcb77c93397680088f10ca23"
+    },
+    {
+      "path": "crates/rd-vm/tests/sqlite_prefs_257.rs",
+      "local_path": "crates/rd-vm/tests/sqlite_prefs_257.rs",
+      "status": "identical",
+      "sha256": "75ca28da10f479ece8187059816985c6e0d906c0b03150ce4280241f78368317"
+    },
+    {
+      "path": "crates/rd-vm/tests/string_270.rs",
+      "local_path": "crates/rd-vm/tests/string_270.rs",
+      "status": "identical",
+      "sha256": "20a9e3b54d62cbd6484e322c3d29d4da6a47749379635a29920e5b93eea29780"
+    },
+    {
+      "path": "crates/rd-vm/tests/view_hierarchy_316.rs",
+      "local_path": "crates/rd-vm/tests/view_hierarchy_316.rs",
+      "status": "identical",
+      "sha256": "ed988e3f8788d2543b2ee6d7e4d2ef62899f96ac0062de1b2c645c1b4303ea22"
+    },
+    {
+      "path": "crates/rd-vm/tests/vm_exec.rs",
+      "local_path": "crates/rd-vm/tests/vm_exec.rs",
+      "status": "adapted",
+      "sha256": "852ce5fe37b726ac27670ca7db15b6cb21f1c2581fd61c0b4a827ccf90f86b21"
+    },
+    {
+      "path": "crates/rd-vm/tests/xml_269.rs",
+      "local_path": "crates/rd-vm/tests/xml_269.rs",
+      "status": "identical",
+      "sha256": "d6ecb398413eb4ce9564271b9035aa66a2e3448fd575371d15f0328f0ae86b34"
+    },
+    {
+      "path": "data/api-coverage.toml",
+      "local_path": "data/api-coverage.toml",
+      "status": "identical",
+      "sha256": "07fef7b5937125aca3eb72ea292c4dc4efec29bfb6fc0d83bb1ec4e69723e1a4"
+    },
+    {
+      "path": "data/behavior-switches.toml",
+      "local_path": "data/behavior-switches.toml",
+      "status": "identical",
+      "sha256": "8621c2a19e98ce502228945c38f79290524750182fb2de765357389f84bfa5e4"
+    },
+    {
+      "path": "data/devices.toml",
+      "local_path": "data/devices.toml",
+      "status": "identical",
+      "sha256": "8b7b0353092d036ec21ef6fe84f0eb1310e9c47b75af3d8fdb3227448974c724"
+    },
+    {
+      "path": "data/engines.toml",
+      "local_path": "data/engines.toml",
+      "status": "identical",
+      "sha256": "a8f66036a5b5375d3ea2089f38965f6568ac421ba47abc1fd913762a7b40b29e"
+    },
+    {
+      "path": "data/gms.toml",
+      "local_path": "data/gms.toml",
+      "status": "identical",
+      "sha256": "af12f896a140d323670b13def9a25c6e05aeacef0099b63a10a4439cd3a90c61"
+    },
+    {
+      "path": "data/jetpack.toml",
+      "local_path": "data/jetpack.toml",
+      "status": "identical",
+      "sha256": "2c4418e47811f97b9419b95b4704b54cff03b9b9cf203662726932de550e811d"
+    },
+    {
+      "path": "data/permissions.toml",
+      "local_path": "data/permissions.toml",
+      "status": "identical",
+      "sha256": "768789a95c720583126c603c717f29485064eaa231cc6597e6ddd40833fafff3"
+    },
+    {
+      "path": "deny.toml",
+      "local_path": "deny.toml",
+      "status": "identical",
+      "sha256": "5ec3642afb4fc20759f82db3df39ff498b7de4629f8c36a4a30fdaf3af66f8a0"
+    },
+    {
+      "path": "docs/FUZZING.md",
+      "local_path": "docs/FUZZING.md",
+      "status": "identical",
+      "sha256": "16c870f9f856e37158f82e0335e9c8a88c815213fd588971ccaa45d939a2b43b"
+    },
+    {
+      "path": "docs/ROADMAP.md",
+      "local_path": "docs/ROADMAP.md",
+      "status": "identical",
+      "sha256": "70ff740d9271b3e7a769701520389103e405a25232fa1ede5888ebf62e75a36e"
+    },
+    {
+      "path": "docs/SUMMARY.md",
+      "local_path": "docs/SUMMARY.md",
+      "status": "identical",
+      "sha256": "e67c06c75cc25e7ca39795dad35e95fb43bc5311be424723500719cd9623b4af"
+    },
+    {
+      "path": "docs/adr/001-mcp-sem-rmcp-msrv.md",
+      "local_path": "docs/adr/001-mcp-sem-rmcp-msrv.md",
+      "status": "identical",
+      "sha256": "249fa8379d7ef432a7e6f4b3c2ddfeb2a8cf561e1c5075b8627b0a6adc1fbc51"
+    },
+    {
+      "path": "docs/adr/002-zip-duplicate-entries.md",
+      "local_path": "docs/adr/002-zip-duplicate-entries.md",
+      "status": "identical",
+      "sha256": "283201148fe82bfb4ef5b923e372ae58495519242297a771dff7be76083f8a95"
+    },
+    {
+      "path": "docs/adr/003-appendix-g-engine-registry.md",
+      "local_path": "docs/adr/003-appendix-g-engine-registry.md",
+      "status": "identical",
+      "sha256": "43ee9cc0ecd4fed69bab43ca8fdd5cfaf94f9573b5f9c7299c9722055d966313"
+    },
+    {
+      "path": "docs/adr/003-m8-compat-host.md",
+      "local_path": "docs/adr/003-m8-compat-host.md",
+      "status": "identical",
+      "sha256": "ce99a5a4a8ef33c8d43c74e090611a3b24086b4dd48d00d72117c31f7e81ed5d"
+    },
+    {
+      "path": "docs/adr/004-m9-native-isolation.md",
+      "local_path": "docs/adr/004-m9-native-isolation.md",
+      "status": "identical",
+      "sha256": "634c011ca14745de5533da82e5b757f6a33343501313686cd8178836f4b6fdd0"
+    },
+    {
+      "path": "docs/adr/005-sqlite-subprocess.md",
+      "local_path": "docs/adr/005-sqlite-subprocess.md",
+      "status": "identical",
+      "sha256": "c83afd6113f120e60b0878d8503e092814b5143dc331b86f4254e58395f3fdcf"
+    },
+    {
+      "path": "docs/adr/006-generational-gc-and-live-frame-roots.md",
+      "local_path": "docs/adr/006-generational-gc-and-live-frame-roots.md",
+      "status": "identical",
+      "sha256": "9f8cc97b74963abda7f6ee1f934034efd205f6e9f28b97ae17cf1ca72baaf28d"
+    },
+    {
+      "path": "docs/adr/007-cranelift-leaf-jit.md",
+      "local_path": "docs/adr/007-cranelift-leaf-jit.md",
+      "status": "identical",
+      "sha256": "8cf5036f7424812f63359b876f92a9962aeb230dc4e8823ad24b1856047ab378"
+    },
+    {
+      "path": "docs/adr/008-15gb-apk-and-1500ms-cold-start.md",
+      "local_path": "docs/adr/008-15gb-apk-and-1500ms-cold-start.md",
+      "status": "identical",
+      "sha256": "deff86f8aafd8fdf85848ae5e5c5e941aba971dfae2f266c0b1a6ec09554f774"
+    },
+    {
+      "path": "docs/adr/009-process-cold-26ms.md",
+      "local_path": "docs/adr/009-process-cold-26ms.md",
+      "status": "identical",
+      "sha256": "f71c00acd04c9ab3592c3717f16d4e760f4fb522fa385732222f2894f650278a"
+    },
+    {
+      "path": "docs/adr/010-rd-sentinel-anti-regression-bot.md",
+      "local_path": "docs/adr/010-rd-sentinel-anti-regression-bot.md",
+      "status": "identical",
+      "sha256": "4fc1c473c6241a159f3f071a3c6147508bb9a0fdf4a6e83737268be9ca13d28d"
+    },
+    {
+      "path": "docs/adr/011-m10-virtual-devices.md",
+      "local_path": "docs/adr/011-m10-virtual-devices.md",
+      "status": "identical",
+      "sha256": "d7c1594b04ebee917cd68641d47e1221b13f3745eaff26cc4974f4c7aa9ba0ea"
+    },
+    {
+      "path": "docs/adr/012-appendix-d-e-registries.md",
+      "local_path": "docs/adr/012-appendix-d-e-registries.md",
+      "status": "identical",
+      "sha256": "546b99264ccc85fdacdf0a5a81b6643facf438b4bb879ccfb6744f7fcd032df1"
+    },
+    {
+      "path": "docs/adr/013-m11-engine-execution-strategy.md",
+      "local_path": "docs/adr/013-m11-engine-execution-strategy.md",
+      "status": "identical",
+      "sha256": "31165269ee9014aaa4bf75ca47419ed2776e54bab2a9eb38aa1a64489e597094"
+    },
+    {
+      "path": "docs/adr/014-lazyarsc-lazystringpool.md",
+      "local_path": "docs/adr/014-lazyarsc-lazystringpool.md",
+      "status": "identical",
+      "sha256": "e794b8873ba90772b0a41566114240ea92126d500ddaad86ba0b30364dc3b569"
+    },
+    {
+      "path": "docs/adr/017-host-thread-local-state-engine-boundary.md",
+      "local_path": "docs/adr/017-host-thread-local-state-engine-boundary.md",
+      "status": "identical",
+      "sha256": "d2f1e233441a91c5ce9f913a9ac36a48deb4dd1b21b52ab3fba394f4fdfe900a"
+    },
+    {
+      "path": "docs/api-coverage.md",
+      "local_path": "docs/api-coverage.md",
+      "status": "identical",
+      "sha256": "fe13b2a922e9070726aba510814b7c49e2d5bff952879c92a6d96bbe51500c67"
+    },
+    {
+      "path": "docs/appendix-c-literal-completion.md",
+      "local_path": "docs/appendix-c-literal-completion.md",
+      "status": "identical",
+      "sha256": "4863cc1ae7f67dd887d82fb48874b2c9e8d6b9f0886af70d191d07899132a146"
+    },
+    {
+      "path": "docs/appendix-d-e.md",
+      "local_path": "docs/appendix-d-e.md",
+      "status": "identical",
+      "sha256": "f97795dcf263ceb895798a0e19c5c07f39d1bac8d0e4ceef385770ccc2c7949d"
+    },
+    {
+      "path": "docs/appendix-g-integration.md",
+      "local_path": "docs/appendix-g-integration.md",
+      "status": "identical",
+      "sha256": "7c1a94bf0812e6b1bc05b90372ead46f42da6b494dcecb5d430bab449c71e213"
+    },
+    {
+      "path": "docs/appendix-g-validation.md",
+      "local_path": "docs/appendix-g-validation.md",
+      "status": "identical",
+      "sha256": "1f310dc9019095332d23a74f0f0ea212ea5599ef600faabc1150fd490fbc8ee0"
+    },
+    {
+      "path": "docs/book.toml",
+      "local_path": "docs/book.toml",
+      "status": "identical",
+      "sha256": "e02e052b39c5fce83543a83e457851f6a43685b2de6c738402fff66ddbfdef37"
+    },
+    {
+      "path": "docs/compat-matrix.md",
+      "local_path": "docs/compat-matrix.md",
+      "status": "identical",
+      "sha256": "9542bc0ec0cd08c29abfc5db54f88091dc9add2a69e833a09e7252892482bc76"
+    },
+    {
+      "path": "docs/comprix-e2e.md",
+      "local_path": "docs/comprix-e2e.md",
+      "status": "identical",
+      "sha256": "85c05eae7d8243411385d8879590e099ec9a96e28a80305960dd5fe64c5373c2"
+    },
+    {
+      "path": "docs/engine-registry.md",
+      "local_path": "docs/engine-registry.md",
+      "status": "identical",
+      "sha256": "996ff3260b3b205538eecfb17cdefc9ca5692a3d8cf9dc8e7ba746a478614782"
+    },
+    {
+      "path": "docs/gc.md",
+      "local_path": "docs/gc.md",
+      "status": "identical",
+      "sha256": "5e221957501064610376ce9833bbc70e11ed5e54f3c7ed66a88bc2ff004296ae"
+    },
+    {
+      "path": "docs/gms.md",
+      "local_path": "docs/gms.md",
+      "status": "identical",
+      "sha256": "d2e75e9a2fad70597c4d790d3dc17d2a08deae081bfada852bcd5edfbd81e311"
+    },
+    {
+      "path": "docs/index.md",
+      "local_path": "docs/index.md",
+      "status": "identical",
+      "sha256": "88791ef9ce23cd9d627386187c1ba7351872dae7ba7bcae09238a9fd41e1d1fd"
+    },
+    {
+      "path": "docs/integration-validation.md",
+      "local_path": "docs/integration-validation.md",
+      "status": "identical",
+      "sha256": "a5245fe892243eb4048916f87b2bfe58636937488754602cb5de0c12a36a99da"
+    },
+    {
+      "path": "docs/jetpack.md",
+      "local_path": "docs/jetpack.md",
+      "status": "identical",
+      "sha256": "e195b332377a903c7e181f798f126f2d4da4d2cc98ed41970b734f8ff171fb6c"
+    },
+    {
+      "path": "docs/labels.json",
+      "local_path": "docs/labels.json",
+      "status": "identical",
+      "sha256": "15a66b38b2552a395eea2c49fd5591d5c9197d7ceaf29cbab9d975056e324d63"
+    },
+    {
+      "path": "docs/m10.md",
+      "local_path": "docs/m10.md",
+      "status": "identical",
+      "sha256": "f72a64cce256e226e1b8f74b83e7117b906af5d3f47cc9f25e7bd2285a7c2c94"
+    },
+    {
+      "path": "docs/m9.md",
+      "local_path": "docs/m9.md",
+      "status": "identical",
+      "sha256": "aea25194d7ed99efb45bdae98de7dbe5f91dedbe8e0bfe6ce01e6d703ff5dd4b"
+    },
+    {
+      "path": "docs/mcp-automation.md",
+      "local_path": "docs/mcp-automation.md",
+      "status": "identical",
+      "sha256": "82cbe64587d103853687697290c9c302d5e04fa1ba5d68c4692e27a792a1117b"
+    },
+    {
+      "path": "docs/mcp-observe.md",
+      "local_path": "docs/mcp-observe.md",
+      "status": "identical",
+      "sha256": "d64a30cda156854d639cf905cff3bcfc1811295a8ceee516b3db2c0b71232cfd"
+    },
+    {
+      "path": "docs/mcp-tools.md",
+      "local_path": "docs/mcp-tools.md",
+      "status": "identical",
+      "sha256": "947971683a5c7d5427fd5bda19017a2ee59974613cb1068e69915d164ba94402"
+    },
+    {
+      "path": "docs/native-languages.md",
+      "local_path": "docs/native-languages.md",
+      "status": "identical",
+      "sha256": "31aa489ef78a7cd36e2ab29bbe06f007e6f5c6ccbf2a8fd1bbedf9b7905bdc87"
+    },
+    {
+      "path": "docs/performance-gc-20261020.md",
+      "local_path": "docs/performance-gc-20261020.md",
+      "status": "identical",
+      "sha256": "f2a19b2f4d500199648846bbcad5bfb4de6a0d6f641a26c481b2791040350b81"
+    },
+    {
+      "path": "docs/rd-sentinel.md",
+      "local_path": "docs/rd-sentinel.md",
+      "status": "identical",
+      "sha256": "fbd1bb17a2100049245a40e6dfe8f66cf78d0cb27ae923161c70032ce81c17a5"
+    },
+    {
+      "path": "docs/suite-format.md",
+      "local_path": "docs/suite-format.md",
+      "status": "identical",
+      "sha256": "f692c4950267e67cbf2a998bdf6a47ba6c12303ca151a4ed531b768b38e2532f"
+    },
+    {
+      "path": "golden-apks/fetch.sh",
+      "local_path": "golden-apks/fetch.sh",
+      "status": "identical",
+      "sha256": "216253cf1c430c5da51c055c353198c0a497dd0bd051d359c672fd58a4aaba7b"
+    },
+    {
+      "path": "golden-apks/native-gate.sh",
+      "local_path": "golden-apks/native-gate.sh",
+      "status": "identical",
+      "sha256": "b0ad42ee4f45dd44f6708f3b68eef099de41eecff47a0d8107a19a476f38c9b8"
+    },
+    {
+      "path": "golden/native-languages/AndroidManifest.xml",
+      "local_path": "golden/native-languages/AndroidManifest.xml",
+      "status": "identical",
+      "sha256": "ff79874b86eefd0732eb4d98076cd82a2b48c84078d1ed8ff430fb283d93cf71"
+    },
+    {
+      "path": "golden/native-languages/build.py",
+      "local_path": "golden/native-languages/build.py",
+      "status": "identical",
+      "sha256": "061fb5d7491df43661eb209c8ed6ff66970b2eed33ebcc50ebec1449eaaf7f18"
+    },
+    {
+      "path": "golden/native-languages/gate.sh",
+      "local_path": "golden/native-languages/gate.sh",
+      "status": "identical",
+      "sha256": "78bdaef79f88a8c2c7692a00612b324eb084280237582eaf37a3abacd374ad92"
+    },
+    {
+      "path": "golden/native-languages/java/DetailsActivity.java",
+      "local_path": "golden/native-languages/java/DetailsActivity.java",
+      "status": "identical",
+      "sha256": "60d44a2602ba79c27f090609568b242f98b8ef2fa53f0e7a0c31fb9df0fa2968"
+    },
+    {
+      "path": "golden/native-languages/java/MainActivity.java",
+      "local_path": "golden/native-languages/java/MainActivity.java",
+      "status": "identical",
+      "sha256": "0aac4b55b751806777739bec19102a5c8f0cc160376a6315b18da98dd8b934f0"
+    },
+    {
+      "path": "golden/native-languages/java/ProofAccessibility.java",
+      "local_path": "golden/native-languages/java/ProofAccessibility.java",
+      "status": "identical",
+      "sha256": "c9109e7c22096f6b7638092f2ae9e1b1355544a1b7c4c4c0a7c350fdd26eb35b"
+    },
+    {
+      "path": "golden/native-languages/java/ProofIme.java",
+      "local_path": "golden/native-languages/java/ProofIme.java",
+      "status": "identical",
+      "sha256": "5015d398eab13d9117295a6c06007b4ee7bda403a194c640f482dd139700c049"
+    },
+    {
+      "path": "golden/native-languages/java/ProofListener.java",
+      "local_path": "golden/native-languages/java/ProofListener.java",
+      "status": "identical",
+      "sha256": "ab60ddd74e593c44d1cf68cab9d42b543277b648ac81fe29e75caf3fe9a9c418"
+    },
+    {
+      "path": "golden/native-languages/java/ProofWidget.java",
+      "local_path": "golden/native-languages/java/ProofWidget.java",
+      "status": "identical",
+      "sha256": "019b77f69bd3184c2cf600581c84ff17f38348b4f400cc5f92a80105d4b7e8c8"
+    },
+    {
+      "path": "golden/native-languages/native/c/calc.c",
+      "local_path": "golden/native-languages/native/c/calc.c",
+      "status": "identical",
+      "sha256": "e5bcc4040bfcf2649e3a208c83750e9e1f178caea390589c51455d15ca74eb88"
+    },
+    {
+      "path": "golden/native-languages/native/cpp/calc.cpp",
+      "local_path": "golden/native-languages/native/cpp/calc.cpp",
+      "status": "identical",
+      "sha256": "82cb6bb12eae43745cbb04923d95be08e4b6416a2abef5ec90f63b5fa740533c"
+    },
+    {
+      "path": "golden/native-languages/native/rust/calc.rs",
+      "local_path": "golden/native-languages/native/rust/calc.rs",
+      "status": "identical",
+      "sha256": "963418ca3fd74ce6411330d1a94d67770d6f7c1c0951937614d227a753df8c57"
+    },
+    {
+      "path": "golden/native-languages/res/layout/widget.xml",
+      "local_path": "golden/native-languages/res/layout/widget.xml",
+      "status": "identical",
+      "sha256": "fbd97dcce5e89ada57651cea187914c04d732f26feabc337f197f9b3fa329245"
+    },
+    {
+      "path": "golden/native-languages/res/values/ids.xml",
+      "local_path": "golden/native-languages/res/values/ids.xml",
+      "status": "identical",
+      "sha256": "5ba0c3225b90acdf429278cdd6d05ddd8839a45ae3592ebae321f6571a2c2595"
+    },
+    {
+      "path": "golden/native-languages/res/xml/accessibility.xml",
+      "local_path": "golden/native-languages/res/xml/accessibility.xml",
+      "status": "identical",
+      "sha256": "75b04eed971a5a28f30d2abf601b4efd39becac3e8d58ea8b674f63fb3e133e2"
+    },
+    {
+      "path": "golden/native-languages/res/xml/ime.xml",
+      "local_path": "golden/native-languages/res/xml/ime.xml",
+      "status": "identical",
+      "sha256": "f052324af4e903a04e8d1f8bcac1023d92db27b46789bf4bb612ffd5afe32891"
+    },
+    {
+      "path": "golden/native-languages/res/xml/widget_info.xml",
+      "local_path": "golden/native-languages/res/xml/widget_info.xml",
+      "status": "identical",
+      "sha256": "f25ef401b32a52a6b8238342ec33864679c727d5a744136888c8fad04b736aee"
+    },
+    {
+      "path": "golden/native/build.sh",
+      "local_path": "golden/native/build.sh",
+      "status": "identical",
+      "sha256": "f90c3b78bf6e26fa9e4a660effc08780dd135f08c011fb79194e6c0f33511968"
+    },
+    {
+      "path": "golden/native/fixture.c",
+      "local_path": "golden/native/fixture.c",
+      "status": "identical",
+      "sha256": "dceb6a9434097e764d05caa706ac2442e7ce46645e5e27277939f3ddab55264d"
+    },
+    {
+      "path": "golden/vm/README.md",
+      "local_path": "golden/vm/README.md",
+      "status": "identical",
+      "sha256": "33bf1333ecbfb27618e3ff185e34bada750657ffc4a42d55bf609e2c22d674ee"
+    },
+    {
+      "path": "golden/vm/build.sh",
+      "local_path": "golden/vm/build.sh",
+      "status": "identical",
+      "sha256": "20ffbd1e499fbc2f5e8f76663a3fa624e28975194bae470f047721620b5a05ab"
+    },
+    {
+      "path": "golden/vm/cases/Arith.java",
+      "local_path": "golden/vm/cases/Arith.java",
+      "status": "identical",
+      "sha256": "d3015d66d499fd4b08a24c6c4e2abc0eac243b3adc7823e3515acb1853724d38"
+    },
+    {
+      "path": "golden/vm/cases/Arrays.java",
+      "local_path": "golden/vm/cases/Arrays.java",
+      "status": "identical",
+      "sha256": "cd3a3f6b745e153f9f5d44afccde6c4a6a5d73142a1ad62f8a956350f7409e9d"
+    },
+    {
+      "path": "golden/vm/cases/Control.java",
+      "local_path": "golden/vm/cases/Control.java",
+      "status": "identical",
+      "sha256": "612d86cfe87894cbd297fced38e6210d918e1cd22f0fecdde78a560e1aa71e3e"
+    },
+    {
+      "path": "golden/vm/cases/Exceptions.java",
+      "local_path": "golden/vm/cases/Exceptions.java",
+      "status": "identical",
+      "sha256": "7f9cd1f2f5f291e213203fd27ef7fbdb7c5e5931c5bfef346978d7211ed639c1"
+    },
+    {
+      "path": "golden/vm/cases/GoldenRunner.java",
+      "local_path": "golden/vm/cases/GoldenRunner.java",
+      "status": "identical",
+      "sha256": "bac5636e7e5a57e00ab1a6f3c5ea43db858cddf4814603759d8ff9eb585c1d94"
+    },
+    {
+      "path": "golden/vm/cases/Statics.java",
+      "local_path": "golden/vm/cases/Statics.java",
+      "status": "identical",
+      "sha256": "9f75e41855533ae51f4da2af74a682c764ac08f6036bed26d0459cd25c5c242a"
+    },
+    {
+      "path": "golden/vm/cases/Strings.java",
+      "local_path": "golden/vm/cases/Strings.java",
+      "status": "identical",
+      "sha256": "bdf3dcd7ffa9889fa8737910418914c68325ab8350a446eb4e779d6036983124"
+    },
+    {
+      "path": "golden/vm/expected-count.txt",
+      "local_path": "golden/vm/expected-count.txt",
+      "status": "identical",
+      "sha256": "9a7f91a861f59c0cb27f0af9323d158fdab7740d5e3c8016a60f4b04c0fc41e0"
+    },
+    {
+      "path": "golden/vm/fetch-tools.sh",
+      "local_path": "golden/vm/fetch-tools.sh",
+      "status": "identical",
+      "sha256": "0690a7daaa63d4fd676fad647c0c93048a6f3a7ce86f2aa69ebc3f31f951e31c"
+    },
+    {
+      "path": "golden/vm/gate.py",
+      "local_path": "golden/vm/gate.py",
+      "status": "identical",
+      "sha256": "57cd2c3e0d83c82823271121f5f90e2742cc5374ff91aac8c1d23008798ad3f2"
+    },
+    {
+      "path": "golden/vm/run-golden.sh",
+      "local_path": "golden/vm/run-golden.sh",
+      "status": "identical",
+      "sha256": "ce1017617115edc86cb8f5dc1088cbbca8b842d8c6b7255850144cfa4d53ce53"
+    },
+    {
+      "path": "golden/vm/test-gate.sh",
+      "local_path": "golden/vm/test-gate.sh",
+      "status": "identical",
+      "sha256": "43d333dc28abce761788bc34e7462291d7705399d9fdd4a3358339dba6483cb0"
+    },
+    {
+      "path": "logo.png",
+      "local_path": "logo.png",
+      "status": "identical",
+      "sha256": "f7925181341a65e0094c7ad95e33d2c1169557be60304ef15d6eb5bb99e47889"
+    },
+    {
+      "path": "rustydroid.manifest.json",
+      "local_path": "rustydroid.manifest.json",
+      "status": "identical",
+      "sha256": "b56a2d4093bd9822061885d241be33c3bcbfaea573c58ffacf2b6b4497eeb99c"
+    },
+    {
+      "path": "scripts/check_md_links.py",
+      "local_path": "scripts/check_md_links.py",
+      "status": "adapted",
+      "sha256": "c473ed8f45d15f6ba9b7b47bc600cb391664555e77d234d99d12583103654b4e"
+    },
+    {
+      "path": "scripts/cold26.py",
+      "local_path": "scripts/cold26.py",
+      "status": "identical",
+      "sha256": "a7022a89d734a959ea931ee8f2b7d156dcd1b582290a4cde44e6c34d9872f66e"
+    },
+    {
+      "path": "scripts/comprix-regression.py",
+      "local_path": "scripts/comprix-regression.py",
+      "status": "identical",
+      "sha256": "91f0069e3dfd288a781a91beb4c2c7c2668395535a88788e21c2443a6b0a8671"
+    },
+    {
+      "path": "scripts/efficiency-benchmark.py",
+      "local_path": "scripts/efficiency-benchmark.py",
+      "status": "identical",
+      "sha256": "145d7a8e5719ece3983648412f2981a48df17601bd06cd19c7fe966d4cbc97ae"
+    },
+    {
+      "path": "scripts/fuzz-campaign.sh",
+      "local_path": "scripts/fuzz-campaign.sh",
+      "status": "identical",
+      "sha256": "638b886b962c8790e000d6e4d1bb9caf30a8670f57fba74e5ed37329cfb09e13"
+    },
+    {
+      "path": "scripts/gen_glyph_atlas.py",
+      "local_path": "scripts/gen_glyph_atlas.py",
+      "status": "identical",
+      "sha256": "03b5766044f6e5053ef7d2f1447277a753e9b5c34e675bd27b1a6800cd16507e"
+    },
+    {
+      "path": "scripts/mcp-session-soak.py",
+      "local_path": "scripts/mcp-session-soak.py",
+      "status": "identical",
+      "sha256": "58047e74af53ef3d2bb34a88c3c70fdbf1ed890d11d241eb5378b037ad946e47"
+    },
+    {
+      "path": "scripts/native-languages-mcp.py",
+      "local_path": "scripts/native-languages-mcp.py",
+      "status": "identical",
+      "sha256": "f5b6e1f6f7bff29eda1f93d61bd40b7883f8323a7eef1809106c64211e68c54d"
+    },
+    {
+      "path": "scripts/native-languages-negative.py",
+      "local_path": "scripts/native-languages-negative.py",
+      "status": "identical",
+      "sha256": "939400c0e7459af935e6e0575e15302a1a0a9d5b72b4c8ba1695d274ee488922"
+    },
+    {
+      "path": "scripts/summarize-efficiency-benchmarks.py",
+      "local_path": "scripts/summarize-efficiency-benchmarks.py",
+      "status": "identical",
+      "sha256": "122d3b0fdf2ef50d5748d3b51c0f727348d8f7cd552dcb0b234b0e3e7346a252"
+    },
+    {
+      "path": "tests/engines/README.md",
+      "local_path": "tests/engines/README.md",
+      "status": "identical",
+      "sha256": "52550e89112470dc87a43026d599b2a7e827ad1b0b90138d274a5e09d367bae3"
+    },
+    {
+      "path": "tests/engines/signatures.json",
+      "local_path": "tests/engines/signatures.json",
+      "status": "identical",
+      "sha256": "01e028fa922c324d3d377a8bcd2da87a6ba20fd791440b9feb63ae9e1e87af65"
+    },
+    {
+      "path": "tests/performance/20261020/final-benchmark-summary.json",
+      "local_path": "tests/performance/20261020/final-benchmark-summary.json",
+      "status": "identical",
+      "sha256": "823dd673beaf04c1b0abfc373753dfddf5ff10bc160a4f596d67f28f00dd7d17"
+    },
+    {
+      "path": "tests/performance/20261020/final-original-nine-paired.json",
+      "local_path": "tests/performance/20261020/final-original-nine-paired.json",
+      "status": "identical",
+      "sha256": "26a8f0eff7a07166e55645924915da95c4c778a559f13331d3d1d35294efdc5a"
+    },
+    {
+      "path": "tests/performance/20261020/hierarchy-table-proof.json",
+      "local_path": "tests/performance/20261020/hierarchy-table-proof.json",
+      "status": "identical",
+      "sha256": "22029454989985d8129f658c01283081ad3f46835dec3b98f51bbe5279db8eaa"
+    },
+    {
+      "path": "tests/performance/20261020/supplemental-jit-summary.json",
+      "local_path": "tests/performance/20261020/supplemental-jit-summary.json",
+      "status": "identical",
+      "sha256": "09dd703c04eeab3a5910cb4ec978d036ca643134b0422d795566edbba4b04bca"
+    },
+    {
+      "path": "tests/suites/contract-no-app.json",
+      "local_path": "tests/suites/contract-no-app.json",
+      "status": "identical",
+      "sha256": "8ef97896b6bc992bd8afeba81c2c36a7e38577b98175816508b0d1a9f8f87c62"
+    },
+    {
+      "path": "tests/suites/m10-virtual-devices.json",
+      "local_path": "tests/suites/m10-virtual-devices.json",
+      "status": "identical",
+      "sha256": "5ad04b99daded91f91136d7f6861140af146522436900ef066f3a5d1cfd47c83"
+    },
+    {
+      "path": "tests/suites/m8-compat.json",
+      "local_path": "tests/suites/m8-compat.json",
+      "status": "identical",
+      "sha256": "efbaebcab6d7e703347c7512214f4ab0ede7ad0da2f4f99d31572cb41a952671"
+    },
+    {
+      "path": "tools/rd-sentinel/README.md",
+      "local_path": "tools/rd-sentinel/README.md",
+      "status": "identical",
+      "sha256": "d6f1ff72f0df25dfdfc8f2446cf3317a18857c3643543a29bbe8542ccd16806a"
+    },
+    {
+      "path": "tools/rd-sentinel/rd_sentinel.py",
+      "local_path": "tools/rd-sentinel/rd_sentinel.py",
+      "status": "identical",
+      "sha256": "5b313481fb33ad94d2e0ec55246c038c8b9b44252b7d7321e4d10221a9366ecf"
+    },
+    {
+      "path": "tools/rd-sentinel/sentinel/__init__.py",
+      "local_path": "tools/rd-sentinel/sentinel/__init__.py",
+      "status": "identical",
+      "sha256": "96cd2db6d5cec8c31ee0063046766f2911b788be0236bd91f1a696d3f1a8309a"
+    },
+    {
+      "path": "tools/rd-sentinel/sentinel/audit.py",
+      "local_path": "tools/rd-sentinel/sentinel/audit.py",
+      "status": "identical",
+      "sha256": "45dece92db9283f05f717e310863c5da57955c6a2cba000ae5757766f385e059"
+    },
+    {
+      "path": "tools/rd-sentinel/sentinel/campaigns.py",
+      "local_path": "tools/rd-sentinel/sentinel/campaigns.py",
+      "status": "identical",
+      "sha256": "07909ffbf73d293d34487594152b5280f6b0928940582e00668c8578e33b02ea"
+    },
+    {
+      "path": "tools/rd-sentinel/sentinel/cli.py",
+      "local_path": "tools/rd-sentinel/sentinel/cli.py",
+      "status": "identical",
+      "sha256": "66dd68710241eecb0971241c485043841d2d77bcf71912a22616c6e8da109ebb"
+    },
+    {
+      "path": "tools/rd-sentinel/sentinel/github_api.py",
+      "local_path": "tools/rd-sentinel/sentinel/github_api.py",
+      "status": "identical",
+      "sha256": "1f9edce7e292fb22708a12f7d2b03816b0f202a4e21899a4b6fa9f10cf4be498"
+    },
+    {
+      "path": "tools/rd-sentinel/sentinel/mcp_endurance.py",
+      "local_path": "tools/rd-sentinel/sentinel/mcp_endurance.py",
+      "status": "identical",
+      "sha256": "09e26ea409510d81a33e19eed8aca476a13a2a356c86ed20eca65d4641520cb7"
+    },
+    {
+      "path": "tools/rd-sentinel/sentinel/model.py",
+      "local_path": "tools/rd-sentinel/sentinel/model.py",
+      "status": "identical",
+      "sha256": "15157f7947c749bfb7fee1a3bcb4bbe7dd4826f8ac2dc89ac973dd2a1817ea86"
+    },
+    {
+      "path": "tools/rd-sentinel/tests/test_rd_sentinel.py",
+      "local_path": "tools/rd-sentinel/tests/test_rd_sentinel.py",
+      "status": "identical",
+      "sha256": "f140176298e5e28a07cf4dc4a7765ac09f3c2a93eff5b81c9aa027fdd14791d1"
+    },
+    {
+      "path": "worklog.md",
+      "local_path": "worklog.md",
+      "status": "identical",
+      "sha256": "3a02588511bd378eaba8512ca2d7172725361d226bbf95eae9969f292b6a813d"
+    },
+    {
+      "path": "xtask/Cargo.toml",
+      "local_path": "xtask/Cargo.toml",
+      "status": "identical",
+      "sha256": "76998cd8b783c27a1d840106abb066a50f55a8bbb6cc73fbd204c69f45c108a9"
+    },
+    {
+      "path": "xtask/src/main.rs",
+      "local_path": "xtask/src/main.rs",
+      "status": "identical",
+      "sha256": "a9374de28e4dd01cd16d0370e9eb2e9da79e3a6301a9527f72c55ecdc78df6a2"
+    },
+    {
+      "path": "xtask/tests/m12_docs_contracts.rs",
+      "local_path": "xtask/tests/m12_docs_contracts.rs",
+      "status": "identical",
+      "sha256": "87b6d867a3a3a743733f5f7ce39c81e049b990092e90b81b751567afc45fd026"
+    }
+  ],
+  "vm_modules": [
+    {
+      "path": "crates/rd-vm/src/accessibility_node.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"advanced-components\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/activity_callbacks.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/activity_extras.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_build.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_colorspace.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_display.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_drawable.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_env.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_json.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_motion.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_observable.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_pm.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_region.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_res.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_spannable.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_stub_surfaces.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_sysservices.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_text.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_uri.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_util.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/android_velocity.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/androidx.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "/// Ap\u00eandice D \u2014 shims host AndroidX/Jetpack (data/jetpack.toml).\n#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/arrays.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [
+        ""
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/atomics.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/boxes.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [
+        ""
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/bundle.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/choreographer.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/classpath.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [
+        ""
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/collections.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/content.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/engine.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [
+        ""
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/err.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [
+        ""
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/framework.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/gc.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/gms.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/graphics.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/handler_msg.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/heap.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [
+        ""
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/inflate.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/interp.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [
+        ""
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/intrinsics.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"std\")]\n",
+        "#[cfg(all(not(feature = \"std\"), feature = \"upstream-runtime\"))]\n#[path = \"intrinsics.rs\"]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jannotations.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jbigdecimal.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jbitset.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [
+        ""
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jbreakiter.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jcollections.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jfile.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jio_chars.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jit.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"jit\")]\n#[cfg(feature = \"std\")]\n"
+      ],
+      "experimental_original_declared": false,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jiterator.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jlclass.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jlocks.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jlstring.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jlsystem.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jnormalizer.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jpriorityqueue.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jrandom.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jregex.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jresources.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jsb.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jsecurity.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jsorted.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jsqlite.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jstring_tokenizer.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jtext_format.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jtime.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/juuid.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/jxml.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/lib.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/biometrics.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"virtual-devices\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/camera.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"virtual-devices\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/connectivity.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"virtual-devices\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/location.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"virtual-devices\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/media.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"virtual-devices\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/mod.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"virtual-devices\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/sensors.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"virtual-devices\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m10/sysconfig.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"virtual-devices\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m8.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/accessibility.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"advanced-components\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/ime.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"advanced-components\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/mod.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"advanced-components\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/notifications.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"advanced-components\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/shortcuts.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"advanced-components\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/m9/widgets.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"advanced-components\")]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/native.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(feature = \"native\")]\n#[cfg(feature = \"std\")]\n"
+      ],
+      "experimental_original_declared": false,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/numerics.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/parcel.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/perms.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/platform_base.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/prefs.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/reflect.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/repr.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [
+        ""
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/screen_model.rs",
+      "device_route": "host-only-original",
+      "cfg": [],
+      "experimental_original_declared": false,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/threads.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/throwable.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/value.rs",
+      "device_route": "shared-source-with-adapters",
+      "cfg": [
+        ""
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/view_attach.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/view_layout.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/view_props.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/vto.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/window.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/src/xml_res.rs",
+      "device_route": "host-only-original",
+      "cfg": [
+        "#[cfg(any(feature = \"std\", feature = \"upstream-runtime\"))]\n"
+      ],
+      "experimental_original_declared": true,
+      "experimental_scope": "cfg declaration only; compile and runtime evidence are separate",
+      "behavior_parity": "unverified"
+    }
+  ],
+  "fork_core_files": [
+    {
+      "path": "crates/rd-vm/src/android_log.rs",
+      "sha256": "b1ce799f0d8d22903c89fa8bccab1a7dd9a552e1ae98d40dce26f6b8d4be1d92",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/android_text.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/collection_values.rs",
+      "sha256": "b234f92be4c9ae1a6c0fe1dcff2b847765f9767d2f9a880bb2f09ee6d22ae554",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/intrinsics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/framework_host.rs",
+      "sha256": "60855f71d0546353e1f784c1183e2e2dfd14fd60eb72def2b68789b304b3eb61",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
+    },
+    {
+      "path": "crates/rd-vm/src/integer_bits.rs",
+      "sha256": "34713658dc6e4d06643fe46a201a17bc910f374179c7143625c51e01e8b12171",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/numerics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/java_format.rs",
+      "sha256": "814dfbd897351d5b44db1ec6ecc019e3a2594766902794277a19959d5dd613cb",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/numerics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/java_values.rs",
+      "sha256": "38aa484a4b753d3042b6691ff208b7a4158114d4d76f860bc3194ee3e644ae47",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/intrinsics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/native_host.rs",
+      "sha256": "199b756c5cc3880efe85f725e0440f95e12a611a461400b520cb4e757a510883",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/atomic.rs",
+      "sha256": "5cf6703a88f205818500412b733720ec2819c2fb60ad3944ada7e4fa573a3bbe",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/atomic_number.rs",
+      "sha256": "95542603ac062f5e74d4de0d1f03eccc1d6e85d2d31ccc253704bb852e28e0e0",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/atomic_reference.rs",
+      "sha256": "a676166c33b877a3bf92ad3f69643540fc60914d3c816b917f52d96c21b24735",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/charset_catalog.rs",
+      "sha256": "17d93625ff81ae1de8bef32febf4e1a802c1153556df414457d5cccdee858bb2",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/classes.rs",
+      "sha256": "3b112ef1f34bdef5a4ca6fced7084260899240793fbc2cc19e3fffda218617eb",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/enums.rs",
+      "sha256": "598e5bf822f15b04205243a103f6e6e61eb563968002b33d9ace149b6894dd55",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/execution.rs",
+      "sha256": "bd68895e7dc16eeeea49366f4798c58190b0f38e9ffb803d432fde5395eb38cf",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
+    },
+    {
+      "path": "crates/rd-vm/src/portable/execution_contracts.rs",
+      "sha256": "a065322f525323bb82f140c47722fc9aee690d80be690190f10ab22644870fe8",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/file.rs",
+      "sha256": "293478bcffe279bcde710457e71a502da9bb47e20a4eee3fb00e9e24d6eeef0d",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/format.rs",
+      "sha256": "305ffed51ea28bc0f7d335a297e44bec24af9521d5e315eef818f5c39b722275",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/gc.rs",
+      "sha256": "d205da86dfea9452647e38f25b91bc07d44291360122178e9d5a51611c1ff7cc",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/intrinsics.rs",
+      "sha256": "83205989953aa1eaee3b51f0d260d2e2ea956970d1dec309c037f9e65c3f4f36",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
+    },
+    {
+      "path": "crates/rd-vm/src/portable/mod.rs",
+      "sha256": "9f61c2751d8620ee1d035ca014000d2030135dd99464d64df5ef7e5ba935323f",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
+    },
+    {
+      "path": "crates/rd-vm/src/portable/monitor.rs",
+      "sha256": "dd8dc060d2006d2307f0e76dd1cd33b128eddb37f9b169539f6574ac22ab1dba",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/random_access.rs",
+      "sha256": "5b2ae421991f0f64b05583fc5aa7d1de7df147e27f449d1ec0237e8c00463353",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/string_encoding.rs",
+      "sha256": "a8ddf674ea40597f290dc363930203bbb9474aed4991d97320c37ded99ff68d9",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/text_contracts.rs",
+      "sha256": "7d89e755dc3e21eeed35002287fe7a127963cbf2c6b46ca9ddf9ff2b5896f75a",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/portable/throwables.rs",
+      "sha256": "8c75169d89b27dc7065adc82840dcfa001be99b9b771c2ac8b0b083e98c84430",
+      "scope": "Reviewed shared extraction/platform adaptation; experimental upstream-runtime state/GC/exception integration where applicable. Not a device behavior parity claim."
+    },
+    {
+      "path": "crates/rd-vm/src/primitive_parse.rs",
+      "sha256": "fc0327470665d5abcd61f81afba5e49f4b9a53beee21ef05d27d044e3b337987",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim",
+      "derived_from": "crates/rd-vm/src/numerics.rs"
+    },
+    {
+      "path": "crates/rd-vm/src/shared_call.rs",
+      "sha256": "45dd64cabf3b113ef01a544e4283b2eb144ed8ba53a0b1b509453020dc7f900c",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-dex/src/budget.rs",
+      "sha256": "cc02d1ce1d4ccfec35d404e2aa2297a5361077f1f3cd8165721d8f93e02dcd37",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-dex/src/sync.rs",
+      "sha256": "340575fa959853de1b4dec1a20758a8323035a01590b53948204005ba252f578",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-apk/src/arsc_identifier.rs",
+      "sha256": "f6ef69dd6239fc824aba28a4ff371ce760556c2b69a9d06dcf0090125580131c",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-apk/src/zip_source.rs",
+      "sha256": "baa7fb70a6996466a0a1bb223d5e2eb790be3e40b6aa6e3a03085d2bb4013bad",
+      "scope": "Shared extraction or platform adaptation; not a device behavior parity claim"
+    },
+    {
+      "path": "crates/rd-vm/src/app_output.rs",
+      "sha256": "6c03f9c8c05fedcef8eb94dbf4ce3a9553e77abfa74388827aed83610feeb618",
+      "scope": "Per-Engine output transport with explicit platform log sink or bounded inspectable reference records. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/collection_clock.rs",
+      "sha256": "61215802449df9e64875792bb44f12c436d10e26b7843d3ba5c35deacb6c80d3",
+      "scope": "Platform monotonic GC measurements with explicit availability; virtual guest time is separate. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/module_tables.rs",
+      "sha256": "856210c76cf53da1adec7defa208f3b6811abe7b66f0272e8021bc25d812f99e",
+      "scope": "Engine-owned reference module side tables, replacing process/TLS lifetime coupling. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/port_env.rs",
+      "sha256": "d9f9893da2cc87350c57bade99cf4363fff29443f65e24935745788b5709be68",
+      "scope": "Desktop environment adapter and explicitly absent diagnostic overrides on the freestanding reference path. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/port_float.rs",
+      "sha256": "2510afadf6ef6be568445b5dc81b1991c16309b40dbc8b72eb3e597d37b19af1",
+      "scope": "Freestanding libm float operations and explicit UFCS host-oracle tests, including composition, extreme integer exponents and IEEE special values. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/port_prelude.rs",
+      "sha256": "679bd01d368c0c84e07e3a799aa14434bdbe58ddb2f7a775c63b8d18baeaf9ef",
+      "scope": "Core/alloc imports for the complete inherited framework dependency closure. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/reference_filesystem.rs",
+      "sha256": "2c52d75fc5ba5385dfd0b3bd472a6ed9b1a8475b67f8f1bef53c7b0306a8983c",
+      "scope": "Explicit session-scoped in-memory reference filesystem; rejects replacing a bound device VFS. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    },
+    {
+      "path": "crates/rd-vm/src/sdk_types.rs",
+      "sha256": "f64ce36883f7dc13da1b9c73b6a23b88c9e712522f384c33fb7ac069e52f7ed0",
+      "scope": "Generated public Android SDK declaration facts only; no method implementation or compatibility claim. Not a device behavior parity claim.",
+      "derived_from": "Android SDK API 35 public declaration metadata; data/android-sdk-types.json pins input SHA-256 and generator; no SDK method bodies."
+    },
+    {
+      "path": "crates/rd-vm/src/throwable_message.rs",
+      "sha256": "7d7ffc1277f54d1fb8f626fcecf5b1b776e6d6b18f33742476d31720baf39992",
+      "scope": "One private Throwable detail-message slot shared by interpreted/host/JNI exception paths. Not a device behavior parity claim.",
+      "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation"
+    }
+  ],
+  "host_only_originals": [
+    "crates/rd-vm/src/accessibility_node.rs",
+    "crates/rd-vm/src/activity_callbacks.rs",
+    "crates/rd-vm/src/activity_extras.rs",
+    "crates/rd-vm/src/android_build.rs",
+    "crates/rd-vm/src/android_colorspace.rs",
+    "crates/rd-vm/src/android_display.rs",
+    "crates/rd-vm/src/android_drawable.rs",
+    "crates/rd-vm/src/android_env.rs",
+    "crates/rd-vm/src/android_json.rs",
+    "crates/rd-vm/src/android_motion.rs",
+    "crates/rd-vm/src/android_observable.rs",
+    "crates/rd-vm/src/android_pm.rs",
+    "crates/rd-vm/src/android_region.rs",
+    "crates/rd-vm/src/android_res.rs",
+    "crates/rd-vm/src/android_spannable.rs",
+    "crates/rd-vm/src/android_stub_surfaces.rs",
+    "crates/rd-vm/src/android_sysservices.rs",
+    "crates/rd-vm/src/android_text.rs",
+    "crates/rd-vm/src/android_uri.rs",
+    "crates/rd-vm/src/android_util.rs",
+    "crates/rd-vm/src/android_velocity.rs",
+    "crates/rd-vm/src/androidx.rs",
+    "crates/rd-vm/src/atomics.rs",
+    "crates/rd-vm/src/bundle.rs",
+    "crates/rd-vm/src/choreographer.rs",
+    "crates/rd-vm/src/collections.rs",
+    "crates/rd-vm/src/content.rs",
+    "crates/rd-vm/src/framework.rs",
+    "crates/rd-vm/src/gc.rs",
+    "crates/rd-vm/src/gms.rs",
+    "crates/rd-vm/src/graphics.rs",
+    "crates/rd-vm/src/handler_msg.rs",
+    "crates/rd-vm/src/inflate.rs",
+    "crates/rd-vm/src/intrinsics.rs",
+    "crates/rd-vm/src/jannotations.rs",
+    "crates/rd-vm/src/jbigdecimal.rs",
+    "crates/rd-vm/src/jbreakiter.rs",
+    "crates/rd-vm/src/jcollections.rs",
+    "crates/rd-vm/src/jfile.rs",
+    "crates/rd-vm/src/jio_chars.rs",
+    "crates/rd-vm/src/jit.rs",
+    "crates/rd-vm/src/jiterator.rs",
+    "crates/rd-vm/src/jlclass.rs",
+    "crates/rd-vm/src/jlocks.rs",
+    "crates/rd-vm/src/jlstring.rs",
+    "crates/rd-vm/src/jlsystem.rs",
+    "crates/rd-vm/src/jnormalizer.rs",
+    "crates/rd-vm/src/jpriorityqueue.rs",
+    "crates/rd-vm/src/jrandom.rs",
+    "crates/rd-vm/src/jregex.rs",
+    "crates/rd-vm/src/jresources.rs",
+    "crates/rd-vm/src/jsb.rs",
+    "crates/rd-vm/src/jsecurity.rs",
+    "crates/rd-vm/src/jsorted.rs",
+    "crates/rd-vm/src/jsqlite.rs",
+    "crates/rd-vm/src/jstring_tokenizer.rs",
+    "crates/rd-vm/src/jtext_format.rs",
+    "crates/rd-vm/src/jtime.rs",
+    "crates/rd-vm/src/juuid.rs",
+    "crates/rd-vm/src/jxml.rs",
+    "crates/rd-vm/src/m10/biometrics.rs",
+    "crates/rd-vm/src/m10/camera.rs",
+    "crates/rd-vm/src/m10/connectivity.rs",
+    "crates/rd-vm/src/m10/location.rs",
+    "crates/rd-vm/src/m10/media.rs",
+    "crates/rd-vm/src/m10/mod.rs",
+    "crates/rd-vm/src/m10/sensors.rs",
+    "crates/rd-vm/src/m10/sysconfig.rs",
+    "crates/rd-vm/src/m8.rs",
+    "crates/rd-vm/src/m9/accessibility.rs",
+    "crates/rd-vm/src/m9/ime.rs",
+    "crates/rd-vm/src/m9/mod.rs",
+    "crates/rd-vm/src/m9/notifications.rs",
+    "crates/rd-vm/src/m9/shortcuts.rs",
+    "crates/rd-vm/src/m9/widgets.rs",
+    "crates/rd-vm/src/native.rs",
+    "crates/rd-vm/src/numerics.rs",
+    "crates/rd-vm/src/parcel.rs",
+    "crates/rd-vm/src/perms.rs",
+    "crates/rd-vm/src/platform_base.rs",
+    "crates/rd-vm/src/prefs.rs",
+    "crates/rd-vm/src/reflect.rs",
+    "crates/rd-vm/src/screen_model.rs",
+    "crates/rd-vm/src/threads.rs",
+    "crates/rd-vm/src/throwable.rs",
+    "crates/rd-vm/src/view_attach.rs",
+    "crates/rd-vm/src/view_layout.rs",
+    "crates/rd-vm/src/view_props.rs",
+    "crates/rd-vm/src/vto.rs",
+    "crates/rd-vm/src/window.rs",
+    "crates/rd-vm/src/xml_res.rs"
+  ],
+  "host_only_originals_scope": "Exclusions in the shipping/default device profile, not the experimental upstream-runtime profile",
+  "upstream_test_routes": [
+    {
+      "path": "crates/rd-vm/tests/accessibility_virtual.rs",
+      "targets": [
+        "upstream_accessibility_virtual"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/activity_history.rs",
+      "targets": [
+        "upstream_activity_history"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/alloc_budget_311.rs",
+      "targets": [
+        "upstream_alloc_budget_311"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_array_containers.rs",
+      "targets": [
+        "upstream_android_array_containers"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_assets.rs",
+      "targets": [
+        "upstream_android_assets"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_atomic_file.rs",
+      "targets": [
+        "upstream_android_atomic_file"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_base64_streams.rs",
+      "targets": [
+        "upstream_android_base64_streams"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_bitset.rs",
+      "targets": [
+        "upstream_android_bitset"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_display.rs",
+      "targets": [
+        "upstream_android_display"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_inherited_dispatch.rs",
+      "targets": [
+        "upstream_android_inherited_dispatch"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_json.rs",
+      "targets": [
+        "upstream_android_json"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_json_274.rs",
+      "targets": [
+        "upstream_android_json_274"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_stub_surfaces.rs",
+      "targets": [
+        "upstream_android_stub_surfaces"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_sysservices_batch1.rs",
+      "targets": [
+        "upstream_android_sysservices_batch1"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_sysservices_batch6.rs",
+      "targets": [
+        "upstream_android_sysservices_batch6"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_touch.rs",
+      "targets": [
+        "upstream_android_touch"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_uri_267.rs",
+      "targets": [
+        "upstream_android_uri_267"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/android_util_lru.rs",
+      "targets": [
+        "upstream_android_util_lru"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/androidx.rs",
+      "targets": [
+        "upstream_androidx"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/androidx_hierarchy.rs",
+      "targets": [
+        "upstream_androidx_hierarchy"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/app.rs",
+      "targets": [
+        "upstream_app"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/app_xml.rs",
+      "targets": [
+        "upstream_app_xml"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/arrays_303.rs",
+      "targets": [
+        "upstream_arrays_303"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/bigdecimal_272.rs",
+      "targets": [
+        "upstream_bigdecimal_272"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/camera_305.rs",
+      "targets": [
+        "upstream_camera_305"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/collections_gc.rs",
+      "targets": [
+        "upstream_collections_gc"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/file_300.rs",
+      "targets": [
+        "upstream_file_300"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/gc.rs",
+      "targets": [
+        "upstream_gc"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/gc_generations.rs",
+      "targets": [
+        "upstream_gc_generations"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/gms.rs",
+      "targets": [
+        "upstream_gms"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/graphics_301.rs",
+      "targets": [
+        "upstream_graphics_301"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/inflate_263.rs",
+      "targets": [
+        "upstream_inflate_263"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/io_chars_266.rs",
+      "targets": [
+        "upstream_io_chars_266"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/jit.rs",
+      "targets": [
+        "upstream_jit"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/jtext_format_295.rs",
+      "targets": [
+        "upstream_jtext_format_295"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/m10.rs",
+      "targets": [
+        "upstream_m10"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/m8.rs",
+      "targets": [
+        "upstream_m8"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/m9.rs",
+      "targets": [
+        "upstream_m9"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/narrow_arrays_250.rs",
+      "targets": [
+        "upstream_narrow_arrays_250"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/native.rs",
+      "targets": [
+        "upstream_native"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/numerics_319.rs",
+      "targets": [
+        "upstream_numerics_319"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/parcel_261.rs",
+      "targets": [
+        "upstream_parcel_261"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/parcel_binder.rs",
+      "targets": [
+        "upstream_parcel_binder"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/regex_262.rs",
+      "targets": [
+        "upstream_regex_262"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/regex_lookaround.rs",
+      "targets": [
+        "upstream_regex_lookaround"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/sqlite_prefs_257.rs",
+      "targets": [
+        "upstream_sqlite_prefs_257"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/string_270.rs",
+      "targets": [
+        "upstream_string_270"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/view_hierarchy_316.rs",
+      "targets": [
+        "upstream_view_hierarchy_316"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/vm_exec.rs",
+      "targets": [
+        "upstream_vm_exec"
+      ],
+      "execution": "unverified"
+    },
+    {
+      "path": "crates/rd-vm/tests/xml_269.rs",
+      "targets": [
+        "upstream_xml_269"
+      ],
+      "execution": "unverified"
+    }
+  ],
+  "device_behavior_parity_pass": false,
+  "device_behavior_parity_reason": "Target adapters and complete upstream behavior corpus require verification"
+}
