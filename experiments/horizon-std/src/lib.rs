@@ -315,7 +315,7 @@ const CASES: &[Probe] = &[
         let before = bridge::thread_counts().0;
         let dtor_before = DTORS.load(Ordering::SeqCst);
         let done = Arc::new(AtomicUsize::new(0));
-        for _ in 0..4 {
+        for _ in 0..8 {
             for _ in 0..32 {
                 let done = done.clone();
                 let w = thread::Builder::new()
@@ -335,12 +335,12 @@ const CASES: &[Probe] = &[
         let (after, live) = bridge::thread_counts();
         let drops = DTORS.load(Ordering::SeqCst) - dtor_before;
         require(
-            after - before == 128
+            after - before == 256
                 && live == 0
-                && drops == 128
-                && done.load(Ordering::Acquire) == 128,
+                && drops == 256
+                && done.load(Ordering::Acquire) == 256,
             format!(
-                "detached=128; reclaimed={}; live={live}; destructors={drops}",
+                "detached=256; reclaimed={}; live={live}; destructors={drops}",
                 after - before
             ),
         )

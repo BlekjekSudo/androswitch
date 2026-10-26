@@ -1,5 +1,9 @@
 # Horizon Rust std feasibility — 26 October 2026
 
+This is the historical **pre-migration** experiment. Its decision and 29/32
+results are retained unchanged below. The user subsequently authorized fixing
+std and migrating the product; see the [current migration record](HORIZON_STD_MIGRATION.md).
+
 **Decision: continue integrating the current `no_std + alloc` core. Keep the
 working `std` prototype for later qualification.** Actual Rust `std` runs in a
 standalone libnx NRO, but this prototype is not ready to replace the runtime's

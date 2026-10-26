@@ -80,11 +80,15 @@ def main():
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--build", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--require-pass", action="store_true", help="Fail unless every finite probe contract passed")
     args = parser.parse_args()
     report = analyze(args.run, args.build)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(json.dumps({"status": report["status"], **report["summary"]}))
+    if args.require_pass and (report["status"] != "passed_probe_contracts"
+                              or report["summary"]["fail"] or report["summary"]["not_run"]):
+        raise SystemExit("std probe acceptance failed; preserve the reported failures")
 
 
 if __name__ == "__main__":

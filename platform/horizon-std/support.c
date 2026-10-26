@@ -123,8 +123,11 @@ int __wrap_pthread_join(pthread_t id, void **value) {
     if (id==pthread_self()) return EDEADLK;
     mutexLock(&lock);
     StdThread *item=NULL;
-    for(unsigned i=0;i<STD_THREADS;i++) if(threads[i].used && threads[i].id==id){item=&threads[i];break;}
-    if (!item || item->detached || item->joining) {mutexUnlock(&lock);return EINVAL;}
+    /* SDK join frees pthread_t before this wrapper can reacquire our lock.
+     * malloc may already have reused that identity for a newly created thread.
+     * A retiring (joining) record must never shadow its replacement. */
+    for(unsigned i=0;i<STD_THREADS;i++) if(threads[i].used && !threads[i].joining && threads[i].id==id){item=&threads[i];break;}
+    if (!item || item->detached) {mutexUnlock(&lock);return EINVAL;}
     item->joining=true;
     mutexUnlock(&lock);
     int rc=__real_pthread_join(id,value);
@@ -138,10 +141,12 @@ int __wrap_pthread_join(pthread_t id, void **value) {
 int __wrap_pthread_detach(pthread_t id) {
     mutexLock(&lock);
     StdThread *item=NULL;
-    for(unsigned i=0;i<STD_THREADS;i++) if(threads[i].used && threads[i].id==id){item=&threads[i];break;}
-    int rc=(!item || item->detached || item->joining) ? EINVAL : 0;
+    for(unsigned i=0;i<STD_THREADS;i++) if(threads[i].used && !threads[i].joining && threads[i].id==id){item=&threads[i];break;}
+    int rc=(!item || item->detached) ? EINVAL : 0;
     if(!rc) item->detached=true;
-    detach_result=rc;
+    /* Rust's JoinHandle Drop cannot return an error. Preserve the first
+     * rejected detach for diagnostics rather than hiding it behind a later 0. */
+    if(detach_result==-999 || (detach_result==0 && rc)) detach_result=rc;
     condvarWakeAll(&changed);
     mutexUnlock(&lock);
     return rc;

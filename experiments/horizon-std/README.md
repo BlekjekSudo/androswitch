@@ -25,7 +25,7 @@ runtime. OS calls use SDK libsysbase/libnx. The shared
 [`platform/horizon-std`](../../platform/horizon-std/support.c) PAL provides
 page-size/core-mask queries and real CSRNG entropy. A reaper reclaims SDK
 pthread resources after detached workers finish, including TLS destructors.
-The test asserts 128 real detached workers are reclaimed; the harness does not
+The test asserts 256 real detached workers are reclaimed; the harness does not
 repair failed detaches. It also checks explicit chmod stays unsupported while
 file contents can be copied on the fixed-permission SD mount.
 

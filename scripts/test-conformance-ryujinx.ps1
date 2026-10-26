@@ -2,6 +2,7 @@
 param(
     [ValidateRange(1,100)][int]$Launches=60,
     [ValidateRange(1000,30000)][int]$WaitMilliseconds=1000,
+    [ValidateRange(1,8)][int]$WaitSegments=1,
     [ValidateRange(30,1800)][int]$TimeoutSeconds=900,
     [string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',
     [string]$RyujinxProfile="$env:APPDATA/Ryujinx",
@@ -55,6 +56,15 @@ $parameters=@{
     PrepareOnly=$PrepareOnly;AllowDesktopEmulator=$AllowDesktopEmulator
 }
 if($Nro){$parameters.Nro=$Nro}
+if($WaitSegments -gt 1){
+    # Keep asynchronous lifecycle/Handler cases in the same ordinary session.
+    # Each protocol wait remains bounded; do not interrupt a case just to split
+    # a long suite into many short launches. APK and acceptance stay unchanged.
+    $events=[Collections.Generic.List[object]]::new()
+    for($segment=0;$segment -lt $WaitSegments;$segment++){$events.Add(@{kind='wait';ms=$WaitMilliseconds})}
+    $events.Add(@{kind='frame'});$events.Add(@{kind='wait';ms=2000});$events.Add(@{kind='return_to_launcher'})
+    $parameters.SessionEvents=@($events.ToArray())
+}
 # Locate the fresh receipt by its unique seed source, not by an untrusted newest file.
 $failure=$null
 try {& "$PSScriptRoot/test-ryujinx-external.ps1" @parameters} catch {$failure=$_.Exception.Message}
