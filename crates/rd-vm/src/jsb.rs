@@ -144,10 +144,9 @@ fn get(vm: &Engine, r: ObjRef) -> Vec<u16> {
 }
 fn set(vm: &mut Engine, r: ObjRef, u: &[u16]) -> Result<(), VmExit> {
     let s = match String::from_utf16(u) {
-        Ok(text) => vm
-            .heap
-            .alloc_string(text)
-            .map_err(crate::err::oom_throwable)?,
+        // Keep the inherited String allocation failure contract. The new raw
+        // backing below uses the array allocator's catchable Java OOM path.
+        Ok(text) => vm.heap.alloc_string(text)?,
         Err(_) => {
             // Java permits an incomplete surrogate while a buffer is being
             // edited. Charge the real managed Value-array storage before any

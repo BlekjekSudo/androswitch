@@ -1072,7 +1072,7 @@
       "path": "crates/rd-vm/src/jsb.rs",
       "blob": "d7da1a8b3c06d78ca8bea04e00ec19c73b7546e2",
       "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Reviewed against pinned RustyDroid and previous adaptation: Shared builder UTF-16 review: preserve raw/unpaired code units in the original managed buf field using a heap char array, with ordinary GC edges and preallocation heap-budget checks. Correct reverse, codePointAt, appendCodePoint and setLength without lossy conversion; independent JVM edits and unchanged APK UI reproduce the integration defect. An unpaired-surrogate String result remains explicitly unavailable pending the UTF-16 String heap. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim.",
-      "sha256": "5b2c2af26e775935d5008a076c33ce8d302b913be8715b8a8871f9a9490a2c65"
+      "sha256": "a8ffbfc36ba8e236519c9076a09c004a957109c6054726fc5fa8690d513f2697"
     },
     {
       "path": "crates/rd-vm/src/jsecurity.rs",
