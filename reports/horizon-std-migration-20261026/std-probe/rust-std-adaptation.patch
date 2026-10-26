@@ -1,0 +1,35 @@
+--- std/src/sys/fs/unix.rs
++++ std/src/sys/fs/unix.rs
+@@ -2138,7 +2138,7 @@
+     set_times_impl(p, times, false)
+ }
+
+-#[cfg(any(target_os = "espidf", target_os = "wasi"))]
++#[cfg(any(target_os = "espidf", target_os = "wasi", target_os = "horizon"))]
+ fn open_to_and_set_permissions(
+     to: &Path,
+     _reader_metadata: &crate::fs::Metadata,
+@@ -2149,7 +2149,7 @@
+     Ok((writer, writer_metadata))
+ }
+
+-#[cfg(not(any(target_os = "espidf", target_os = "wasi")))]
++#[cfg(not(any(target_os = "espidf", target_os = "wasi", target_os = "horizon")))]
+ fn open_to_and_set_permissions(
+     to: &Path,
+     reader_metadata: &crate::fs::Metadata,
+--- std/src/sys/thread/unix.rs
++++ std/src/sys/thread/unix.rs
+@@ -151,6 +151,12 @@
+
+ pub fn available_parallelism() -> io::Result<NonZero<usize>> {
+     cfg_select! {
++        target_os = "horizon" => {
++            // The PAL queries the current process's actual allowed core mask.
++            let cpus = unsafe { libc::sysconf(libc::_SC_NPROCESSORS_ONLN) };
++            if cpus < 0 { Err(io::Error::last_os_error()) }
++            else { NonZero::new(cpus as usize).ok_or(io::Error::UNKNOWN_THREAD_COUNT) }
++        }
+         any(
+             target_os = "android",
+             target_os = "emscripten",

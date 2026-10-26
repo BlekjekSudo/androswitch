@@ -1,0 +1,17 @@
+   Compiling rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-dex)
+   Compiling aho-corasick v1.1.5
+   Compiling regex-syntax v0.8.11
+   Compiling regex-automata v0.4.18
+   Compiling bit-vec v0.6.3
+   Compiling bit-set v0.5.3
+   Compiling fancy-regex v0.13.0
+   Compiling regex v1.13.1
+   Compiling rd-vm v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-vm)
+memory allocation of 1867792 bytes failed
+stack backtrace:
+memory allocation of 1572864 bytes failed
+skipping backtrace printing to avoid potential recursion
+error: could not compile `rd-vm` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\Administrator\.rustup\toolchains\1.97.1-x86_64-pc-windows-gnu\bin\rustc.exe --crate-name rd_vm --edition=2021 crates\rd-vm\src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no --forbid=unsafe_code --cfg "feature=\"advanced-components\"" --cfg "feature=\"default\"" --cfg "feature=\"desktop-runtime\"" --cfg "feature=\"std\"" --cfg "feature=\"virtual-devices\"" --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"advanced-components\", \"default\", \"desktop-runtime\", \"jit\", \"native\", \"portable-test-support\", \"std\", \"upstream-runtime\", \"virtual-devices\"))" -C metadata=5f49084e2679d85f -C extra-filename=-d9ea9293ca447c60 --out-dir C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps -C strip=debuginfo -L dependency=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps --extern as_platform=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libas_platform-6eb832e95049f458.rmeta --extern fancy_regex=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libfancy_regex-ecec05baa57666ed.rmeta --extern rd_apk=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\librd_apk-1b18a3221c0243db.rmeta --extern rd_dex=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\librd_dex-cad46e296d8a0333.rmeta --extern regex=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libregex-6d32579df330e0d6.rmeta --extern serde=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libserde-f776547f4b8d0fe3.rmeta --extern serde_json=C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\libserde_json-eee4300219892fc7.rmeta` (exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN)

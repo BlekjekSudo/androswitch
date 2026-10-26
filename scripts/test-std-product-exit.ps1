@@ -50,7 +50,10 @@ function Stop-Owned {
     if(@(Update-Owned).Count){throw 'Owned emulator still holds test SD; keep backup'}
 }
 try {
-    $existing=@(Get-CimInstance Win32_Process -Filter "Name='Ryujinx.exe'"|Where-Object {$p=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue;$p -and -not $p.HasExited})
+    $existing=@(Get-CimInstance Win32_Process -Filter "Name='Ryujinx.exe'"|Where-Object {
+        $_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath) -ieq $emulator -and
+        ($p=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue) -and -not $p.HasExited
+    })
     if($existing.Count){throw 'An emulator is already running'}
     New-Item -ItemType Directory -Force $switchRoot|Out-Null
     if((Get-Item $switchRoot -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'Linked switch root forbidden'}

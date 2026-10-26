@@ -1,0 +1,362 @@
+{
+  "commands": [
+    {
+      "kind": "frame"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "events": [
+        {
+          "ms": 1000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    }
+  ],
+  "session_id": "1bf5ac5569cf4654926d5667f6767484",
+  "schema_version": 1
+}

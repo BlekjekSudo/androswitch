@@ -1,0 +1,15 @@
+native signal contracts: PASS (LP64 sets 1..64; ENOSYS delivery, untouched outputs, pthread errno)
+stdio identity bridge
+native ABI contracts: PASS (C++ lifetimes, guards/once/keys, allocation, fortify, stdio/VFS, logging)
+libdl scoped function/data pointers, TLS errors, references, stale handles: PASS
+anonymous mmap: zeroing, permissions, partial unmap, advice, ownership, failures and reset PASS
+native locale contracts: PASS (ABI, names/masks, ownership/TLS, numeric, Unicode, collation, time)
+native multibyte contracts: PASS (UTF-8/UTF-32, LP64 state, restart, strings, TLS, errors)
+native random contracts: PASS (pinned vectors, seeds, aliases, private state, threads, reset)
+native finalization contracts: PASS (late TLS, cross-registration, keys, reentrancy, errors, bounds)
+kernel CPU tick accounting: live/retired/main/thread/error/version contracts PASS
+Rust SDK futex adapter: real waits/wakes, count, bitset/address isolation, timeout, invalid/error contracts PASS
+SDK clock, allocation, unsupported syscall and real vector I/O contracts PASS
+native ARM64 bridge oracle: PASS (registers, stack, TLS, nested callbacks, x18, four-vector returns)
+Rust loader tests skipped explicitly with -SkipRustTests.
+Native ABI checks completed on Msys. Receipt: D:\Dev\Switch\AndroSwitch\local-artifacts\m9\native-abi\msys\host-result.json

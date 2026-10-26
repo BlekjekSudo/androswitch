@@ -1,0 +1,32 @@
+display rotation: all 4 complete frame/input/capture rotations and CPU RGB rows, 12 malformed row guards and lifecycle/failure policies passed
+framebuffer copy: 4 address/guard cases passed
+PPM publication: 12 complete/atomic/error/guard cases passed;720p uses721 writes
+GLSurface worker normal: passed (host contract only)
+GLSurface worker portrait: passed (host contract only)
+GLSurface worker portrait-pause-preserve: passed (host contract only)
+GLSurface worker portrait-slow-termination: passed (host contract only)
+GLSurface worker pause-preserve: passed (host contract only)
+GLSurface worker pause-recreate: passed (host contract only)
+GLSurface worker pause-exit: passed (host contract only)
+GLSurface worker pause-before-create: passed (host contract only)
+GLSurface worker pause-preserve-exit: passed (host contract only)
+GLSurface worker pause-toggle-discard: passed (host contract only)
+GLSurface worker suspend-failure: passed (host contract only)
+GLSurface worker resume-failure: passed (host contract only)
+GLSurface worker queue-before-context: passed (host contract only)
+GLSurface worker initialize-failure: passed (host contract only)
+GLSurface worker choose-failure: passed (host contract only)
+GLSurface worker egl-create-failure: passed (host contract only)
+GLSurface worker attach-failure: passed (host contract only)
+GLSurface worker callback-failure: passed (host contract only)
+GLSurface worker queue-failure: passed (host contract only)
+GLSurface worker poll-failure: passed (host contract only)
+GLSurface worker close-failure: passed (host contract only)
+GLSurface worker self-join: passed (host contract only)
+GLSurface worker wait-failure: passed (host contract only)
+GLSurface worker thread-close-failure: passed (host contract only)
+GLSurface worker timeout: passed (host contract only)
+GLSurface worker concurrent-join: passed (host contract only)
+GLSurface worker normal: passed (host contract only)
+Host display checks passed: 4 full rotations with CPU RGB rows, 12 row guards, 4 framebuffer cases, 12 PPM publication cases, 31 worker scenarios.
+Receipt: D:\Dev\Switch\AndroSwitch\local-artifacts\tests\horizon-display\result.json

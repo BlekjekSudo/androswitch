@@ -28,6 +28,8 @@ pthread resources after detached workers finish, including TLS destructors.
 The test asserts 256 real detached workers are reclaimed; the harness does not
 repair failed detaches. It also checks explicit chmod stays unsupported while
 file contents can be copied on the fixed-permission SD mount.
+The reclamation stress uses 256 KiB worker stacks to stay inside the fixture's
+128 MiB heap; other creation/join cases still exercise the default stack.
 
 From the runtime repository in PowerShell, with Rust/Cargo and Python on PATH:
 
@@ -40,6 +42,9 @@ python -X utf8 scripts/report-horizon-std.py `
   --run local-artifacts/horizon-std/runs/<session-id> `
   --output local-artifacts/horizon-std/report.json
 ```
+
+Use `--require-pass` on the report command for acceptance. The emulator script
+alone observes execution markers; it does not promote failed contracts to PASS.
 
 The emulator script requires the previously pinned headless executable by hash,
 uses an exclusive test lock, preserves its own SD folder, and stops only owned

@@ -1,0 +1,1137 @@
+[
+  {
+    "path": "autorun.txt",
+    "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+    "utf8": "0"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-0.json",
+    "sha256": "8a6d8f19120aba0821f347bc25cb481e7342ada3aad7dcc0dc3db28a70acda28",
+    "utf8": "{\"id\":\"dex.overflow\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":14236000,\"detail\":\"-2147483648\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-1.json",
+    "sha256": "5f4d9b938ec52098b6d258c51ea30c512a7a7c73c9d66aa64411c9c32ec0e8b4",
+    "utf8": "{\"id\":\"dex.division\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1284000,\"detail\":\"-5:-2\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-10.json",
+    "sha256": "561b046ce0cafde62a04452e2748287e170f2daf44c842f45333929e2496c8b5",
+    "utf8": "{\"id\":\"dex.bounds\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6632000,\"detail\":\"bounds\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-100.json",
+    "sha256": "0e75b94aaac5ec43605cf40115765fe405b0498f088a99e5edb5c9e61196e319",
+    "utf8": "{\"id\":\"host.cpu.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-101.json",
+    "sha256": "ab586c5a91d1aadd65778612ef5d31e3faf9e7c30ffa5b44abe7abf8622b927b",
+    "utf8": "{\"id\":\"host.gpu.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-102.json",
+    "sha256": "c2c4fbab4d586c9786ff54c8369875fd16b5f55582ac70a205faf046d424aff1",
+    "utf8": "{\"id\":\"host.memory.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-103.json",
+    "sha256": "8010d7f4883201f0a0be93ea11e827d8deae43ec89c95da9ea68d77a73c65de1",
+    "utf8": "{\"id\":\"host.tick.frequency_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":967000,\"detail\":\"19200000\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-104.json",
+    "sha256": "fd18e0b0e55f296449b636117eb3c3dc27d7a1a59a889cfb60ce80ecd9f7bf18",
+    "utf8": "{\"id\":\"host.os.name\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":542000,\"detail\":\"Horizon\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-105.json",
+    "sha256": "1203faef98c68c5ac7c60b97e6fc0620c5fa158a7d9982f1b5458650f6f4db50",
+    "utf8": "{\"id\":\"host.os.version\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":683000,\"detail\":\"3.0.0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-106.json",
+    "sha256": "f48f49f7b0360b97414855923b4b8de080c0e0462c455c874eb1f2a67a52619a",
+    "utf8": "{\"id\":\"host.renderer.backend\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2250000,\"detail\":\"Horizon Mesa EGL/GLES2 + NVK Vulkan\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-107.json",
+    "sha256": "6f59f4fd428fba1ec72d0ffb0cc9c41fed57f3134e43580bb903fe4123e750d9",
+    "utf8": "{\"id\":\"build.model\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":14723000,\"detail\":\"AndroSwitch\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-108.json",
+    "sha256": "7930b793f9c4f686b253a39a1a6964938947b9aeb4c080198bc44c466f22f46d",
+    "utf8": "{\"id\":\"build.manufacturer\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2276000,\"detail\":\"AndroSwitch\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-109.json",
+    "sha256": "05b058160125c6332ee4626111332e3917bb2ceea7023241d343733492b0b1a8",
+    "utf8": "{\"id\":\"build.brand\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1906000,\"detail\":\"androswitch\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-11.json",
+    "sha256": "ef327f26903ac66129c2a1dc2380a9c0df9e62bcea7caabd581002b001affb2f",
+    "utf8": "{\"id\":\"dex.division-zero\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3861000,\"detail\":\"arithmetic\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-110.json",
+    "sha256": "dea878bc96446a8f34d12c346eeb7634a300a9da124c2c0c8ed16439cf03ee68",
+    "utf8": "{\"id\":\"build.device\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":713000,\"detail\":\"androswitch\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-111.json",
+    "sha256": "b56124a428c783dc97555f6aff5922d704634f0d0a1d3695c8421e4afe466a33",
+    "utf8": "{\"id\":\"build.product\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1504000,\"detail\":\"androswitch_horizon\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-112.json",
+    "sha256": "853f30365d8543a2703978d0119954abdf6353c25ba589cb96d3c6909e43216f",
+    "utf8": "{\"id\":\"build.board\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":765000,\"detail\":\"horizon\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-113.json",
+    "sha256": "9d618e6be92851f03a8806b365d19b09819ad47ddeac495963bc6a1ebab0590b",
+    "utf8": "{\"id\":\"build.hardware\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2530000,\"detail\":\"horizon\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-114.json",
+    "sha256": "bb8823f6d9fc311c13271deafb6d356adb0a92831627e7a31a021ea21cf26710",
+    "utf8": "{\"id\":\"build.id\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":981000,\"detail\":\"AS26\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-115.json",
+    "sha256": "a17541aa4049a9c4040a2324b1d1e4438222746afccc8cabc3f0e007bb5ba74e",
+    "utf8": "{\"id\":\"build.display\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1382000,\"detail\":\"AndroSwitch API26 compatibility profile v1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-116.json",
+    "sha256": "5e9ee03bf03fa311508e73b608efe3b25923d9f283a8b4ddaa9a97f4180d5be2",
+    "utf8": "{\"id\":\"build.fingerprint\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1512000,\"detail\":\"androswitch/horizon/androswitch:8.0.0/AS26/0.1.0:eng/test-keys\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-117.json",
+    "sha256": "55e97de4100739845e829160ca9eb8e76611f17b4a317f7ce34e65149409243b",
+    "utf8": "{\"id\":\"build.type\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":3215000,\"detail\":\"eng\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-118.json",
+    "sha256": "85bae58173bc90a85dbe5906abe535d497c77061b75737583cd53eafce00b4f6",
+    "utf8": "{\"id\":\"build.tags\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1843000,\"detail\":\"test-keys\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-119.json",
+    "sha256": "2f9ea7fdad2d4fd2e2981a8c57d4c7547c532074f5cd1e4795f66acd98865ab8",
+    "utf8": "{\"id\":\"build.user\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1095000,\"detail\":\"androswitch\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-12.json",
+    "sha256": "99fecf49d10d1858a5981788401f0feda681c5b55ad6af8c4b4cf0752a435214",
+    "utf8": "{\"id\":\"text.utf16-length\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":412000,\"detail\":\"4\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-120.json",
+    "sha256": "c401a00e34289e6004b21c96907be3aa978d35c8a04b9a70950ec2a3e8ec60de",
+    "utf8": "{\"id\":\"build.host\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4880000,\"detail\":\"horizon\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-121.json",
+    "sha256": "b62781fbc4583498f48d74287c17a074c4f8cb09cca1a24bed4b152ae3391562",
+    "utf8": "{\"id\":\"build.time\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1790000,\"detail\":\"buildTime=0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-122.json",
+    "sha256": "c18fb611a79e561535c7c04d8e656cf58bc8148b245b81dde27dd009ed3b11ac",
+    "utf8": "{\"id\":\"build.abis\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4241000,\"detail\":\"arm64-v8a count=1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-123.json",
+    "sha256": "fd4759db5324529e6a1b974d9fe1cd4249ec8646619359d4353f7e73f91d2e16",
+    "utf8": "{\"id\":\"build.version.release\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2207000,\"detail\":\"8.0.0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-124.json",
+    "sha256": "214a6805fd718b97fe421741b9c3b0ec7fde4534af99a860cb58436c0174d89a",
+    "utf8": "{\"id\":\"build.version.incremental\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1400000,\"detail\":\"0.1.0-dev\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-125.json",
+    "sha256": "4a781cdca21d05f7cb2218342761a3dbb08a5b2f8556f21ad3b3c141dd4f550d",
+    "utf8": "{\"id\":\"build.version.codename\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":867000,\"detail\":\"REL\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-126.json",
+    "sha256": "1447c9ea113a59909db75e35caa0ac655df6a61ef07627fe73fb8f1ceb53fb5a",
+    "utf8": "{\"id\":\"build.version.base_os\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":458000,\"detail\":\"\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-127.json",
+    "sha256": "6f00232f137004a3bc2b7e8cbd4219a0857c05a4960a4838ce40f28d83a5d047",
+    "utf8": "{\"id\":\"build.version.security_patch\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1892000,\"detail\":\"\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-128.json",
+    "sha256": "75fbd21dfcefe5a5cb0b820ac6e034a8ab0358e82f4293d71d073640039bedcf",
+    "utf8": "{\"id\":\"build.version.sdk\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1855000,\"detail\":\"guestAPI=26\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-129.json",
+    "sha256": "fc4b425e8950fd9e04a5ab330434c9679cf095af364106d720e19fb8ac7a87b8",
+    "utf8": "{\"id\":\"build.version.preview\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1065000,\"detail\":\"preview=0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-13.json",
+    "sha256": "7f38a9af8545a260ecb292b0273ee2978fe36959d7bcb9b12111567fdd54bce3",
+    "utf8": "{\"id\":\"text.substring\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8355000,\"detail\":\"bc\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-130.json",
+    "sha256": "4f3bdc24a2728088fca347bce4af394e341c10b0f0cbabe02b5782816710b401",
+    "utf8": "{\"id\":\"clock.wall\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1324000,\"detail\":\"1793011298244\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-131.json",
+    "sha256": "624d7fe9b749a18bbc294ae435ec6a7b81fb1adab29c6173a4bcbd015a92581a",
+    "utf8": "{\"id\":\"clock.nano\",\"group\":\"Clock\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":423000,\"detail\":\"3000\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-132.json",
+    "sha256": "b712d975c17575b44b733f6330ac9ce624ced438d4e9ab208db5dc986123e56d",
+    "utf8": "{\"id\":\"clock.elapsed\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1758000,\"detail\":\"296576\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-133.json",
+    "sha256": "d00efd9fe238586eea736feef09881742fd6f1392862740d85aff170e78035f5",
+    "utf8": "{\"id\":\"clock.uptime\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":866000,\"detail\":\"299605\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-134.json",
+    "sha256": "6f2ac4e92b41873e63888b6b8d5a7139de90fddfc26d0e54c2ea643042f6960f",
+    "utf8": "{\"id\":\"display.metrics\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":12785000,\"detail\":\"1280x720 density=2\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-135.json",
+    "sha256": "8dd48de7ed12ca1639408588d4ad4076734b1785ee743df9ab89b5242b3366da",
+    "utf8": "{\"id\":\"display.configuration\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8613000,\"detail\":\"orientation=2 density=320 dp=640x360\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-136.json",
+    "sha256": "1f90ea0599c18b1d33763810de5d8e4361bed17bfbbd9726c6d0cccaf4f10640",
+    "utf8": "{\"id\":\"display.rotation\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8378000,\"detail\":\"rotation=0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-137.json",
+    "sha256": "187eeffe3779b4dc4be05695f4490fdada6f2092fc4181afe0a82a7bcc476a22",
+    "utf8": "{\"id\":\"display.requested-orientation\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2026000,\"detail\":\"requested=-1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-138.json",
+    "sha256": "1a9a11e4e3a5b7d6433b73ff642ebed7866a7e86e64670ebce277801cc6829cc",
+    "utf8": "{\"id\":\"display.landscape\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6548000,\"detail\":\"landscape requested; physical rotation is separate\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-139.json",
+    "sha256": "5f11eb63c8c69eab85622e0a5f773f970cc51725deefb0bdd7393b6b14dbd771",
+    "utf8": "{\"id\":\"display.portrait\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2984000,\"detail\":\"portrait requested; physical rotation is separate\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-14.json",
+    "sha256": "7e7a87833d96670e50dd3f9c1ab3814e998bfc506a85f28c89cc22a24b56fed8",
+    "utf8": "{\"id\":\"text.char-at\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":484000,\"detail\":\"8364\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-140.json",
+    "sha256": "5ffa46dc8af312fe87451d1645983b032a8e5f82d973febc374b1dd539ebefd3",
+    "utf8": "{\"id\":\"display.window\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2392000,\"detail\":\"window and decor\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-141.json",
+    "sha256": "b3020f82a45a8638cc0d1468ea5a37c625268a4e9baaa02da18c1053734379bd",
+    "utf8": "{\"id\":\"display.keep-screen-on\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3284000,\"detail\":\"read/write window flags\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-142.json",
+    "sha256": "664506d86183266b48f09c543aaae013663d9ec8414899ee5fe73ec82622d563",
+    "utf8": "{\"id\":\"package.identity\",\"group\":\"Package\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2622000,\"detail\":\"org.androswitch.conformance\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-143.json",
+    "sha256": "410a6c9aa208c7aad0aa3551c71b0aeed41b2a5ced876ab2c58093d556956547",
+    "utf8": "{\"id\":\"package.info\",\"group\":\"Package\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":38211000,\"detail\":\"0.1.0/1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-144.json",
+    "sha256": "177a2ea0262800e9c64bdf94948bd0bf5c53fb5f789fc1f4494cb26016b96f14",
+    "utf8": "{\"id\":\"package.apk-stream\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6518000,\"detail\":\"PK\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-145.json",
+    "sha256": "fe222db40b6deed86b90dca56269893d122891a41416e7a0da83de3f2a9a5163",
+    "utf8": "{\"id\":\"package.missing\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3854000,\"detail\":\"NameNotFoundException\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-146.json",
+    "sha256": "34dbacade00614bf2c8b1de616d39762ba09c29d7649037dcd482f1b4b7126e6",
+    "utf8": "{\"id\":\"package.assets\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":25675000,\"detail\":\"AS asset\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-147.json",
+    "sha256": "bb284d4d62884c76e63bc0bc6d299f13d620af9eeb4626a5a49cd5ab60958b1f",
+    "utf8": "{\"id\":\"storage.write-read\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":12724000,\"detail\":\"3,7,11,EOF\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-148.json",
+    "sha256": "6bdbedf23f701ec44b85e385cbeac8ef209fee37bf849fc5d20652479cbbc020",
+    "utf8": "{\"id\":\"storage.append\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":9570000,\"detail\":\"1,2\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-149.json",
+    "sha256": "fe5f82b9ad9271732a06bcf4d9df3a1e2c51d17b35a0c9b113f2580028314529",
+    "utf8": "{\"id\":\"storage.name-parent\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7375000,\"detail\":\"/data/user/0/org.androswitch.conformance/files\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-15.json",
+    "sha256": "fa4b4fde8f97e0ae9861a3915eed91ab1e46d834d87d4324832ac58f06f87bd6",
+    "utf8": "{\"id\":\"text.equals\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5888000,\"detail\":\"true\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-150.json",
+    "sha256": "785ba33e1eb0008742fbf5ed6f74dc7ed701d18755e21c9d0b81d6117ed8944b",
+    "utf8": "{\"id\":\"storage.mkdir\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6600000,\"detail\":\"/data/user/0/org.androswitch.conformance/files/nested/a\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-151.json",
+    "sha256": "bada9d20bbb2e628fb33fb46619b6e9baa76eb6714a8bea09a93e52f7621ac9a",
+    "utf8": "{\"id\":\"storage.delete\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4377000,\"detail\":\"deleted\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-152.json",
+    "sha256": "d192dfeab80cdd1736d09b2876d32f94cac5a7a6f79f08c876a732b30faeaee4",
+    "utf8": "{\"id\":\"storage.random-access\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":22697000,\"detail\":\"seek/read\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-153.json",
+    "sha256": "4a9e95b34e2bc950ac7f3202a24ab05350b2846ed06b2d44f3a4454d2e867a47",
+    "utf8": "{\"id\":\"preferences.int\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":75042000,\"detail\":\"committed\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-154.json",
+    "sha256": "3b75ad1e81fb91339308a8b298df7bee06baa06ccfcd4c4dd809356e5c535ccd",
+    "utf8": "{\"id\":\"preferences.long\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":11843000,\"detail\":\"committed\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-155.json",
+    "sha256": "7e3a9b7e1f3fb5c460c6b218faa6b40c6518340e79eee1e64309476b9da0da5e",
+    "utf8": "{\"id\":\"preferences.boolean\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":17873000,\"detail\":\"committed\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-156.json",
+    "sha256": "6995e531c46e738d930934285593dc724b2f79518938f960d4ce0760cdd8a35d",
+    "utf8": "{\"id\":\"preferences.float\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":141150000,\"detail\":\"committed\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-157.json",
+    "sha256": "37dfc6e1abc3168d63159c84c9fdc894a1655c67233d575530f597da208059b6",
+    "utf8": "{\"id\":\"preferences.string\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":23725000,\"detail\":\"escaped string\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-158.json",
+    "sha256": "28b8fdff1c17fc4566a46f2553c5db82522bb6a9106ebd60124eadc7821a74e1",
+    "utf8": "{\"id\":\"preferences.remove\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":45169000,\"detail\":\"removed\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-159.json",
+    "sha256": "020bdf69437ef6dc7307dfbeb4f5ef1c3cd329470485738da5549f9107184743",
+    "utf8": "{\"id\":\"preferences.clear\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":39241000,\"detail\":\"cleared\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-16.json",
+    "sha256": "3b2d4c2436712d863a5e5a0111cb2f6589f051b72712a1028502d34d58ce399d",
+    "utf8": "{\"id\":\"text.builder-char\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1726000,\"detail\":\"x,true42\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-160.json",
+    "sha256": "22f0cb9f6e719ea1502f73ac5442ba1693965ae88701b5a704695e9f654e3c62",
+    "utf8": "{\"id\":\"bundle.int\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6437000,\"detail\":\"int\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-161.json",
+    "sha256": "ae804e4c4f4b677877302c9dd96caa1d502e689585c5433d858159dd9b7258bd",
+    "utf8": "{\"id\":\"bundle.long\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4443000,\"detail\":\"long\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-162.json",
+    "sha256": "8e6c1c7ba2ce358e8f78f6b6382aa88f65648f865d3f284bc61c9c4354ac950f",
+    "utf8": "{\"id\":\"bundle.boolean\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":955000,\"detail\":\"boolean\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-163.json",
+    "sha256": "537c0d376f120ebbf345727c9eef76413c7a8e9b4b7dc60471a08f0e13225bcb",
+    "utf8": "{\"id\":\"bundle.float\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4144000,\"detail\":\"float\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-164.json",
+    "sha256": "cbffd0bd27fab2268b8ba37b098d3fa2e0bbe145a6bd34d1f14a232bf0c8c034",
+    "utf8": "{\"id\":\"bundle.double\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3828000,\"detail\":\"double\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-165.json",
+    "sha256": "206b903e6d91a2f2a1d493754bbb7d7590ebfd403109af074e79406b920e66a1",
+    "utf8": "{\"id\":\"bundle.byte\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":704000,\"detail\":\"byte\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-166.json",
+    "sha256": "eb99ba9fb286d9114932d7242f2c5e5c2df1ae65bb09d3a5ec514a2414486f38",
+    "utf8": "{\"id\":\"bundle.short\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":896000,\"detail\":\"short\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-167.json",
+    "sha256": "4bc52ebafc31f2b816a799b7f3f050ae23df81a55b56d83e08988d7274b31a27",
+    "utf8": "{\"id\":\"bundle.char\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":721000,\"detail\":\"char\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-168.json",
+    "sha256": "51492b462a007f33638846cff263e66a6f056fa417295bae7e9a14c4630b2196",
+    "utf8": "{\"id\":\"bundle.string\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":954000,\"detail\":\"value\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-169.json",
+    "sha256": "9a38729b961270d7c9a2d1e72c47bf104400619b6172dd3c6679cbe5431d9555",
+    "utf8": "{\"id\":\"bundle.default\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":672000,\"detail\":\"91\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-17.json",
+    "sha256": "f93a631ce4e4cae204238d5844953b3238d386b141bec344dfd9120ba84afb06",
+    "utf8": "{\"id\":\"text.buffer\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1186000,\"detail\":\"one2\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-170.json",
+    "sha256": "da48ef0a5f8156cc89aa877cf33204c71a2ef1eb150aa7ede6772ef864960f60",
+    "utf8": "{\"id\":\"bundle.nested\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":129200000,\"detail\":\"7\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-171.json",
+    "sha256": "999e47e4bc3ffb20810570ac49b7e4f4971f1d437b3981600050eacf1f9e6778",
+    "utf8": "{\"id\":\"ui.view-context\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4597000,\"detail\":\"actual Context\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-172.json",
+    "sha256": "79e97fe46cc8a1a47512a399598a0df23268028feb215af9c8159af6660eefbf",
+    "utf8": "{\"id\":\"ui.textview\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2175000,\"detail\":\"test\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-173.json",
+    "sha256": "f1bae1e619e0ccb44416a5a380baec6b665cf3e9d670862e25c34e7c795a80be",
+    "utf8": "{\"id\":\"ui.button\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1577000,\"detail\":\"401/button\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-174.json",
+    "sha256": "70117e921d28f251cb8ee8f6ec6157ffde0c7ff2838f989fcda964e651924908",
+    "utf8": "{\"id\":\"ui.input-connection\",\"group\":\"Input\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":37250000,\"detail\":\"aXd\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-175.json",
+    "sha256": "82db6fd2b1c7a2257ddfe2d718efa515aaef2677cb0e118f092f6ba8bf46d016",
+    "utf8": "{\"id\":\"ui.editable-utf16\",\"group\":\"Input\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3473000,\"detail\":\"AZ\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-176.json",
+    "sha256": "791ae60405d69169c35715308ed7c4317f064b384cdb3d3ed0143bbf87947453",
+    "utf8": "{\"id\":\"sqlite.insert\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":600300000,\"detail\":\"rows=1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-177.json",
+    "sha256": "143ac938b769c9aabdc1caf4600e63bc6aca0e95d6f34eabf69e61e60a079c1a",
+    "utf8": "{\"id\":\"sqlite.rollback\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":54251000,\"detail\":\"rows=0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-178.json",
+    "sha256": "1f8690afccea23faf1a4c7838dc55ce6461a2d69e43758dd9c9ce9376317b5f5",
+    "utf8": "{\"id\":\"sqlite.commit\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":37941000,\"detail\":\"rows=1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-179.json",
+    "sha256": "98faf5fdf208f71d3092463e9412841ceb598dfb03f6d2cdc704d16ec2fe4370",
+    "utf8": "{\"id\":\"sqlite.bind\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":109076000,\"detail\":\"bound string\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-18.json",
+    "sha256": "ce46788657e494cb487752162272c20c9e6002ac897cf888e4ff9e8b336367e6",
+    "utf8": "{\"id\":\"text.utf8\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":987000,\"detail\":\"4:226\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-180.json",
+    "sha256": "9132fa9d9d438862935937b217b44466a939aae734858ac75b6ca73d679e9def",
+    "utf8": "{\"id\":\"audio.minimum-buffer\",\"group\":\"Audio\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1508000,\"detail\":\"minimum=1920\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-181.json",
+    "sha256": "0fc52345acb9a9e6aef90ffe2c54ba977e7ca917d6527bd5e12042680700d082",
+    "utf8": "{\"id\":\"audio.pcm-write\",\"group\":\"Audio\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":259560000,\"detail\":\"bytes=1920\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-182.json",
+    "sha256": "ecae3ef7aaf94f65bcb45eac971377725e7ee026f7d839f4218722e2cd6138ad",
+    "utf8": "{\"id\":\"activity.roundtrip\",\"group\":\"Lifecycle\",\"kind\":\"integration\",\"status\":\"PASS\",\"elapsed_ns\":0,\"detail\":\"Actual child lifecycle=CSRPTD\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-183.json",
+    "sha256": "43ae131e5169418909f2e9caf0ca8b110f68841d1717fc5e0050578aa3f1a3e9",
+    "utf8": "{\"id\":\"activity.application\",\"group\":\"Lifecycle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":11138000,\"detail\":\"org.androswitch.conformance.Recorder\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-184.json",
+    "sha256": "f697dc27c89d61b452e4cc68b6debcdf871f97a3244b365c626be98694ddb47d",
+    "utf8": "{\"id\":\"activity.intent\",\"group\":\"Lifecycle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1742000,\"detail\":\"attached Intent\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-185.json",
+    "sha256": "7db4320d919b7484c66fbb21ca37dc1674490819514a05eed35216c991654ddf",
+    "utf8": "{\"id\":\"activity.handler-order\",\"group\":\"Lifecycle\",\"kind\":\"integration\",\"status\":\"PASS\",\"elapsed_ns\":0,\"detail\":\"Handler order=12\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-186.json",
+    "sha256": "5ceacae69a6afd37e54fb3605b53179de388ec0705712750ed48752c76b526cb",
+    "utf8": "{\"id\":\"jni.pointer-width\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":159590000,\"detail\":\"8\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-187.json",
+    "sha256": "2472ddbb534112536b0904d7b495ca396f139ccec7918cce0c778190d9c44a40",
+    "utf8": "{\"id\":\"jni.mixed-abi\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2231000,\"detail\":\"10.75\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-188.json",
+    "sha256": "67faf2d1abdc80d8b229061b52a658962d759d7fce42f758d227b0a499396590",
+    "utf8": "{\"id\":\"jni.string-utf8\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8690000,\"detail\":\"A\\u20acZ\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-189.json",
+    "sha256": "b6ea3ad6d6f4698e5ec01e0ac8ef10beb83f403e591531eef9f4e65d808749cc",
+    "utf8": "{\"id\":\"jni.array-copyback\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":21391000,\"detail\":\"2,-4,6\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-19.json",
+    "sha256": "e0bd1550f125b2e7093ff470c2d6e900efd874f39f9257ae49d1493fe9805bf2",
+    "utf8": "{\"id\":\"text.ascii\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4800000,\"detail\":\"3:67\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-190.json",
+    "sha256": "59e83458d1e4b7597e59dc8925a7cf3956c43df171204e20c80b41aa88a53347",
+    "utf8": "{\"id\":\"jni.exception\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":18933000,\"detail\":\"native-exception\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-191.json",
+    "sha256": "f64d70c1f9cc0b3fa32fcbb7e664eacc9cdf2fda173923f7603c616e8e9cb165",
+    "utf8": "{\"id\":\"jni.callback-gc\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":27545000,\"detail\":\"259\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-192.json",
+    "sha256": "9325957ad9c38df9d8c8d6c73cc42823e65b1e96386096074dccd8070114bde2",
+    "utf8": "{\"id\":\"jni.local-frame\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6551000,\"detail\":\"local frame\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-193.json",
+    "sha256": "2dbc15c7517afd090ffe72f828539f2a9f551ccd6b956ce624d517c3dbe5e871",
+    "utf8": "{\"id\":\"jni.thread-attach\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":25065000,\"detail\":\"21\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-194.json",
+    "sha256": "932951817eeac6c65272ba55dd13e28e3e08296aab97223dfe2f663ac640bd73",
+    "utf8": "{\"id\":\"jni.native-file-sharing\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":32583000,\"detail\":\"Java/native file shared\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-195.json",
+    "sha256": "daabf8f103377e645abe3926072b36e88b96ed43b93732776d59e33c8048079c",
+    "utf8": "{\"id\":\"native.monotonic\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6975000,\"detail\":\"monotonic\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-196.json",
+    "sha256": "a8999560380f0721f3ecc39ea630adf1bbefb427d89cf410a0a489e9e998513b",
+    "utf8": "{\"id\":\"native.clock-resolution\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":18002000,\"detail\":\"resolution=0:53\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-197.json",
+    "sha256": "4fc92bf775bf91eeb7ac47b0d31b02dc4406b4087486b5ce48cef681af464a43",
+    "utf8": "{\"id\":\"native.process-cpu-count\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":3115000,\"detail\":\"nativeOnlineProcessors=3\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-198.json",
+    "sha256": "2c5189bee9b575acd016f88b0870cb5de104f860b4bdfed52fde585213d43d37",
+    "utf8": "{\"id\":\"native.errno\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5854000,\"detail\":\"ENOENT\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-199.json",
+    "sha256": "1972eaaa4b419171020e4211365b6b04ccfba223bce802e29445fbf033d59090",
+    "utf8": "{\"id\":\"native.tls\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4842000,\"detail\":\"TLS roundtrip\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-2.json",
+    "sha256": "28fa173284da821e52de32dc76404cd68aa280e808ec20de89b01572ad762b9b",
+    "utf8": "{\"id\":\"dex.shift\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1460000,\"detail\":\"2147483647:2\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-20.json",
+    "sha256": "8217127323620a1410c418cee062cdbf6f49e1a955328d2c9d187a3ac231c626",
+    "utf8": "{\"id\":\"text.format\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":53136000,\"detail\":\"x:0007:%\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-200.json",
+    "sha256": "594592b66bb7649afbd0f2f543332bb9dd1f4df881b5945e388e404ebeee4a74",
+    "utf8": "{\"id\":\"native.malloc-realloc\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3925000,\"detail\":\"allocation preserved\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-201.json",
+    "sha256": "d2d6a40ce8168fb962b6e69ca76e7f65ab531c56f1eed907acc9f703efb13ff7",
+    "utf8": "{\"id\":\"native.locale-c\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2706000,\"detail\":\"decimal point .\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-202.json",
+    "sha256": "51dbf75ce4b0d452e0997cc417f2130a7c898a0320a5be5577c0c3b0771ea93c",
+    "utf8": "{\"id\":\"native.process-clock\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8666000,\"detail\":\"processCPU=184:881181927 work=9702991005100624961\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-203.json",
+    "sha256": "37934f3eeb3df4740f0c65394617cbebdc31da06e4ebd4e42d077c8d5e0167d7",
+    "utf8": "{\"id\":\"native.abi\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":13006000,\"detail\":\"pointer=8 long=8 wchar=4\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-204.json",
+    "sha256": "236a2cff027c2d52fa56438e72ca6dbe41d88f4e22f369e9c5d0288ef4a7cb8f",
+    "utf8": "{\"id\":\"gles.vendor\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":754074000,\"detail\":\"Mesa\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-205.json",
+    "sha256": "339ddcf584d7025141339020ef1f7f78c0dbfabf9046e471e281838114a90dfa",
+    "utf8": "{\"id\":\"gles.renderer\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":41465000,\"detail\":\"NV12B\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-206.json",
+    "sha256": "ba3ba9e1741667c021c5e072745a392208d6c0463413c0494e818b7f7a1bf415",
+    "utf8": "{\"id\":\"gles.version\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":29635000,\"detail\":\"OpenGL ES 3.2 Mesa 26.2.4 (git-0ff52079ca)\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-207.json",
+    "sha256": "5f7583ea6fb79e680fda1d0e4afc79b4e05273af36225b0d34cb86b26875faa8",
+    "utf8": "{\"id\":\"gles.extensions\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":28295000,\"detail\":\"GL_EXT_blend_minmax GL_EXT_multi_draw_arrays GL_EXT_texture_filter_anisotropic GL_EXT_texture_compression_s3tc GL_EXT_texture_compression_dxt1 GL_EXT_texture_compression_rgtc GL_EXT_texture_format_BGRA8888 GL_OES_compressed_ETC1_RGB8_texture GL_OES_depth24 GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_mapbuffer GL_OES_rgb8_rgba8 GL_OES_standard_derivatives GL_OES_stencil8 GL_OES_texture_3D GL_OES_texture_float GL_OES_texture_float_linear GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_texture_npot GL_OES_vertex_half_float GL_EXT_draw_instanced GL_EXT_texture_sRGB_decode GL_OES_EGL_image GL_OES_depth_texture GL_OES_packed_depth_stencil GL_EXT_texture_type_2_10_10_10_REV GL_NV_conditional_render GL_OES_get_program_binary GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_read_format_bgra GL_EXT_texture_storage GL_NV_pack_subimage GL_NV_texture_barrier GL_EXT_frag_depth GL_NV_fbo_color_attachments GL_OES_EGL_image_external GL_OES_EGL_sync GL_OES_vertex_array_object GL_OES_viewport_array GL_ANGLE_pack_reverse_row_order GL_ANGLE_texture_compression_dxt3 GL_ANGLE_texture_compression_dxt5 GL_EXT_occlusion_query_boolean GL_EXT_robustness GL_EXT_sRGB GL_EXT_texture_rg GL_EXT_unpack_subimage GL_NV_draw_buffers GL_NV_read_buffer GL_NV_read_depth GL_NV_read_depth_stencil GL_NV_read_stencil GL_APPLE_sync GL_EXT_draw_buffers GL_EXT_instanced_arrays GL_EXT_map_buffer_range GL_EXT_shadow_samplers GL_KHR_debug GL_KHR_robustness GL_KHR_texture_compression_astc_ldr GL_NV_generate_mipmap_sRGB GL_NV_pixel_buffer_object GL_OES_depth_texture_cube_map GL_OES_required_internalformat GL_OES_surfaceless_context GL_EXT_color_buffer_float GL_EXT_debug_label GL_EXT_sRGB_write_control GL_EXT_separate_shader_objects GL_EXT_shader_group_vote GL_EXT_shader_implicit_conversions GL_EXT_shader_integer_mix GL_EXT_tessellation_point_size GL_EXT_tessellation_shader GL_ANDROID_extension_pack_es31a GL_EXT_base_instance GL_EXT_compressed_ETC1_RGB8_sub_texture GL_EXT_copy_image GL_EXT_draw_buffers_indexe [truncated]\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-208.json",
+    "sha256": "de163ec13d1a80e5ebe4320bb4d53340605e1fe6339d9fee691a1ecb78f0ea93",
+    "utf8": "{\"id\":\"gles.clear-readback\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":463068000,\"detail\":\"rgba=255,0,0,255\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-209.json",
+    "sha256": "d752b43364ddcf5ad5b730057327f5b63a6349b6863d1498e0b342338b6d05c5",
+    "utf8": "{\"id\":\"gles.shader-valid\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":611440000,\"detail\":\"compile=1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-21.json",
+    "sha256": "2fc0c49d13f4bf11906bfa839fb03d9eeb5031f18ae01e7191b24346aeadae84",
+    "utf8": "{\"id\":\"text.index\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6592000,\"detail\":\"2:4\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-210.json",
+    "sha256": "e9c71fd402e9136f4a100ce03d67f24a76f9adde7014d43158506038c5f04ec2",
+    "utf8": "{\"id\":\"gles.shader-invalid\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":180704000,\"detail\":\"compile=0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-211.json",
+    "sha256": "dc613b2818de68295c648e3eac5a19da703133f2adcb7098c98b9a56986c8a29",
+    "utf8": "{\"id\":\"gles.buffer-roundtrip\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":44465000,\"detail\":\"bufferBytes=16\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-212.json",
+    "sha256": "c110d307c1525f3a0f3cbe6669c331e508765491ccce663e9f773c70805953ba",
+    "utf8": "{\"id\":\"gles.texture-framebuffer\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":130391000,\"detail\":\"fbo=36053 green=255\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-213.json",
+    "sha256": "1985473dbc02cbae804535ab2022673003f3e3cba20ae90c894ef029a7c45697",
+    "utf8": "{\"id\":\"vulkan.loader\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4973000,\"detail\":\"Vulkan Android entrypoint available; not a rendering pass\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-214.json",
+    "sha256": "380f93dfdb507727905fb7577fef56bd35bae227d07511c9d9d9a5834cd1803b",
+    "utf8": "{\"id\":\"vulkan.instance\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":93216000,\"detail\":\"instance created\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-215.json",
+    "sha256": "a4afb1a2ce426394cdd08dabf81e2efc0f8ac245b8ec32124e8259296f2a9e80",
+    "utf8": "{\"id\":\"vulkan.physical-device\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8910000,\"detail\":\"gpu=NVIDIA Tegra X1 (GM20B) (NVK GM20B) vendor=10de device=0fe0 api=4211042\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-216.json",
+    "sha256": "76977c9d34181a2b8b8f0625f58dffed38ada0f81dd7cfe60da7b01601049d61",
+    "utf8": "{\"id\":\"vulkan.queue-families\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":11603000,\"detail\":\"queueFamilies=1 graphics=0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-217.json",
+    "sha256": "dd0edc0640a93264da46130f4d6e0bcfcdc52b453141f3706540de0b979f8d98",
+    "utf8": "{\"id\":\"vulkan.logical-device\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":249652000,\"detail\":\"logical device created and destroyed; no queue work submitted\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-218.json",
+    "sha256": "636d998b63ebd73618afabd39d944aeb625c46f0c10d9eb13532bbeab28f5957",
+    "utf8": "{\"id\":\"vulkan.memory-heaps\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":7569000,\"detail\":\"heaps=1 types=2 advertisedBytes=2582642688\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-22.json",
+    "sha256": "c8b84882bd527ab337ba1a5433a1bec06f4682bbeb56ac02be247bd4baaedb71",
+    "utf8": "{\"id\":\"text.replace\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2400000,\"detail\":\"a+b+c\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-23.json",
+    "sha256": "c04014f8439644d6371942859cabed555c92f3d4f68ae82648e88d50192ea98d",
+    "utf8": "{\"id\":\"text.starts-ends\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5329000,\"detail\":\"true:true\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-24.json",
+    "sha256": "acc2e3f85dd9e6f80523151748a27f645e726dd6a623579b6c02d738934fb1c5",
+    "utf8": "{\"id\":\"text.null-append\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1855000,\"detail\":\"null\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-25.json",
+    "sha256": "55250ee8febf6df4aca76992ab0e080333aed679a6365fb6bdf1da13c2b204c6",
+    "utf8": "{\"id\":\"text.surrogate\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1642000,\"detail\":\"128512\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-26.json",
+    "sha256": "ff2a8230ffebf1dadd29def19b743fe23396c55d36df74bd00045257274abd04",
+    "utf8": "{\"id\":\"collections.arraylist\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":28146000,\"detail\":\"b:1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-27.json",
+    "sha256": "56e3577cb242104949cda8c41309625be35c79f89bad44591791c347bf0bc747",
+    "utf8": "{\"id\":\"collections.list-null\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4249000,\"detail\":\"true\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-28.json",
+    "sha256": "b0f2489b1074e793d9c8a4d868f9254f33fe5cd0a10e6140c1df54858456115f",
+    "utf8": "{\"id\":\"collections.list-iterator\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":10169000,\"detail\":\"8\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-29.json",
+    "sha256": "b400a183c8e9136c874841f7ab0bcd56c3c697c6bfe7f5eeb12278ab1f3b85b1",
+    "utf8": "{\"id\":\"collections.map\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":19320000,\"detail\":\"1:7\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-3.json",
+    "sha256": "8be0e0e71f8b9f466c9319b870c6b2a3b58264d2387757555efaa05b704372f8",
+    "utf8": "{\"id\":\"dex.long\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1707000,\"detail\":\"-9223372036854775808\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-30.json",
+    "sha256": "0fd134da395201e435bc8c2afb920d7e65e7ff8c51650ab51914c820a3db4718",
+    "utf8": "{\"id\":\"collections.set\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1564000,\"detail\":\"1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-31.json",
+    "sha256": "b1b19db1055e8b6056c366f5593f53c8d8e116e872a7c25cc09e524c233fecb0",
+    "utf8": "{\"id\":\"collections.cow-snapshot\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":66085000,\"detail\":\"a:false:2\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-32.json",
+    "sha256": "1b5b3ad9583a5eaa93090842e04848cb3c05aa935afb7caf869321b7d1bcbeca",
+    "utf8": "{\"id\":\"collections.cow-array-copy\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5316000,\"detail\":\"a\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-33.json",
+    "sha256": "ea010ee75b6fe43133d9ce4ca08ef66f97e7eab3ec1d6459176d5fdba1b1027a",
+    "utf8": "{\"id\":\"collections.cow-remove-unsupported\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2651000,\"detail\":\"unsupported\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-34.json",
+    "sha256": "8d4fe7cbcd39caef401db76a4d0cc3813566f7b72aaa8c4e8f052b4ed110ccd8",
+    "utf8": "{\"id\":\"collections.boxed-equals\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4795000,\"detail\":\"true:false\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-35.json",
+    "sha256": "65595d988ed07e31617fd1fac0d5e43a4e8d67d72d9ed8aff8220869b8c2d0e9",
+    "utf8": "{\"id\":\"collections.arraycopy\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":16293000,\"detail\":\"1:1:2:3\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-36.json",
+    "sha256": "98864a68c266e53d149dbfe18a81847408da94c8b08565e5e2cabe91f21932a7",
+    "utf8": "{\"id\":\"collections.array-clone\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1034000,\"detail\":\"1:9\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-37.json",
+    "sha256": "c6b5d071c618dd553a0d9d8dd7e34dbbf683d5cbcf84733022d91a9b4fb59d88",
+    "utf8": "{\"id\":\"collections.abstract-subclass\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":30785000,\"detail\":\"false:true\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-38.json",
+    "sha256": "eb872dc3dd50ee85e97419c8ddc1cfb19d8c87100a03b14516180b5ca4c551ee",
+    "utf8": "{\"id\":\"timeunit.ordinal.0\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8840000,\"detail\":\"NANOSECONDS:0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-39.json",
+    "sha256": "3b5edabb65677461350d794b5d6b895f99879811d51aa0c230be1bf5ca25abdf",
+    "utf8": "{\"id\":\"timeunit.ordinal.1\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1103000,\"detail\":\"MICROSECONDS:1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-4.json",
+    "sha256": "4ef2bad3fa797d51e077da483ec3722773df60d254a87815ad1d9a68fa22df35",
+    "utf8": "{\"id\":\"dex.loop\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":567000,\"detail\":\"4950\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-40.json",
+    "sha256": "ff5c9ed009eee2dba65d42a32a268011815781fb206e5b01d53b258bd850d357",
+    "utf8": "{\"id\":\"timeunit.ordinal.2\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1196000,\"detail\":\"MILLISECONDS:2\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-41.json",
+    "sha256": "923d5d2b759aaa9600484d18beadd5876c441994df1496e3d53397e9edb7f51c",
+    "utf8": "{\"id\":\"timeunit.ordinal.3\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1021000,\"detail\":\"SECONDS:3\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-42.json",
+    "sha256": "ef26cc1aa0fa98ce693c05b2a457672130339ea23809ee1494cd13135de9b4d5",
+    "utf8": "{\"id\":\"timeunit.ordinal.4\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1213000,\"detail\":\"MINUTES:4\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-43.json",
+    "sha256": "f026ddac0a3a4546713d28c91a231ff6a0fa9e4be48455077a85151199827d73",
+    "utf8": "{\"id\":\"timeunit.ordinal.5\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2254000,\"detail\":\"HOURS:5\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-44.json",
+    "sha256": "9a852c3c4649be4bc8c4bc46ab9bbf477dce3d6da0e191ae5af66273a9a4dd4d",
+    "utf8": "{\"id\":\"timeunit.ordinal.6\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":868000,\"detail\":\"DAYS:6\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-45.json",
+    "sha256": "f95d46d8d212aa0e3773e8130154388c84f6f216332258d0f7812506e4c2b840",
+    "utf8": "{\"id\":\"timeunit.convert.nanoseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6684000,\"detail\":\"123456789\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-46.json",
+    "sha256": "7e482551997a88c1ec1b9e7f75d988bccc26e801f5e835233c398ef67d07cbcd",
+    "utf8": "{\"id\":\"timeunit.convert.nanoseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":797000,\"detail\":\"0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-47.json",
+    "sha256": "0f1129bfe7571adf7d148f92b41cd623867cf6800a5bbff22f94bc4987548ce5",
+    "utf8": "{\"id\":\"timeunit.convert.nanoseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2114000,\"detail\":\"0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-48.json",
+    "sha256": "2cb9d3f879b4b37bab7699e50e4d4494694766ff64f37d34f8e4b03b6d63ae15",
+    "utf8": "{\"id\":\"timeunit.convert.microseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1617000,\"detail\":\"123456789000\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-49.json",
+    "sha256": "76d4a13cd284d03be646a6bc38f4010282630321e9dad03cf5f467d0de059d7d",
+    "utf8": "{\"id\":\"timeunit.convert.microseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":463000,\"detail\":\"123\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-5.json",
+    "sha256": "ac44606abeed55f19ca76f1d6d2beb1d751c3a6172f121596e712108a537191a",
+    "utf8": "{\"id\":\"dex.switch\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1114000,\"detail\":\"seven\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-50.json",
+    "sha256": "f95bff0cd8544741dbb381588a57ac4246f59cce11f2f4568a03d10c25ff73df",
+    "utf8": "{\"id\":\"timeunit.convert.microseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":502000,\"detail\":\"0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-51.json",
+    "sha256": "de0faea0bdb53ced4d55b533dda71d02843faf38f728876d38ccca3f7678e021",
+    "utf8": "{\"id\":\"timeunit.convert.milliseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3201000,\"detail\":\"123456789000000\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-52.json",
+    "sha256": "56d254e871097a61a7e2abaf7f25b6ef009587ed73d33c3449a94e2b02cd34da",
+    "utf8": "{\"id\":\"timeunit.convert.milliseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1072000,\"detail\":\"123456\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-53.json",
+    "sha256": "00b37ec98839d1da6203c693329f947921792b51b667ae021ab0cbb5715b12aa",
+    "utf8": "{\"id\":\"timeunit.convert.milliseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":538000,\"detail\":\"1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-54.json",
+    "sha256": "0f4b7a32b4d10ac99f18bf1a766483f6f505ab500a1202fe8da43c19fb6d627d",
+    "utf8": "{\"id\":\"timeunit.convert.seconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1509000,\"detail\":\"123456789000000000\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-55.json",
+    "sha256": "ec1c989a613a4d0912aa6284889d90a527f4aef7da7abf49065642ee14252def",
+    "utf8": "{\"id\":\"timeunit.convert.seconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1677000,\"detail\":\"123456789\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-56.json",
+    "sha256": "37e76d14fdc3cab131c853329b54f85205fe29476aef0897a1bb44bfc811705b",
+    "utf8": "{\"id\":\"timeunit.convert.seconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":588000,\"detail\":\"1428\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-57.json",
+    "sha256": "a0a8b5a3533dd521bb8c3381489251d5ea8829f4caa0cb85f529e292d44c26e3",
+    "utf8": "{\"id\":\"timeunit.convert.minutes.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1390000,\"detail\":\"7407407340000000000\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-58.json",
+    "sha256": "9f955448afaeb4cd5234d4cace3a4f44ceb4289aab1bda51830cf1cca7720cec",
+    "utf8": "{\"id\":\"timeunit.convert.minutes.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1739000,\"detail\":\"7407407340\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-59.json",
+    "sha256": "c53f2ed47e5b8c6fbd9f361f675747ca0a85d6aa59ff9fead2ec7eac77eb0198",
+    "utf8": "{\"id\":\"timeunit.convert.minutes.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":614000,\"detail\":\"85733\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-6.json",
+    "sha256": "f958b580a9007197d50f8e98925f31e11127ee2be16cbfd6f56091f27943427f",
+    "utf8": "{\"id\":\"dex.double\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8824000,\"detail\":\"3.75\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-60.json",
+    "sha256": "cca669ea6724ae7dd6b5473cca4a45be3dc17507ea7e966ebcea2d30f56086b1",
+    "utf8": "{\"id\":\"timeunit.convert.hours.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":879000,\"detail\":\"9223372036854775807\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-61.json",
+    "sha256": "29a950b9abdc3122984a5a9a1576af320ca909467b69b9d2151d435b54c0232f",
+    "utf8": "{\"id\":\"timeunit.convert.hours.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":797000,\"detail\":\"444444440400\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-62.json",
+    "sha256": "89e23a4a955b5164a66015386d49c1ca497604c175d5f7616c46ad38387f9349",
+    "utf8": "{\"id\":\"timeunit.convert.hours.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":568000,\"detail\":\"5144032\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-63.json",
+    "sha256": "256ff5ab64ec1adb814bc02ea0e0f6759238c31f80cc1df2761d123bece60b23",
+    "utf8": "{\"id\":\"timeunit.convert.days.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":809000,\"detail\":\"9223372036854775807\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-64.json",
+    "sha256": "df46a9d1f37f0d94b61415e5c3b448ebe31cf9585fc4c6f53dde6ddf02229a27",
+    "utf8": "{\"id\":\"timeunit.convert.days.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1336000,\"detail\":\"10666666569600\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-65.json",
+    "sha256": "40757b65f6bb648ad8ff0d877e205e7e2df6510e06dbdfdbc19b3b00bc894122",
+    "utf8": "{\"id\":\"timeunit.convert.days.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":692000,\"detail\":\"123456789\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-66.json",
+    "sha256": "6d20e8a597ce37a2159daf47876373ae1dbaf898a09dc5cc875062f63035cc4c",
+    "utf8": "{\"id\":\"timeunit.saturation\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2510000,\"detail\":\"9223372036854775807\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-67.json",
+    "sha256": "823177e16da6ff80be715df94114a95d7cc99971bda922ac261211efe9f9b140",
+    "utf8": "{\"id\":\"exceptions.throw-catch\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":28888000,\"detail\":\"detail\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-68.json",
+    "sha256": "945862d788b70eef2e128b60d71438a7cf757299a873d1347c51063ee0ef8134",
+    "utf8": "{\"id\":\"exceptions.finally\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":452000,\"detail\":\"5\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-69.json",
+    "sha256": "33e8e5500de2e30cd739191e73b8ee07e2eca074bddd5622e6e0703f5f3479f2",
+    "utf8": "{\"id\":\"exceptions.null\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":443000,\"detail\":\"null\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-7.json",
+    "sha256": "99f22f7d0070755762b7bc0d169f5b8daf2ef12f22793ea5cd1ae0aecf8cd9f2",
+    "utf8": "{\"id\":\"dex.nan\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":429000,\"detail\":\"true\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-70.json",
+    "sha256": "cf75315c665e870ff605f646543f3d2b5de488cfff2fe98d56248bb9ec05f49a",
+    "utf8": "{\"id\":\"exceptions.cast\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":418000,\"detail\":\"cast\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-71.json",
+    "sha256": "7a2738d3b2a164a2ef76e17c0f81a512c6f9abb61207331bf2bf6cf6c2106afc",
+    "utf8": "{\"id\":\"exceptions.message\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1831000,\"detail\":\"true\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-72.json",
+    "sha256": "8b7af4b8d993c6259e7e1c1b8348016f2c5c19be5b2b93d72cc94a29c28c2819",
+    "utf8": "{\"id\":\"reflection.name\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7341000,\"detail\":\"org.androswitch.conformance.PureCases\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-73.json",
+    "sha256": "da9576d72e57e9344b506d569ddc1bbbf0748ff1b5a6e7cbfb1d6b5f0900c731",
+    "utf8": "{\"id\":\"reflection.interface\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1123000,\"detail\":\"true\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-74.json",
+    "sha256": "2fb74de06789a3a5e32a5ef77aef12edb9b5f1b95e57f20400aa6a051c8b3f3d",
+    "utf8": "{\"id\":\"reflection.assignable\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3499000,\"detail\":\"true:false\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-75.json",
+    "sha256": "1ab5f2dc8a372d382f1962505a84e07d68e6c52205cc61b09dd2cfd6931b61dc",
+    "utf8": "{\"id\":\"reflection.field-static\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":51226000,\"detail\":\"61\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-76.json",
+    "sha256": "2ca73faf2c94ab0f63be076fd00eea3af93a3532ddc6523529c0aec1fdcad988",
+    "utf8": "{\"id\":\"reflection.field-instance\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":17172000,\"detail\":\"field\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-77.json",
+    "sha256": "d448ac171afb913ef037be145ed16a46ddfb15c1a0b2bd2e5a89f12f75a7c9c7",
+    "utf8": "{\"id\":\"reflection.private\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3581000,\"detail\":\"47\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-78.json",
+    "sha256": "8eba81897684639cc7c0996f59d9f6df95c93db2c4a12eb946cca4981d0d2092",
+    "utf8": "{\"id\":\"reflection.missing\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2649000,\"detail\":\"missing\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-79.json",
+    "sha256": "99685dc1067636115832b34325d084b32202156ce8ec5ccb86aa4d80037731b9",
+    "utf8": "{\"id\":\"reflection.widening\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2156000,\"detail\":\"12\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-8.json",
+    "sha256": "89431ef874ef3d76333b10e7b2f0cdace6243570d442cbfdacc362eb3ccacfc3",
+    "utf8": "{\"id\":\"dex.signed-zero\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":408000,\"detail\":\"true\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-80.json",
+    "sha256": "5c3cae49a1a14ea46719f91f7ae9d960b0de886fc4707e2b8d4a3b67f20dd8cb",
+    "utf8": "{\"id\":\"reflection.method\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":21949000,\"detail\":\"hi you\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-81.json",
+    "sha256": "8006dea95bed9140c04061c64dfd7921b777bd1314d2219b349804004606d139",
+    "utf8": "{\"id\":\"threads.initial\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":18892000,\"detail\":\"7\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-82.json",
+    "sha256": "8aa49c4287fb4deeb3adbaf8f8d219a7db21ad0b1139afdb61fd1726a7f74c7a",
+    "utf8": "{\"id\":\"threads.stored-null\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2438000,\"detail\":\"true\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-83.json",
+    "sha256": "94416dc17e2040dbdc94635469c4a3917b1799d73418bae85f70e4d8cf6d75f4",
+    "utf8": "{\"id\":\"threads.remove\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7848000,\"detail\":\"7\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-84.json",
+    "sha256": "b4b061d9ed2c5a8693eadb466eaf1830ebfca5c44c9dd3a12a4dcfd4a7f30ccc",
+    "utf8": "{\"id\":\"threads.monitor\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3184000,\"detail\":\"reentrant\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-85.json",
+    "sha256": "f3fbccc21604886658d253a577b198fe10fe9229ccdd87743403bbf990d0e58d",
+    "utf8": "{\"id\":\"threads.atomic\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1899000,\"detail\":\"true:true\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-86.json",
+    "sha256": "0fad63c461df0e57eea3e1cde11910717cdfba522647195ba4b1776bd2ebfb4a",
+    "utf8": "{\"id\":\"math.abs.-3\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2669000,\"detail\":\"3\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-87.json",
+    "sha256": "bae870f38b89e09991925bf23bf49df6dd28e493657d685509a31dc501963a8a",
+    "utf8": "{\"id\":\"math.abs.-1\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":393000,\"detail\":\"1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-88.json",
+    "sha256": "e80d8be9d808433749b07caa98c9c6e4598e46257d5931eea25e0edb73c3bca7",
+    "utf8": "{\"id\":\"math.abs.0\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":704000,\"detail\":\"0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-89.json",
+    "sha256": "25510beddad0d38ced7f97b8867400f62765633d6b387afdf304bb39e3e1d977",
+    "utf8": "{\"id\":\"math.abs.1\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1475000,\"detail\":\"1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-9.json",
+    "sha256": "ff8f1c1ef25dd27ab7e6ee854d389871f9efb245ce03027b22ac98ab27022caf",
+    "utf8": "{\"id\":\"dex.cast\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1563000,\"detail\":\"-3\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-90.json",
+    "sha256": "36e13f0d7c553ac12843c315f25e2cf546331ce269961ecf4ff54c29edfecacc",
+    "utf8": "{\"id\":\"math.abs.3\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":432000,\"detail\":\"3\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-91.json",
+    "sha256": "dc14bb2dfd4463d17aac394420ec35882faad962ec47444083c92979de0c550f",
+    "utf8": "{\"id\":\"numbers.hex.0\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1295000,\"detail\":\"0\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-92.json",
+    "sha256": "ec2d1d35c13c535314c24e6d9c1dd73f2b980eaa1c9e9ea838a0a00fdd64b9ab",
+    "utf8": "{\"id\":\"numbers.hex.1\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":386000,\"detail\":\"1\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-93.json",
+    "sha256": "44caee895b05f4b840d12c5fa6f5e71128c660b3e9b98dfbeef438eea96fe0f0",
+    "utf8": "{\"id\":\"numbers.hex.127\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":417000,\"detail\":\"7f\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-94.json",
+    "sha256": "15a00a36401a7732b9490ed1853344fbe1d8bde82a6c42a149ebf3df0cefab30",
+    "utf8": "{\"id\":\"numbers.hex.128\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":410000,\"detail\":\"80\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-95.json",
+    "sha256": "95cc11a6c8acc4c5d7f325f13c9542f46bebb9cd2d2fdde683f5eadca8e995ac",
+    "utf8": "{\"id\":\"numbers.hex.255\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1065000,\"detail\":\"ff\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-96.json",
+    "sha256": "a66cf568a293e9f8ddb5743b097eb9a82dd2b13f09b5d0c51ade85972e8e021f",
+    "utf8": "{\"id\":\"numbers.hex.32767\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1742000,\"detail\":\"7fff\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-97.json",
+    "sha256": "dff9c838864b3dce592ef198e8341d35492795f1ae6c44ccba5a34869e10bbeb",
+    "utf8": "{\"id\":\"cpu.available\",\"group\":\"CPU\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8814000,\"detail\":\"allowedProcessors=3\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-98.json",
+    "sha256": "e888ada49bacd31fbffaf885c7fad0e603d028235c4607a31d117580de6c0db6",
+    "utf8": "{\"id\":\"cpu.singleton-gc\",\"group\":\"CPU\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":131130000,\"detail\":\"same Runtime\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/case-99.json",
+    "sha256": "f82b5a209e430e4e4d5c04190488fc21a80efc382ad27bd4191a0057d88882a3",
+    "utf8": "{\"id\":\"host.cpu.allowed_mask\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8661000,\"detail\":\"0x0000000000000007\"}"
+  },
+  {
+    "path": "conformance/0778a8ded891/history-1793012428404.json",
+    "sha256": "3751572b9a855e979342d8fcbfb679d296fd8fc70dc7336a36004494d8903764",
+    "utf8": "{\"schema_version\":1,\"suite\":\"AndroSwitch Conformance\",\"suite_revision\":1,\"coverage_scope\":\"Declared catalog only; not all Android or a CTS certification\",\"reference_api\":26,\"sensor_tests\":false,\"total\":219,\"catalog_sha256\":\"0778a8ded8917482b38aa7d9046e286f417c6e4ddc857be989718e65c3e69864\",\"next\":219,\"cases\":[{\"id\":\"dex.overflow\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":14236000,\"detail\":\"-2147483648\"},{\"id\":\"dex.division\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1284000,\"detail\":\"-5:-2\"},{\"id\":\"dex.shift\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1460000,\"detail\":\"2147483647:2\"},{\"id\":\"dex.long\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1707000,\"detail\":\"-9223372036854775808\"},{\"id\":\"dex.loop\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":567000,\"detail\":\"4950\"},{\"id\":\"dex.switch\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1114000,\"detail\":\"seven\"},{\"id\":\"dex.double\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8824000,\"detail\":\"3.75\"},{\"id\":\"dex.nan\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":429000,\"detail\":\"true\"},{\"id\":\"dex.signed-zero\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":408000,\"detail\":\"true\"},{\"id\":\"dex.cast\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1563000,\"detail\":\"-3\"},{\"id\":\"dex.bounds\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6632000,\"detail\":\"bounds\"},{\"id\":\"dex.division-zero\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3861000,\"detail\":\"arithmetic\"},{\"id\":\"text.utf16-length\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":412000,\"detail\":\"4\"},{\"id\":\"text.substring\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8355000,\"detail\":\"bc\"},{\"id\":\"text.char-at\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":484000,\"detail\":\"8364\"},{\"id\":\"text.equals\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5888000,\"detail\":\"true\"},{\"id\":\"text.builder-char\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1726000,\"detail\":\"x,true42\"},{\"id\":\"text.buffer\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1186000,\"detail\":\"one2\"},{\"id\":\"text.utf8\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":987000,\"detail\":\"4:226\"},{\"id\":\"text.ascii\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4800000,\"detail\":\"3:67\"},{\"id\":\"text.format\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":53136000,\"detail\":\"x:0007:%\"},{\"id\":\"text.index\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6592000,\"detail\":\"2:4\"},{\"id\":\"text.replace\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2400000,\"detail\":\"a+b+c\"},{\"id\":\"text.starts-ends\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5329000,\"detail\":\"true:true\"},{\"id\":\"text.null-append\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1855000,\"detail\":\"null\"},{\"id\":\"text.surrogate\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1642000,\"detail\":\"128512\"},{\"id\":\"collections.arraylist\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":28146000,\"detail\":\"b:1\"},{\"id\":\"collections.list-null\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4249000,\"detail\":\"true\"},{\"id\":\"collections.list-iterator\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":10169000,\"detail\":\"8\"},{\"id\":\"collections.map\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":19320000,\"detail\":\"1:7\"},{\"id\":\"collections.set\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1564000,\"detail\":\"1\"},{\"id\":\"collections.cow-snapshot\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":66085000,\"detail\":\"a:false:2\"},{\"id\":\"collections.cow-array-copy\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5316000,\"detail\":\"a\"},{\"id\":\"collections.cow-remove-unsupported\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2651000,\"detail\":\"unsupported\"},{\"id\":\"collections.boxed-equals\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4795000,\"detail\":\"true:false\"},{\"id\":\"collections.arraycopy\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":16293000,\"detail\":\"1:1:2:3\"},{\"id\":\"collections.array-clone\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1034000,\"detail\":\"1:9\"},{\"id\":\"collections.abstract-subclass\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":30785000,\"detail\":\"false:true\"},{\"id\":\"timeunit.ordinal.0\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8840000,\"detail\":\"NANOSECONDS:0\"},{\"id\":\"timeunit.ordinal.1\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1103000,\"detail\":\"MICROSECONDS:1\"},{\"id\":\"timeunit.ordinal.2\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1196000,\"detail\":\"MILLISECONDS:2\"},{\"id\":\"timeunit.ordinal.3\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1021000,\"detail\":\"SECONDS:3\"},{\"id\":\"timeunit.ordinal.4\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1213000,\"detail\":\"MINUTES:4\"},{\"id\":\"timeunit.ordinal.5\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2254000,\"detail\":\"HOURS:5\"},{\"id\":\"timeunit.ordinal.6\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":868000,\"detail\":\"DAYS:6\"},{\"id\":\"timeunit.convert.nanoseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6684000,\"detail\":\"123456789\"},{\"id\":\"timeunit.convert.nanoseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":797000,\"detail\":\"0\"},{\"id\":\"timeunit.convert.nanoseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2114000,\"detail\":\"0\"},{\"id\":\"timeunit.convert.microseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1617000,\"detail\":\"123456789000\"},{\"id\":\"timeunit.convert.microseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":463000,\"detail\":\"123\"},{\"id\":\"timeunit.convert.microseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":502000,\"detail\":\"0\"},{\"id\":\"timeunit.convert.milliseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3201000,\"detail\":\"123456789000000\"},{\"id\":\"timeunit.convert.milliseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1072000,\"detail\":\"123456\"},{\"id\":\"timeunit.convert.milliseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":538000,\"detail\":\"1\"},{\"id\":\"timeunit.convert.seconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1509000,\"detail\":\"123456789000000000\"},{\"id\":\"timeunit.convert.seconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1677000,\"detail\":\"123456789\"},{\"id\":\"timeunit.convert.seconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":588000,\"detail\":\"1428\"},{\"id\":\"timeunit.convert.minutes.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1390000,\"detail\":\"7407407340000000000\"},{\"id\":\"timeunit.convert.minutes.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1739000,\"detail\":\"7407407340\"},{\"id\":\"timeunit.convert.minutes.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":614000,\"detail\":\"85733\"},{\"id\":\"timeunit.convert.hours.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":879000,\"detail\":\"9223372036854775807\"},{\"id\":\"timeunit.convert.hours.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":797000,\"detail\":\"444444440400\"},{\"id\":\"timeunit.convert.hours.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":568000,\"detail\":\"5144032\"},{\"id\":\"timeunit.convert.days.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":809000,\"detail\":\"9223372036854775807\"},{\"id\":\"timeunit.convert.days.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1336000,\"detail\":\"10666666569600\"},{\"id\":\"timeunit.convert.days.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":692000,\"detail\":\"123456789\"},{\"id\":\"timeunit.saturation\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2510000,\"detail\":\"9223372036854775807\"},{\"id\":\"exceptions.throw-catch\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":28888000,\"detail\":\"detail\"},{\"id\":\"exceptions.finally\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":452000,\"detail\":\"5\"},{\"id\":\"exceptions.null\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":443000,\"detail\":\"null\"},{\"id\":\"exceptions.cast\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":418000,\"detail\":\"cast\"},{\"id\":\"exceptions.message\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1831000,\"detail\":\"true\"},{\"id\":\"reflection.name\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7341000,\"detail\":\"org.androswitch.conformance.PureCases\"},{\"id\":\"reflection.interface\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1123000,\"detail\":\"true\"},{\"id\":\"reflection.assignable\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3499000,\"detail\":\"true:false\"},{\"id\":\"reflection.field-static\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":51226000,\"detail\":\"61\"},{\"id\":\"reflection.field-instance\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":17172000,\"detail\":\"field\"},{\"id\":\"reflection.private\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3581000,\"detail\":\"47\"},{\"id\":\"reflection.missing\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2649000,\"detail\":\"missing\"},{\"id\":\"reflection.widening\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2156000,\"detail\":\"12\"},{\"id\":\"reflection.method\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":21949000,\"detail\":\"hi you\"},{\"id\":\"threads.initial\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":18892000,\"detail\":\"7\"},{\"id\":\"threads.stored-null\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2438000,\"detail\":\"true\"},{\"id\":\"threads.remove\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7848000,\"detail\":\"7\"},{\"id\":\"threads.monitor\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3184000,\"detail\":\"reentrant\"},{\"id\":\"threads.atomic\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1899000,\"detail\":\"true:true\"},{\"id\":\"math.abs.-3\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2669000,\"detail\":\"3\"},{\"id\":\"math.abs.-1\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":393000,\"detail\":\"1\"},{\"id\":\"math.abs.0\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":704000,\"detail\":\"0\"},{\"id\":\"math.abs.1\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1475000,\"detail\":\"1\"},{\"id\":\"math.abs.3\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":432000,\"detail\":\"3\"},{\"id\":\"numbers.hex.0\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1295000,\"detail\":\"0\"},{\"id\":\"numbers.hex.1\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":386000,\"detail\":\"1\"},{\"id\":\"numbers.hex.127\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":417000,\"detail\":\"7f\"},{\"id\":\"numbers.hex.128\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":410000,\"detail\":\"80\"},{\"id\":\"numbers.hex.255\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1065000,\"detail\":\"ff\"},{\"id\":\"numbers.hex.32767\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1742000,\"detail\":\"7fff\"},{\"id\":\"cpu.available\",\"group\":\"CPU\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8814000,\"detail\":\"allowedProcessors=3\"},{\"id\":\"cpu.singleton-gc\",\"group\":\"CPU\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":131130000,\"detail\":\"same Runtime\"},{\"id\":\"host.cpu.allowed_mask\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8661000,\"detail\":\"0x0000000000000007\"},{\"id\":\"host.cpu.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"},{\"id\":\"host.gpu.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"},{\"id\":\"host.memory.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"},{\"id\":\"host.tick.frequency_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":967000,\"detail\":\"19200000\"},{\"id\":\"host.os.name\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":542000,\"detail\":\"Horizon\"},{\"id\":\"host.os.version\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":683000,\"detail\":\"3.0.0\"},{\"id\":\"host.renderer.backend\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2250000,\"detail\":\"Horizon Mesa EGL/GLES2 + NVK Vulkan\"},{\"id\":\"build.model\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":14723000,\"detail\":\"AndroSwitch\"},{\"id\":\"build.manufacturer\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2276000,\"detail\":\"AndroSwitch\"},{\"id\":\"build.brand\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1906000,\"detail\":\"androswitch\"},{\"id\":\"build.device\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":713000,\"detail\":\"androswitch\"},{\"id\":\"build.product\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1504000,\"detail\":\"androswitch_horizon\"},{\"id\":\"build.board\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":765000,\"detail\":\"horizon\"},{\"id\":\"build.hardware\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2530000,\"detail\":\"horizon\"},{\"id\":\"build.id\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":981000,\"detail\":\"AS26\"},{\"id\":\"build.display\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1382000,\"detail\":\"AndroSwitch API26 compatibility profile v1\"},{\"id\":\"build.fingerprint\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1512000,\"detail\":\"androswitch/horizon/androswitch:8.0.0/AS26/0.1.0:eng/test-keys\"},{\"id\":\"build.type\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":3215000,\"detail\":\"eng\"},{\"id\":\"build.tags\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1843000,\"detail\":\"test-keys\"},{\"id\":\"build.user\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1095000,\"detail\":\"androswitch\"},{\"id\":\"build.host\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4880000,\"detail\":\"horizon\"},{\"id\":\"build.time\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1790000,\"detail\":\"buildTime=0\"},{\"id\":\"build.abis\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4241000,\"detail\":\"arm64-v8a count=1\"},{\"id\":\"build.version.release\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2207000,\"detail\":\"8.0.0\"},{\"id\":\"build.version.incremental\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1400000,\"detail\":\"0.1.0-dev\"},{\"id\":\"build.version.codename\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":867000,\"detail\":\"REL\"},{\"id\":\"build.version.base_os\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":458000,\"detail\":\"\"},{\"id\":\"build.version.security_patch\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1892000,\"detail\":\"\"},{\"id\":\"build.version.sdk\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1855000,\"detail\":\"guestAPI=26\"},{\"id\":\"build.version.preview\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1065000,\"detail\":\"preview=0\"},{\"id\":\"clock.wall\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1324000,\"detail\":\"1793011298244\"},{\"id\":\"clock.nano\",\"group\":\"Clock\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":423000,\"detail\":\"3000\"},{\"id\":\"clock.elapsed\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1758000,\"detail\":\"296576\"},{\"id\":\"clock.uptime\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":866000,\"detail\":\"299605\"},{\"id\":\"display.metrics\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":12785000,\"detail\":\"1280x720 density=2\"},{\"id\":\"display.configuration\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8613000,\"detail\":\"orientation=2 density=320 dp=640x360\"},{\"id\":\"display.rotation\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8378000,\"detail\":\"rotation=0\"},{\"id\":\"display.requested-orientation\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2026000,\"detail\":\"requested=-1\"},{\"id\":\"display.landscape\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6548000,\"detail\":\"landscape requested; physical rotation is separate\"},{\"id\":\"display.portrait\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2984000,\"detail\":\"portrait requested; physical rotation is separate\"},{\"id\":\"display.window\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2392000,\"detail\":\"window and decor\"},{\"id\":\"display.keep-screen-on\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3284000,\"detail\":\"read/write window flags\"},{\"id\":\"package.identity\",\"group\":\"Package\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2622000,\"detail\":\"org.androswitch.conformance\"},{\"id\":\"package.info\",\"group\":\"Package\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":38211000,\"detail\":\"0.1.0/1\"},{\"id\":\"package.apk-stream\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6518000,\"detail\":\"PK\"},{\"id\":\"package.missing\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3854000,\"detail\":\"NameNotFoundException\"},{\"id\":\"package.assets\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":25675000,\"detail\":\"AS asset\"},{\"id\":\"storage.write-read\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":12724000,\"detail\":\"3,7,11,EOF\"},{\"id\":\"storage.append\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":9570000,\"detail\":\"1,2\"},{\"id\":\"storage.name-parent\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7375000,\"detail\":\"/data/user/0/org.androswitch.conformance/files\"},{\"id\":\"storage.mkdir\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6600000,\"detail\":\"/data/user/0/org.androswitch.conformance/files/nested/a\"},{\"id\":\"storage.delete\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4377000,\"detail\":\"deleted\"},{\"id\":\"storage.random-access\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":22697000,\"detail\":\"seek/read\"},{\"id\":\"preferences.int\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":75042000,\"detail\":\"committed\"},{\"id\":\"preferences.long\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":11843000,\"detail\":\"committed\"},{\"id\":\"preferences.boolean\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":17873000,\"detail\":\"committed\"},{\"id\":\"preferences.float\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":141150000,\"detail\":\"committed\"},{\"id\":\"preferences.string\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":23725000,\"detail\":\"escaped string\"},{\"id\":\"preferences.remove\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":45169000,\"detail\":\"removed\"},{\"id\":\"preferences.clear\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":39241000,\"detail\":\"cleared\"},{\"id\":\"bundle.int\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6437000,\"detail\":\"int\"},{\"id\":\"bundle.long\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4443000,\"detail\":\"long\"},{\"id\":\"bundle.boolean\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":955000,\"detail\":\"boolean\"},{\"id\":\"bundle.float\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4144000,\"detail\":\"float\"},{\"id\":\"bundle.double\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3828000,\"detail\":\"double\"},{\"id\":\"bundle.byte\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":704000,\"detail\":\"byte\"},{\"id\":\"bundle.short\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":896000,\"detail\":\"short\"},{\"id\":\"bundle.char\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":721000,\"detail\":\"char\"},{\"id\":\"bundle.string\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":954000,\"detail\":\"value\"},{\"id\":\"bundle.default\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":672000,\"detail\":\"91\"},{\"id\":\"bundle.nested\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":129200000,\"detail\":\"7\"},{\"id\":\"ui.view-context\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4597000,\"detail\":\"actual Context\"},{\"id\":\"ui.textview\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2175000,\"detail\":\"test\"},{\"id\":\"ui.button\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1577000,\"detail\":\"401/button\"},{\"id\":\"ui.input-connection\",\"group\":\"Input\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":37250000,\"detail\":\"aXd\"},{\"id\":\"ui.editable-utf16\",\"group\":\"Input\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3473000,\"detail\":\"AZ\"},{\"id\":\"sqlite.insert\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":600300000,\"detail\":\"rows=1\"},{\"id\":\"sqlite.rollback\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":54251000,\"detail\":\"rows=0\"},{\"id\":\"sqlite.commit\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":37941000,\"detail\":\"rows=1\"},{\"id\":\"sqlite.bind\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":109076000,\"detail\":\"bound string\"},{\"id\":\"audio.minimum-buffer\",\"group\":\"Audio\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1508000,\"detail\":\"minimum=1920\"},{\"id\":\"audio.pcm-write\",\"group\":\"Audio\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":259560000,\"detail\":\"bytes=1920\"},{\"id\":\"activity.roundtrip\",\"group\":\"Lifecycle\",\"kind\":\"integration\",\"status\":\"INTERRUPTED\",\"elapsed_ns\":0,\"detail\":\"Previous execution ended before a result. See runtime session report for actual cause.\"},{\"id\":\"activity.application\",\"group\":\"Lifecycle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":15026000,\"detail\":\"org.androswitch.conformance.Recorder\"},{\"id\":\"activity.intent\",\"group\":\"Lifecycle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3322000,\"detail\":\"attached Intent\"},{\"id\":\"activity.handler-order\",\"group\":\"Lifecycle\",\"kind\":\"integration\",\"status\":\"PASS\",\"elapsed_ns\":0,\"detail\":\"Handler order=12\"},{\"id\":\"jni.pointer-width\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":159590000,\"detail\":\"8\"},{\"id\":\"jni.mixed-abi\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2231000,\"detail\":\"10.75\"},{\"id\":\"jni.string-utf8\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8690000,\"detail\":\"A\\u20acZ\"},{\"id\":\"jni.array-copyback\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":21391000,\"detail\":\"2,-4,6\"},{\"id\":\"jni.exception\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":18933000,\"detail\":\"native-exception\"},{\"id\":\"jni.callback-gc\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":27545000,\"detail\":\"259\"},{\"id\":\"jni.local-frame\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6551000,\"detail\":\"local frame\"},{\"id\":\"jni.thread-attach\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":25065000,\"detail\":\"21\"},{\"id\":\"jni.native-file-sharing\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":32583000,\"detail\":\"Java/native file shared\"},{\"id\":\"native.monotonic\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6975000,\"detail\":\"monotonic\"},{\"id\":\"native.clock-resolution\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":18002000,\"detail\":\"resolution=0:53\"},{\"id\":\"native.process-cpu-count\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":3115000,\"detail\":\"nativeOnlineProcessors=3\"},{\"id\":\"native.errno\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5854000,\"detail\":\"ENOENT\"},{\"id\":\"native.tls\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4842000,\"detail\":\"TLS roundtrip\"},{\"id\":\"native.malloc-realloc\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3925000,\"detail\":\"allocation preserved\"},{\"id\":\"native.locale-c\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2706000,\"detail\":\"decimal point .\"},{\"id\":\"native.process-clock\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8666000,\"detail\":\"processCPU=184:881181927 work=9702991005100624961\"},{\"id\":\"native.abi\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":13006000,\"detail\":\"pointer=8 long=8 wchar=4\"},{\"id\":\"gles.vendor\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":754074000,\"detail\":\"Mesa\"},{\"id\":\"gles.renderer\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":41465000,\"detail\":\"NV12B\"},{\"id\":\"gles.version\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":29635000,\"detail\":\"OpenGL ES 3.2 Mesa 26.2.4 (git-0ff52079ca)\"},{\"id\":\"gles.extensions\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":28295000,\"detail\":\"GL_EXT_blend_minmax GL_EXT_multi_draw_arrays GL_EXT_texture_filter_anisotropic GL_EXT_texture_compression_s3tc GL_EXT_texture_compression_dxt1 GL_EXT_texture_compression_rgtc GL_EXT_texture_format_BGRA8888 GL_OES_compressed_ETC1_RGB8_texture GL_OES_depth24 GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_mapbuffer GL_OES_rgb8_rgba8 GL_OES_standard_derivatives GL_OES_stencil8 GL_OES_texture_3D GL_OES_texture_float GL_OES_texture_float_linear GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_texture_npot GL_OES_vertex_half_float GL_EXT_draw_instanced GL_EXT_texture_sRGB_decode GL_OES_EGL_image GL_OES_depth_texture GL_OES_packed_depth_stencil GL_EXT_texture_type_2_10_10_10_REV GL_NV_conditional_render GL_OES_get_program_binary GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_read_format_bgra GL_EXT_texture_storage GL_NV_pack_subimage GL_NV_texture_barrier GL_EXT_frag_depth GL_NV_fbo_color_attachments GL_OES_EGL_image_external GL_OES_EGL_sync GL_OES_vertex_array_object GL_OES_viewport_array GL_ANGLE_pack_reverse_row_order GL_ANGLE_texture_compression_dxt3 GL_ANGLE_texture_compression_dxt5 GL_EXT_occlusion_query_boolean GL_EXT_robustness GL_EXT_sRGB GL_EXT_texture_rg GL_EXT_unpack_subimage GL_NV_draw_buffers GL_NV_read_buffer GL_NV_read_depth GL_NV_read_depth_stencil GL_NV_read_stencil GL_APPLE_sync GL_EXT_draw_buffers GL_EXT_instanced_arrays GL_EXT_map_buffer_range GL_EXT_shadow_samplers GL_KHR_debug GL_KHR_robustness GL_KHR_texture_compression_astc_ldr GL_NV_generate_mipmap_sRGB GL_NV_pixel_buffer_object GL_OES_depth_texture_cube_map GL_OES_required_internalformat GL_OES_surfaceless_context GL_EXT_color_buffer_float GL_EXT_debug_label GL_EXT_sRGB_write_control GL_EXT_separate_shader_objects GL_EXT_shader_group_vote GL_EXT_shader_implicit_conversions GL_EXT_shader_integer_mix GL_EXT_tessellation_point_size GL_EXT_tessellation_shader GL_ANDROID_extension_pack_es31a GL_EXT_base_instance GL_EXT_compressed_ETC1_RGB8_sub_texture GL_EXT_copy_image GL_EXT_draw_buffers_indexe [truncated]\"},{\"id\":\"gles.clear-readback\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":463068000,\"detail\":\"rgba=255,0,0,255\"},{\"id\":\"gles.shader-valid\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":611440000,\"detail\":\"compile=1\"},{\"id\":\"gles.shader-invalid\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":180704000,\"detail\":\"compile=0\"},{\"id\":\"gles.buffer-roundtrip\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":44465000,\"detail\":\"bufferBytes=16\"},{\"id\":\"gles.texture-framebuffer\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":130391000,\"detail\":\"fbo=36053 green=255\"},{\"id\":\"vulkan.loader\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4973000,\"detail\":\"Vulkan Android entrypoint available; not a rendering pass\"},{\"id\":\"vulkan.instance\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":93216000,\"detail\":\"instance created\"},{\"id\":\"vulkan.physical-device\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8910000,\"detail\":\"gpu=NVIDIA Tegra X1 (GM20B) (NVK GM20B) vendor=10de device=0fe0 api=4211042\"},{\"id\":\"vulkan.queue-families\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":11603000,\"detail\":\"queueFamilies=1 graphics=0\"},{\"id\":\"vulkan.logical-device\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":249652000,\"detail\":\"logical device created and destroyed; no queue work submitted\"},{\"id\":\"vulkan.memory-heaps\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":7569000,\"detail\":\"heaps=1 types=2 advertisedBytes=2582642688\"}]}\n"
+  },
+  {
+    "path": "conformance/0778a8ded891/next.txt",
+    "sha256": "2811745d7b8d8874f6e653d176cefdd19e05e920ce389b9b7e83e5b2dfa546c7",
+    "utf8": "186"
+  },
+  {
+    "path": "conformance/0778a8ded891/report.json",
+    "sha256": "55cc0387dfb11d02e31ced92a1327a02d1e86bb0bb763196ad7b3c0a94d9b00d",
+    "utf8": "{\"schema_version\":1,\"suite\":\"AndroSwitch Conformance\",\"suite_revision\":1,\"coverage_scope\":\"Declared catalog only; not all Android or a CTS certification\",\"reference_api\":26,\"sensor_tests\":false,\"total\":219,\"catalog_sha256\":\"0778a8ded8917482b38aa7d9046e286f417c6e4ddc857be989718e65c3e69864\",\"next\":219,\"cases\":[{\"id\":\"dex.overflow\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":14236000,\"detail\":\"-2147483648\"},{\"id\":\"dex.division\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1284000,\"detail\":\"-5:-2\"},{\"id\":\"dex.shift\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1460000,\"detail\":\"2147483647:2\"},{\"id\":\"dex.long\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1707000,\"detail\":\"-9223372036854775808\"},{\"id\":\"dex.loop\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":567000,\"detail\":\"4950\"},{\"id\":\"dex.switch\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1114000,\"detail\":\"seven\"},{\"id\":\"dex.double\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8824000,\"detail\":\"3.75\"},{\"id\":\"dex.nan\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":429000,\"detail\":\"true\"},{\"id\":\"dex.signed-zero\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":408000,\"detail\":\"true\"},{\"id\":\"dex.cast\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1563000,\"detail\":\"-3\"},{\"id\":\"dex.bounds\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6632000,\"detail\":\"bounds\"},{\"id\":\"dex.division-zero\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3861000,\"detail\":\"arithmetic\"},{\"id\":\"text.utf16-length\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":412000,\"detail\":\"4\"},{\"id\":\"text.substring\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8355000,\"detail\":\"bc\"},{\"id\":\"text.char-at\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":484000,\"detail\":\"8364\"},{\"id\":\"text.equals\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5888000,\"detail\":\"true\"},{\"id\":\"text.builder-char\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1726000,\"detail\":\"x,true42\"},{\"id\":\"text.buffer\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1186000,\"detail\":\"one2\"},{\"id\":\"text.utf8\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":987000,\"detail\":\"4:226\"},{\"id\":\"text.ascii\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4800000,\"detail\":\"3:67\"},{\"id\":\"text.format\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":53136000,\"detail\":\"x:0007:%\"},{\"id\":\"text.index\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6592000,\"detail\":\"2:4\"},{\"id\":\"text.replace\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2400000,\"detail\":\"a+b+c\"},{\"id\":\"text.starts-ends\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5329000,\"detail\":\"true:true\"},{\"id\":\"text.null-append\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1855000,\"detail\":\"null\"},{\"id\":\"text.surrogate\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1642000,\"detail\":\"128512\"},{\"id\":\"collections.arraylist\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":28146000,\"detail\":\"b:1\"},{\"id\":\"collections.list-null\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4249000,\"detail\":\"true\"},{\"id\":\"collections.list-iterator\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":10169000,\"detail\":\"8\"},{\"id\":\"collections.map\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":19320000,\"detail\":\"1:7\"},{\"id\":\"collections.set\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1564000,\"detail\":\"1\"},{\"id\":\"collections.cow-snapshot\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":66085000,\"detail\":\"a:false:2\"},{\"id\":\"collections.cow-array-copy\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5316000,\"detail\":\"a\"},{\"id\":\"collections.cow-remove-unsupported\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2651000,\"detail\":\"unsupported\"},{\"id\":\"collections.boxed-equals\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4795000,\"detail\":\"true:false\"},{\"id\":\"collections.arraycopy\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":16293000,\"detail\":\"1:1:2:3\"},{\"id\":\"collections.array-clone\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1034000,\"detail\":\"1:9\"},{\"id\":\"collections.abstract-subclass\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":30785000,\"detail\":\"false:true\"},{\"id\":\"timeunit.ordinal.0\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8840000,\"detail\":\"NANOSECONDS:0\"},{\"id\":\"timeunit.ordinal.1\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1103000,\"detail\":\"MICROSECONDS:1\"},{\"id\":\"timeunit.ordinal.2\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1196000,\"detail\":\"MILLISECONDS:2\"},{\"id\":\"timeunit.ordinal.3\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1021000,\"detail\":\"SECONDS:3\"},{\"id\":\"timeunit.ordinal.4\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1213000,\"detail\":\"MINUTES:4\"},{\"id\":\"timeunit.ordinal.5\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2254000,\"detail\":\"HOURS:5\"},{\"id\":\"timeunit.ordinal.6\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":868000,\"detail\":\"DAYS:6\"},{\"id\":\"timeunit.convert.nanoseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6684000,\"detail\":\"123456789\"},{\"id\":\"timeunit.convert.nanoseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":797000,\"detail\":\"0\"},{\"id\":\"timeunit.convert.nanoseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2114000,\"detail\":\"0\"},{\"id\":\"timeunit.convert.microseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1617000,\"detail\":\"123456789000\"},{\"id\":\"timeunit.convert.microseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":463000,\"detail\":\"123\"},{\"id\":\"timeunit.convert.microseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":502000,\"detail\":\"0\"},{\"id\":\"timeunit.convert.milliseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3201000,\"detail\":\"123456789000000\"},{\"id\":\"timeunit.convert.milliseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1072000,\"detail\":\"123456\"},{\"id\":\"timeunit.convert.milliseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":538000,\"detail\":\"1\"},{\"id\":\"timeunit.convert.seconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1509000,\"detail\":\"123456789000000000\"},{\"id\":\"timeunit.convert.seconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1677000,\"detail\":\"123456789\"},{\"id\":\"timeunit.convert.seconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":588000,\"detail\":\"1428\"},{\"id\":\"timeunit.convert.minutes.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1390000,\"detail\":\"7407407340000000000\"},{\"id\":\"timeunit.convert.minutes.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1739000,\"detail\":\"7407407340\"},{\"id\":\"timeunit.convert.minutes.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":614000,\"detail\":\"85733\"},{\"id\":\"timeunit.convert.hours.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":879000,\"detail\":\"9223372036854775807\"},{\"id\":\"timeunit.convert.hours.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":797000,\"detail\":\"444444440400\"},{\"id\":\"timeunit.convert.hours.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":568000,\"detail\":\"5144032\"},{\"id\":\"timeunit.convert.days.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":809000,\"detail\":\"9223372036854775807\"},{\"id\":\"timeunit.convert.days.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1336000,\"detail\":\"10666666569600\"},{\"id\":\"timeunit.convert.days.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":692000,\"detail\":\"123456789\"},{\"id\":\"timeunit.saturation\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2510000,\"detail\":\"9223372036854775807\"},{\"id\":\"exceptions.throw-catch\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":28888000,\"detail\":\"detail\"},{\"id\":\"exceptions.finally\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":452000,\"detail\":\"5\"},{\"id\":\"exceptions.null\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":443000,\"detail\":\"null\"},{\"id\":\"exceptions.cast\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":418000,\"detail\":\"cast\"},{\"id\":\"exceptions.message\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1831000,\"detail\":\"true\"},{\"id\":\"reflection.name\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7341000,\"detail\":\"org.androswitch.conformance.PureCases\"},{\"id\":\"reflection.interface\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1123000,\"detail\":\"true\"},{\"id\":\"reflection.assignable\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3499000,\"detail\":\"true:false\"},{\"id\":\"reflection.field-static\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":51226000,\"detail\":\"61\"},{\"id\":\"reflection.field-instance\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":17172000,\"detail\":\"field\"},{\"id\":\"reflection.private\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3581000,\"detail\":\"47\"},{\"id\":\"reflection.missing\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2649000,\"detail\":\"missing\"},{\"id\":\"reflection.widening\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2156000,\"detail\":\"12\"},{\"id\":\"reflection.method\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":21949000,\"detail\":\"hi you\"},{\"id\":\"threads.initial\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":18892000,\"detail\":\"7\"},{\"id\":\"threads.stored-null\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2438000,\"detail\":\"true\"},{\"id\":\"threads.remove\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7848000,\"detail\":\"7\"},{\"id\":\"threads.monitor\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3184000,\"detail\":\"reentrant\"},{\"id\":\"threads.atomic\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1899000,\"detail\":\"true:true\"},{\"id\":\"math.abs.-3\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2669000,\"detail\":\"3\"},{\"id\":\"math.abs.-1\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":393000,\"detail\":\"1\"},{\"id\":\"math.abs.0\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":704000,\"detail\":\"0\"},{\"id\":\"math.abs.1\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1475000,\"detail\":\"1\"},{\"id\":\"math.abs.3\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":432000,\"detail\":\"3\"},{\"id\":\"numbers.hex.0\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1295000,\"detail\":\"0\"},{\"id\":\"numbers.hex.1\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":386000,\"detail\":\"1\"},{\"id\":\"numbers.hex.127\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":417000,\"detail\":\"7f\"},{\"id\":\"numbers.hex.128\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":410000,\"detail\":\"80\"},{\"id\":\"numbers.hex.255\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1065000,\"detail\":\"ff\"},{\"id\":\"numbers.hex.32767\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1742000,\"detail\":\"7fff\"},{\"id\":\"cpu.available\",\"group\":\"CPU\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8814000,\"detail\":\"allowedProcessors=3\"},{\"id\":\"cpu.singleton-gc\",\"group\":\"CPU\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":131130000,\"detail\":\"same Runtime\"},{\"id\":\"host.cpu.allowed_mask\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8661000,\"detail\":\"0x0000000000000007\"},{\"id\":\"host.cpu.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"},{\"id\":\"host.gpu.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"},{\"id\":\"host.memory.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"},{\"id\":\"host.tick.frequency_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":967000,\"detail\":\"19200000\"},{\"id\":\"host.os.name\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":542000,\"detail\":\"Horizon\"},{\"id\":\"host.os.version\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":683000,\"detail\":\"3.0.0\"},{\"id\":\"host.renderer.backend\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2250000,\"detail\":\"Horizon Mesa EGL/GLES2 + NVK Vulkan\"},{\"id\":\"build.model\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":14723000,\"detail\":\"AndroSwitch\"},{\"id\":\"build.manufacturer\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2276000,\"detail\":\"AndroSwitch\"},{\"id\":\"build.brand\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1906000,\"detail\":\"androswitch\"},{\"id\":\"build.device\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":713000,\"detail\":\"androswitch\"},{\"id\":\"build.product\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1504000,\"detail\":\"androswitch_horizon\"},{\"id\":\"build.board\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":765000,\"detail\":\"horizon\"},{\"id\":\"build.hardware\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2530000,\"detail\":\"horizon\"},{\"id\":\"build.id\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":981000,\"detail\":\"AS26\"},{\"id\":\"build.display\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1382000,\"detail\":\"AndroSwitch API26 compatibility profile v1\"},{\"id\":\"build.fingerprint\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1512000,\"detail\":\"androswitch/horizon/androswitch:8.0.0/AS26/0.1.0:eng/test-keys\"},{\"id\":\"build.type\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":3215000,\"detail\":\"eng\"},{\"id\":\"build.tags\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1843000,\"detail\":\"test-keys\"},{\"id\":\"build.user\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1095000,\"detail\":\"androswitch\"},{\"id\":\"build.host\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4880000,\"detail\":\"horizon\"},{\"id\":\"build.time\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1790000,\"detail\":\"buildTime=0\"},{\"id\":\"build.abis\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4241000,\"detail\":\"arm64-v8a count=1\"},{\"id\":\"build.version.release\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2207000,\"detail\":\"8.0.0\"},{\"id\":\"build.version.incremental\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1400000,\"detail\":\"0.1.0-dev\"},{\"id\":\"build.version.codename\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":867000,\"detail\":\"REL\"},{\"id\":\"build.version.base_os\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":458000,\"detail\":\"\"},{\"id\":\"build.version.security_patch\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1892000,\"detail\":\"\"},{\"id\":\"build.version.sdk\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1855000,\"detail\":\"guestAPI=26\"},{\"id\":\"build.version.preview\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1065000,\"detail\":\"preview=0\"},{\"id\":\"clock.wall\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1324000,\"detail\":\"1793011298244\"},{\"id\":\"clock.nano\",\"group\":\"Clock\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":423000,\"detail\":\"3000\"},{\"id\":\"clock.elapsed\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1758000,\"detail\":\"296576\"},{\"id\":\"clock.uptime\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":866000,\"detail\":\"299605\"},{\"id\":\"display.metrics\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":12785000,\"detail\":\"1280x720 density=2\"},{\"id\":\"display.configuration\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8613000,\"detail\":\"orientation=2 density=320 dp=640x360\"},{\"id\":\"display.rotation\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8378000,\"detail\":\"rotation=0\"},{\"id\":\"display.requested-orientation\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2026000,\"detail\":\"requested=-1\"},{\"id\":\"display.landscape\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6548000,\"detail\":\"landscape requested; physical rotation is separate\"},{\"id\":\"display.portrait\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2984000,\"detail\":\"portrait requested; physical rotation is separate\"},{\"id\":\"display.window\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2392000,\"detail\":\"window and decor\"},{\"id\":\"display.keep-screen-on\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3284000,\"detail\":\"read/write window flags\"},{\"id\":\"package.identity\",\"group\":\"Package\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2622000,\"detail\":\"org.androswitch.conformance\"},{\"id\":\"package.info\",\"group\":\"Package\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":38211000,\"detail\":\"0.1.0/1\"},{\"id\":\"package.apk-stream\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6518000,\"detail\":\"PK\"},{\"id\":\"package.missing\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3854000,\"detail\":\"NameNotFoundException\"},{\"id\":\"package.assets\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":25675000,\"detail\":\"AS asset\"},{\"id\":\"storage.write-read\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":12724000,\"detail\":\"3,7,11,EOF\"},{\"id\":\"storage.append\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":9570000,\"detail\":\"1,2\"},{\"id\":\"storage.name-parent\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7375000,\"detail\":\"/data/user/0/org.androswitch.conformance/files\"},{\"id\":\"storage.mkdir\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6600000,\"detail\":\"/data/user/0/org.androswitch.conformance/files/nested/a\"},{\"id\":\"storage.delete\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4377000,\"detail\":\"deleted\"},{\"id\":\"storage.random-access\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":22697000,\"detail\":\"seek/read\"},{\"id\":\"preferences.int\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":75042000,\"detail\":\"committed\"},{\"id\":\"preferences.long\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":11843000,\"detail\":\"committed\"},{\"id\":\"preferences.boolean\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":17873000,\"detail\":\"committed\"},{\"id\":\"preferences.float\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":141150000,\"detail\":\"committed\"},{\"id\":\"preferences.string\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":23725000,\"detail\":\"escaped string\"},{\"id\":\"preferences.remove\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":45169000,\"detail\":\"removed\"},{\"id\":\"preferences.clear\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":39241000,\"detail\":\"cleared\"},{\"id\":\"bundle.int\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6437000,\"detail\":\"int\"},{\"id\":\"bundle.long\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4443000,\"detail\":\"long\"},{\"id\":\"bundle.boolean\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":955000,\"detail\":\"boolean\"},{\"id\":\"bundle.float\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4144000,\"detail\":\"float\"},{\"id\":\"bundle.double\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3828000,\"detail\":\"double\"},{\"id\":\"bundle.byte\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":704000,\"detail\":\"byte\"},{\"id\":\"bundle.short\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":896000,\"detail\":\"short\"},{\"id\":\"bundle.char\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":721000,\"detail\":\"char\"},{\"id\":\"bundle.string\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":954000,\"detail\":\"value\"},{\"id\":\"bundle.default\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":672000,\"detail\":\"91\"},{\"id\":\"bundle.nested\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":129200000,\"detail\":\"7\"},{\"id\":\"ui.view-context\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4597000,\"detail\":\"actual Context\"},{\"id\":\"ui.textview\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2175000,\"detail\":\"test\"},{\"id\":\"ui.button\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1577000,\"detail\":\"401/button\"},{\"id\":\"ui.input-connection\",\"group\":\"Input\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":37250000,\"detail\":\"aXd\"},{\"id\":\"ui.editable-utf16\",\"group\":\"Input\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3473000,\"detail\":\"AZ\"},{\"id\":\"sqlite.insert\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":600300000,\"detail\":\"rows=1\"},{\"id\":\"sqlite.rollback\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":54251000,\"detail\":\"rows=0\"},{\"id\":\"sqlite.commit\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":37941000,\"detail\":\"rows=1\"},{\"id\":\"sqlite.bind\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":109076000,\"detail\":\"bound string\"},{\"id\":\"audio.minimum-buffer\",\"group\":\"Audio\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1508000,\"detail\":\"minimum=1920\"},{\"id\":\"audio.pcm-write\",\"group\":\"Audio\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":259560000,\"detail\":\"bytes=1920\"},{\"id\":\"activity.roundtrip\",\"group\":\"Lifecycle\",\"kind\":\"integration\",\"status\":\"PASS\",\"elapsed_ns\":0,\"detail\":\"Actual child lifecycle=CSRPTD\"},{\"id\":\"activity.application\",\"group\":\"Lifecycle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":11138000,\"detail\":\"org.androswitch.conformance.Recorder\"},{\"id\":\"activity.intent\",\"group\":\"Lifecycle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1742000,\"detail\":\"attached Intent\"},{\"id\":\"activity.handler-order\",\"group\":\"Lifecycle\",\"kind\":\"integration\",\"status\":\"PASS\",\"elapsed_ns\":0,\"detail\":\"Handler order=12\"},{\"id\":\"jni.pointer-width\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":159590000,\"detail\":\"8\"},{\"id\":\"jni.mixed-abi\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2231000,\"detail\":\"10.75\"},{\"id\":\"jni.string-utf8\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8690000,\"detail\":\"A\\u20acZ\"},{\"id\":\"jni.array-copyback\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":21391000,\"detail\":\"2,-4,6\"},{\"id\":\"jni.exception\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":18933000,\"detail\":\"native-exception\"},{\"id\":\"jni.callback-gc\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":27545000,\"detail\":\"259\"},{\"id\":\"jni.local-frame\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6551000,\"detail\":\"local frame\"},{\"id\":\"jni.thread-attach\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":25065000,\"detail\":\"21\"},{\"id\":\"jni.native-file-sharing\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":32583000,\"detail\":\"Java/native file shared\"},{\"id\":\"native.monotonic\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6975000,\"detail\":\"monotonic\"},{\"id\":\"native.clock-resolution\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":18002000,\"detail\":\"resolution=0:53\"},{\"id\":\"native.process-cpu-count\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":3115000,\"detail\":\"nativeOnlineProcessors=3\"},{\"id\":\"native.errno\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5854000,\"detail\":\"ENOENT\"},{\"id\":\"native.tls\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4842000,\"detail\":\"TLS roundtrip\"},{\"id\":\"native.malloc-realloc\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3925000,\"detail\":\"allocation preserved\"},{\"id\":\"native.locale-c\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2706000,\"detail\":\"decimal point .\"},{\"id\":\"native.process-clock\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8666000,\"detail\":\"processCPU=184:881181927 work=9702991005100624961\"},{\"id\":\"native.abi\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":13006000,\"detail\":\"pointer=8 long=8 wchar=4\"},{\"id\":\"gles.vendor\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":754074000,\"detail\":\"Mesa\"},{\"id\":\"gles.renderer\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":41465000,\"detail\":\"NV12B\"},{\"id\":\"gles.version\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":29635000,\"detail\":\"OpenGL ES 3.2 Mesa 26.2.4 (git-0ff52079ca)\"},{\"id\":\"gles.extensions\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":28295000,\"detail\":\"GL_EXT_blend_minmax GL_EXT_multi_draw_arrays GL_EXT_texture_filter_anisotropic GL_EXT_texture_compression_s3tc GL_EXT_texture_compression_dxt1 GL_EXT_texture_compression_rgtc GL_EXT_texture_format_BGRA8888 GL_OES_compressed_ETC1_RGB8_texture GL_OES_depth24 GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_mapbuffer GL_OES_rgb8_rgba8 GL_OES_standard_derivatives GL_OES_stencil8 GL_OES_texture_3D GL_OES_texture_float GL_OES_texture_float_linear GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_texture_npot GL_OES_vertex_half_float GL_EXT_draw_instanced GL_EXT_texture_sRGB_decode GL_OES_EGL_image GL_OES_depth_texture GL_OES_packed_depth_stencil GL_EXT_texture_type_2_10_10_10_REV GL_NV_conditional_render GL_OES_get_program_binary GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_read_format_bgra GL_EXT_texture_storage GL_NV_pack_subimage GL_NV_texture_barrier GL_EXT_frag_depth GL_NV_fbo_color_attachments GL_OES_EGL_image_external GL_OES_EGL_sync GL_OES_vertex_array_object GL_OES_viewport_array GL_ANGLE_pack_reverse_row_order GL_ANGLE_texture_compression_dxt3 GL_ANGLE_texture_compression_dxt5 GL_EXT_occlusion_query_boolean GL_EXT_robustness GL_EXT_sRGB GL_EXT_texture_rg GL_EXT_unpack_subimage GL_NV_draw_buffers GL_NV_read_buffer GL_NV_read_depth GL_NV_read_depth_stencil GL_NV_read_stencil GL_APPLE_sync GL_EXT_draw_buffers GL_EXT_instanced_arrays GL_EXT_map_buffer_range GL_EXT_shadow_samplers GL_KHR_debug GL_KHR_robustness GL_KHR_texture_compression_astc_ldr GL_NV_generate_mipmap_sRGB GL_NV_pixel_buffer_object GL_OES_depth_texture_cube_map GL_OES_required_internalformat GL_OES_surfaceless_context GL_EXT_color_buffer_float GL_EXT_debug_label GL_EXT_sRGB_write_control GL_EXT_separate_shader_objects GL_EXT_shader_group_vote GL_EXT_shader_implicit_conversions GL_EXT_shader_integer_mix GL_EXT_tessellation_point_size GL_EXT_tessellation_shader GL_ANDROID_extension_pack_es31a GL_EXT_base_instance GL_EXT_compressed_ETC1_RGB8_sub_texture GL_EXT_copy_image GL_EXT_draw_buffers_indexe [truncated]\"},{\"id\":\"gles.clear-readback\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":463068000,\"detail\":\"rgba=255,0,0,255\"},{\"id\":\"gles.shader-valid\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":611440000,\"detail\":\"compile=1\"},{\"id\":\"gles.shader-invalid\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":180704000,\"detail\":\"compile=0\"},{\"id\":\"gles.buffer-roundtrip\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":44465000,\"detail\":\"bufferBytes=16\"},{\"id\":\"gles.texture-framebuffer\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":130391000,\"detail\":\"fbo=36053 green=255\"},{\"id\":\"vulkan.loader\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4973000,\"detail\":\"Vulkan Android entrypoint available; not a rendering pass\"},{\"id\":\"vulkan.instance\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":93216000,\"detail\":\"instance created\"},{\"id\":\"vulkan.physical-device\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8910000,\"detail\":\"gpu=NVIDIA Tegra X1 (GM20B) (NVK GM20B) vendor=10de device=0fe0 api=4211042\"},{\"id\":\"vulkan.queue-families\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":11603000,\"detail\":\"queueFamilies=1 graphics=0\"},{\"id\":\"vulkan.logical-device\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":249652000,\"detail\":\"logical device created and destroyed; no queue work submitted\"},{\"id\":\"vulkan.memory-heaps\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":7569000,\"detail\":\"heaps=1 types=2 advertisedBytes=2582642688\"}]}\n"
+  },
+  {
+    "path": "conformance/report.json",
+    "sha256": "55cc0387dfb11d02e31ced92a1327a02d1e86bb0bb763196ad7b3c0a94d9b00d",
+    "utf8": "{\"schema_version\":1,\"suite\":\"AndroSwitch Conformance\",\"suite_revision\":1,\"coverage_scope\":\"Declared catalog only; not all Android or a CTS certification\",\"reference_api\":26,\"sensor_tests\":false,\"total\":219,\"catalog_sha256\":\"0778a8ded8917482b38aa7d9046e286f417c6e4ddc857be989718e65c3e69864\",\"next\":219,\"cases\":[{\"id\":\"dex.overflow\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":14236000,\"detail\":\"-2147483648\"},{\"id\":\"dex.division\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1284000,\"detail\":\"-5:-2\"},{\"id\":\"dex.shift\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1460000,\"detail\":\"2147483647:2\"},{\"id\":\"dex.long\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1707000,\"detail\":\"-9223372036854775808\"},{\"id\":\"dex.loop\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":567000,\"detail\":\"4950\"},{\"id\":\"dex.switch\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1114000,\"detail\":\"seven\"},{\"id\":\"dex.double\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8824000,\"detail\":\"3.75\"},{\"id\":\"dex.nan\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":429000,\"detail\":\"true\"},{\"id\":\"dex.signed-zero\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":408000,\"detail\":\"true\"},{\"id\":\"dex.cast\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1563000,\"detail\":\"-3\"},{\"id\":\"dex.bounds\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6632000,\"detail\":\"bounds\"},{\"id\":\"dex.division-zero\",\"group\":\"DEX\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3861000,\"detail\":\"arithmetic\"},{\"id\":\"text.utf16-length\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":412000,\"detail\":\"4\"},{\"id\":\"text.substring\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8355000,\"detail\":\"bc\"},{\"id\":\"text.char-at\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":484000,\"detail\":\"8364\"},{\"id\":\"text.equals\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5888000,\"detail\":\"true\"},{\"id\":\"text.builder-char\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1726000,\"detail\":\"x,true42\"},{\"id\":\"text.buffer\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1186000,\"detail\":\"one2\"},{\"id\":\"text.utf8\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":987000,\"detail\":\"4:226\"},{\"id\":\"text.ascii\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4800000,\"detail\":\"3:67\"},{\"id\":\"text.format\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":53136000,\"detail\":\"x:0007:%\"},{\"id\":\"text.index\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6592000,\"detail\":\"2:4\"},{\"id\":\"text.replace\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2400000,\"detail\":\"a+b+c\"},{\"id\":\"text.starts-ends\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5329000,\"detail\":\"true:true\"},{\"id\":\"text.null-append\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1855000,\"detail\":\"null\"},{\"id\":\"text.surrogate\",\"group\":\"Text\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1642000,\"detail\":\"128512\"},{\"id\":\"collections.arraylist\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":28146000,\"detail\":\"b:1\"},{\"id\":\"collections.list-null\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4249000,\"detail\":\"true\"},{\"id\":\"collections.list-iterator\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":10169000,\"detail\":\"8\"},{\"id\":\"collections.map\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":19320000,\"detail\":\"1:7\"},{\"id\":\"collections.set\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1564000,\"detail\":\"1\"},{\"id\":\"collections.cow-snapshot\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":66085000,\"detail\":\"a:false:2\"},{\"id\":\"collections.cow-array-copy\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5316000,\"detail\":\"a\"},{\"id\":\"collections.cow-remove-unsupported\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2651000,\"detail\":\"unsupported\"},{\"id\":\"collections.boxed-equals\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4795000,\"detail\":\"true:false\"},{\"id\":\"collections.arraycopy\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":16293000,\"detail\":\"1:1:2:3\"},{\"id\":\"collections.array-clone\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1034000,\"detail\":\"1:9\"},{\"id\":\"collections.abstract-subclass\",\"group\":\"Collections\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":30785000,\"detail\":\"false:true\"},{\"id\":\"timeunit.ordinal.0\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8840000,\"detail\":\"NANOSECONDS:0\"},{\"id\":\"timeunit.ordinal.1\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1103000,\"detail\":\"MICROSECONDS:1\"},{\"id\":\"timeunit.ordinal.2\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1196000,\"detail\":\"MILLISECONDS:2\"},{\"id\":\"timeunit.ordinal.3\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1021000,\"detail\":\"SECONDS:3\"},{\"id\":\"timeunit.ordinal.4\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1213000,\"detail\":\"MINUTES:4\"},{\"id\":\"timeunit.ordinal.5\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2254000,\"detail\":\"HOURS:5\"},{\"id\":\"timeunit.ordinal.6\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":868000,\"detail\":\"DAYS:6\"},{\"id\":\"timeunit.convert.nanoseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6684000,\"detail\":\"123456789\"},{\"id\":\"timeunit.convert.nanoseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":797000,\"detail\":\"0\"},{\"id\":\"timeunit.convert.nanoseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2114000,\"detail\":\"0\"},{\"id\":\"timeunit.convert.microseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1617000,\"detail\":\"123456789000\"},{\"id\":\"timeunit.convert.microseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":463000,\"detail\":\"123\"},{\"id\":\"timeunit.convert.microseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":502000,\"detail\":\"0\"},{\"id\":\"timeunit.convert.milliseconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3201000,\"detail\":\"123456789000000\"},{\"id\":\"timeunit.convert.milliseconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1072000,\"detail\":\"123456\"},{\"id\":\"timeunit.convert.milliseconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":538000,\"detail\":\"1\"},{\"id\":\"timeunit.convert.seconds.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1509000,\"detail\":\"123456789000000000\"},{\"id\":\"timeunit.convert.seconds.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1677000,\"detail\":\"123456789\"},{\"id\":\"timeunit.convert.seconds.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":588000,\"detail\":\"1428\"},{\"id\":\"timeunit.convert.minutes.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1390000,\"detail\":\"7407407340000000000\"},{\"id\":\"timeunit.convert.minutes.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1739000,\"detail\":\"7407407340\"},{\"id\":\"timeunit.convert.minutes.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":614000,\"detail\":\"85733\"},{\"id\":\"timeunit.convert.hours.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":879000,\"detail\":\"9223372036854775807\"},{\"id\":\"timeunit.convert.hours.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":797000,\"detail\":\"444444440400\"},{\"id\":\"timeunit.convert.hours.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":568000,\"detail\":\"5144032\"},{\"id\":\"timeunit.convert.days.nanoseconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":809000,\"detail\":\"9223372036854775807\"},{\"id\":\"timeunit.convert.days.seconds\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1336000,\"detail\":\"10666666569600\"},{\"id\":\"timeunit.convert.days.days\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":692000,\"detail\":\"123456789\"},{\"id\":\"timeunit.saturation\",\"group\":\"TimeUnit\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2510000,\"detail\":\"9223372036854775807\"},{\"id\":\"exceptions.throw-catch\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":28888000,\"detail\":\"detail\"},{\"id\":\"exceptions.finally\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":452000,\"detail\":\"5\"},{\"id\":\"exceptions.null\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":443000,\"detail\":\"null\"},{\"id\":\"exceptions.cast\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":418000,\"detail\":\"cast\"},{\"id\":\"exceptions.message\",\"group\":\"Exceptions\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1831000,\"detail\":\"true\"},{\"id\":\"reflection.name\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7341000,\"detail\":\"org.androswitch.conformance.PureCases\"},{\"id\":\"reflection.interface\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1123000,\"detail\":\"true\"},{\"id\":\"reflection.assignable\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3499000,\"detail\":\"true:false\"},{\"id\":\"reflection.field-static\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":51226000,\"detail\":\"61\"},{\"id\":\"reflection.field-instance\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":17172000,\"detail\":\"field\"},{\"id\":\"reflection.private\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3581000,\"detail\":\"47\"},{\"id\":\"reflection.missing\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2649000,\"detail\":\"missing\"},{\"id\":\"reflection.widening\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2156000,\"detail\":\"12\"},{\"id\":\"reflection.method\",\"group\":\"Reflection\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":21949000,\"detail\":\"hi you\"},{\"id\":\"threads.initial\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":18892000,\"detail\":\"7\"},{\"id\":\"threads.stored-null\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2438000,\"detail\":\"true\"},{\"id\":\"threads.remove\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7848000,\"detail\":\"7\"},{\"id\":\"threads.monitor\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3184000,\"detail\":\"reentrant\"},{\"id\":\"threads.atomic\",\"group\":\"Threads\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1899000,\"detail\":\"true:true\"},{\"id\":\"math.abs.-3\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2669000,\"detail\":\"3\"},{\"id\":\"math.abs.-1\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":393000,\"detail\":\"1\"},{\"id\":\"math.abs.0\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":704000,\"detail\":\"0\"},{\"id\":\"math.abs.1\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1475000,\"detail\":\"1\"},{\"id\":\"math.abs.3\",\"group\":\"Math\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":432000,\"detail\":\"3\"},{\"id\":\"numbers.hex.0\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1295000,\"detail\":\"0\"},{\"id\":\"numbers.hex.1\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":386000,\"detail\":\"1\"},{\"id\":\"numbers.hex.127\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":417000,\"detail\":\"7f\"},{\"id\":\"numbers.hex.128\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":410000,\"detail\":\"80\"},{\"id\":\"numbers.hex.255\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1065000,\"detail\":\"ff\"},{\"id\":\"numbers.hex.32767\",\"group\":\"Numbers\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1742000,\"detail\":\"7fff\"},{\"id\":\"cpu.available\",\"group\":\"CPU\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8814000,\"detail\":\"allowedProcessors=3\"},{\"id\":\"cpu.singleton-gc\",\"group\":\"CPU\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":131130000,\"detail\":\"same Runtime\"},{\"id\":\"host.cpu.allowed_mask\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8661000,\"detail\":\"0x0000000000000007\"},{\"id\":\"host.cpu.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"},{\"id\":\"host.gpu.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"},{\"id\":\"host.memory.clock_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"NOT_RUN\",\"elapsed_ns\":0,\"detail\":\"Explicit test-control exclusion (exclude.txt); API was not executed\"},{\"id\":\"host.tick.frequency_hz\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":967000,\"detail\":\"19200000\"},{\"id\":\"host.os.name\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":542000,\"detail\":\"Horizon\"},{\"id\":\"host.os.version\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":683000,\"detail\":\"3.0.0\"},{\"id\":\"host.renderer.backend\",\"group\":\"Horizon\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2250000,\"detail\":\"Horizon Mesa EGL/GLES2 + NVK Vulkan\"},{\"id\":\"build.model\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":14723000,\"detail\":\"AndroSwitch\"},{\"id\":\"build.manufacturer\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2276000,\"detail\":\"AndroSwitch\"},{\"id\":\"build.brand\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1906000,\"detail\":\"androswitch\"},{\"id\":\"build.device\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":713000,\"detail\":\"androswitch\"},{\"id\":\"build.product\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1504000,\"detail\":\"androswitch_horizon\"},{\"id\":\"build.board\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":765000,\"detail\":\"horizon\"},{\"id\":\"build.hardware\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2530000,\"detail\":\"horizon\"},{\"id\":\"build.id\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":981000,\"detail\":\"AS26\"},{\"id\":\"build.display\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1382000,\"detail\":\"AndroSwitch API26 compatibility profile v1\"},{\"id\":\"build.fingerprint\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1512000,\"detail\":\"androswitch/horizon/androswitch:8.0.0/AS26/0.1.0:eng/test-keys\"},{\"id\":\"build.type\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":3215000,\"detail\":\"eng\"},{\"id\":\"build.tags\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1843000,\"detail\":\"test-keys\"},{\"id\":\"build.user\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1095000,\"detail\":\"androswitch\"},{\"id\":\"build.host\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4880000,\"detail\":\"horizon\"},{\"id\":\"build.time\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1790000,\"detail\":\"buildTime=0\"},{\"id\":\"build.abis\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4241000,\"detail\":\"arm64-v8a count=1\"},{\"id\":\"build.version.release\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2207000,\"detail\":\"8.0.0\"},{\"id\":\"build.version.incremental\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1400000,\"detail\":\"0.1.0-dev\"},{\"id\":\"build.version.codename\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":867000,\"detail\":\"REL\"},{\"id\":\"build.version.base_os\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":458000,\"detail\":\"\"},{\"id\":\"build.version.security_patch\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1892000,\"detail\":\"\"},{\"id\":\"build.version.sdk\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1855000,\"detail\":\"guestAPI=26\"},{\"id\":\"build.version.preview\",\"group\":\"Android identity\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1065000,\"detail\":\"preview=0\"},{\"id\":\"clock.wall\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1324000,\"detail\":\"1793011298244\"},{\"id\":\"clock.nano\",\"group\":\"Clock\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":423000,\"detail\":\"3000\"},{\"id\":\"clock.elapsed\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1758000,\"detail\":\"296576\"},{\"id\":\"clock.uptime\",\"group\":\"Clock\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":866000,\"detail\":\"299605\"},{\"id\":\"display.metrics\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":12785000,\"detail\":\"1280x720 density=2\"},{\"id\":\"display.configuration\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8613000,\"detail\":\"orientation=2 density=320 dp=640x360\"},{\"id\":\"display.rotation\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8378000,\"detail\":\"rotation=0\"},{\"id\":\"display.requested-orientation\",\"group\":\"Display\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2026000,\"detail\":\"requested=-1\"},{\"id\":\"display.landscape\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6548000,\"detail\":\"landscape requested; physical rotation is separate\"},{\"id\":\"display.portrait\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2984000,\"detail\":\"portrait requested; physical rotation is separate\"},{\"id\":\"display.window\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2392000,\"detail\":\"window and decor\"},{\"id\":\"display.keep-screen-on\",\"group\":\"Display\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3284000,\"detail\":\"read/write window flags\"},{\"id\":\"package.identity\",\"group\":\"Package\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":2622000,\"detail\":\"org.androswitch.conformance\"},{\"id\":\"package.info\",\"group\":\"Package\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":38211000,\"detail\":\"0.1.0/1\"},{\"id\":\"package.apk-stream\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6518000,\"detail\":\"PK\"},{\"id\":\"package.missing\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3854000,\"detail\":\"NameNotFoundException\"},{\"id\":\"package.assets\",\"group\":\"Package\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":25675000,\"detail\":\"AS asset\"},{\"id\":\"storage.write-read\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":12724000,\"detail\":\"3,7,11,EOF\"},{\"id\":\"storage.append\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":9570000,\"detail\":\"1,2\"},{\"id\":\"storage.name-parent\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":7375000,\"detail\":\"/data/user/0/org.androswitch.conformance/files\"},{\"id\":\"storage.mkdir\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6600000,\"detail\":\"/data/user/0/org.androswitch.conformance/files/nested/a\"},{\"id\":\"storage.delete\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4377000,\"detail\":\"deleted\"},{\"id\":\"storage.random-access\",\"group\":\"Storage\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":22697000,\"detail\":\"seek/read\"},{\"id\":\"preferences.int\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":75042000,\"detail\":\"committed\"},{\"id\":\"preferences.long\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":11843000,\"detail\":\"committed\"},{\"id\":\"preferences.boolean\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":17873000,\"detail\":\"committed\"},{\"id\":\"preferences.float\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":141150000,\"detail\":\"committed\"},{\"id\":\"preferences.string\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":23725000,\"detail\":\"escaped string\"},{\"id\":\"preferences.remove\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":45169000,\"detail\":\"removed\"},{\"id\":\"preferences.clear\",\"group\":\"Preferences\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":39241000,\"detail\":\"cleared\"},{\"id\":\"bundle.int\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6437000,\"detail\":\"int\"},{\"id\":\"bundle.long\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4443000,\"detail\":\"long\"},{\"id\":\"bundle.boolean\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":955000,\"detail\":\"boolean\"},{\"id\":\"bundle.float\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4144000,\"detail\":\"float\"},{\"id\":\"bundle.double\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3828000,\"detail\":\"double\"},{\"id\":\"bundle.byte\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":704000,\"detail\":\"byte\"},{\"id\":\"bundle.short\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":896000,\"detail\":\"short\"},{\"id\":\"bundle.char\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":721000,\"detail\":\"char\"},{\"id\":\"bundle.string\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":954000,\"detail\":\"value\"},{\"id\":\"bundle.default\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":672000,\"detail\":\"91\"},{\"id\":\"bundle.nested\",\"group\":\"Bundle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":129200000,\"detail\":\"7\"},{\"id\":\"ui.view-context\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4597000,\"detail\":\"actual Context\"},{\"id\":\"ui.textview\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2175000,\"detail\":\"test\"},{\"id\":\"ui.button\",\"group\":\"UI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1577000,\"detail\":\"401/button\"},{\"id\":\"ui.input-connection\",\"group\":\"Input\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":37250000,\"detail\":\"aXd\"},{\"id\":\"ui.editable-utf16\",\"group\":\"Input\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3473000,\"detail\":\"AZ\"},{\"id\":\"sqlite.insert\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":600300000,\"detail\":\"rows=1\"},{\"id\":\"sqlite.rollback\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":54251000,\"detail\":\"rows=0\"},{\"id\":\"sqlite.commit\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":37941000,\"detail\":\"rows=1\"},{\"id\":\"sqlite.bind\",\"group\":\"SQLite\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":109076000,\"detail\":\"bound string\"},{\"id\":\"audio.minimum-buffer\",\"group\":\"Audio\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":1508000,\"detail\":\"minimum=1920\"},{\"id\":\"audio.pcm-write\",\"group\":\"Audio\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":259560000,\"detail\":\"bytes=1920\"},{\"id\":\"activity.roundtrip\",\"group\":\"Lifecycle\",\"kind\":\"integration\",\"status\":\"PASS\",\"elapsed_ns\":0,\"detail\":\"Actual child lifecycle=CSRPTD\"},{\"id\":\"activity.application\",\"group\":\"Lifecycle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":11138000,\"detail\":\"org.androswitch.conformance.Recorder\"},{\"id\":\"activity.intent\",\"group\":\"Lifecycle\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":1742000,\"detail\":\"attached Intent\"},{\"id\":\"activity.handler-order\",\"group\":\"Lifecycle\",\"kind\":\"integration\",\"status\":\"PASS\",\"elapsed_ns\":0,\"detail\":\"Handler order=12\"},{\"id\":\"jni.pointer-width\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":159590000,\"detail\":\"8\"},{\"id\":\"jni.mixed-abi\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2231000,\"detail\":\"10.75\"},{\"id\":\"jni.string-utf8\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8690000,\"detail\":\"A\\u20acZ\"},{\"id\":\"jni.array-copyback\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":21391000,\"detail\":\"2,-4,6\"},{\"id\":\"jni.exception\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":18933000,\"detail\":\"native-exception\"},{\"id\":\"jni.callback-gc\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":27545000,\"detail\":\"259\"},{\"id\":\"jni.local-frame\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6551000,\"detail\":\"local frame\"},{\"id\":\"jni.thread-attach\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":25065000,\"detail\":\"21\"},{\"id\":\"jni.native-file-sharing\",\"group\":\"JNI\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":32583000,\"detail\":\"Java/native file shared\"},{\"id\":\"native.monotonic\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":6975000,\"detail\":\"monotonic\"},{\"id\":\"native.clock-resolution\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":18002000,\"detail\":\"resolution=0:53\"},{\"id\":\"native.process-cpu-count\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":3115000,\"detail\":\"nativeOnlineProcessors=3\"},{\"id\":\"native.errno\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":5854000,\"detail\":\"ENOENT\"},{\"id\":\"native.tls\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":4842000,\"detail\":\"TLS roundtrip\"},{\"id\":\"native.malloc-realloc\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":3925000,\"detail\":\"allocation preserved\"},{\"id\":\"native.locale-c\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":2706000,\"detail\":\"decimal point .\"},{\"id\":\"native.process-clock\",\"group\":\"Native\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":8666000,\"detail\":\"processCPU=184:881181927 work=9702991005100624961\"},{\"id\":\"native.abi\",\"group\":\"Native\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":13006000,\"detail\":\"pointer=8 long=8 wchar=4\"},{\"id\":\"gles.vendor\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":754074000,\"detail\":\"Mesa\"},{\"id\":\"gles.renderer\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":41465000,\"detail\":\"NV12B\"},{\"id\":\"gles.version\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":29635000,\"detail\":\"OpenGL ES 3.2 Mesa 26.2.4 (git-0ff52079ca)\"},{\"id\":\"gles.extensions\",\"group\":\"OpenGL ES\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":28295000,\"detail\":\"GL_EXT_blend_minmax GL_EXT_multi_draw_arrays GL_EXT_texture_filter_anisotropic GL_EXT_texture_compression_s3tc GL_EXT_texture_compression_dxt1 GL_EXT_texture_compression_rgtc GL_EXT_texture_format_BGRA8888 GL_OES_compressed_ETC1_RGB8_texture GL_OES_depth24 GL_OES_element_index_uint GL_OES_fbo_render_mipmap GL_OES_mapbuffer GL_OES_rgb8_rgba8 GL_OES_standard_derivatives GL_OES_stencil8 GL_OES_texture_3D GL_OES_texture_float GL_OES_texture_float_linear GL_OES_texture_half_float GL_OES_texture_half_float_linear GL_OES_texture_npot GL_OES_vertex_half_float GL_EXT_draw_instanced GL_EXT_texture_sRGB_decode GL_OES_EGL_image GL_OES_depth_texture GL_OES_packed_depth_stencil GL_EXT_texture_type_2_10_10_10_REV GL_NV_conditional_render GL_OES_get_program_binary GL_APPLE_texture_max_level GL_EXT_discard_framebuffer GL_EXT_read_format_bgra GL_EXT_texture_storage GL_NV_pack_subimage GL_NV_texture_barrier GL_EXT_frag_depth GL_NV_fbo_color_attachments GL_OES_EGL_image_external GL_OES_EGL_sync GL_OES_vertex_array_object GL_OES_viewport_array GL_ANGLE_pack_reverse_row_order GL_ANGLE_texture_compression_dxt3 GL_ANGLE_texture_compression_dxt5 GL_EXT_occlusion_query_boolean GL_EXT_robustness GL_EXT_sRGB GL_EXT_texture_rg GL_EXT_unpack_subimage GL_NV_draw_buffers GL_NV_read_buffer GL_NV_read_depth GL_NV_read_depth_stencil GL_NV_read_stencil GL_APPLE_sync GL_EXT_draw_buffers GL_EXT_instanced_arrays GL_EXT_map_buffer_range GL_EXT_shadow_samplers GL_KHR_debug GL_KHR_robustness GL_KHR_texture_compression_astc_ldr GL_NV_generate_mipmap_sRGB GL_NV_pixel_buffer_object GL_OES_depth_texture_cube_map GL_OES_required_internalformat GL_OES_surfaceless_context GL_EXT_color_buffer_float GL_EXT_debug_label GL_EXT_sRGB_write_control GL_EXT_separate_shader_objects GL_EXT_shader_group_vote GL_EXT_shader_implicit_conversions GL_EXT_shader_integer_mix GL_EXT_tessellation_point_size GL_EXT_tessellation_shader GL_ANDROID_extension_pack_es31a GL_EXT_base_instance GL_EXT_compressed_ETC1_RGB8_sub_texture GL_EXT_copy_image GL_EXT_draw_buffers_indexe [truncated]\"},{\"id\":\"gles.clear-readback\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":463068000,\"detail\":\"rgba=255,0,0,255\"},{\"id\":\"gles.shader-valid\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":611440000,\"detail\":\"compile=1\"},{\"id\":\"gles.shader-invalid\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":180704000,\"detail\":\"compile=0\"},{\"id\":\"gles.buffer-roundtrip\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":44465000,\"detail\":\"bufferBytes=16\"},{\"id\":\"gles.texture-framebuffer\",\"group\":\"OpenGL ES\",\"kind\":\"contract\",\"status\":\"PASS\",\"elapsed_ns\":130391000,\"detail\":\"fbo=36053 green=255\"},{\"id\":\"vulkan.loader\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":4973000,\"detail\":\"Vulkan Android entrypoint available; not a rendering pass\"},{\"id\":\"vulkan.instance\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":93216000,\"detail\":\"instance created\"},{\"id\":\"vulkan.physical-device\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":8910000,\"detail\":\"gpu=NVIDIA Tegra X1 (GM20B) (NVK GM20B) vendor=10de device=0fe0 api=4211042\"},{\"id\":\"vulkan.queue-families\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":11603000,\"detail\":\"queueFamilies=1 graphics=0\"},{\"id\":\"vulkan.logical-device\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":249652000,\"detail\":\"logical device created and destroyed; no queue work submitted\"},{\"id\":\"vulkan.memory-heaps\",\"group\":\"Vulkan\",\"kind\":\"observation\",\"status\":\"PASS\",\"elapsed_ns\":7569000,\"detail\":\"heaps=1 types=2 advertisedBytes=2582642688\"}]}\n"
+  },
+  {
+    "path": "exclude.txt",
+    "sha256": "8597e07079d183191690b75b00b9d90271731653652aabcf6d0dad8aa01c1cde",
+    "utf8": "host.cpu.clock_hz\nhost.gpu.clock_hz\nhost.memory.clock_hz"
+  },
+  {
+    "path": "filter.txt",
+    "sha256": "46459b1fa9194f6ab92c85c47b97e2fc12cbe1bc17ba956d74016cea9c26eed9",
+    "utf8": "Lifecycle"
+  },
+  {
+    "path": "resume-evidence.json",
+    "sha256": "c273a8a643aef3093a5a165d6bdd7f804f32f7aa51ce2b98c9f392de8d81b30f",
+    "utf8": "{\r\n  \"nro_sha256\": \"a3a34bab32cf31e182fb72efe524bad1e06b5a69107853e9a0aba893aaef2bf8\",\r\n  \"receipt\": \"D:\\\\Dev\\\\Switch\\\\AndroSwitch\\\\local-artifacts\\\\m9\\\\external-runs\\\\1bf5ac5569cf4654926d5667f6767484\\\\verification.json\",\r\n  \"apk_sha256\": \"f77a08b2463d60fef05e2a2c0130d5126fab77eb10e4c24ff76ccdc42a279157\",\r\n  \"receipt_sha256\": \"49f3873bd87b58c5f7c7cf7f9ba991263f5fc17dce731cfbcea4b2f4bcbde594\",\r\n  \"schema_version\": 1\r\n}\r\n"
+  }
+]

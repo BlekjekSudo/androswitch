@@ -9,11 +9,13 @@ param(
     [string]$Nro='',
     [string[]]$ExcludeCases=@(),
     [string]$ResumeEvidenceDirectory='',
+    [string]$RerunCategory='',
     [switch]$Baseline,
     [switch]$PrepareOnly,
     [switch]$AllowDesktopEmulator
 )
 $ErrorActionPreference='Stop'
+if($RerunCategory -and (-not $ResumeEvidenceDirectory -or $Launches -ne 1)){throw 'UI category rerun requires one launch and a verified resume journal'}
 $repo=Split-Path -Parent $PSScriptRoot
 if($ExcludeCases.Count -and -not $Baseline){throw 'Case exclusions are allowed only with -Baseline; full acceptance requires all 219 PASS'}
 $output=Join-Path $repo 'local-artifacts/conformance'
@@ -43,7 +45,7 @@ if($ResumeEvidenceDirectory){
     }
     @{schema_version=1;receipt=$receiptPath;receipt_sha256=(Get-FileHash $receiptPath).Hash.ToLowerInvariant();nro_sha256=$priorReceipt.nro_sha256;apk_sha256=$priorReceipt.inputs[0].sha256}|ConvertTo-Json|Set-Content "$seed/$package/files/resume-evidence.json" -Encoding utf8NoBOM
 }
-[IO.File]::WriteAllText("$seed/$package/files/autorun.txt",'1')
+[IO.File]::WriteAllText("$seed/$package/files/autorun.txt",$(if($RerunCategory){'0'}else{'1'}))
 $known=@((Get-Content $catalogPath -Raw|ConvertFrom-Json).cases|ForEach-Object id)
 foreach($caseId in $ExcludeCases){if($caseId -cnotin $known){throw "Unknown excluded case: $caseId"}}
 if($ExcludeCases.Count){[IO.File]::WriteAllText("$seed/$package/files/exclude.txt",($ExcludeCases -join "`n"))}
@@ -56,11 +58,29 @@ $parameters=@{
     PrepareOnly=$PrepareOnly;AllowDesktopEmulator=$AllowDesktopEmulator
 }
 if($Nro){$parameters.Nro=$Nro}
-if($WaitSegments -gt 1){
+if($WaitSegments -gt 1 -or $RerunCategory){
     # Keep asynchronous lifecycle/Handler cases in the same ordinary session.
     # Each protocol wait remains bounded; do not interrupt a case just to split
     # a long suite into many short launches. APK and acceptance stay unchanged.
     $events=[Collections.Generic.List[object]]::new()
+    if($RerunCategory){
+        # Use the unchanged APK's ordinary category/reset/run controls. Never
+        # edit case result files or turn an interrupted observation into PASS.
+        $activity=Get-Content "$repo/fixtures/conformance/java/org/androswitch/conformance/MainActivity.java" -Raw
+        $definition=[regex]::Match($activity,'(?s)GROUPS\s*=\s*\{(.*?)\};')
+        $groups=@([regex]::Matches($definition.Groups[1].Value,'"([^"]+)"')|ForEach-Object {$_.Groups[1].Value})
+        $index=$groups.IndexOf($RerunCategory)
+        if($index -le 0){throw 'Choose a declared non-All category'}
+        $oldLauncher=Get-Content (Join-Path $prior 'emulator.json') -Raw|ConvertFrom-Json
+        $views=@($oldLauncher.sessions|ForEach-Object snapshots|ForEach-Object views)
+        $back=@($views|Where-Object {$_.id -eq 2 -and $_.text -ceq 'Previous category'})|Select-Object -Last 1
+        $start=@($views|Where-Object {$_.id -eq 4 -and $_.text -ceq 'Run category'})|Select-Object -Last 1
+        if(-not $back -or -not $start){throw 'Verified APK UI control bounds unavailable'}
+        foreach($control in @(@($back)*($groups.Count-$index))+@($start)){
+            $x=[int]($control.bounds[0]+$control.bounds[2]/2);$y=[int]($control.bounds[1]+$control.bounds[3]/2)
+            $events.Add(@{kind='touch';action=0;x=$x;y=$y});$events.Add(@{kind='touch';action=1;x=$x;y=$y})
+        }
+    }
     for($segment=0;$segment -lt $WaitSegments;$segment++){$events.Add(@{kind='wait';ms=$WaitMilliseconds})}
     $events.Add(@{kind='frame'});$events.Add(@{kind='wait';ms=2000});$events.Add(@{kind='return_to_launcher'})
     $parameters.SessionEvents=@($events.ToArray())

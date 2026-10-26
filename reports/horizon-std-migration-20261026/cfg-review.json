@@ -1,0 +1,134 @@
+[
+  {
+    "path": "crates/rd-vm/src/android_log.rs",
+    "before_sha256": "b1ce799f0d8d22903c89fa8bccab1a7dd9a552e1ae98d40dce26f6b8d4be1d92",
+    "after_sha256": "b74045f577c5ed72a0ee98dc325f7dca7f131656ff52ff4e124e3d31ce09d520",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/android_stub_surfaces.rs",
+    "before_sha256": "a01df7f0c01adb4df2c00f67107f0604684a6b055ccf850eb55476506e8d0c74",
+    "after_sha256": "4c7bab12c95cbf1bbdca73d82c3b01d790847fdf428925b9c2e8f1bd22e4e4df",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/app_output.rs",
+    "before_sha256": "6c03f9c8c05fedcef8eb94dbf4ce3a9553e77abfa74388827aed83610feeb618",
+    "after_sha256": "e8fbb1c8350e3cec6066a5a77fb02c16b25378daf7935d360a438bf55d370a67",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/arrays.rs",
+    "before_sha256": "fb724c320990a37c3bc562e3cbe6c10c8a38e1ad26824919c3f261d6970bb9ec",
+    "after_sha256": "a42ce61a44d9f84912693c28a84b23b47ad8785ae94b5bba6a7b166cae7f5c97",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/classpath.rs",
+    "before_sha256": "748736aa4f204e0efffb8a8171e92cbbe0d21b3cc5511cfe1c4caccbf1937da9",
+    "after_sha256": "c65aeb1ac2a7212ec8ceb56ff21cb2e3eb51be2f3ea2f2c8d46f7346ba235a5d",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/engine.rs",
+    "before_sha256": "f3168605097c583404a3b1bb1a00e27b07258e4dd3da9c2023462fe9d5e8f723",
+    "after_sha256": "86f41422c2553bde9e328b0fcdefa01ef94f96418c0122e3ad99aa78e442b22a",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/framework.rs",
+    "before_sha256": "f632292bcf0f025a4a13bc8b18ade06fe7f1730f2e3fe60d421796262adb1c8e",
+    "after_sha256": "b8d14421d02f357da4f6dca1e7e3bab075e28f39217e694ebfbf4307eb6d5ecb",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/framework_host.rs",
+    "before_sha256": "60855f71d0546353e1f784c1183e2e2dfd14fd60eb72def2b68789b304b3eb61",
+    "after_sha256": "a49f824573ac898e8388355a0a8878240d6a6df96c2289a502ea7f834493700c",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/gc.rs",
+    "before_sha256": "23a61a935a2ed4c8f321b988752156c0a8dce3f9cc7c75a2de2feb615388f6d9",
+    "after_sha256": "e1bfbc565e2ce7b3344b8b9afd848cb28dcb3b18d22ca7a967be2eb9cc5822d5",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/heap.rs",
+    "before_sha256": "5bf429ce70e60ebcc275b1f13688d5134c7273cc83e2b15c7b5525b9b7eef870",
+    "after_sha256": "adb5f3012c4ba555575d75ba51cc9e307d5d8c9969cac69a699f6405e3608b84",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/inflate.rs",
+    "before_sha256": "f44dd978362c1a60134644693c44454f80275ca2dfdf6273296656856ab5c34a",
+    "after_sha256": "d5440811e021fa7f64fe34fbab356269912a00fc1735dec2e1ddee5a200f75e8",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/interp.rs",
+    "before_sha256": "5a7c6daced28c4799b5b74e4e25ab7333f852c684bbf3632f7e5ef47826dc6b0",
+    "after_sha256": "6b94e18bbdb43fc02dc8726ef3c0a2370b6c3cb050c4015f1a73667e37b18097",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/intrinsics.rs",
+    "before_sha256": "0442dabf7decebfa278ad6755d2723e3f7d16d13b65d03a6d4c87f74bdcfb74c",
+    "after_sha256": "01246e3320c933bd51ac40d01e1648073d2a74b75abb2d6064a04691013c8219",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/jfile.rs",
+    "before_sha256": "592231192828766ca5b545a4eb2397d632d1d06db904aa43c96b3026bbdef8f8",
+    "after_sha256": "63d7f996857cb06be890c26e6e1bb21aa48949e838d68f100fc2a29bcf36c269",
+    "only_execution_cfg_and_format": false
+  },
+  {
+    "path": "crates/rd-vm/src/jsqlite.rs",
+    "before_sha256": "0b4df0f6bf4c53533e4affec7c1d182907551e10bc07e0421ac191a0b0260cac",
+    "after_sha256": "9b75d87d31ab535beb5d877feb053783280ad465a0fa8d882c7f080a9377c2ab",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/lib.rs",
+    "before_sha256": "2d0cccfdcf94196cdace2a55bcece213d081988181f39c602e49d7a7e251dfba",
+    "after_sha256": "019ea0440f9e018ef8f941593e225ec43c4bff8198b1a41d832b3a1dbc628a74",
+    "only_execution_cfg_and_format": false
+  },
+  {
+    "path": "crates/rd-vm/src/screen_model.rs",
+    "before_sha256": "27dd9a5215c594356fe6c8fe7c33487449ab90edade0bab67dcafbacddd6e553",
+    "after_sha256": "843830016d30f807f21be7bb99f98a1bc8f0b123c3b92e811cf5893a7fb5387b",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/shared_call.rs",
+    "before_sha256": "45dd64cabf3b113ef01a544e4283b2eb144ed8ba53a0b1b509453020dc7f900c",
+    "after_sha256": "53ea7db2779b0acd36ebe2bf98b16488cb6bca068764fc494efa0f54aae19cb0",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/throwable_message.rs",
+    "before_sha256": "7d7ffc1277f54d1fb8f626fcecf5b1b776e6d6b18f33742476d31720baf39992",
+    "after_sha256": "4e036ab15414ac9c0537aa77127944bd341c113ef7600543f46809f3df2e68f0",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/src/view_layout.rs",
+    "before_sha256": "a90edee5760c3e15d948f00c10e1c26f343ff6e6261d95f8dbb637b4c655f2d8",
+    "after_sha256": "831f838dad3b64671b44058b2252a7ad95e2fd235c5a7637a040162be52637a9",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/tests/m8.rs",
+    "before_sha256": "3b45330aabac07d079087919891b69cb20c75a690c489afff3c85704a573d79b",
+    "after_sha256": "8031c874ef88f84e25e336d6f8bc51a06b587a23348407156839fd17a1722dec",
+    "only_execution_cfg_and_format": true
+  },
+  {
+    "path": "crates/rd-vm/tests/vm_exec.rs",
+    "before_sha256": "852ce5fe37b726ac27670ca7db15b6cb21f1c2581fd61c0b4a827ccf90f86b21",
+    "after_sha256": "dea085ed74a441ca1d60340d69b0a13e764365ad0a7f3b61c303fe16fbaf7973",
+    "only_execution_cfg_and_format": true
+  }
+]

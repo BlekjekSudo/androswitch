@@ -1,0 +1,9 @@
+    Checking serde v1.0.229
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+    Checking rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-dex)
+    Checking rd-apk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-apk)
+    Checking as-platform v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-platform)
+    Checking as-vm-render-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-render-testsupport)
+    Checking as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+    Checking rd-jni v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-jni)
+    Finished `dev` profile [unoptimized] target(s) in 1m 07s

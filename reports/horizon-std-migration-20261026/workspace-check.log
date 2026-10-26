@@ -1,0 +1,69 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling syn v3.0.6
+   Compiling serde_derive v1.0.229
+    Checking serde v1.0.229
+    Checking rd-apk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-apk)
+    Checking as-platform v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-platform)
+    Checking rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-dex)
+   Compiling syn v2.0.119
+    Checking aho-corasick v1.1.5
+    Checking equivalent v1.0.2
+    Checking windows-link v0.2.1
+    Checking regex-syntax v0.8.11
+    Checking hashbrown v0.16.1
+    Checking indexmap v2.11.4
+    Checking regex-automata v0.4.18
+    Checking windows-sys v0.61.2
+    Checking toml_datetime v0.6.11
+    Checking serde_spanned v0.6.9
+    Checking toml_write v0.1.2
+    Checking winnow v0.7.15
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+    Checking bit-vec v0.6.3
+    Checking bit-set v0.5.3
+    Checking toml_edit v0.22.27
+   Compiling thiserror v1.0.69
+    Checking anstyle v1.0.14
+    Checking utf8parse v0.2.2
+    Checking once_cell_polyfill v1.70.2
+    Checking anstyle-wincon v3.0.11
+    Checking anstyle-parse v0.2.7
+    Checking toml v0.8.23
+    Checking fancy-regex v0.13.0
+    Checking anstyle-query v1.1.5
+    Checking as-package v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-package)
+    Checking regex v1.13.1
+   Compiling thiserror-impl v1.0.69
+    Checking colorchoice v1.0.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking anstream v0.6.21
+    Checking rd-vm v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-vm)
+    Checking as-sqlite v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-sqlite)
+   Compiling heck v0.5.0
+   Compiling anyhow v1.0.104
+    Checking clap_lex v0.7.7
+    Checking strsim v0.11.1
+    Checking clap_builder v4.5.57
+    Checking as-storage v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-storage)
+   Compiling clap_derive v4.5.55
+    Checking rd-framework v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-framework)
+    Checking rd-engine-registry v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-engine-registry)
+    Checking as-framework v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-framework)
+    Checking clap v4.5.57
+    Checking rd-render v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-render)
+    Checking rd-ndk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-ndk)
+    Checking rd-jni v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-jni)
+    Checking as-native v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-native)
+    Checking rd-agent v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-agent)
+    Checking as-launcher v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-launcher)
+    Checking as-runtime v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-runtime)
+    Checking as-cli v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-cli)
+    Checking as-switch-smoke v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-switch-smoke)
+    Checking rd-cli v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-cli)
+    Checking xtask v0.9.0 (D:\Dev\Switch\AndroSwitch\xtask)
+    Checking rd-testsupport v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-testsupport)
+    Checking as-vm-render-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-render-testsupport)
+    Checking as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+    Checking as-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-testsupport)
+    Finished `dev` profile [unoptimized] target(s) in 1m 22s

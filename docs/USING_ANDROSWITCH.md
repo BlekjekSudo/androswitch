@@ -2,6 +2,11 @@
 
 This is a one-NRO validation candidate, not the completed offline v0.1 release.
 Host and Ryujinx evidence do not establish physical Switch compatibility.
+The current std migration ZIP includes one unified AndroSwitch Conformance APK.
+Its 219 sensor-free cases cover the recorded project contracts; it is not
+official Android CTS or a claim of complete Android compatibility. The current
+std binary passed 216 cases in Ryujinx; three PCV clock queries were unavailable.
+See the [std qualification](HORIZON_STD_MIGRATION.md) before hardware testing.
 The user reported that the four bundled samples install/open on a real Switch
 and the native triangle animation and beeps work. The user subsequently confirmed
 that the display handoff fix resolves Plus return and the startup stall; see the

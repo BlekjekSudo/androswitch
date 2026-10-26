@@ -112,25 +112,25 @@ packages a binary manifest/APK, and runs the JVM oracle. It writes the APK,
 request, expected results and build receipt to `local-artifacts/m1/fixture/`.
 Generated APK ZIP timestamps can differ; each output receives its own hash.
 
-## Build the freestanding Rust library and NRO
+## Build the historical parser smoke with the std profile
 
-Install the dated toolchain explicitly; keep an unrelated `nightly` default
-untouched:
+Use an installed selector with the matching compiler and rust-src. The helper
+validates commit `787af2b8c` and creates its independent source overlay; it does
+not change the global default or install components:
 
 ```powershell
-rustup toolchain install nightly-2026-08-26 --profile minimal --component rust-src
-./scripts/build-switch-smoke.ps1 -Toolchain nightly-2026-08-26
+./scripts/build-switch-smoke.ps1 -Toolchain nightly
 ```
 
-The script verifies the nightly manifest date. It builds `core` and `alloc`
-with `-Zbuild-std=core,alloc` for
-`aarch64-nintendo-switch-freestanding`, then invokes the libnx
+The script delegates to the same pinned product Rust builder. It builds
+`core`, `alloc`, `std` and `panic_abort` with `-Zbuild-std` for the custom
+`aarch64-androswitch-newlib` target, then invokes the libnx
 [Makefile](../platform/switch-smoke/Makefile) in WSL. WSL paths are derived
 from the Windows checkout path; no fixed developer checkout is needed.
 
 | Output | Location |
 | --- | --- |
-| Rust static library | `target/switch/aarch64-nintendo-switch-freestanding/release/libas_switch_smoke.a` |
+| Rust static library | `target/switch/aarch64-androswitch-newlib/release/libas_switch_smoke.a` |
 | ELF / NACP / NRO | `local-artifacts/m1/androswitch-smoke.*` |
 | Prepared SD package | `local-artifacts/m1/package/switch/androswitch-smoke/` |
 | Run reports / emulator logs | `local-artifacts/m1/runs/<session>/` |

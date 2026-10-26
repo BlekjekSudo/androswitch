@@ -1,0 +1,52 @@
+warning: patch `libc v0.2.189 (D:\Dev\Switch\AndroSwitch\local-artifacts\horizon-std\libc-0.2.189)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Updating crates.io index
+   Compiling compiler_builtins v0.1.160 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins)
+   Compiling core v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\core)
+   Compiling rustc-std-workspace-core v1.99.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\rustc-std-workspace-core)
+   Compiling alloc v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\alloc)
+   Compiling rustc-std-workspace-alloc v1.99.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\rustc-std-workspace-alloc)
+   Compiling libc v0.2.189 (D:\Dev\Switch\AndroSwitch\local-artifacts\horizon-std\libc-0.2.189)
+   Compiling object v0.39.1
+   Compiling unwind v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\unwind)
+   Compiling gimli v0.34.0
+   Compiling memchr v2.8.3
+   Compiling adler2 v2.0.1
+   Compiling std v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\std)
+   Compiling miniz_oxide v0.9.1
+   Compiling addr2line v0.27.1
+   Compiling panic_unwind v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\panic_unwind)
+   Compiling std_detect v0.1.5 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\std_detect)
+   Compiling hashbrown v0.17.1
+   Compiling panic_abort v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\panic_abort)
+   Compiling cfg-if v1.0.4
+   Compiling rustc-demangle v0.1.28
+   Compiling rustc-literal-escaper v0.0.8
+   Compiling proc_macro v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\proc_macro)
+   Compiling serde_core v1.0.229
+   Compiling crc32fast v1.5.2
+   Compiling serde v1.0.229
+    Checking cfg-if v1.0.5
+    Checking regex-syntax v0.8.11
+    Checking simd-adler32 v0.3.10
+    Checking regex-automata v0.4.18
+   Compiling as-sqlite v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-sqlite)
+   Compiling zmij v1.0.23
+    Checking bit-vec v0.6.3
+   Compiling serde_json v1.0.151
+   Compiling libm v0.2.15
+    Checking bit-set v0.5.3
+    Checking flate2 v1.1.10
+    Checking itoa v1.0.18
+    Checking spin v0.9.9
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+    Checking rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-dex)
+    Checking rd-apk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-apk)
+    Checking fancy-regex v0.13.0
+    Checking regex v1.13.1
+    Checking siphasher v1.0.4
+    Checking as-platform v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-platform)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4m 44s

@@ -1,0 +1,1 @@
+C atexit reached after Rust returned

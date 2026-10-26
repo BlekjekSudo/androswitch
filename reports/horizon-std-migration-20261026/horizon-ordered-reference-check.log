@@ -1,0 +1,8 @@
+warning: patch `libc v0.2.189 (D:\Dev\Switch\AndroSwitch\local-artifacts\horizon-std\libc-0.2.189)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Updating crates.io index
+    Checking as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.90s

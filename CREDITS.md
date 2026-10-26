@@ -71,8 +71,8 @@ their licenses and provenance. It provides the actual Horizon EGL/NVC0/NVK
 driver implementations; AndroSwitch supplies Android ABI/lifetime/TLS bridges.
 The SDK's shader compiler requires its matching Rust 1.101.0 nightly component.
 This is separate from the RustyDroid VM's Horizon/newlib std. The Mesa archives'
-exception personality is namespaced in build-local copies so compiler versions
-do not accidentally share that ABI.
+exception personality and Linux clock/sysconf imports are namespaced in
+build-local copies, preserving Horizon C/newlib imports and compiler identities.
 See [renderer port details](docs/MESA_SWITCH_PORT.md) for pinned artifacts,
 platform adapters, limits and verification; a successful link is not a GPU pass.
 

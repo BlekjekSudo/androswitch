@@ -25,6 +25,11 @@ independent features; enabling std preserves the Switch's existing JNI,
 execution-owner and persistent-storage contracts. See the
 [std migration report](docs/HORIZON_STD_MIGRATION.md) for its separate host,
 emulator and hardware evidence.
+The std probe now passes **32/32 in three consecutive runs**; the combined
+NRO passes the available **216 conformance cases**, eleven console sessions,
+and normal process exit after graphics/audio. Three emulator PCV queries and
+new std hardware verification remain unrun. This does not complete upstream
+Android API parity or the independent-game first-screen gate.
 Latest upstream Arrays/BitSet code and lazy parser improvements now share the
 portable path; source synchronization is kept separate from execution evidence.
 
@@ -101,7 +106,7 @@ Actual submitted console framebuffer from the M7 Ryujinx test.
 | Native ARM64 | Program-header ELF loader, dependencies, constructors, supported relocations/TLS and real libnx execution |
 | JNI | Native registration, callbacks/reentry, strings, primitive arrays, exception/reference/GC and pthread callback proof |
 | Ryujinx E2E | DEX semantics, persistent storage, native CPU oracle and mixed Java/Kotlin JNI fixtures; see milestone evidence |
-| Merged upstream VM regression | 707 host tests pass on the latest-source merge; device behavior parity remains a separate gate |
+| Merged upstream VM regression | 704 active std-reference tests pass; the earlier core/alloc checkpoint had three additional adapter-only unit tests; device API parity remains a separate gate |
 | Android lifecycle/UI | Supported M5 subset; 14 Java/Kotlin UI snapshots pass in Ryujinx |
 | Native graphics/audio | NativeActivity, incremental assets, input queue, EGL/GLES2; Java AudioTrack, AAudio writes and OpenSL ES PCM queue callbacks |
 | Console launcher | Scan/install/update/launch/return/uninstall; persistent saves, named failures and one NRO |

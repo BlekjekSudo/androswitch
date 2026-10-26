@@ -1,6 +1,9 @@
 # AndroSwitch: mulai dari satu NRO
 
-Ini kandidat validasi M9. Baseline M1–M7 sudah dikonfirmasi diuji di Switch asli.
+Ini kandidat validasi M9. Runtime terbaru memakai Rust `std` di Horizon melalui
+PAL libnx/newlib yang dipin. Build `std` ini sudah diuji di Ryujinx dan masih
+memerlukan tes Switch fisik; lihat [laporan migrasi](HORIZON_STD_MIGRATION.md).
+Baseline M1–M7 sudah dikonfirmasi diuji di Switch asli.
 Kandidat sebelumnya juga mendapat laporan bahwa instalasi APK besar, SQLite,
 dan SharedPreferences berjalan. Perubahan memori/native/GLSurfaceView yang baru
 belum diuji di Switch; kedua game belum memiliki bukti layar pertama.
@@ -32,9 +35,14 @@ Save internal ada di `userdata/<nama.paket>/`.
 APK umum masih bisa gagal karena API Android yang belum tersedia. Batas awal:
 APK tunggal maksimal **512 MiB**, minSdk maksimal 26, native ARM64, offline. Belum
 ada dukungan Google Play Services, split APK atau jaminan engine/game umum.
-Kandidat ini menyertakan tujuh contoh: empat contoh sebelumnya, preferences,
-catatan SQLite, dan HelloActivity asli AOSP. Buka preferences/catatan beberapa
-kali untuk memeriksa data tetap tersimpan, lalu periksa kembali tombol Plus.
+Paket migrasi `std` menyertakan satu **AndroSwitchConformance.apk**, dengan
+219 kasus tanpa sensor dalam satu aplikasi. Install, buka, lalu pilih Run all;
+tes bisa dilanjutkan melalui jurnal setelah aplikasi dibuka ulang. Pilih Run
+category untuk mengulang kelompok tertentu. Hasil ada di
+`userdata/org.androswitch.conformance/files/`. Ini suite proyek, bukan CTS resmi.
+Ryujinx mencatat 216 PASS dan tiga query clock PCV NOT_RUN; hasil Switch fisik
+harus dicatat tersendiri. Contoh kecil lama tetap tersedia sebagai fixture
+pengembang, dan hanya ikut paket jika dipilih ketika mengemas.
 
 Batas container kini 512 MiB dengan pembacaan bertahap. Metadata/resource yang
 dimuat utuh tetap dibatasi 64 MiB; native memakai anggaran terpisah hingga

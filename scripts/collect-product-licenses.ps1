@@ -68,7 +68,7 @@ foreach($source in $sources){
 }
 Push-Location $projectRoot
 try{
-  $tree=& cargo tree -p as-switch-smoke --target aarch64-nintendo-switch-freestanding --edges normal --prefix none --format '{p}' --locked
+  $tree=& cargo +nightly tree -p as-switch-smoke --target platform/horizon-std/aarch64-androswitch-newlib.json -Zjson-target-spec --edges normal --prefix none --format '{p}' --locked
   if($LASTEXITCODE){throw 'Device dependency graph failed'}
   $metadata=(& cargo metadata --format-version 1 --locked | ConvertFrom-Json)
   if($LASTEXITCODE){throw 'Cargo metadata failed'}

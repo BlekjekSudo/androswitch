@@ -23,7 +23,10 @@ function Stop-TestProcess([Diagnostics.Process]$OwnedProcess){
 }
 $preflightDeadline=[DateTime]::UtcNow.AddSeconds(3)
 # CIM can retain a terminated updater child after the PID has disappeared.
-do{$existing=@(Get-CimInstance Win32_Process -Filter "Name='Ryujinx.exe'" | Where-Object {$testProcess=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue;$testProcess -and -not $testProcess.HasExited});if(-not $existing.Count){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $preflightDeadline)
+do{$existing=@(Get-CimInstance Win32_Process -Filter "Name='Ryujinx.exe'" | Where-Object {
+    $_.ExecutablePath -and [IO.Path]::GetFullPath($_.ExecutablePath) -ieq [IO.Path]::GetFullPath($Ryujinx) -and
+    ($testProcess=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue) -and -not $testProcess.HasExited
+});if(-not $existing.Count){break};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $preflightDeadline)
 if($existing.Count){throw 'Close the existing Ryujinx session before this isolated E2E run.'}
 $id=[guid]::NewGuid().ToString('N');$run=Join-Path $projectRoot "local-artifacts/m7/runs/$id"
 $switchRoot=[IO.Path]::GetFullPath((Join-Path $RyujinxProfile 'sdcard/switch'))

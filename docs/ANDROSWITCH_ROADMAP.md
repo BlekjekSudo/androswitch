@@ -47,6 +47,13 @@ core/alloc-only product build decision. Rust library support and the embedded
 Android execution backend are separate; past hardware results do not qualify
 the new binary.
 
+The std qualification now records three 32/32 probe runs, 216 available
+Conformance cases (three PCV queries NOT_RUN in Ryujinx), eleven console
+sessions and a clean graphics/audio process exit. These are scoped std/product
+gates; the [migration report](HORIZON_STD_MIGRATION.md) retains failed runs,
+long-session performance limits and separate unrun hardware status. They do
+not close M9 or the complete upstream API integration requirement.
+
 The M9 work now includes a complete latest-upstream merge and a source omission
 gate. See [upstream porting](UPSTREAM_PORTING.md). This records every upstream
 file and remaining host-only original VM source. **Full Horizon behavior parity

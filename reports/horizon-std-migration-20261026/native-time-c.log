@@ -1,0 +1,2 @@
+native time contracts: empty zone / offset preservation / mktime normalization / UTC / 11 invalid offsets / partial zone passed
+Native time checks passed on Msys. Receipt: D:\Dev\Switch\AndroSwitch\local-artifacts\m9\native-time\msys\host-result.json

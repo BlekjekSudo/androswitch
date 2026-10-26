@@ -1,0 +1,5 @@
+All archive members accepted by aarch64-none-elf-objdump (exit 0).
+
+Algorithm       Hash                                                                   Path
+---------       ----                                                                   ----
+SHA256          A3A34BAB32CF31E182FB72EFE524BAD1E06B5A69107853E9A0ABA893AAEF2BF8       D:\Dev\Switch\AndroSwitch\local-…

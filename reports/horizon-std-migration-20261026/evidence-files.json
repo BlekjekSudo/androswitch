@@ -1,0 +1,770 @@
+[
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\upstream-ordered-std-tests.log",
+    "path": "reports/horizon-std-migration-20261026/upstream-ordered-std-tests.log",
+    "raw_sha256": "38f3fb35c2c70ed5dd268f827f48f08005fba1483cf267c118d7bbad4c6aaf4c",
+    "sha256": "04a62f6d8159d6509f4563f89542dff95470fd0479403e8753a607c2b7aa0d20"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-host-tests.log",
+    "path": "reports/horizon-std-migration-20261026/product-host-tests.log",
+    "raw_sha256": "0ca194421da93557814612e2a22b005a6641429bce86fd47c088a9d080417b19",
+    "sha256": "361657ac3b52991f87ea5dfd4974c999ea5ce21e3b95980ff23ff2348d250979"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-host-tests-oom.log",
+    "path": "reports/horizon-std-migration-20261026/product-host-tests-oom.log",
+    "raw_sha256": "1f8af2f0acaa358bf6a63d1b9122384b8c36fd7190accab767a5e74996ac60c6",
+    "sha256": "859258cdafa388d8245c70bd4cbc26b8b83f07e60509e96d13b407262c7f1646"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\workspace-check.log",
+    "path": "reports/horizon-std-migration-20261026/workspace-check.log",
+    "raw_sha256": "31696da0e1a7fd6006c33fb969cee713e7ef1c052876835497cab96a2bf8f5ca",
+    "sha256": "04e2687959f48a1532c3f51fabc176e2cd254883bb034e008b909ba4b05cd465"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\workspace-clippy-final.log",
+    "path": "reports/horizon-std-migration-20261026/workspace-clippy-final.log",
+    "raw_sha256": "54a2a64101c456ad8abcf0d7b9d25371a12a6c668716bc2010b0e868628570ff",
+    "sha256": "8a0399a201827e158d987453fdbb9c2a2d78e4d05ccad7969c6bf3a6470b8f18"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\upstream-clippy.log",
+    "path": "reports/horizon-std-migration-20261026/upstream-clippy.log",
+    "raw_sha256": "3b1ae8310cae91cc6c204dd21bfb3f2c680d7454b7fed3d3993bd5f2d650c9a8",
+    "sha256": "4ff687f8b95299cba17fc302d7a5f4779fe53dba4c1710db7683aa2816fe7e93"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\horizon-reference-check.log",
+    "path": "reports/horizon-std-migration-20261026/horizon-reference-check.log",
+    "raw_sha256": "0e850ef468ce1a19ed810c70ad4156b41bc5e646ac0499d3a33eb7392e57c000",
+    "sha256": "f9a4bb3d77ca9c1aea0f0f1fb027af0348d1845dbcf706a73d008ee3e98f184d"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\bridge-unit-tests-final.log",
+    "path": "reports/horizon-std-migration-20261026/bridge-unit-tests-final.log",
+    "raw_sha256": "a401f36829984edd783cd97462bb87b0bafa3e973e4a230c89faa48202ce3f9b",
+    "sha256": "f5838bea43082e4557f7a75a343e6a1613464435061dfa1208bd75ff121cb773"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\python-checks-final.log",
+    "path": "reports/horizon-std-migration-20261026/python-checks-final.log",
+    "raw_sha256": "e32a42e955a9160f57c6bcde5cf165d2a5702433c6b72fabaf8de7a6d65ff781",
+    "sha256": "09de2fba0a74d658d405eb4012722922bce0a6b391de72114252354d2cf60c77"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\native-abi-c-final.log",
+    "path": "reports/horizon-std-migration-20261026/native-abi-c-final.log",
+    "raw_sha256": "54606aa829c19da7499e928083cd57d945ab0621773b8a94aa6eaf54a2ac36c7",
+    "sha256": "23a77c79eb7c0fcbc38e46aae3225fe0bd5d8d7fabf02c7cddc0b4a4fedd3a48"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\native-time-c.log",
+    "path": "reports/horizon-std-migration-20261026/native-time-c.log",
+    "raw_sha256": "eb135706c4b3d9c1356ea762f2c23c2fcc5670ee0cd34bcce0737c46dea9aaaf",
+    "sha256": "94e2e596bb7690348be7e5df16824ab7a9728b819e521163e84989622da9864e"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\background-workers-c.log",
+    "path": "reports/horizon-std-migration-20261026/background-workers-c.log",
+    "raw_sha256": "73b7bfec241f8cd7b217cc7644716348110cde3395c2f6f5e242ca10cf74e2fd",
+    "sha256": "f0cfaf0c186e9c7ee31b1cfdaf6c6598c1bf831eb8033f60f2d4a49dca7d118a"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\display-c.log",
+    "path": "reports/horizon-std-migration-20261026/display-c.log",
+    "raw_sha256": "55d6da07626fdf0dfdb7c09a8232c3608725019cf857394fefe90dfe2d54ffee",
+    "sha256": "646faded3aabc89cf9db3234d3d41666805a618fc9122d2619e9b46f42ad7168"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runtime-resources-c.log",
+    "path": "reports/horizon-std-migration-20261026/runtime-resources-c.log",
+    "raw_sha256": "0a01964a89195c0c6f8fd725ace65fd8089467ed3e49b17dc19d98dadfb5195c",
+    "sha256": "2c90a88b654714df43a3e80e366ff2cf924edf987875e7552a8896615ee35dc5"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\capture-ownership.log",
+    "path": "reports/horizon-std-migration-20261026/capture-ownership.log",
+    "raw_sha256": "47edc2e949ee14bc455b22e0ceca3414a85d1099c6cea17520eebf808f701546",
+    "sha256": "f62c598fafc4ef7fb55e6c50a25dc614ea13dec7e0070632151849322ec5111c"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\cfg-review.json",
+    "path": "reports/horizon-std-migration-20261026/cfg-review.json",
+    "raw_sha256": "50ac88aaced348488276522e1c85fef9f76eec82c331e09fa4c70cb30a730da5",
+    "sha256": "0f0a2dd652fbea0802baa9a2bbc7673f2eb00c2f5315fbf0a5ba4aa3ab111ced"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\reviewed-source-paths.json",
+    "path": "reports/horizon-std-migration-20261026/reviewed-source-paths.json",
+    "raw_sha256": "4ae2618ed0f47503f5fc1592c521da3a37f1048e51dc274555c7a7bd1996960b",
+    "sha256": "6fbd24132c08e1a4e1d898a7f2b6a70a7e27a300623f90a6650d15cdeb179274"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\migration-qualified\\build.json",
+    "path": "reports/horizon-std-migration-20261026/std-probe/build.json",
+    "raw_sha256": "6e2886f8559007e8cf67903655243002ded0614d0484ee8b0a17afeb02068c8e",
+    "sha256": "6e2886f8559007e8cf67903655243002ded0614d0484ee8b0a17afeb02068c8e"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\migration-qualified\\source.json",
+    "path": "reports/horizon-std-migration-20261026/std-probe/source.json",
+    "raw_sha256": "86eb1fffde24b639b3989e0346167ad43d52a2b6bd19599fa1fe1b7cb855d41f",
+    "sha256": "86eb1fffde24b639b3989e0346167ad43d52a2b6bd19599fa1fe1b7cb855d41f"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\migration-qualified\\libc-adaptation.patch",
+    "path": "reports/horizon-std-migration-20261026/std-probe/libc-adaptation.patch",
+    "raw_sha256": "96690552cd23d7a7e38c8a1d67951028c3cff3e63522c3dfa0773332168b5660",
+    "sha256": "bf2527b984382ff4181750a1b6de8561c4d7c3ccccd649d12e6cffd873a0340b"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\migration-qualified\\rust-std-adaptation.patch",
+    "path": "reports/horizon-std-migration-20261026/std-probe/rust-std-adaptation.patch",
+    "raw_sha256": "712e5397bef665c052869c717b535dc425e9494d694cbb3fa2ff25f8455a96b5",
+    "sha256": "af764bd3785158ea316146f3663d487541f9396d28ad61b1e54f55940d65fded"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\probe-qualified-report-1.json",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/report.json",
+    "raw_sha256": "05348c9df6386ef7a36f5edaede96f74a995d8cbee604f64ee90788b3840ef0f",
+    "sha256": "f70504287378e0eac30a70f58da50626c94a7907ee4b5fb6ae0555354ecc6e98"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/verification.json",
+    "raw_sha256": "503dd2d9ac990eed72912c1e59cb6b9a82071e3685c8f1fd77e12b0ce3be0cab",
+    "sha256": "e4e7580b9c75c97a925f9959808e4f812e88498f2daf88833ddb38afb93340bd"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\sd-result\\19f01a4ae7d14a0d953edb68bc5fcfae\\results.tsv",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/results.tsv",
+    "raw_sha256": "9022060e3d3cbceab67a2bbb4998c8408b31eddc1ebdeafd7c1da4bb6ee0cef8",
+    "sha256": "9022060e3d3cbceab67a2bbb4998c8408b31eddc1ebdeafd7c1da4bb6ee0cef8"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\sd-result\\19f01a4ae7d14a0d953edb68bc5fcfae\\complete-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/complete-suite.txt",
+    "raw_sha256": "9ef8cb5e7251e2245258e0470b87ee1663855f5ccf92db1e285bc912027402a7",
+    "sha256": "9ef8cb5e7251e2245258e0470b87ee1663855f5ccf92db1e285bc912027402a7"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\sd-result\\19f01a4ae7d14a0d953edb68bc5fcfae\\returned-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/returned-suite.txt",
+    "raw_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\sd-result\\19f01a4ae7d14a0d953edb68bc5fcfae\\shutdown-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/shutdown-suite.txt",
+    "raw_sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4",
+    "sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\sd-result\\19f01a4ae7d14a0d953edb68bc5fcfae\\complete-restart.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/complete-restart.txt",
+    "raw_sha256": "4e5049fcf5ae8d2da6b0968a50e169d8d7acafcf1745e9a43e44c10e12f58d4b",
+    "sha256": "4e5049fcf5ae8d2da6b0968a50e169d8d7acafcf1745e9a43e44c10e12f58d4b"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\sd-result\\19f01a4ae7d14a0d953edb68bc5fcfae\\returned-restart.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/returned-restart.txt",
+    "raw_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\sd-result\\19f01a4ae7d14a0d953edb68bc5fcfae\\shutdown-restart.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/shutdown-restart.txt",
+    "raw_sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4",
+    "sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\sd-result\\19f01a4ae7d14a0d953edb68bc5fcfae\\panic.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/panic.txt",
+    "raw_sha256": "e123f2939f8daa418a1bba4e9dd767aa1dcee10728035a8a63c2340c57989b53",
+    "sha256": "5a51db4e2e74e4c5409ad4682b9ac26e75732225bf4182ceae15628c669c6f96"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\suite.stdout.log",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/suite.stdout.log",
+    "raw_sha256": "266e11585c71fc35ba398a1ebd8e8409502e4e481ac526e7494fcbf1b3c57e5c",
+    "sha256": "4816f5104110826e5298266f622c3da3ca3b443a4ef062ed96cb72b48acbd7ba"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\restart.stdout.log",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/restart.stdout.log",
+    "raw_sha256": "6b03c1dfd95ab7a9328be05d35c5a398b3dbd0a5ff633042fdadfa50d46b7ddc",
+    "sha256": "0010c880a55357013b95c0dac4e1a171af3fcd7ac621a4194f4267ba97820f72"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\19f01a4ae7d14a0d953edb68bc5fcfae\\panic.stdout.log",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-1/panic.stdout.log",
+    "raw_sha256": "7db0fe32c7c8a681d599055dd8288128faf09064c0e3e6643949b6e2a5668d39",
+    "sha256": "f98243ff0973ef4735de5e1ac14049661a65984d57bbed1528882e523b680d24"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\probe-qualified-report-2.json",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/report.json",
+    "raw_sha256": "791bb7bcbf181bd2aa8c368b16d49e8a4854ccd54c02da816fa42bb968fec026",
+    "sha256": "234d166234fc700b3600832dfb82d7ee898abc5efa1f8b0da806f0f6a7465569"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/verification.json",
+    "raw_sha256": "8e8ce51efdf63c57f0379a8e943f0bb7e4396f5bc538d2d8a9e5f5ba16349b6b",
+    "sha256": "07f00e21a4a89922467fff23e6816c3e67745d555bb9f1dc7ec051b04ae8f8ad"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\sd-result\\bb3a19e41925456d9168da8c624eb15e\\results.tsv",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/results.tsv",
+    "raw_sha256": "778501827e5e4bf0ab1f7b6f50f4b0e9700f31e1f1d925f53767e13272987767",
+    "sha256": "778501827e5e4bf0ab1f7b6f50f4b0e9700f31e1f1d925f53767e13272987767"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\sd-result\\bb3a19e41925456d9168da8c624eb15e\\complete-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/complete-suite.txt",
+    "raw_sha256": "48ae1e1d86225447dc6f1824bf43ae9118dc47ebaeb9d429ecacf376d5e778bd",
+    "sha256": "48ae1e1d86225447dc6f1824bf43ae9118dc47ebaeb9d429ecacf376d5e778bd"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\sd-result\\bb3a19e41925456d9168da8c624eb15e\\returned-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/returned-suite.txt",
+    "raw_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\sd-result\\bb3a19e41925456d9168da8c624eb15e\\shutdown-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/shutdown-suite.txt",
+    "raw_sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4",
+    "sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\sd-result\\bb3a19e41925456d9168da8c624eb15e\\complete-restart.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/complete-restart.txt",
+    "raw_sha256": "d796bfe6c7bee5c478f4a2170905510d911267970b42a036d13e6ad6fe67c60f",
+    "sha256": "d796bfe6c7bee5c478f4a2170905510d911267970b42a036d13e6ad6fe67c60f"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\sd-result\\bb3a19e41925456d9168da8c624eb15e\\returned-restart.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/returned-restart.txt",
+    "raw_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\sd-result\\bb3a19e41925456d9168da8c624eb15e\\shutdown-restart.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/shutdown-restart.txt",
+    "raw_sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4",
+    "sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\sd-result\\bb3a19e41925456d9168da8c624eb15e\\panic.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/panic.txt",
+    "raw_sha256": "e123f2939f8daa418a1bba4e9dd767aa1dcee10728035a8a63c2340c57989b53",
+    "sha256": "5a51db4e2e74e4c5409ad4682b9ac26e75732225bf4182ceae15628c669c6f96"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\suite.stdout.log",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/suite.stdout.log",
+    "raw_sha256": "ccbeb3e765081faf6ffaffd707dacec2092079aeb4559c0f0fd7a39d37ea5e60",
+    "sha256": "ff144c9c6554608c7d520ac2f3c7029ddc8b7e2258d0a81196eb3f47df1069b5"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\restart.stdout.log",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/restart.stdout.log",
+    "raw_sha256": "965f805d48a014c9ab265407db72c45679e91992b3e8ca4038b693b939468345",
+    "sha256": "b52f1e1b0a796cc24950d71d40166c4442e9e9942349db128563510d34f1b5bf"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\bb3a19e41925456d9168da8c624eb15e\\panic.stdout.log",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-2/panic.stdout.log",
+    "raw_sha256": "c535032d1c2eefbd884662ee43acea237ff4dc8b1b7dcf29d3752ef549715cc4",
+    "sha256": "35b673d00f10ef78d3fd5b489420c15ce0b7bd153791ca7ca273340de84fb559"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\probe-qualified-report-3.json",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/report.json",
+    "raw_sha256": "663f368c57b6dc2c2fa54284a01cae3dc8c3b7e9c09b4c04270c6dfcc87f5a7e",
+    "sha256": "68a7abb1d50df7100a379fbb6260efc509143f2e9fd7a60a7deb81399eebf4d8"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/verification.json",
+    "raw_sha256": "d6bd6ebd068f834ac07ac09cc7caeae2e5c255a989cbb01c536864a01fdd1f27",
+    "sha256": "c986d6125a5a6e256254611af8e106a54039c1f338cab63dad1ce737c484574e"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\sd-result\\4a3260a7aa1240cbb86dc884e157bf7b\\results.tsv",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/results.tsv",
+    "raw_sha256": "dcb0b4d251bbbad8c4a5ec95e7946630abfac57b2d41f02ad330637462cf63eb",
+    "sha256": "dcb0b4d251bbbad8c4a5ec95e7946630abfac57b2d41f02ad330637462cf63eb"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\sd-result\\4a3260a7aa1240cbb86dc884e157bf7b\\complete-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/complete-suite.txt",
+    "raw_sha256": "bc8d941552740ccfae122d6d77359e7758e9d85f7176a330188f9b1df825fe3b",
+    "sha256": "bc8d941552740ccfae122d6d77359e7758e9d85f7176a330188f9b1df825fe3b"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\sd-result\\4a3260a7aa1240cbb86dc884e157bf7b\\returned-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/returned-suite.txt",
+    "raw_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\sd-result\\4a3260a7aa1240cbb86dc884e157bf7b\\shutdown-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/shutdown-suite.txt",
+    "raw_sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4",
+    "sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\sd-result\\4a3260a7aa1240cbb86dc884e157bf7b\\complete-restart.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/complete-restart.txt",
+    "raw_sha256": "de5ba04d1e22910ce82c16106fb4c07b0ee3a4a0b9c8841fe40b393b97a3fcf4",
+    "sha256": "de5ba04d1e22910ce82c16106fb4c07b0ee3a4a0b9c8841fe40b393b97a3fcf4"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\sd-result\\4a3260a7aa1240cbb86dc884e157bf7b\\returned-restart.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/returned-restart.txt",
+    "raw_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\sd-result\\4a3260a7aa1240cbb86dc884e157bf7b\\shutdown-restart.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/shutdown-restart.txt",
+    "raw_sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4",
+    "sha256": "d65f35968b4b50ace65cc1fadece710b22a88386556f9746bba81664204d37e4"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\sd-result\\4a3260a7aa1240cbb86dc884e157bf7b\\panic.txt",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/panic.txt",
+    "raw_sha256": "e123f2939f8daa418a1bba4e9dd767aa1dcee10728035a8a63c2340c57989b53",
+    "sha256": "5a51db4e2e74e4c5409ad4682b9ac26e75732225bf4182ceae15628c669c6f96"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\suite.stdout.log",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/suite.stdout.log",
+    "raw_sha256": "4603b3b2443398e38d4575149eb332ede658ff56de7df1911fa24b70334e3407",
+    "sha256": "d586353aad79e826004514a1c6efd97916ab16d41ff115ea649c73c696caa3f7"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\restart.stdout.log",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/restart.stdout.log",
+    "raw_sha256": "944c089e05ed17ea8ce583b9d926811f8cc7a5f3f9fdb122ec52478dbe25f137",
+    "sha256": "1ac26a3fccea14cee1c38c02676e6e63a134f8e82947aaba44d4689c226c8069"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\4a3260a7aa1240cbb86dc884e157bf7b\\panic.stdout.log",
+    "path": "reports/horizon-std-migration-20261026/std-probe/run-3/panic.stdout.log",
+    "raw_sha256": "dd1f8c60096e1ffd852d40b9881a1ddb66bc8b5d57df89794b4fe883a3819404",
+    "sha256": "1fc8f7ebf1e03cd8a58218b45e407ae493d5ae3f5a2986db3e16a4e49108eefb"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\retirement-race-before-fix\\build.json",
+    "path": "reports/horizon-std-migration-20261026/preliminary/retirement-race/build.json",
+    "raw_sha256": "a0d9cff74e8905622f81f843b7d2319f5425a7c6080d2329c8dc7762d01edb77",
+    "sha256": "a0d9cff74e8905622f81f843b7d2319f5425a7c6080d2329c8dc7762d01edb77"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\retirement-race-before-fix\\source.json",
+    "path": "reports/horizon-std-migration-20261026/preliminary/retirement-race/source.json",
+    "raw_sha256": "d8e5f7939a2b2270a792c4eee2d2142491619cc2089e9d2f53b04a3d729ab8d2",
+    "sha256": "d8e5f7939a2b2270a792c4eee2d2142491619cc2089e9d2f53b04a3d729ab8d2"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\3ae599c637854c799afd6cca1b97e327\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/preliminary/retirement-race/verification.json",
+    "raw_sha256": "46b036ee1a0f88e32fabccd2a8c1ccbe5fbd1022eba63a671666b6656fe4da31",
+    "sha256": "96e4ea75de167e1635f4ea5cc876cd680b64334f934dfc6ac82d3589c2e6f981"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\3ae599c637854c799afd6cca1b97e327\\sd-result\\3ae599c637854c799afd6cca1b97e327\\results.tsv",
+    "path": "reports/horizon-std-migration-20261026/preliminary/retirement-race/results.tsv",
+    "raw_sha256": "a032a200ba935334268c1d6e47fedd4665bdb5fc7f16616155be92de9548ca26",
+    "sha256": "a032a200ba935334268c1d6e47fedd4665bdb5fc7f16616155be92de9548ca26"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\3ae599c637854c799afd6cca1b97e327\\sd-result\\3ae599c637854c799afd6cca1b97e327\\returned-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/preliminary/retirement-race/returned-suite.txt",
+    "raw_sha256": "97b912eb4a61df5f806ca6239dde3e1a4f51ad20aced1642cbb83dc510a5fa6b",
+    "sha256": "97b912eb4a61df5f806ca6239dde3e1a4f51ad20aced1642cbb83dc510a5fa6b"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\migration-fixed\\build.json",
+    "path": "reports/horizon-std-migration-20261026/preliminary/default-stack-exhaustion/build.json",
+    "raw_sha256": "bc46663b79ff75f9f02fadc49846566644c0bf5c975c429652605391ba995e84",
+    "sha256": "bc46663b79ff75f9f02fadc49846566644c0bf5c975c429652605391ba995e84"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\migration-fixed\\source.json",
+    "path": "reports/horizon-std-migration-20261026/preliminary/default-stack-exhaustion/source.json",
+    "raw_sha256": "65688f69a2dbb96374562d679d6e7c667008cc6edda1bb7c62d9b64d046a5e68",
+    "sha256": "65688f69a2dbb96374562d679d6e7c667008cc6edda1bb7c62d9b64d046a5e68"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\37d5d6f80dd8488db1956ea0128c4793\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/preliminary/default-stack-exhaustion/verification.json",
+    "raw_sha256": "3debcbb3bee930587fd692f25ead1648000688807c1fd981ee112047825bcb5e",
+    "sha256": "48ff755e54f27e88138c9a9bc8135e35454ec1970dcc6b7b201eb87399dfe21b"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\37d5d6f80dd8488db1956ea0128c4793\\sd-result\\37d5d6f80dd8488db1956ea0128c4793\\results.tsv",
+    "path": "reports/horizon-std-migration-20261026/preliminary/default-stack-exhaustion/results.tsv",
+    "raw_sha256": "b6336661ad377060d1dfe8e11f8463883e3b27b3b2c4048ceb4ee04b55c8e86f",
+    "sha256": "b6336661ad377060d1dfe8e11f8463883e3b27b3b2c4048ceb4ee04b55c8e86f"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\runs\\37d5d6f80dd8488db1956ea0128c4793\\sd-result\\37d5d6f80dd8488db1956ea0128c4793\\returned-suite.txt",
+    "path": "reports/horizon-std-migration-20261026/preliminary/default-stack-exhaustion/returned-suite.txt",
+    "raw_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\4717f2c4d8fa4805af2a825caea63493\\conformance-summary.json",
+    "path": "reports/horizon-std-migration-20261026/preliminary/long-session-timeout/conformance-summary.json",
+    "raw_sha256": "34918f7a84370b4c5d4f8a2359ecffb1d4d6f3cabff1d54c477a3698f53dcb94",
+    "sha256": "0a480c364ba1d828c8383f415d26028c900c300720ec35dcc8ada52d9ff85a6e"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\4717f2c4d8fa4805af2a825caea63493\\conformance-report.json",
+    "path": "reports/horizon-std-migration-20261026/preliminary/long-session-timeout/conformance-report.json",
+    "raw_sha256": "e72470a905c0cec09ebf47a090f9cda017d795fce1692c802b346a3c3710e93a",
+    "sha256": "e72470a905c0cec09ebf47a090f9cda017d795fce1692c802b346a3c3710e93a"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\4717f2c4d8fa4805af2a825caea63493\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/preliminary/long-session-timeout/verification.json",
+    "raw_sha256": "99372f39a7c3e3881f9c717472ad173cf3471ce5eb3e5e3c78d8357d9f5ade26",
+    "sha256": "31bd8b5a1dc4bb83b6a32e78388d000c0b09965c87bdca9f2e9becbc66913e5d"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\startup-iterations\\nro52\\product-build.json",
+    "path": "reports/horizon-std-migration-20261026/product-build.json",
+    "raw_sha256": "b6ff6f7baf872374fa771b41822c088b524d0b01e3617bf8b6973a234ea7bad2",
+    "sha256": "143dc5d5eee670d1e3fc9a005fca3c7362913587f8b4dbcb785fa4bb433f8330"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\startup-iterations\\nro52\\product-source.json",
+    "path": "reports/horizon-std-migration-20261026/product-source.json",
+    "raw_sha256": "70db4b9908f59fd2600d0f56484914d9094990f1a0f6cede9d200ec341203dfb",
+    "sha256": "70db4b9908f59fd2600d0f56484914d9094990f1a0f6cede9d200ec341203dfb"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\startup-iterations\\nro52\\product-std-platform.json",
+    "path": "reports/horizon-std-migration-20261026/product-std-platform.json",
+    "raw_sha256": "b83772ee2f1a3756d300faea1744d6ec8b1eaf64826e4befe33dc9b709965d56",
+    "sha256": "661510264383a277512c84501d4217868301b2b2486a99fdb598d86105d3a71f"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\startup-iterations\\nro52\\product-mesa-link.json",
+    "path": "reports/horizon-std-migration-20261026/product-mesa-link.json",
+    "raw_sha256": "838539c2bffb67d9b7f7d7781ee8645f323bb1b344d64ab72c00c6fbb25add1a",
+    "sha256": "41c7f75a1d0081f617dada75ff43208c342cd86146c314f53cf7aa37fc0782b9"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-ordered-host-tests.log",
+    "path": "reports/horizon-std-migration-20261026/product-ordered-host-tests.log",
+    "raw_sha256": "b6be8441ff79b6eb1f1644157845e7750a18c92f591198e4bb51e1a7161fb903",
+    "sha256": "8c5cc3966b61e901aa036ea9ad7c5ff9217af9ea12713dc0679defeab0d841a6"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\workspace-ordered-clippy.log",
+    "path": "reports/horizon-std-migration-20261026/workspace-ordered-clippy.log",
+    "raw_sha256": "402fea92ecc34b03150c975a0f9ea5f0a68f5cf66f75931520eb029c1f8826d7",
+    "sha256": "55ce395513bdab8f19410721c99d300a10edac09d90408089464da79c58cf384"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\upstream-ordered-clippy.log",
+    "path": "reports/horizon-std-migration-20261026/upstream-ordered-clippy.log",
+    "raw_sha256": "bed6da76bb344e267b473069d3b3bca34816f370a17016caf38604ab04d7e44f",
+    "sha256": "5f3ea0d1a953fafb6ef8f4b8e849d4afac47f59ae3f0d513689ca1e4a7660792"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\format-final.log",
+    "path": "reports/horizon-std-migration-20261026/format-final.log",
+    "raw_sha256": "8f1059a9e535b1eb953c4c827a9f0e3437ee0622ad8bbc073260c2e26c276a46",
+    "sha256": "7222e9e8e18fc70ff699950c8df99a4be5238c0ddc81ff5350ae94b4d66f48b7"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\python-checks-last.log",
+    "path": "reports/horizon-std-migration-20261026/python-checks-last.log",
+    "raw_sha256": "753e673f4638e06807c25e1f8ff74f4acedbd1fd439f1f871c88feec5049d3ae",
+    "sha256": "b45d3be442563314ce2b8251aec277aaa9fdfb02a32464b97e22bb16a45be60b"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\upstream-sync-final.json",
+    "path": "reports/horizon-std-migration-20261026/upstream-sync-final.json",
+    "raw_sha256": "3a966fa78687f310b23b3df97448bcc67dd2b6efb62e6f400d9a1f64e9b0adc1",
+    "sha256": "3f4fcb917c04d63092296638ba1de8ca9c0f76a73ceff0619657618032ef8577"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\horizon-ordered-reference-check.log",
+    "path": "reports/horizon-std-migration-20261026/horizon-ordered-reference-check.log",
+    "raw_sha256": "389c4b1a750cb10573a1c147a7bed254a6f5103b9572b273bd376894bb6f7a57",
+    "sha256": "a1d2fad672a9f8ec208a8ca63605ba338e71f8d7625956514f1b43a15cdc5847"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\d3a7c903fb2745a6b5d7c5d82a86f966\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/initial-short/verification.json",
+    "raw_sha256": "378d61246186c856865f6ecabae644b88342bcb1be69760e199b37ce06c0b9f6",
+    "sha256": "edf1771bebaf9b400f481a03ebc4ae8e5c1834fef6d8b2021749ebd644e91dd6"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\d3a7c903fb2745a6b5d7c5d82a86f966\\conformance-summary.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/initial-short/conformance-summary.json",
+    "raw_sha256": "1703f9646284bd05129cc4babef8acd969b60c15609ef76aa8d393aaf46e0e76",
+    "sha256": "2eee1a00df692ebab4caaae2dbad6f3372f8573b14b1d837fa292a5778d9999a"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\d3a7c903fb2745a6b5d7c5d82a86f966\\conformance-report.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/initial-short/conformance-report.json",
+    "raw_sha256": "7f7e2c03aacd1dd048b5d70a82f343dddc412d1ebdda5833d03d4b6baaf40d9e",
+    "sha256": "7f7e2c03aacd1dd048b5d70a82f343dddc412d1ebdda5833d03d4b6baaf40d9e"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\d3a7c903fb2745a6b5d7c5d82a86f966\\emulator.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/initial-short/emulator.json",
+    "raw_sha256": "4cfa4c70a9e42fd32dc45fda396650d3eb345ba4ddf0a8a6a821d69f5031b6ab",
+    "sha256": "63cec36f8160a2cb085904d6051c3f2915da5a96cc5081a1f1c322752fb9859f"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\d3a7c903fb2745a6b5d7c5d82a86f966\\launcher-test.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/initial-short/launcher-test.json",
+    "raw_sha256": "31e91de2faf814387acc4a4e3343d9ad4941a228e3effb46b997cadbca8782fd",
+    "sha256": "52d1a0330d8d5c7efa3ab87c143f828da8155124e85d8e311bc71fd1206cf2d5"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\1bf5ac5569cf4654926d5667f6767484\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/continued-short/verification.json",
+    "raw_sha256": "49f3873bd87b58c5f7c7cf7f9ba991263f5fc17dce731cfbcea4b2f4bcbde594",
+    "sha256": "df2bcef7b38c42c5204bd8decd06f9ed9da6a4cac442801868cf5018f4bd31e6"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\1bf5ac5569cf4654926d5667f6767484\\conformance-summary.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/continued-short/conformance-summary.json",
+    "raw_sha256": "d3e8a5dcaf3034166b28987270b3b1b2ef4c6be447e5e1f0d4bbd401163465d6",
+    "sha256": "19847104836d0eb6d2454d7ccf88bad19ab71f7685d35976d0d359b0b56c2d07"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\1bf5ac5569cf4654926d5667f6767484\\conformance-report.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/continued-short/conformance-report.json",
+    "raw_sha256": "3751572b9a855e979342d8fcbfb679d296fd8fc70dc7336a36004494d8903764",
+    "sha256": "3751572b9a855e979342d8fcbfb679d296fd8fc70dc7336a36004494d8903764"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\1bf5ac5569cf4654926d5667f6767484\\emulator.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/continued-short/emulator.json",
+    "raw_sha256": "5a81b6047b2c660db0ff98e02cc65557ccadcbaecce6d92719b59cf4890ef93b",
+    "sha256": "1abe758ebd5a98e8e9d0eb66cfca77f9fe83de4a7b688ba9e8163625f93ff816"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\1bf5ac5569cf4654926d5667f6767484\\launcher-test.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/continued-short/launcher-test.json",
+    "raw_sha256": "eefbda827609cac55affea3206b328266da1f54b39ed4b40b5361b182cd113c5",
+    "sha256": "75a0df8f1c0a4f07616d562652fd474f7086985d94d55a760c5c3f157ba9f4da"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\563f4a488fbb4d5ea26e44c9427b6ede\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/lifecycle-ui-rerun/verification.json",
+    "raw_sha256": "03e678634d86f4c9718eceddc7e055a0a2008b9436c8bf4345f3efbec2ee3d4d",
+    "sha256": "d34cdc96b485cae414b194fffb47f82cc86d4b6287a52bcad1afe10fdb29ee58"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\563f4a488fbb4d5ea26e44c9427b6ede\\conformance-summary.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/lifecycle-ui-rerun/conformance-summary.json",
+    "raw_sha256": "2200f485db17c964b59a3890ef2d52d960daaae755211073056b4035369d9644",
+    "sha256": "6c492fc3fda5496bd33d09ced02858001c03e8622085e17e6aba0fb758cef07a"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\563f4a488fbb4d5ea26e44c9427b6ede\\conformance-report.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/lifecycle-ui-rerun/conformance-report.json",
+    "raw_sha256": "55cc0387dfb11d02e31ced92a1327a02d1e86bb0bb763196ad7b3c0a94d9b00d",
+    "sha256": "55cc0387dfb11d02e31ced92a1327a02d1e86bb0bb763196ad7b3c0a94d9b00d"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\563f4a488fbb4d5ea26e44c9427b6ede\\emulator.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/lifecycle-ui-rerun/emulator.json",
+    "raw_sha256": "17d0b367c6ebfbeafdea624618723ff0b51a0691ffceabd448ef28c37c79c53c",
+    "sha256": "c1e2d3caa51cbfb676610075ecb760a0844193ae4e44910c801b51f2e0bb84b2"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\563f4a488fbb4d5ea26e44c9427b6ede\\launcher-test.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/lifecycle-ui-rerun/launcher-test.json",
+    "raw_sha256": "24e290681d204d022e14a298a22675ac2540a5df708455bdf7fee0a8a724475f",
+    "sha256": "c3479c87bb8f96c2bfb09dc1bd1db167e874b3005dedcedbd2c364924d2ba843"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\final-journal-files.json",
+    "path": "reports/horizon-std-migration-20261026/conformance/final-journal-files.json",
+    "raw_sha256": "7521afbd63edf4da5a1e02cb8a749f90bb3cc6f3f328ac0e1e047155a1752861",
+    "sha256": "bd967e613280d2ebbdd7abb337c15f2d45f1b8e464769de9c535c9638f852757"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m7\\runs\\3245a1c737544c8f84937e10acea21ff\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/launcher/verification.json",
+    "raw_sha256": "6702d1f31a8ccab045e830e2d9176f21d7e18ab2b764f89d61572c932ca7d60d",
+    "sha256": "317cc4b54733134cc5e6bedcb2241f90f5d89e34229f7fea127b7a19a34e4e7b"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m7\\runs\\3245a1c737544c8f84937e10acea21ff\\verification-before-validator-update.json",
+    "path": "reports/horizon-std-migration-20261026/launcher/verification-before-validator-update.json",
+    "raw_sha256": "79507a149c7bc423ed930b65e38285b0abf127141dbc0c2083f91457d3600603",
+    "sha256": "5dc2da6ee9e40c123e5b9498ec00ce88e96a4331da3b0c5b11f917d3c8c55e82"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m7\\runs\\3245a1c737544c8f84937e10acea21ff\\emulator.json",
+    "path": "reports/horizon-std-migration-20261026/launcher/emulator.json",
+    "raw_sha256": "8f668e9b6ecc582218f250daf9565d86a95f065fa336a7be30f9b2080e1d8720",
+    "sha256": "6723c9c8a619f2928a1c6d9c4d496b5abcead6e4c4aeb6f1448e33c1f823960b"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m7\\runs\\3245a1c737544c8f84937e10acea21ff\\guest-media.json",
+    "path": "reports/horizon-std-migration-20261026/launcher/guest-media.json",
+    "raw_sha256": "91ab5e6e7cc8cf8f225dd6e83b479595eda57f8f52957facb2f66755e6f8875c",
+    "sha256": "992c9c72f9e1399ae2d045735471aeaaf9eb54622b36f27835cfe52818b03250"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m7\\runs\\3245a1c737544c8f84937e10acea21ff\\teardown.log",
+    "path": "reports/horizon-std-migration-20261026/launcher/teardown.log",
+    "raw_sha256": "c81b943b0b2b2635b5fcd7a1ca562534735f2ab45925e80a84cb3421dfaf77b3",
+    "sha256": "c81b943b0b2b2635b5fcd7a1ca562534735f2ab45925e80a84cb3421dfaf77b3"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m7\\runs\\3245a1c737544c8f84937e10acea21ff\\display-handoffs.log",
+    "path": "reports/horizon-std-migration-20261026/launcher/display-handoffs.log",
+    "raw_sha256": "3d67c9a905c435ae99f8eda129b453eb1ca387d36515d46df50b08cde8f8287a",
+    "sha256": "3d67c9a905c435ae99f8eda129b453eb1ca387d36515d46df50b08cde8f8287a"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m7\\runs\\3245a1c737544c8f84937e10acea21ff\\launcher-test.json",
+    "path": "reports/horizon-std-migration-20261026/launcher/launcher-test.json",
+    "raw_sha256": "62bd67587f83c0e17c6298373fd856616cbd29215c1591772b48c4e99c043b85",
+    "sha256": "93a6da5a4a1bf7f76bf549598fd8e9de7e1feda6c40e086c0aa5b96d5ebe5fe7"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\verification.json",
+    "path": "reports/horizon-std-migration-20261026/product-exit/verification.json",
+    "raw_sha256": "0f8d1ac2f5203fceba15be62883f1bcb8684a2d4766e6ca698faf165f54edff7",
+    "sha256": "90bf0a6251633a028338bcfbb8a6a70d632ecf0cfbb03ee986034843571bd4a6"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\launch.json",
+    "path": "reports/horizon-std-migration-20261026/product-exit/launch.json",
+    "raw_sha256": "d0672b501fb68d91dc8154a0326e97774d38e007cf957c9e44467bb6ce939bc2",
+    "sha256": "92862b33e42de88c68233a78561256fa6c55998d1b81b776c9e8c9379010ac59"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\ryujinx.stdout.log",
+    "path": "reports/horizon-std-migration-20261026/product-exit/ryujinx.stdout.log",
+    "raw_sha256": "63b09d3e2539f405c4f5b2243d582bde0842e3f77700ffe2657dbd2372dad323",
+    "sha256": "a0a8eb3c20571d8129cb30f953aff79b054a8e843fde3b295dcaf5828878913c"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\ryujinx.stderr.log",
+    "path": "reports/horizon-std-migration-20261026/product-exit/ryujinx.stderr.log",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\sd-result\\logs\\rust-std-platform.json",
+    "path": "reports/horizon-std-migration-20261026/product-exit/rust-std-platform.json",
+    "raw_sha256": "19260e1e19cace87ceca4efba12ec800e553d7ccefd323f6d502662cdd366cb3",
+    "sha256": "19260e1e19cace87ceca4efba12ec800e553d7ccefd323f6d502662cdd366cb3"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\sd-result\\logs\\rust-std-shutdown.txt",
+    "path": "reports/horizon-std-migration-20261026/product-exit/rust-std-shutdown.txt",
+    "raw_sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\sd-result\\logs\\session-report.json",
+    "path": "reports/horizon-std-migration-20261026/product-exit/session-report.json",
+    "raw_sha256": "9dd957398f3de55eb6a2a1b1e97d46ffa291c90bde2cc1c44878fbd29879e4a0",
+    "sha256": "de5762bebc111cd11207395c7d4c4c33c848c305d4b241025b5567f09460adf9"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\sd-result\\logs\\teardown.log",
+    "path": "reports/horizon-std-migration-20261026/product-exit/teardown.log",
+    "raw_sha256": "3ddf2eb17990e8d0093db61cf3240f6c80a9959c257000d87bfdc1544f1a726c",
+    "sha256": "3ddf2eb17990e8d0093db61cf3240f6c80a9959c257000d87bfdc1544f1a726c"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\sd-result\\logs\\media-stop.log",
+    "path": "reports/horizon-std-migration-20261026/product-exit/media-stop.log",
+    "raw_sha256": "99e43a160f417fdfe6b3598a7ed1c951d642b670e1f8eb82985824c1108591a9",
+    "sha256": "99e43a160f417fdfe6b3598a7ed1c951d642b670e1f8eb82985824c1108591a9"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\sd-result\\userdata\\org.fixture.nativemedia\\files\\media.json",
+    "path": "reports/horizon-std-migration-20261026/product-exit/guest-media.json",
+    "raw_sha256": "ef59b80bb1cff56785348625d9635211e054a9030f1dd3855851297396c786d1",
+    "sha256": "1f5b487a832e31d50c39942a878e4d4049744ba94decbbcd346b01a71c539c0b"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\target\\evidence\\product-build.json",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/product-build.json",
+    "raw_sha256": "909e9cdac6f1ee723895b4e23a416636ee84b0e0d137beb2e0e346afbe57b6b4",
+    "sha256": "b5ba4992e121ddda7adece42ae0a55875a0a87a503f2ade80f973309d76006ac"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\target\\evidence\\product-source.json",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/product-source.json",
+    "raw_sha256": "af2aa0deee0981269f04cb0df9d0e25677425717e3c1666ed97885ce96346621",
+    "sha256": "af2aa0deee0981269f04cb0df9d0e25677425717e3c1666ed97885ce96346621"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\target\\evidence\\product-std-platform.json",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/product-std-platform.json",
+    "raw_sha256": "fc71f510e10f8c711312994c23a8c77513f0e709a1015773961b528c3fe1f384",
+    "sha256": "277006fbe07c869ebd36db285f39f715eee00ff8b9520213f4a11d9abff692b7"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\target\\evidence\\product-mesa-link.json",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/product-mesa-link.json",
+    "raw_sha256": "838539c2bffb67d9b7f7d7781ee8645f323bb1b344d64ab72c00c6fbb25add1a",
+    "sha256": "41c7f75a1d0081f617dada75ff43208c342cd86146c314f53cf7aa37fc0782b9"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\sqlite-target-rebuild.log",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/sqlite-target-rebuild.log",
+    "raw_sha256": "6d64a7ec24c4fd4624f778637ba8d75ef6cb730da2ccfb63e55be00cdd7823c4",
+    "sha256": "401e7c4e8caa8c588f636fb3da50db9bead3fe8cfb13641cad33ce855ee9618e"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\parser-smoke-build.log",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/parser-smoke-build.log",
+    "raw_sha256": "454325b58c540d82e042f0b3356e8bae713044cb8354d81411be0f1bd1ed7ec3",
+    "sha256": "9a9b6f3235f5486cf152ae791d174e850df1778ddc2a03028dda60298c482225"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\parser-smoke-fixed-build.log",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/parser-smoke-fixed-build.log",
+    "raw_sha256": "b7c4999b22152d381f6924de2848943f7e4874b2349cd81feaf89024216455dd",
+    "sha256": "87dccd4af12c5dde52809c698fbbc1edac329599fc7e76faac6dd9b5bd5547ee"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\sqlite-target-verification.txt",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/sqlite-target-verification.txt",
+    "raw_sha256": "d2d0f725236bbe25178710cec3a0c6d277708719b7dfbd948d8cefa4a597f320",
+    "sha256": "91d4d93a4e85d721537b39e93ef9c7fa5bb6ac33014c7bee007c5a1bb727a5f7"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\sqlite-host-final.log",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/sqlite-host-final.log",
+    "raw_sha256": "d3eab138dcb36beaccd132dcf0c3064f3ab0d44dc3459f4451b267eef1b41f2e",
+    "sha256": "f287fcd1fceca662736725299926948fb77e9bce4593a1874dc304c8d179c3f1"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\sqlite-clippy-final.log",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/sqlite-clippy-final.log",
+    "raw_sha256": "16d4f6d2abc6597d3909b82c0ec4f559200599ad6af083c6fcab501d73df16ec",
+    "sha256": "26fa99ced8965c91e9409bff6ab1ac9478e8ea035bcc9f2703229e12266926e3"
+  },
+  {
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\upstream-sync-post-sqlite.log",
+    "path": "reports/horizon-std-migration-20261026/sqlite-target-rebuild/upstream-sync-post-sqlite.log",
+    "raw_sha256": "4c8475078ced9b8c5365e35310e1958991773ca8948f3842013b9eb0101d3f12",
+    "sha256": "5300fb15410a650cdd3945811d37dbcaafa824e1c1e3842347c7a4e930b3d4af"
+  }
+]

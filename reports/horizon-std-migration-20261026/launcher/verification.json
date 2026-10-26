@@ -1,0 +1,23 @@
+{
+  "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+  "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-e2e-result-3245a1c737544c8f84937e10acea21ff",
+  "scenario": "workflow",
+  "pid": 250812,
+  "session_id": "3245a1c737544c8f84937e10acea21ff",
+  "status": "passed",
+  "physical_device": "not_run",
+  "backend": "ryujinx",
+  "sd_original_restore": "restored",
+  "emulator": {
+    "version": "1.3.3+e2143d4",
+    "sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c"
+  },
+  "schema_version": 1,
+  "emulator_frontend": "headless_sdl2",
+  "commands": 67,
+  "completed_sessions": 11,
+  "expected_api_errors": 0,
+  "nro_sha256": "a3a34bab32cf31e182fb72efe524bad1e06b5a69107853e9a0aba893aaef2bf8",
+  "validation": "current unknown-service contract; all eleven real sessions and unchanged graphics/persistence/display assertions verified from saved SD",
+  "validator_sha256": "ac2b0f099ab5339a8496c0c98e32d5ee1dd726b2e1cf732daa40dc9a7ffc906c"
+}

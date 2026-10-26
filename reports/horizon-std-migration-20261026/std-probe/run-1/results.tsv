@@ -1,0 +1,29 @@
+abi.sdk_layouts	pass	rust=[2, 2, 2, 2, 8, 8, 8, 104, 8, 16, 24, 72, 260, 3, 1, 4, 512, 2048, 1024, 8, 18446744073709551614, 24, 8, 12, 4, 4, 4, 16, 8, 8, 8, 8, 8]; sdk=[2, 2, 2, 2, 8, 8, 8, 104, 8, 16, 24, 72, 260, 3, 1, 4, 512, 2048, 1024, 8, 18446744073709551614, 24, 8, 12, 4, 4, 4, 16, 8, 8, 8, 8, 8]
+alloc.vec_string	pass	Horizon🦀:33550336
+alloc.aligned	pass	4096-byte aligned Box
+hashmap.entropy	pass	1024 randomized HashMap entries
+io.write_read	pass	128 KiB binary round trip
+io.seek_metadata	pass	seek and native stat
+io.c_shared_file	pass	Rust -> C -> Rust shared bytes
+io.rename	pass	renamed with exact contents
+io.copy	pass	copy contents; explicit chmod stays Unsupported
+io.directory	pass	native dirent decoded
+io.not_found	pass	kind=NotFound, errno=Some(2)
+io.exclusive_create	pass	kind=AlreadyExists
+io.sync_all	pass	actual fsync succeeded
+time.monotonic_sleep	pass	elapsed_ms=44
+time.system_clock	pass	epoch_seconds=1793008671
+thread.spawn_join	pass	distinct real thread returns 42
+thread.tls_destructors	pass	isolated=true; main=99; drops=8
+thread.repeated_join_tls	pass	workers=64; isolated=true; destructors=64
+thread.detached_handle	pass	detached=256; reclaimed=256; live=0; destructors=256
+sync.mutex_contention	pass	counter=8000
+sync.condvar_notify	pass	notification before deadline
+sync.condvar_timeout	pass	timeout=true; elapsed_ms=40
+sync.rwlock_once	pass	RwLock and shared OnceLock
+sync.channel_timeout	pass	cross-thread channel message
+sync.park_unpark	pass	park_ms=24
+env.set_get_remove	pass	process environment
+thread.available_parallelism	pass	reported=3; kernel_process_mask_count=3
+process.unsupported	pass	kind=Unsupported; operation not supported on this platform
+io.fresh_process_persistence	pass	persisted="19f01a4ae7d14a0d953edb68bc5fcfae\n"

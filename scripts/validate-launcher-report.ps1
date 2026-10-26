@@ -52,8 +52,11 @@ if(Test-Path (Join-Path $Root 'logs/display-error.json')){throw 'Display failure
   if($result.snapshots[-1].shell.decoded_icons -ne 1){throw 'APK resource PNG icon was not decoded'}
   if(-not ($result.snapshots | Where-Object {$_.shell.message -match 'INVALID_APK'})){throw 'Broken APK install did not report its failure'}
   $failed=@($result.sessions | Where-Object status -eq 'failed');$successful=@($result.sessions | Where-Object status -eq 'passed_execution')
-  if($failed.Count -ne 1 -or $failed[0].error -notmatch 'getSystemService'){throw 'Expected named framework API failure missing'}
-  if($successful.Count -ne 10){throw "Expected 10 completed app sessions, got $($successful.Count)"}
+  # The legacy negative fixture queries an unknown system-service name. That
+  # API is now implemented and Android returns null for an unknown name, so
+  # normal completion is the current contract. Do not resurrect a fake error.
+  if($failed.Count -ne 0 -or @($successful|Where-Object package -eq 'org.fixture.unavailable').Count -ne 1){throw 'Unknown-service query did not complete normally'}
+  if($successful.Count -ne 11){throw "Expected 11 completed app sessions, got $($successful.Count)"}
   $javaRuns=@($successful | Where-Object package -eq 'org.fixture.uiproof')
   $lastTexts=@($javaRuns | ForEach-Object {($_.snapshots[-1].views | Where-Object text | ForEach-Object text) -join ' | '})
   if($javaRuns.Count -ne 5 -or $lastTexts[1] -notmatch 'Ready 1 / app 1' -or $lastTexts[2] -notmatch 'Ready 1 / app 1' -or $lastTexts[3] -notmatch 'Ready 1 / app 1' -or $lastTexts[4] -notmatch 'Ready 0 / app 1'){throw "Save/update/uninstall/restart mismatch: $lastTexts"}

@@ -1,0 +1,420 @@
+{
+  "commands": [
+    {
+      "kind": "frame"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "key": "left",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "x": 100,
+          "y": 64,
+          "action": 0,
+          "kind": "touch"
+        },
+        {
+          "x": 100,
+          "y": 64,
+          "action": 1,
+          "kind": "touch"
+        },
+        {
+          "ms": 1500,
+          "kind": "wait"
+        },
+        {
+          "kind": "gc"
+        },
+        {
+          "x": 100,
+          "y": 110,
+          "action": 0,
+          "kind": "touch"
+        },
+        {
+          "x": 100,
+          "y": 110,
+          "action": 1,
+          "kind": "touch"
+        },
+        {
+          "code": 4,
+          "kind": "key"
+        },
+        {
+          "x": 60,
+          "y": 190,
+          "action": 0,
+          "kind": "touch"
+        },
+        {
+          "x": 60,
+          "y": 190,
+          "action": 1,
+          "kind": "touch"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "events": [
+        {
+          "ms": 1500,
+          "kind": "wait"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "code": 23,
+          "kind": "key"
+        },
+        {
+          "kind": "gc"
+        },
+        {
+          "code": 23,
+          "kind": "key"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "kind": "frame"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "ms": 10000,
+          "kind": "wait"
+        },
+        {
+          "y": 100,
+          "x": 100,
+          "action": 0,
+          "kind": "touch"
+        },
+        {
+          "y": 100,
+          "x": 100,
+          "action": 1,
+          "kind": "touch"
+        },
+        {
+          "ms": 4000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "key": "up",
+      "kind": "key"
+    },
+    {
+      "key": "up",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "code": 23,
+          "kind": "key"
+        },
+        {
+          "kind": "gc"
+        },
+        {
+          "code": 23,
+          "kind": "key"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "ms": 10000,
+          "kind": "wait"
+        },
+        {
+          "y": 100,
+          "x": 100,
+          "action": 0,
+          "kind": "touch"
+        },
+        {
+          "y": 100,
+          "x": 100,
+          "action": 1,
+          "kind": "touch"
+        },
+        {
+          "ms": 4000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    },
+    {
+      "key": "down",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "kind": "frame"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "key": "up",
+      "kind": "key"
+    },
+    {
+      "key": "up",
+      "kind": "key"
+    },
+    {
+      "key": "up",
+      "kind": "key"
+    },
+    {
+      "key": "up",
+      "kind": "key"
+    },
+    {
+      "key": "remove",
+      "kind": "key"
+    },
+    {
+      "key": "back",
+      "kind": "key"
+    },
+    {
+      "key": "remove",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "ms": 1500,
+          "kind": "wait"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "ms": 1500,
+          "kind": "wait"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "key": "clear_data",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "ms": 1500,
+          "kind": "wait"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "key": "details",
+      "kind": "key"
+    },
+    {
+      "key": "back",
+      "kind": "key"
+    },
+    {
+      "kind": "frame"
+    }
+  ],
+  "session_id": "3245a1c737544c8f84937e10acea21ff",
+  "schema_version": 1
+}

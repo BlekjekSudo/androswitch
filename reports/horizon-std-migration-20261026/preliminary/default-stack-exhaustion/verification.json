@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "session_id": "37d5d6f80dd8488db1956ea0128c4793",
+  "status": "executed_requires_contract_review",
+  "backend": "ryujinx_headless_sdl2",
+  "physical_device": "not_run",
+  "nro_sha256": "3c290cf4886c50560eef2e1cc7c32a4063f6cd39c8a90021997d01207a656a43",
+  "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+  "emulator_version": "1.3.3+e2143d4",
+  "phases": [
+    {
+      "mode": "suite",
+      "status": "observed",
+      "started_utc": "2026-10-26T09:34:20.8964871Z",
+      "pid": 267508,
+      "marker_observed": true,
+      "live_after_grace": 1
+    },
+    {
+      "mode": "restart",
+      "status": "observed",
+      "started_utc": "2026-10-26T09:34:35.9201217Z",
+      "pid": 271856,
+      "marker_observed": true,
+      "live_after_grace": 1
+    },
+    {
+      "mode": "panic",
+      "status": "observed",
+      "started_utc": "2026-10-26T09:34:46.1206713Z",
+      "pid": 275572,
+      "marker_observed": true,
+      "live_after_grace": 1
+    }
+  ],
+  "source_commit": "2336e3c32c72a303357044a14487fc33f12173d4",
+  "sd_restore": "restored"
+}

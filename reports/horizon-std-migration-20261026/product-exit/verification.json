@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "session_id": "db7db3cb16594f3a97dcc1f3d1b6b433",
+  "status": "passed",
+  "nro_sha256": "a3a34bab32cf31e182fb72efe524bad1e06b5a69107853e9a0aba893aaef2bf8",
+  "apk_sha256": "540da2796c0e0bf941ba4ee22fa82a87f71fcdd75595007ce385bfa2795e877b",
+  "asctl_sha256": "123511b61defc27ed8bbf175f6df901b467f110ad82cedbb0b0fb1900016a936",
+  "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+  "backend": "pinned Ryujinx headless; direct product request",
+  "physical_device": "not_run",
+  "sd_restore": "restored",
+  "sd_result": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\product-exit-runs\\db7db3cb16594f3a97dcc1f3d1b6b433\\sd-result",
+  "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-std-exit-backup-db7db3cb16594f3a97dcc1f3d1b6b433",
+  "package": "org.fixture.nativemedia",
+  "revision": 1,
+  "proof": {
+    "frames": 586,
+    "input": 2,
+    "asset_ok": 1,
+    "audio_frames": 12000,
+    "gl_ok": 1,
+    "readback_ok": 1,
+    "tls": 73,
+    "renderer": "NV12B"
+  },
+  "std_platform": {
+    "passed": true,
+    "std_unix_ms": 1793012464256,
+    "native_unix_ms": 1793012464265,
+    "std_cores": 3,
+    "native_cores": 3
+  },
+  "std_shutdown": 0,
+  "guest_os_exit_observed": true
+}

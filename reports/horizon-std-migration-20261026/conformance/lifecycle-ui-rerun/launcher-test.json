@@ -1,0 +1,112 @@
+{
+  "session_id": "563f4a488fbb4d5ea26e44c9427b6ede",
+  "commands": [
+    {
+      "kind": "frame"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "action": 0,
+          "y": 180,
+          "kind": "touch",
+          "x": 101
+        },
+        {
+          "action": 1,
+          "y": 180,
+          "kind": "touch",
+          "x": 101
+        },
+        {
+          "action": 0,
+          "y": 180,
+          "kind": "touch",
+          "x": 101
+        },
+        {
+          "action": 1,
+          "y": 180,
+          "kind": "touch",
+          "x": 101
+        },
+        {
+          "action": 0,
+          "y": 180,
+          "kind": "touch",
+          "x": 101
+        },
+        {
+          "action": 1,
+          "y": 180,
+          "kind": "touch",
+          "x": 101
+        },
+        {
+          "action": 0,
+          "y": 180,
+          "kind": "touch",
+          "x": 101
+        },
+        {
+          "action": 1,
+          "y": 180,
+          "kind": "touch",
+          "x": 101
+        },
+        {
+          "action": 0,
+          "y": 180,
+          "kind": "touch",
+          "x": 101
+        },
+        {
+          "action": 1,
+          "y": 180,
+          "kind": "touch",
+          "x": 101
+        },
+        {
+          "action": 0,
+          "y": 228,
+          "kind": "touch",
+          "x": 76
+        },
+        {
+          "action": 1,
+          "y": 228,
+          "kind": "touch",
+          "x": 76
+        },
+        {
+          "ms": 10000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "kind": "frames",
+      "count": 60
+    }
+  ],
+  "schema_version": 1
+}

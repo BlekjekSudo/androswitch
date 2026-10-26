@@ -1,0 +1,26 @@
+   Compiling serde v1.0.229
+   Compiling rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-dex)
+   Compiling rd-apk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-apk)
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+   Compiling as-package v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-package)
+   Compiling as-framework v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-framework)
+   Compiling rd-ndk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-ndk)
+   Compiling rd-jni v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-jni)
+   Compiling as-native v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-native)
+   Compiling as-launcher v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-launcher)
+   Compiling as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+   Compiling as-switch-smoke v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-switch-smoke)
+    Finished `test` profile [unoptimized] target(s) in 27.06s
+     Running unittests src\lib.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\as_switch_smoke-ba314ba52bf8f110.exe)
+
+running 8 tests
+test tests::ffi_rejects_null_buffers_before_reading ... ok
+test session_report::tests::console_ids_distinguish_boots_and_scripts_keep_their_exact_prefix ... ok
+test session_report::tests::current_snapshot_cleanup_preserves_history_and_process_traces ... ok
+test session_report::tests::repeated_console_serial_does_not_merge_different_packages_or_revisions ... ok
+test session_report::tests::interrupted_snapshot_keeps_only_a_matching_report_and_is_independent ... ok
+test tests::malformed_dex_returns_a_real_parser_error ... ok
+test session_report::tests::shutdown_diagnostic_keeps_the_first_application_failure ... ok
+test tests::allocator_checksum_is_stable ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

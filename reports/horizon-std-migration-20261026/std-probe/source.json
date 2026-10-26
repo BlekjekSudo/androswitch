@@ -1,0 +1,58 @@
+[
+  {
+    "path": "experiments/horizon-std/abi.c",
+    "sha256": "2435ddc708c1ee6dc698cc08a5b5ea05021dc9c6cc02c414cb1c27cd4a7fe0c2"
+  },
+  {
+    "path": "experiments/horizon-std/Cargo.lock",
+    "sha256": "454509c6ebb8db4345ad70b781259a1a95fec76e918301e5854371f666ca8f9c"
+  },
+  {
+    "path": "experiments/horizon-std/Cargo.toml",
+    "sha256": "485e8ecf78ebadd43fbe464e627f41bb687fb8bf87c4781f89e7b89f46a7cb40"
+  },
+  {
+    "path": "experiments/horizon-std/main.c",
+    "sha256": "6853f62be37240e2b01f46cdadc79f936d14cbf4beb819d03775b647644fd82c"
+  },
+  {
+    "path": "experiments/horizon-std/Makefile",
+    "sha256": "35d5c3e65ff6ffa056632d6aeffb9297645ba60fc4ee7143034d0d7f71dac270"
+  },
+  {
+    "path": "experiments/horizon-std/src/lib.rs",
+    "sha256": "1e4207ff42889c67d9f49933de6f14b282de45a320f37987bbf0d41f99910d9d"
+  },
+  {
+    "path": "platform/horizon-std/aarch64-androswitch-newlib.json",
+    "sha256": "bbe39be0af7b829ddf4c646aaaa4b937d3525e8cc0d23854ce715fba657689ab"
+  },
+  {
+    "path": "platform/horizon-std/rust-source.lock.json",
+    "sha256": "bc87196f3129a4a6a3bbdfda50423841145f068b9f6d78834c98887788352386"
+  },
+  {
+    "path": "platform/horizon-std/support.c",
+    "sha256": "0d29449e8d41d42922a24b6342f76777a7efc98eaa8a2a63287b9eafd2843912"
+  },
+  {
+    "path": "platform/horizon-std/support.h",
+    "sha256": "aa2e4437886fcdccadb4a2e50bdf8f93a3e94cebe250b4f2a1d01d6b1724053a"
+  },
+  {
+    "path": "scripts/build-horizon-std.ps1",
+    "sha256": "17f086fb459787fe57baa9dee9451f00388e6f42f5e6ecf1cb26c1b86b9265a1"
+  },
+  {
+    "path": "scripts/prepare-horizon-std-toolchain.py",
+    "sha256": "1d57cda7253a0e1ac631374493949d9b551774c6ff9e6c6b19503ad17ee8632b"
+  },
+  {
+    "path": "scripts/prepare-horizon-std.py",
+    "sha256": "dba768a342acaa5342f4d44b79c2b65de26cdbdb69e14a387b5a073580ff3f3d"
+  },
+  {
+    "path": "scripts/test-horizon-std-ryujinx.ps1",
+    "sha256": "30730af2a285599f5afb9a3de101cd2b8f82e4d0d9af729bc66381c515b0958f"
+  }
+]

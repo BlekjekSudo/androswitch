@@ -1,0 +1,248 @@
+{
+  "c_compiler_version": "15.2.0",
+  "source_manifest_sha256": "70db4b9908f59fd2600d0f56484914d9094990f1a0f6cede9d200ec341203dfb",
+  "link_backend": "Windows",
+  "rust_toolchain": "nightly",
+  "rust_library_profile": "std",
+  "nro_sha256": "a3a34bab32cf31e182fb72efe524bad1e06b5a69107853e9a0aba893aaef2bf8",
+  "mesa_static_inputs": [
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libaddr2line-f88b4a5ad99efdaa.rlib",
+      "sha256": "e356f00102241f4a68f21f8188fbdeab770fbf8fd874ca715eca728dc331e0e9"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libadler2-4d8a3a02880e0536.rlib",
+      "sha256": "a12e4602c87598fa46ffdda9d3b4f6a13c99f6957b13f8716edd1a1c7129d606"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\liballoc-9866fea3d1eb6a82.rlib",
+      "sha256": "be14d6b37f598ec0bc76c8ef9cc86e2f3b19d2b5f90ebc39e8c7cfbf5e2a86f8"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libcfg_if-356797859cb38376.rlib",
+      "sha256": "9b3ca4a6428b3b43e782e1d0e0880538991f5ee4537124be04532a1872c3b2dd"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libcompiler_builtins-5d97cb3e2cb35b44.rlib",
+      "sha256": "a2d22ab07b4d80d3fea3e65bff9229a90dff8419cadff6a8665c277387bef1a5"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libcore-e288075ad1e23491.rlib",
+      "sha256": "ded61c6d3a23f325309ac913c6ddb4de3acb0228f1a52492c9ca6e3b164309d3"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libgetopts-707af06578ad0f27.rlib",
+      "sha256": "2ca275d91dd8634273b37aff0e32f483d4b56e4ba871d59a28857877ed1d088f"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libgimli-10fd6397cdf8b576.rlib",
+      "sha256": "72efedf6d8c276221ddce73cf75f18eafea2ca419e9129ae5702d35d7e218947"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libhashbrown-213446fa5a0e2a4b.rlib",
+      "sha256": "8ed264ce13c1b84033ca968aade9e0836afb89a7c40a4d1ea0bafa5a66d4cdb1"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\liblibc-5ed7db560aff3b66.rlib",
+      "sha256": "da36be842911f24ceae19e75d1e939432fb1d6b95a8c511d1fbbb70bb2cb0a6c"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libmemchr-48865b00bb1f788d.rlib",
+      "sha256": "b65278cc6cc75c1fbc872b53113957f70c15822c0f29408c9e81533745ff8ebb"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libminiz_oxide-49d3eabad0af1e17.rlib",
+      "sha256": "7969b52a609a69f3d8042e5cf6a12ab597811fed8afe235d7ccbefbc7b9fcf4e"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libobject-9bb980a13aa1cc8f.rlib",
+      "sha256": "c85224d00fdd8a3e5753b148975ee9219e420872935626219eef75313deb211d"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libpanic_unwind-798824c9340428bc.rlib",
+      "sha256": "3f1802524b83b4a7b1a61a5425d463bca509a256d40e4cdcb3d8f0b250d434d4"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libproc_macro-bf9f397371e7c499.rlib",
+      "sha256": "24a7d67dfce46b8e1cf3885fd1dbcc94cda26be4a0f163a03ab54148be028664"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libprofiler_builtins-0422ff386be25f1e.rlib",
+      "sha256": "8ff011c85ac6e968f0bf2834afc0e569ed0285c63d9dbd8f5e8b468b1755165d"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_demangle-d8cf2e243f7f024b.rlib",
+      "sha256": "5be0e335187ab3793ea1539caa1aaaf37d5bb0b397d6b5bd3f7b607d583a80db"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_literal_escaper-34e4438e8fc96a33.rlib",
+      "sha256": "520b3d07fe687313478d302db92ee0461c7e2e67a3db7776249ed792f6e803b0"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_std_workspace_alloc-b31ee33f41285142.rlib",
+      "sha256": "b336aea56d84bf7acd8c816eedaeb28c668798d681179bf6e09f0a626a4f2581"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_std_workspace_core-ddc0bfd59b2289e1.rlib",
+      "sha256": "f49b9a16b2d678ab1a8de69156110822cc15932a511c148d2c3d04910bba53b4"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\librustc_std_workspace_std-d699f95255bdce1b.rlib",
+      "sha256": "6942a43c1f25b30d478b8bbf4d407872782bbbad7f66ffc4ac02ae0547a631e4"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libstd_detect-de8ad90142ad622c.rlib",
+      "sha256": "46c8def928a2ee3d7322809712a82f0ec8dc872338817143941d9971ab23047b"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libstd-fbcb7b14d0766431.rlib",
+      "sha256": "3374b9af6a5db51d75f4f89259bc62aa53925a0361413c41eea029a1c482d89d"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libsysroot-f9c715cd0292aef6.rlib",
+      "sha256": "25896e38c04def8fd3496321a41851620dc52af164ed3281029c6dcb155db697"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libtest-16eb038793a58b76.rlib",
+      "sha256": "bd97a22ead8dc52738350f713f491a03ee46e7d9b54dd08b52e6655ffba282f5"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\rust-std\\rust-std-nightly-aarch64-unknown-linux-gnu\\rust-std-aarch64-unknown-linux-gnu\\lib\\rustlib\\aarch64-unknown-linux-gnu\\lib\\libunwind-ad223e35a99bed2b.rlib",
+      "sha256": "2cf55bf5d41745d2ad409a8bc0135ee10902479ef3ef5740516452f15d098c8d"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libblake3.a",
+      "sha256": "0c2cb7ab53fcbdd738a8262fa8f41f0142b0aa67542d3565409073ba9c776b61"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libcompiler_c_helpers.a",
+      "sha256": "34cf4390440cfdd210b36d1bc0caf40eead340956a2220af0a158215ef881a2e"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libcompiler.a",
+      "sha256": "d0caa17d06eb4388a5070519984070e67085ca315c82b1a88fd71edff390edf9"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libEGL.a",
+      "sha256": "1f25fe42ab32f0b498a23ae1e6a9daf9614f80381a4863011e640ab0b8676ffe"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libGL.a",
+      "sha256": "a38e125f14411bd39514372dc9e808cfa256eadd58ef3b52d59f1a8f85a7239d"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libglapi.a",
+      "sha256": "fc614d85d48430f43f7905bc73ab198304258b34896a6da3e19d6925a756aa2d"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libGLESv1_CM.a",
+      "sha256": "ef751dd308a70b162d65636d710f02854cf5d739dc95eac08bb04186e39d7cb7"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libGLESv2.a",
+      "sha256": "9124a703066a8178d67c86993b8c87576a6a0f2c8f5334f8c7593e7b15bb0375"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\liblibnil_format_table.a",
+      "sha256": "60033b93b2d5383ebcf21bb7c6682458a3244c12a628bdd583da3e58ce307454"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libmesa_util_c11.a",
+      "sha256": "f25264964c7afda6610a0e91a3fe92abc168c34e03628308a01b7ec8d196d3b5"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libmesa_util_simd.a",
+      "sha256": "9e88355006a320213908d310ab7d15b6cb919999a4d79ade8d4b636a1dd84bc8"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libmesa_util.a",
+      "sha256": "a078decd7ac8807fd731919e7d4dc0f773ba9b6cadd718b992404d476d688ab4"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnak_rs.a",
+      "sha256": "733f450fd61032a3e659b50d50a1d37bfabb351d7aa17954e47d342fc2b038e9"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnak.a",
+      "sha256": "5c8f7624d9b4d793cbae6c3916ed456cf5cd8d8155062624012acd3b410ffeeb"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnil.a",
+      "sha256": "e808ff58d862340eb3b8baf55ad44f7c34c26fff637e1fb98f3c5cf228dbb9f8"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnir.a",
+      "sha256": "cc90b12cb66e9e4e71aea13163e8cf2117fa0748fcff75fc13b776164971de7f"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnouveau_horizon.a",
+      "sha256": "5335d11d756845266310eab3caf20536168b72ab3b42d8b46bb13c0ccd59e335"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnouveau_mme.a",
+      "sha256": "198f3cdda632bc220a4d98464be2fe0e205c17eac7d19bc91b2847dd59805c33"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnouveau_ws.a",
+      "sha256": "5121f8ed35afee3f31981cc968ae86bbde81fdd5a9b7e7405a9dd2f4275daaaa"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnvidia_headers_c.a",
+      "sha256": "98e8e9518749ba73d4881c7f5117ab2c9acfd4ed5376396b7d1c79b9c23f4099"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libnvk.a",
+      "sha256": "4198573b67e7e8d749f0f65b56c67f3f1a60253694dd7a6b65ebc5dd05d5764e"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libvtn.a",
+      "sha256": "1eb80da16e4630194d4c11eaf89da465b3fe48027060b1b4ae9613033a37a723"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libvulkan_util.a",
+      "sha256": "38d955869b0ac9d2bded10e6c74fe24528bcd82241084f46c3d4e8f76efc8a6e"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libvulkan.a",
+      "sha256": "36bb9ab68578897157b11bfeabe6c6b0b0895d5fb3c31a9b6f31982d85131351"
+    },
+    {
+      "path": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\dependencies\\mesa-switch-0ff52079\\sdk\\opt\\devkitpro\\portlibs\\switch\\lib\\libxmlconfig.a",
+      "sha256": "3e1ebc594d7b4626006a48857e47580ef1086154f9ad7f06244f741f30912b51"
+    }
+  ],
+  "status": "built",
+  "schema_version": 2,
+  "windows_devkitpro": "C:/devkitPro",
+  "cargo_version": "cargo 1.100.0-nightly (e8cb624d5 2026-08-22)",
+  "std_overlay": {
+    "compiler_commit": "787af2b8c80638c51a4fc8e44f84e6891f243ec7",
+    "original_sysroot": "C:\\Users\\Administrator\\.rustup\\toolchains\\nightly-x86_64-pc-windows-gnu",
+    "overlay_sysroot": "C:\\Users\\Administrator\\.cache\\androswitch\\horizon-std-toolchain-787af2b",
+    "original_library_tree_sha256": "ced5aec7ddb3f4b4ad91e0d56872bc7a498f07b395df8d9867ce4993347439e8",
+    "original_library_file_count": 3631,
+    "files": [
+      {
+        "path": "std/src/sys/fs/unix.rs",
+        "original_sha256": "a25c02ec631e41bc634d2eef5ffcc76689955b531f77a3159e492e9a006c8305",
+        "adapted_sha256": "7bbe67712b2c9296d196fc4a7ab7aa975a4b1de98de532f49b6d2e977e48fc32"
+      },
+      {
+        "path": "std/src/sys/thread/unix.rs",
+        "original_sha256": "93784ff17f94154d57299d568afb42bf77adce9d4f4a15efeed55716f601c2d0",
+        "adapted_sha256": "30ed4928e0ed27a6b3faa355c5c8a5ffe70a5106ddd25e24726ade787bacca5b"
+      }
+    ]
+  },
+  "target": "aarch64-androswitch-newlib",
+  "rustc_verbose": "rustc 1.100.0-nightly (787af2b8c 2026-08-25)\r\nbinary: rustc\r\ncommit-hash: 787af2b8c80638c51a4fc8e44f84e6891f243ec7\r\ncommit-date: 2026-08-25\r\nhost: x86_64-pc-windows-gnu\r\nrelease: 1.100.0-nightly\r\nLLVM version: 23.1.0",
+  "execution_backend": "embedded-horizon",
+  "mesa_rust_libraries": "D:\\Dev\\Switch\\AndroSwitch/local-artifacts/dependencies/mesa-switch-0ff52079/rust-std/rust-std-nightly-aarch64-unknown-linux-gnu/rust-std-aarch64-unknown-linux-gnu/lib/rustlib/aarch64-unknown-linux-gnu/lib",
+  "executed": false,
+  "target_directory": "C:\\Users\\Administrator\\.cache\\androswitch\\37b5fa1d-switch-target",
+  "mesa_sdk": "D:/Dev/Switch/AndroSwitch/local-artifacts/dependencies/mesa-switch-0ff52079/sdk/opt/devkitpro/portlibs/switch",
+  "profile": "release panic=abort",
+  "sqlite_source_lock_sha256": "cce2cc3f0b3e6354568cc3da7d6067980ef88788f451349711975d7cb7f85e95",
+  "nro_bytes": 28610616,
+  "source_commit": "ed594603a15c234286efd63f29f154f0a45eb023"
+}

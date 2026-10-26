@@ -1,0 +1,278 @@
+{
+  "schema_version": 1,
+  "session_id": "19f01a4ae7d14a0d953edb68bc5fcfae",
+  "status": "passed_probe_contracts",
+  "summary": {
+    "pass": 32,
+    "fail": 0,
+    "not_run": 0
+  },
+  "cases": [
+    {
+      "id": "abi.sdk_layouts",
+      "status": "pass",
+      "detail": "rust=[2, 2, 2, 2, 8, 8, 8, 104, 8, 16, 24, 72, 260, 3, 1, 4, 512, 2048, 1024, 8, 18446744073709551614, 24, 8, 12, 4, 4, 4, 16, 8, 8, 8, 8, 8]; sdk=[2, 2, 2, 2, 8, 8, 8, 104, 8, 16, 24, 72, 260, 3, 1, 4, 512, 2048, 1024, 8, 18446744073709551614, 24, 8, 12, 4, 4, 4, 16, 8, 8, 8, 8, 8]"
+    },
+    {
+      "id": "alloc.vec_string",
+      "status": "pass",
+      "detail": "Horizon🦀:33550336"
+    },
+    {
+      "id": "alloc.aligned",
+      "status": "pass",
+      "detail": "4096-byte aligned Box"
+    },
+    {
+      "id": "hashmap.entropy",
+      "status": "pass",
+      "detail": "1024 randomized HashMap entries"
+    },
+    {
+      "id": "io.write_read",
+      "status": "pass",
+      "detail": "128 KiB binary round trip"
+    },
+    {
+      "id": "io.seek_metadata",
+      "status": "pass",
+      "detail": "seek and native stat"
+    },
+    {
+      "id": "io.c_shared_file",
+      "status": "pass",
+      "detail": "Rust -> C -> Rust shared bytes"
+    },
+    {
+      "id": "io.rename",
+      "status": "pass",
+      "detail": "renamed with exact contents"
+    },
+    {
+      "id": "io.copy",
+      "status": "pass",
+      "detail": "copy contents; explicit chmod stays Unsupported"
+    },
+    {
+      "id": "io.directory",
+      "status": "pass",
+      "detail": "native dirent decoded"
+    },
+    {
+      "id": "io.not_found",
+      "status": "pass",
+      "detail": "kind=NotFound, errno=Some(2)"
+    },
+    {
+      "id": "io.exclusive_create",
+      "status": "pass",
+      "detail": "kind=AlreadyExists"
+    },
+    {
+      "id": "io.sync_all",
+      "status": "pass",
+      "detail": "actual fsync succeeded"
+    },
+    {
+      "id": "time.monotonic_sleep",
+      "status": "pass",
+      "detail": "elapsed_ms=44"
+    },
+    {
+      "id": "time.system_clock",
+      "status": "pass",
+      "detail": "epoch_seconds=1793008671"
+    },
+    {
+      "id": "thread.spawn_join",
+      "status": "pass",
+      "detail": "distinct real thread returns 42"
+    },
+    {
+      "id": "thread.tls_destructors",
+      "status": "pass",
+      "detail": "isolated=true; main=99; drops=8"
+    },
+    {
+      "id": "thread.repeated_join_tls",
+      "status": "pass",
+      "detail": "workers=64; isolated=true; destructors=64"
+    },
+    {
+      "id": "thread.detached_handle",
+      "status": "pass",
+      "detail": "detached=256; reclaimed=256; live=0; destructors=256"
+    },
+    {
+      "id": "sync.mutex_contention",
+      "status": "pass",
+      "detail": "counter=8000"
+    },
+    {
+      "id": "sync.condvar_notify",
+      "status": "pass",
+      "detail": "notification before deadline"
+    },
+    {
+      "id": "sync.condvar_timeout",
+      "status": "pass",
+      "detail": "timeout=true; elapsed_ms=40"
+    },
+    {
+      "id": "sync.rwlock_once",
+      "status": "pass",
+      "detail": "RwLock and shared OnceLock"
+    },
+    {
+      "id": "sync.channel_timeout",
+      "status": "pass",
+      "detail": "cross-thread channel message"
+    },
+    {
+      "id": "sync.park_unpark",
+      "status": "pass",
+      "detail": "park_ms=24"
+    },
+    {
+      "id": "env.set_get_remove",
+      "status": "pass",
+      "detail": "process environment"
+    },
+    {
+      "id": "thread.available_parallelism",
+      "status": "pass",
+      "detail": "reported=3; kernel_process_mask_count=3"
+    },
+    {
+      "id": "process.unsupported",
+      "status": "pass",
+      "detail": "kind=Unsupported; operation not supported on this platform"
+    },
+    {
+      "id": "io.fresh_process_persistence",
+      "status": "pass",
+      "detail": "persisted=\"19f01a4ae7d14a0d953edb68bc5fcfae\\n\""
+    },
+    {
+      "id": "shutdown.suite",
+      "status": "pass",
+      "detail": "fresh completion, actual Rust return and C atexit must agree"
+    },
+    {
+      "id": "shutdown.restart",
+      "status": "pass",
+      "detail": "fresh completion, actual Rust return and C atexit must agree"
+    },
+    {
+      "id": "panic.abort",
+      "status": "pass",
+      "detail": "hook recorded intentional panic, guest exited, C return/atexit not reached"
+    }
+  ],
+  "build": {
+    "panic": "abort",
+    "status": "built_not_executed",
+    "target": "aarch64-androswitch-newlib",
+    "sdk_inputs": [
+      {
+        "path": "libnx/lib/libnx.a",
+        "sha256": "12a59cdfdceab83e39ee129b0275dd803e393e83f19de3922a3b6cc95c767edd"
+      },
+      {
+        "path": "devkitA64/aarch64-none-elf/lib/pic/libsysbase.a",
+        "sha256": "6e616a27169f07402bfd1a2df0693778b248c84597d1220a912b3a21f91f8026"
+      },
+      {
+        "path": "devkitA64/aarch64-none-elf/lib/pic/libc.a",
+        "sha256": "9bf41282aadf7957fe18b8c1fc71394bf255fca6175c8b449fd3f23ff387a362"
+      },
+      {
+        "path": "devkitA64/aarch64-none-elf/lib/pic/libm.a",
+        "sha256": "e9d2e4ae3376222d8cac21f6f5143481e4ef5b58f51ba48c6d4b24b9e2c7bad7"
+      },
+      {
+        "path": "libnx/switch.specs",
+        "sha256": "a6bb2d0c1eaaff3e6c568d372c562b48b079e94bafb431f8169e21d7d9ed8c02"
+      }
+    ],
+    "source_manifest_sha256": "86eb1fffde24b639b3989e0346167ad43d52a2b6bd19599fa1fe1b7cb855d41f",
+    "rustc_verbose": "rustc 1.100.0-nightly (787af2b8c 2026-08-25)\r\nbinary: rustc\r\ncommit-hash: 787af2b8c80638c51a4fc8e44f84e6891f243ec7\r\ncommit-date: 2026-08-25\r\nhost: x86_64-pc-windows-gnu\r\nrelease: 1.100.0-nightly\r\nLLVM version: 23.1.0",
+    "libc": {
+      "url": "https://static.crates.io/crates/libc/libc-0.2.189.crate",
+      "sha256": "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2",
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\libc-0.2.189\\src\\unix\\newlib\\mod.rs",
+      "adapted_sha256": "44e031cf8eea5166571be0e57b41706e8fc51e96764068e5a81b709975a33fb5",
+      "scope": "Horizon std probe and product build-std graph; host dependencies unchanged"
+    },
+    "schema_version": 1,
+    "libc_patch_sha256": "96690552cd23d7a7e38c8a1d67951028c3cff3e63522c3dfa0773332168b5660",
+    "c_compiler": "15.2.0",
+    "rust_std_overlay": {
+      "compiler_commit": "787af2b8c80638c51a4fc8e44f84e6891f243ec7",
+      "original_sysroot": "C:\\Users\\Administrator\\.rustup\\toolchains\\nightly-x86_64-pc-windows-gnu",
+      "overlay_sysroot": "C:\\Users\\Administrator\\.cache\\androswitch\\horizon-std-toolchain-787af2b",
+      "original_library_tree_sha256": "ced5aec7ddb3f4b4ad91e0d56872bc7a498f07b395df8d9867ce4993347439e8",
+      "original_library_file_count": 3631,
+      "files": [
+        {
+          "path": "std/src/sys/fs/unix.rs",
+          "original_sha256": "a25c02ec631e41bc634d2eef5ffcc76689955b531f77a3159e492e9a006c8305",
+          "adapted_sha256": "7bbe67712b2c9296d196fc4a7ab7aa975a4b1de98de532f49b6d2e977e48fc32"
+        },
+        {
+          "path": "std/src/sys/thread/unix.rs",
+          "original_sha256": "93784ff17f94154d57299d568afb42bf77adce9d4f4a15efeed55716f601c2d0",
+          "adapted_sha256": "30ed4928e0ed27a6b3faa355c5c8a5ffe70a5106ddd25e24726ade787bacca5b"
+        }
+      ]
+    },
+    "rust_std_source": "task-local pinned source overlay; installed toolchain unchanged",
+    "toolchain_selector": "nightly",
+    "nro_sha256": "36cf9f75438b0d2dcc75c08d904566bd478aecad4b61841685977f6b16553c39",
+    "nro_bytes": 573496,
+    "source_commit": "ebef0f4216dc646d65044d7db66722bb0dce5fc9"
+  },
+  "execution": {
+    "schema_version": 1,
+    "session_id": "19f01a4ae7d14a0d953edb68bc5fcfae",
+    "status": "executed_requires_contract_review",
+    "backend": "ryujinx_headless_sdl2",
+    "physical_device": "not_run",
+    "nro_sha256": "36cf9f75438b0d2dcc75c08d904566bd478aecad4b61841685977f6b16553c39",
+    "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+    "emulator_version": "1.3.3+e2143d4",
+    "phases": [
+      {
+        "mode": "suite",
+        "status": "observed",
+        "started_utc": "2026-10-26T09:57:44.9104878Z",
+        "pid": 267420,
+        "marker_observed": true,
+        "live_after_grace": 1
+      },
+      {
+        "mode": "restart",
+        "status": "observed",
+        "started_utc": "2026-10-26T09:57:59.4493255Z",
+        "pid": 277204,
+        "marker_observed": true,
+        "live_after_grace": 1
+      },
+      {
+        "mode": "panic",
+        "status": "observed",
+        "started_utc": "2026-10-26T09:58:09.8914721Z",
+        "pid": 279856,
+        "marker_observed": true,
+        "live_after_grace": 1
+      }
+    ],
+    "source_commit": "ebef0f4216dc646d65044d7db66722bb0dce5fc9",
+    "sd_restore": "restored"
+  },
+  "physical_device": "not_run",
+  "product_runner_changed": false,
+  "android_api_parity": "not_established_by_this_probe",
+  "scope": "real std standalone libnx NRO; finite smoke contracts, not complete std certification",
+  "recommendation": "qualify_std_product_regressions_separately"
+}
