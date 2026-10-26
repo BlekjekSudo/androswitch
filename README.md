@@ -66,8 +66,11 @@ The current [collector integration](docs/UPSTREAM_GC_SHARED.md) also removes
 the separate product collector. Both profiles compile original RustyDroid GC,
 with product roots and platform side-state adapters. Its host verification has
 710 reference tests, 1,001 product/desktop regressions, the five unchanged
-upstream heap scenarios and the same UI/JVM checks passing. Horizon qualification
-of this later implementation is recorded separately from NRO `5876341`.
+upstream heap scenarios and the same UI/JVM checks passing. Its new std NRO also
+completes the available SDK corpus in two guarded headless Ryujinx launches:
+**254 PASS, 3 NOT_RUN**, with safe launcher return and SD restoration. See the
+[shared collector receipt](reports/gc-shared-20261027.json). The three missing
+PCV clock observations and physical testing of this binary remain open.
 
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
 257 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,

@@ -1,0 +1,18 @@
+{
+  "jvm_values_matching": 135,
+  "host_ui": [
+    {
+      "group": "Collections",
+      "passed": 34,
+      "complete": true,
+      "sha256": "a904ef1dece021d80049f3eddb0668f59bd76cf6ec981f82ab25d455c0d7f481"
+    },
+    {
+      "group": "Text",
+      "passed": 30,
+      "complete": true,
+      "sha256": "5acfa91474909e2caceb4f1894a36c47b32870f7e941e17215e2c70a56451fa1"
+    }
+  ],
+  "scope": "Scoped host verification; no NRO/physical parity claim"
+}

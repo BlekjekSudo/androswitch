@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "script": "scripts/test-conformance-ryujinx.ps1",
+  "sha256": "1200f06f79028407ad17f6df7c92ed218b81ea16d806e976b6fcc4bf23d04387",
+  "powershell_parse_errors": 0,
+  "wait_segments_max": 32,
+  "default_wait_segments": 1,
+  "outer_timeout_max_seconds": 1800,
+  "scope": "Bounded harness wait only; no runtime/fixture changes"
+}

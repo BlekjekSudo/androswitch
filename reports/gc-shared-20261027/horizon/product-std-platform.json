@@ -1,0 +1,45 @@
+{
+  "runtime_sdk": [
+    {
+      "path": "libnx/lib/libnx.a",
+      "sha256": "12a59cdfdceab83e39ee129b0275dd803e393e83f19de3922a3b6cc95c767edd"
+    },
+    {
+      "path": "libnx/include/switch/kernel/thread.h",
+      "sha256": "3c662aa6a88232d5b43cb78a7c22b2908eaf486584fdaac56b42147f2957c748"
+    },
+    {
+      "path": "libnx/switch.specs",
+      "sha256": "a6bb2d0c1eaaff3e6c568d372c562b48b079e94bafb431f8169e21d7d9ed8c02"
+    },
+    {
+      "path": "devkitA64/aarch64-none-elf/include/pthread.h",
+      "sha256": "3bf12f11e00043f02a294b054e219172c54fbf3b0ffef1da00cd59a4ba208331"
+    },
+    {
+      "path": "devkitA64/aarch64-none-elf/lib/pic/libsysbase.a",
+      "sha256": "6e616a27169f07402bfd1a2df0693778b248c84597d1220a912b3a21f91f8026"
+    },
+    {
+      "path": "devkitA64/aarch64-none-elf/lib/pic/libc.a",
+      "sha256": "9bf41282aadf7957fe18b8c1fc71394bf255fca6175c8b449fd3f23ff387a362"
+    },
+    {
+      "path": "devkitA64/aarch64-none-elf/lib/pic/libm.a",
+      "sha256": "e9d2e4ae3376222d8cac21f6f5143481e4ef5b58f51ba48c6d4b24b9e2c7bad7"
+    }
+  ],
+  "schema_version": 1,
+  "libc": {
+    "url": "https://static.crates.io/crates/libc/libc-0.2.189.crate",
+    "sha256": "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\libc-0.2.189\\src\\unix\\newlib\\mod.rs",
+    "adapted_sha256": "44e031cf8eea5166571be0e57b41706e8fc51e96764068e5a81b709975a33fb5",
+    "scope": "Horizon std probe and product build-std graph; host dependencies unchanged"
+  },
+  "mesa_objcopy": {
+    "path": "C:\\Users\\Administrator\\AppData\\Local/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-objcopy.exe",
+    "sha256": "e47bd9ad686780554d5ffccf66ddd8114f48bc669fa9db2bdc66b9643cfe493c"
+  },
+  "mesa_link_adaptation_sha256": "838539c2bffb67d9b7f7d7781ee8645f323bb1b344d64ab72c00c6fbb25add1a"
+}

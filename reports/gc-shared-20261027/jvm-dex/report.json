@@ -1,0 +1,1229 @@
+{
+  "backend": "portable_host",
+  "cases": [
+    {
+      "detail": "-2147483648",
+      "elapsed_us": 1537,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.overflow",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-5:-2",
+      "elapsed_us": 750,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.division",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2147483647:2",
+      "elapsed_us": 1042,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.shift",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-9223372036854775808",
+      "elapsed_us": 991,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.long",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "4950",
+      "elapsed_us": 627,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.loop",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "seven",
+      "elapsed_us": 592,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.switch",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "3.75",
+      "elapsed_us": 485,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.double",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 440,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.nan",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 466,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.signed-zero",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-3",
+      "elapsed_us": 454,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.cast",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "bounds",
+      "elapsed_us": 686,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.bounds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "arithmetic",
+      "elapsed_us": 882,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.division-zero",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "4",
+      "elapsed_us": 399,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.utf16-length",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "bc",
+      "elapsed_us": 333,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.substring",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "8364",
+      "elapsed_us": 398,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.char-at",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 473,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.equals",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "x,true42",
+      "elapsed_us": 735,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.builder-char",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "one2",
+      "elapsed_us": 452,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.buffer",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "4:226",
+      "elapsed_us": 555,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.utf8",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "3:67",
+      "elapsed_us": 389,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.ascii",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "x:0007:%",
+      "elapsed_us": 703,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.format",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:4",
+      "elapsed_us": 494,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.index",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a+b+c",
+      "elapsed_us": 484,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.replace",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true",
+      "elapsed_us": 1584,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.starts-ends",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "null",
+      "elapsed_us": 710,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.null-append",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "128512",
+      "elapsed_us": 733,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.surrogate",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "b:1",
+      "elapsed_us": 1934,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.arraylist",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 1234,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.list-null",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "8",
+      "elapsed_us": 2019,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.list-iterator",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:7",
+      "elapsed_us": 1645,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.map",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 1196,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.set",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a:false:2",
+      "elapsed_us": 1794,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cow-snapshot",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a",
+      "elapsed_us": 636,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cow-array-copy",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "unsupported",
+      "elapsed_us": 2170,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cow-remove-unsupported",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:false",
+      "elapsed_us": 1198,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.boxed-equals",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:1:2:3",
+      "elapsed_us": 877,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.arraycopy",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:9",
+      "elapsed_us": 770,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.array-clone",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "false:true",
+      "elapsed_us": 2432,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.abstract-subclass",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "NANOSECONDS:0",
+      "elapsed_us": 1867,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.0",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "MICROSECONDS:1",
+      "elapsed_us": 1380,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.1",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "MILLISECONDS:2",
+      "elapsed_us": 1336,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.2",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "SECONDS:3",
+      "elapsed_us": 1135,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.3",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "MINUTES:4",
+      "elapsed_us": 1172,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.4",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "HOURS:5",
+      "elapsed_us": 959,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.5",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "DAYS:6",
+      "elapsed_us": 1103,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.6",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789",
+      "elapsed_us": 1153,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.nanoseconds.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 688,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.nanoseconds.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 514,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.nanoseconds.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789000",
+      "elapsed_us": 1171,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.microseconds.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123",
+      "elapsed_us": 466,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.microseconds.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 387,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.microseconds.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789000000",
+      "elapsed_us": 1170,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.milliseconds.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456",
+      "elapsed_us": 552,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.milliseconds.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 377,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.milliseconds.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789000000000",
+      "elapsed_us": 724,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.seconds.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789",
+      "elapsed_us": 661,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.seconds.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1428",
+      "elapsed_us": 587,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.seconds.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7407407340000000000",
+      "elapsed_us": 1309,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.minutes.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7407407340",
+      "elapsed_us": 956,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.minutes.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "85733",
+      "elapsed_us": 761,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.minutes.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "9223372036854775807",
+      "elapsed_us": 1075,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.hours.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "444444440400",
+      "elapsed_us": 1337,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.hours.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "5144032",
+      "elapsed_us": 838,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.hours.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "9223372036854775807",
+      "elapsed_us": 1211,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.days.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "10666666569600",
+      "elapsed_us": 1226,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.days.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789",
+      "elapsed_us": 915,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.days.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "9223372036854775807",
+      "elapsed_us": 1115,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.saturation",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "detail",
+      "elapsed_us": 814,
+      "family": "jvm",
+      "group": "Exceptions",
+      "id": "exceptions.throw-catch",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "5",
+      "elapsed_us": 454,
+      "family": "jvm",
+      "group": "Exceptions",
+      "id": "exceptions.finally",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "null",
+      "elapsed_us": 470,
+      "family": "jvm",
+      "group": "Exceptions",
+      "id": "exceptions.null",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "cast",
+      "elapsed_us": 369,
+      "family": "jvm",
+      "group": "Exceptions",
+      "id": "exceptions.cast",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 408,
+      "family": "jvm",
+      "group": "Exceptions",
+      "id": "exceptions.message",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "org.androswitch.conformance.PureCases",
+      "elapsed_us": 796,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.name",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 482,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.interface",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:false",
+      "elapsed_us": 787,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.assignable",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "61",
+      "elapsed_us": 578,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.field-static",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "field",
+      "elapsed_us": 960,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.field-instance",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "47",
+      "elapsed_us": 843,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.private",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "missing",
+      "elapsed_us": 532,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.missing",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "12",
+      "elapsed_us": 779,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.widening",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "hi you",
+      "elapsed_us": 1208,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.method",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7",
+      "elapsed_us": 1251,
+      "family": "jvm",
+      "group": "Threads",
+      "id": "threads.initial",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 1080,
+      "family": "jvm",
+      "group": "Threads",
+      "id": "threads.stored-null",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7",
+      "elapsed_us": 1383,
+      "family": "jvm",
+      "group": "Threads",
+      "id": "threads.remove",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "reentrant",
+      "elapsed_us": 898,
+      "family": "jvm",
+      "group": "Threads",
+      "id": "threads.monitor",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true",
+      "elapsed_us": 847,
+      "family": "jvm",
+      "group": "Threads",
+      "id": "threads.atomic",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "3",
+      "elapsed_us": 349,
+      "family": "jvm",
+      "group": "Math",
+      "id": "math.abs.-3",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 373,
+      "family": "jvm",
+      "group": "Math",
+      "id": "math.abs.-1",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 509,
+      "family": "jvm",
+      "group": "Math",
+      "id": "math.abs.0",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 416,
+      "family": "jvm",
+      "group": "Math",
+      "id": "math.abs.1",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "3",
+      "elapsed_us": 311,
+      "family": "jvm",
+      "group": "Math",
+      "id": "math.abs.3",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 303,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.0",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 289,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.1",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7f",
+      "elapsed_us": 515,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.127",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "80",
+      "elapsed_us": 446,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.128",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "ff",
+      "elapsed_us": 430,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.255",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7fff",
+      "elapsed_us": 448,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.32767",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:true:true",
+      "elapsed_us": 1936,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.copy-set-dedup",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:2:2:2",
+      "elapsed_us": 2616,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.copy-list-variants",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:[a, b, a, b]",
+      "elapsed_us": 1797,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.self-add-all",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true:true",
+      "elapsed_us": 2005,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.bulk-filter",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:[a, b, null, x]",
+      "elapsed_us": 1622,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.typed-array",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[a, z, d]:[z, d]",
+      "elapsed_us": 11647,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.nested-sublist-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a:0:b:false:[b]",
+      "elapsed_us": 9663,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.list-iterator-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a",
+      "elapsed_us": 926,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.iterator-remove-state",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:true:1:2",
+      "elapsed_us": 3105,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.abstract-list",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[a, b, a]:true:false",
+      "elapsed_us": 3787,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.abstract-collection",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true:[a, b]",
+      "elapsed_us": 2770,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.object-contracts",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a:c:[c, b, a]",
+      "elapsed_us": 1797,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.sort-reverse-minmax",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "b",
+      "elapsed_us": 1230,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.singleton-map-immutable",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 1359,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.readonly-bulk",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:[a, b]",
+      "elapsed_us": 1066,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.static-add-all",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 738,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.indexed-add-all-bounds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "null",
+      "elapsed_us": 517,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.constructor-null",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2",
+      "elapsed_us": 784,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.sublist-bounds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[a, c, d, b]",
+      "elapsed_us": 1860,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.indexed-add-all",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[c, b, a]",
+      "elapsed_us": 28694,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.comparator-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-24:-1:-1987",
+      "elapsed_us": 1522,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.compare-utf16",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0:true",
+      "elapsed_us": 1150,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.compare-ignore-case",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true",
+      "elapsed_us": 1406,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regions",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:bc",
+      "elapsed_us": 1325,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.content-sequence",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a/b/a",
+      "elapsed_us": 1923,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.join-dex-iterable",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "abc:128512",
+      "elapsed_us": 1121,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.trim-codepoint",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:ab:true",
+      "elapsed_us": 2076,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-flags",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:ok:2:4",
+      "elapsed_us": 1133,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-named-lookahead-utf16",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "aa:0:2:false",
+      "elapsed_us": 6921,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-match-result-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:b:0:2",
+      "elapsed_us": 6947,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-use-pattern-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "ba-ba:ba-ab",
+      "elapsed_us": 1115,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-replace-groups",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "x b x",
+      "elapsed_us": 12417,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-append-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[a, b, ]",
+      "elapsed_us": 896,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-split",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "state",
+      "elapsed_us": 480,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-result-state",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "syntax",
+      "elapsed_us": 438,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-syntax-error",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:11-22",
+      "elapsed_us": 2144,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-string-shared",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[]",
+      "elapsed_us": 1353,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cycle-string-unwind",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:true:1",
+      "elapsed_us": 1947,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cycle-equals-hash-unwind",
+      "kind": "contract",
+      "status": "PASS"
+    }
+  ],
+  "catalog": "local-artifacts/horizon-std/collection-text-final-catalog.json",
+  "completed": 135,
+  "elapsed_seconds": 0.6701436,
+  "reference_api": 26,
+  "schema_version": 1,
+  "scope": "Declared catalog only; native JNI/GPU/audio need actual Horizon or Android backend; not complete Android coverage",
+  "sensor_tests": false,
+  "suite": "AndroSwitch Conformance",
+  "total": 135
+}

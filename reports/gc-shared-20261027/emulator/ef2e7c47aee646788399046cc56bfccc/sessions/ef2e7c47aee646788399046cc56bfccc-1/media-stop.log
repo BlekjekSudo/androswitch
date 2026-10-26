@@ -1,0 +1,7 @@
+{"operation":"cpu_capture_publish_result","result":0,"detail":0,"tick":11037858614}
+{"operation":"cpu_capture_publish_result","result":-7,"detail":0,"tick":11247055701}
+{"operation":"glsurface_quiesce_result","result":0,"detail":0,"tick":11260418184}
+{"operation":"opensl_quiesce_result","result":0,"detail":0,"tick":11260434650}
+{"operation":"glsurface_quiesce_result","result":0,"detail":0,"tick":11260703402}
+{"operation":"opensl_quiesce_result","result":0,"detail":0,"tick":11260722798}
+{"operation":"cpu_capture_publish_result","result":-7,"detail":0,"tick":11294390780}

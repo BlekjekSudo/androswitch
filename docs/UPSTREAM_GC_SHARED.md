@@ -1,6 +1,9 @@
 # Original RustyDroid collector on the product profile
 
-Status: host integration verified; Horizon qualification is in progress.
+Status: host integration and the available SDK corpus in diagnostic Ryujinx
+verified; physical-device qualification remains open.
+Implementation: `81edca4255581ccadca551e0e9fd01cebbed6862`.
+See the [retained checkpoint](../reports/gc-shared-20261027.json).
 The preceding [pressure-policy checkpoint](UPSTREAM_GC_PRESSURE.md) and its
 frozen NRO remain separate evidence.
 
@@ -65,3 +68,33 @@ framework side table, or any untested device service. Source selection now leave
 84 original VM modules outside the default product profile; that count is not an
 API denominator. Full upstream API parity and new physical-device verification
 remain open.
+
+## Horizon and persistence evidence
+
+The std/Mesa NRO has SHA-256
+`f91a9a64f6a6db7a23ca796671c13a609c69aa9a1e6d9b68fdfe3f3781ef0a6b`.
+The unchanged 257-case SDK/NDK APK completes with **254 PASS and 3 NOT_RUN** in
+two pinned headless Ryujinx launches. No case is FAIL, ERROR, UNSUPPORTED or
+INTERRUPTED. CPU, GPU and memory clock observations are the only three explicit
+baseline exclusions: the emulator has no corresponding PCV service.
+
+The first launch returns safely after its request budget with 168 PASS. It is
+retained as an incomplete corpus attempt. The second launch uses the existing
+guarded resume path with exactly the same NRO, APK and catalog, then completes
+the remaining cases. Its 171 seeded case records, including the three explicit
+exclusions, are compared with the prior journal; the report does not count them
+as newly executed cases. Both launches return to the launcher without a runtime
+error and restore the original SD tree.
+
+Actual captured framebuffers were reviewed. The first capture precedes the last
+few journal updates and is a partial screen, not completion evidence. The final
+capture shows 257 recorded cases, 254 passes, three other results and the selected
+run completion message. It retains the rotation exercised by the SDK orientation
+tests. The full result also covers storage/preferences/SQLite, lifecycle, JNI,
+native memory/threading, audio, GLES and the declared Vulkan discovery subset.
+It does not establish Vulkan rendering or all Android APIs.
+
+A copyable diagnostic NRO/folder bundle is recorded in the receipt, with its
+archive and payload hashes and explicit `hardware: not_run`. Its three NOT_RUN
+observations keep full catalog acceptance false. The earlier 219-case physical
+Switch result is not attached to this binary.

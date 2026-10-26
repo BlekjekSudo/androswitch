@@ -1,0 +1,401 @@
+{
+  "schema_version": 1,
+  "acceptance_passed": false,
+  "remaining_cases": [
+    {
+      "id": "host.cpu.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.gpu.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.memory.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "clock.uptime",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.metrics",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.configuration",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.rotation",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.requested-orientation",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.landscape",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.portrait",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.window",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "display.keep-screen-on",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "package.identity",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "package.info",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "package.apk-stream",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "package.missing",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "package.assets",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.write-read",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.append",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.name-parent",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.mkdir",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.delete",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "storage.random-access",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.int",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.long",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.boolean",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.float",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.string",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.remove",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "preferences.clear",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.int",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.long",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.boolean",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.float",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.double",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.byte",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.short",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.char",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.string",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.default",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "bundle.nested",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "ui.view-context",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "ui.textview",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "ui.button",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "ui.input-connection",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "ui.editable-utf16",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "sqlite.insert",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "sqlite.rollback",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "sqlite.commit",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "sqlite.bind",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "audio.minimum-buffer",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "audio.pcm-write",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "activity.roundtrip",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "activity.application",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "activity.intent",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "activity.handler-order",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.pointer-width",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.mixed-abi",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.string-utf8",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.array-copyback",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.exception",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.callback-gc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.local-frame",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.thread-attach",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "jni.native-file-sharing",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.monotonic",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.clock-resolution",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.process-cpu-count",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.errno",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.tls",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.malloc-realloc",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.locale-c",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.process-clock",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "native.abi",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.vendor",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.renderer",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.version",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.extensions",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.clear-readback",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.shader-valid",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.shader-invalid",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.buffer-roundtrip",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.texture-framebuffer",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.loader",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.instance",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.physical-device",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.queue-families",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.logical-device",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.memory-heaps",
+      "status": "NOT_RUN"
+    }
+  ],
+  "status": "observed_catalog_not_compatibility_pass",
+  "catalog_completed": false,
+  "selected_group": null,
+  "selected_total": 257,
+  "selected_counts": {
+    "PASS": 168,
+    "NOT_RUN": 89
+  },
+  "selected_completed": false,
+  "selected_passed": false,
+  "backend": "Horizon via diagnostic Ryujinx; not physical hardware or stock Ryujinx",
+  "catalog_sha256": "04ad15655ed955809aed7ec72bdea9127fb54b15a24db0f4333d6c27014f8770",
+  "explicit_exclusions": [
+    "host.cpu.clock_hz",
+    "host.gpu.clock_hz",
+    "host.memory.clock_hz"
+  ],
+  "total": 257,
+  "counts": {
+    "PASS": 168,
+    "NOT_RUN": 89
+  },
+  "apk_sha256": "32718652d7fefd16fa8c555ae2886d3f6ef8463670b46bba72ba44675ba3fcbf",
+  "nro_sha256": "f91a9a64f6a6db7a23ca796671c13a609c69aa9a1e6d9b68fdfe3f3781ef0a6b",
+  "external_status": "execution_verified_visual_review_required",
+  "original_sd_restore": "restored",
+  "launcher_completed": true,
+  "sessions": [
+    {
+      "session_id": "ef2e7c47aee646788399046cc56bfccc-1",
+      "status": "passed_execution",
+      "pending_case": null,
+      "error": null,
+      "raw_report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\ef2e7c47aee646788399046cc56bfccc\\sessions\\ef2e7c47aee646788399046cc56bfccc-1\\session-report.json"
+    }
+  ],
+  "android_reference": "not_run",
+  "physical_hardware": "not_run",
+  "scope": "An interrupted case remains INTERRUPTED; matching raw runtime errors explain it without inventing success."
+}

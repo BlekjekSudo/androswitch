@@ -1,0 +1,3 @@
+host.cpu.clock_hz
+host.gpu.clock_hz
+host.memory.clock_hz

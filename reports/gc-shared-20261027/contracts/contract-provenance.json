@@ -1,0 +1,47 @@
+{
+  "upstream": "3761815dc6a2a1427e9fc66b66e8471b78d1b170",
+  "functions": [
+    {
+      "name": "minor_remembers_old_fields_arrays_and_promotes_survivors",
+      "upstream": "crates/rd-vm/tests/gc_generations.rs",
+      "shared": "crates/rd-vm/tests/common/gc_contracts.rs",
+      "body_sha256": "3b32370fbc37d0c1620d38ae44148123f77a6789b3b41f88acdcc2ad62ea49de",
+      "body_identical": true
+    },
+    {
+      "name": "one_java_call_allocates_many_times_its_heap_budget",
+      "upstream": "crates/rd-vm/tests/gc_generations.rs",
+      "shared": "crates/rd-vm/tests/common/gc_contracts.rs",
+      "body_sha256": "67c66a59e4722fec3a550c63140410a4fca322a2c5e7b298d9d51014b113dbb3",
+      "body_identical": true
+    },
+    {
+      "name": "fuel_window_is_bounded_but_not_a_session_lifetime_limit",
+      "upstream": "crates/rd-vm/tests/gc_generations.rs",
+      "shared": "crates/rd-vm/tests/common/gc_contracts.rs",
+      "body_sha256": "f7842b86a7064cf51fef87580cf6e21962a84461f0e012d1d1e38400b854a6ae",
+      "body_identical": true
+    },
+    {
+      "name": "weak_references_are_cleared",
+      "upstream": "crates/rd-vm/tests/gc.rs",
+      "shared": "crates/rd-vm/tests/common/gc_weak_contracts.rs",
+      "body_sha256": "e6eca00034418abf22999f6be0b0a1e461e4640ea5af6c9fc9c778a48de9da1a",
+      "body_identical": true
+    },
+    {
+      "name": "cleared_weak_refs_are_enqueued",
+      "upstream": "crates/rd-vm/tests/gc.rs",
+      "shared": "crates/rd-vm/tests/common/gc_weak_contracts.rs",
+      "body_sha256": "e979bc13ce4c5c0dafaecc40089f766889e0eeb368a1aab8779613f518f083ed",
+      "body_identical": true
+    },
+    {
+      "name": "class_of",
+      "upstream": "crates/rd-vm/tests/gc.rs",
+      "shared": "crates/rd-vm/tests/common/gc_weak_contracts.rs",
+      "body_sha256": "7643c98bdbdd9ef19005ff83be8043d98cd6a4d50340904f87de4ada9ee5c99e",
+      "body_identical": true
+    }
+  ]
+}
