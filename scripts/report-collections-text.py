@@ -15,7 +15,9 @@ PARITY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PARITY)
 
 
-def generate(logs, fixture, output, commit, target_build=None, emulator_runs=()):
+def generate(logs, fixture, output, commit, target_build=None, emulator_runs=(), observed_runs=()):
+    logs, fixture, output = logs.resolve(), fixture.resolve(), output.resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Full implementation commit required")
     kind = subprocess.check_output(["git", "-C", str(ROOT), "cat-file", "-t", commit], text=True).strip()
@@ -94,6 +96,7 @@ def generate(logs, fixture, output, commit, target_build=None, emulator_runs=())
             if path.exists():
                 keep(path, "horizon/" + name)
     emulator = []
+    catalog_by_id = {r["id"]: r for r in catalog["cases"]}
     for run in emulator_runs:
         receipt = json.loads((run / "verification.json").read_bytes())
         summary = json.loads((run / "conformance-summary.json").read_bytes())
@@ -104,11 +107,12 @@ def generate(logs, fixture, output, commit, target_build=None, emulator_runs=())
         journal = Path(receipt["sd_result"]) / "userdata/org.androswitch.conformance/files/conformance/report.json"
         rows = json.loads(journal.read_bytes())["cases"]
         selected = [r for r in rows if r["status"] != "NOT_RUN"]
-        expected = [r for r in catalog["cases"] if r["group"] in {s["group"] for s in selected}]
+        groups = {catalog_by_id[s["id"]]["group"] for s in selected}
+        expected = [r for r in catalog["cases"] if r["group"] in groups]
         if (not selected or not all(s["status"] == "PASS" for s in selected)
                 or [r["id"] for r in selected] != [r["id"] for r in expected]):
             raise ValueError("Selected emulator groups are incomplete or not all passing")
-        emulator.append(dict(run=run.name, groups=sorted({s["group"] for s in selected}),
+        emulator.append(dict(run=run.name, groups=sorted(groups),
                              selected_passed=len(selected), total_catalog=len(rows),
                              full_catalog_acceptance=summary["acceptance_passed"]))
         keep(journal, f"emulator/{run.name}/report.json")
@@ -119,6 +123,59 @@ def generate(logs, fixture, output, commit, target_build=None, emulator_runs=())
         for path in sorted((run / "sessions").rglob("*")):
             if path.is_file() and path.suffix in {".json", ".log"}:
                 keep(path, f"emulator/{run.name}/sessions/" + path.relative_to(run / "sessions").as_posix())
+    observations = []
+    for run in observed_runs:
+        receipt = json.loads((run / "verification.json").read_bytes())
+        if (target is None or receipt["nro_sha256"] != target["nro_sha256"]
+                or receipt["sd_original_restore"] != "restored"
+                or len(receipt["inputs"]) != 1 or receipt["inputs"][0]["sha256"] != apk_hash):
+            raise ValueError("Observed attempts must match NRO/APK and restore original SD")
+        journal_root = Path(receipt["sd_result"]) / "userdata/org.androswitch.conformance/files/conformance"
+        journal = json.loads((journal_root / "report.json").read_bytes())
+        if [r["id"] for r in journal["cases"]] != [r["id"] for r in catalog["cases"]]:
+            raise ValueError("Observed journal must match the frozen catalog")
+        counts = {status: sum(r["status"] == status for r in journal["cases"])
+                  for status in sorted({r["status"] for r in journal["cases"]})}
+        observations.append(dict(run=run.name, status=receipt["status"], error=receipt.get("error"),
+                                 journal_counts=counts, next=journal.get("next"),
+                                 qualifies_emulator_pass=False, full_catalog_acceptance=False))
+        for name in ("verification.json", "conformance-summary.json", "emulator.json", "launcher-test.json",
+                     "ryujinx.stdout.log", "ryujinx.stderr.log"):
+            path = run / name
+            if path.exists(): keep(path, f"observed/{run.name}/{name}")
+        for base, label in ((run / "sessions", "sessions"), (journal_root, "journal")):
+            for path in sorted(base.rglob("*")):
+                if path.is_file() and path.suffix in {".json", ".log"}:
+                    keep(path, f"observed/{run.name}/{label}/" + path.relative_to(base).as_posix())
+    for name in ("collection-text-collections-timeout-before.log", "collection-text-collections-timeout-recheck.log"):
+        path = logs / name
+        if path.exists(): keep(path, "before/" + name)
+    host_ui = None
+    ui_journal = logs / "collections-ui-storage/userdata/org.androswitch.conformance/files/conformance/report.json"
+    ui_log = logs / "collection-text-host-ui.log"
+    if ui_journal.exists() and ui_log.exists():
+        rows = json.loads(ui_journal.read_bytes())
+        if ([r["id"] for r in rows["cases"]] != [r["id"] for r in catalog["cases"]]
+                or rows["catalog_sha256"] != hashlib.sha256((fixture / "catalog.json").read_bytes()).hexdigest()):
+            raise ValueError("Host UI journal must match the frozen catalog")
+        selected = [r for r in rows["cases"] if catalog_by_id[r["id"]]["group"] == "Collections"]
+        stdout = ui_log.read_text(encoding="utf-8-sig").splitlines()
+        completed = False
+        if stdout and stdout[-1].startswith('{"'):
+            snapshots = json.loads(stdout[-1]).get("snapshots", [])
+            completed = bool(snapshots) and any(
+                v.get("text") == "Selected run complete; other categories may be NOT_RUN"
+                for v in snapshots[-1]["views"])
+        host_ui = dict(group="Collections", passed=sum(r["status"] == "PASS" for r in selected),
+                       declared=len(selected), selected_run_completed=completed,
+                       qualifies_scoped_host_ui_pass=completed and all(r["status"] == "PASS" for r in selected),
+                       full_catalog_acceptance=False, horizon_evidence=False)
+        keep(ui_journal, "host-ui/report.json")
+        keep(ui_log, "host-ui/execution.log")
+        keep(logs / "collections-ui-request.json", "host-ui/request.json")
+        for name in ("collection-text-host-ui-stack.log", "collection-text-host-ui-diagnostic.json"):
+            path = logs / name
+            if path.exists(): keep(path, "host-ui/" + name)
     report = dict(schema_version=1, date="2026-10-26", status="scoped_integration_checkpoint",
         implementation_commit=commit, upstream_revision=audit["upstream"],
         upstream_credit="RustyDroid by nadabgfccvd and contributors; history/licenses retained",
@@ -127,7 +184,9 @@ def generate(logs, fixture, output, commit, target_build=None, emulator_runs=())
         shipping_excluded_scope="Source selection, not API denominator; every original module still behavior-unverified in the source audit",
         shared_original_modules=["jcollections", "jiterator", "collections", "jlstring", "jsb", "jregex"],
         tests=tests, jvm_dex=dict(passed=len(pure), apk_sha256=apk_hash, total_catalog=len(catalog["cases"])),
-        horizon_build=target, emulator=emulator, physical_device="not_run_for_this_implementation",
+        horizon_build=target, emulator=emulator, observed_incomplete_emulator_attempts=observations,
+        ordinary_host_ui=host_ui,
+        physical_device="not_run_for_this_implementation",
         prior_hardware_report="reports/conformance-std-hardware-20261026.json; old std candidate only",
         independent_games="deferred_until_complete_upstream_integration_per_user_request",
         limitations_document="docs/UPSTREAM_COLLECTIONS_TEXT.md", evidence=evidence)
@@ -143,7 +202,9 @@ if __name__ == "__main__":
     parser.add_argument("--implementation-commit", required=True)
     parser.add_argument("--target-build", type=Path)
     parser.add_argument("--emulator-run", type=Path, action="append", default=[])
+    parser.add_argument("--observed-emulator-run", type=Path, action="append", default=[],
+                        help="Retain incomplete attempts without qualifying an emulator pass")
     args = parser.parse_args()
     result = generate(args.logs, args.fixture, args.output, args.implementation_commit,
-                      args.target_build, args.emulator_run)
+                      args.target_build, args.emulator_run, args.observed_emulator_run)
     print(f"Retained {len(result['evidence'])} inputs/outputs; complete upstream API parity remains false")

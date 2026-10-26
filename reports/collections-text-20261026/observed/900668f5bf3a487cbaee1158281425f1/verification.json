@@ -1,0 +1,108 @@
+{
+  "native_trace_requested": false,
+  "startup_wait_ms": 30000,
+  "custom_session_events": true,
+  "root_stop_wait_attempts": 1,
+  "cases": [],
+  "emulator_frontend": "headless_sdl2",
+  "latest_media_stop": [],
+  "schema_version": 1,
+  "artifact": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\900668f5bf3a487cbaee1158281425f1\\androswitch.nro",
+  "host_storage_preflight": {
+    "volume": "C:\\",
+    "available_bytes": 14324219904,
+    "scope": "Host staging estimate, separate from guest/Horizon memory admission",
+    "required_bytes": 566860220
+  },
+  "latest_session_report": {
+    "package": "org.androswitch.conformance",
+    "revision": 1,
+    "schema_version": 1,
+    "session_id": "900668f5bf3a487cbaee1158281425f1-1",
+    "status": "running"
+  },
+  "observed_sessions": [
+    {
+      "runtime_status": "running",
+      "package": "org.androswitch.conformance",
+      "error": null,
+      "session_id": "900668f5bf3a487cbaee1158281425f1-1",
+      "completed_case_verified": false,
+      "scope": "Diagnostic observation; final launcher result is required to verify completion and installation identity.",
+      "report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\900668f5bf3a487cbaee1158281425f1\\sessions\\900668f5bf3a487cbaee1158281425f1-1\\session-report.json",
+      "revision": 1
+    }
+  ],
+  "sd_result": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-result-900668f5bf3a487cbaee1158281425f1",
+  "launches": [
+    {
+      "expected_session_id": "900668f5bf3a487cbaee1158281425f1-1",
+      "sha256": "32718652d7fefd16fa8c555ae2886d3f6ef8463670b46bba72ba44675ba3fcbf",
+      "bytes": 57953,
+      "install_snapshot_step": 3,
+      "attempt": 0,
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-collections-text-final\\AndroSwitchConformance.apk",
+      "index": 0,
+      "staged_name": "0000-external.apk"
+    }
+  ],
+  "first_screen_contract": "Runtime execution, fresh guest frames and safe return; a recognizable application screen requires visual review. This does not prove gameplay.",
+  "userdata_seed": [
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-collections-text-final\\seeds-9e25d9466fc240fab2e73085ad79e582\\org.androswitch.conformance\\files\\autorun.txt",
+      "relative": "org.androswitch.conformance/files/autorun.txt",
+      "bytes": 1,
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "frozen": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\900668f5bf3a487cbaee1158281425f1\\userdata-seed\\org.androswitch.conformance\\files\\autorun.txt"
+    },
+    {
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-collections-text-final\\seeds-9e25d9466fc240fab2e73085ad79e582\\org.androswitch.conformance\\files\\filter.txt",
+      "relative": "org.androswitch.conformance/files/filter.txt",
+      "bytes": 11,
+      "sha256": "9f9feade761d22f340a4de9c586f222aa74658351faadc8365335bc3c548ba71",
+      "frozen": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\900668f5bf3a487cbaee1158281425f1\\userdata-seed\\org.androswitch.conformance\\files\\filter.txt"
+    }
+  ],
+  "emulator_path": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-hle-fixed-20261025\\Ryujinx.exe",
+  "root_handle_pinned": true,
+  "nro_sha256": "1a577dd42a8fe673e511800f95d020995dd15e5ff6dc822818bc1081a39aca7c",
+  "inputs": [
+    {
+      "install_snapshot_step": 3,
+      "index": 0,
+      "bytes": 57953,
+      "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\conformance-collections-text-final\\AndroSwitchConformance.apk",
+      "staged_name": "0000-external.apk",
+      "sha256": "32718652d7fefd16fa8c555ae2886d3f6ef8463670b46bba72ba44675ba3fcbf"
+    }
+  ],
+  "pid": 267448,
+  "emulator_sha256": "cf03a8da21588166082735c0427413fe791032b84cba77919f38f5652218997c",
+  "emulator_version": "1.3.3+e2143d4",
+  "capture_ownership_contract": "Protocol1 runtime generation identity; matching pending request for CPU frames; identity rechecked after copy. Filesystem timestamps are not ownership evidence.",
+  "physical_device": "not_run",
+  "visual_review": "not_run",
+  "backend": "ryujinx",
+  "root_stop_wait_ms": 559,
+  "latest_memory_admission": {
+    "allocator_available_after_load": 1600059296,
+    "allocator_available_before_load": 1601099568,
+    "estimated_parser_bytes": 1354548,
+    "package": "org.androswitch.conformance",
+    "parser_budget_bytes": 268435456,
+    "raw_dex_bytes": 71032,
+    "revision": 1,
+    "schema_version": 1,
+    "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+    "session_id": "900668f5bf3a487cbaee1158281425f1-1",
+    "status": "vm_ready"
+  },
+  "execution_attempted": true,
+  "commands": 5,
+  "error": "No fresh completed launcher report before the timeout.",
+  "ryujinx_profile": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e",
+  "status": "attempted_failed",
+  "sd_original_restore": "restored",
+  "sd_backup": "C:\\Users\\Administrator\\.cache\\androswitch\\ryujinx-cfg-e2e\\sdcard\\switch\\androswitch-external-backup-900668f5bf3a487cbaee1158281425f1",
+  "session_id": "900668f5bf3a487cbaee1158281425f1"
+}

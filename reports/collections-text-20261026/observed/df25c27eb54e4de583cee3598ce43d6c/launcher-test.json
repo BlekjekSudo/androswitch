@@ -1,0 +1,44 @@
+{
+  "commands": [
+    {
+      "kind": "frame"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "kind": "wait",
+          "ms": 30000
+        },
+        {
+          "kind": "wait",
+          "ms": 30000
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "kind": "wait",
+          "ms": 2000
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "kind": "frames",
+      "count": 60
+    }
+  ],
+  "session_id": "df25c27eb54e4de583cee3598ce43d6c",
+  "schema_version": 1
+}

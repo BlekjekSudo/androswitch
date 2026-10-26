@@ -1,0 +1,6 @@
+External-APK evidence (attempted_failed): D:\Dev\Switch\AndroSwitch\local-artifacts\m9\external-runs\df25c27eb54e4de583cee3598ce43d6c/verification.json
+Traceback (most recent call last):
+  File "D:\Dev\Switch\AndroSwitch\scripts/collect-conformance.py", line 59, in <module>
+    selected = [row for row in journal['cases'] if not args.group or row['group'] == args.group]
+                                                                     ~~~^^^^^^^^^
+KeyError: 'group'

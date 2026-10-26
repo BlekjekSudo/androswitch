@@ -1,0 +1,48 @@
+[New Thread 267280.0x44408]
+[New Thread 267280.0x439d4]
+[New Thread 267280.0x44338]
+
+Thread 4 (Thread 267280.0x44338):
+#0  0x00007ffe7cfb3641 in ntdll!DbgBreakPoint () from C:\Windows\SYSTEM32\ntdll.dll
+#1  0x00007ffe7cfe6f6e in ntdll!DbgUiRemoteBreakin () from C:\Windows\SYSTEM32\ntdll.dll
+#2  0x00007ffe7ba1257d in KERNEL32!BaseThreadInitThunk () from C:\Windows\System32\kernel32.dll
+#3  0x00007ffe7cf6aa48 in ntdll!RtlUserThreadStart () from C:\Windows\SYSTEM32\ntdll.dll
+#4  0x0000000000000000 in ?? ()
+
+Thread 3 (Thread 267280.0x439d4):
+#0  0x00007ffe7cfb35a4 in ntdll!ZwWaitForWorkViaWorkerFactory () from C:\Windows\SYSTEM32\ntdll.dll
+#1  0x00007ffe7cf4537e in ntdll!RtlClearThreadWorkOnBehalfTicket () from C:\Windows\SYSTEM32\ntdll.dll
+#2  0x00007ffe7ba1257d in KERNEL32!BaseThreadInitThunk () from C:\Windows\System32\kernel32.dll
+#3  0x00007ffe7cf6aa48 in ntdll!RtlUserThreadStart () from C:\Windows\SYSTEM32\ntdll.dll
+#4  0x0000000000000000 in ?? ()
+
+Thread 2 (Thread 267280.0x44408 "WindhawkMainLoopThreadAttachExempt"):
+#0  0x00007ffe7cfb04a4 in ntdll!ZwWaitForMultipleObjects () from C:\Windows\SYSTEM32\ntdll.dll
+#1  0x00007ffe7a46fda9 in WaitForMultipleObjectsEx () from C:\Windows\System32\KernelBase.dll
+#2  0x00007ffe7a46fcae in WaitForMultipleObjects () from C:\Windows\System32\KernelBase.dll
+#3  0x00007ffe0e7ed1ad in windhawk!GlobalHookSessionStart () from C:\Program Files\Windhawk\Engine\1.7.3\64\windhawk.dll
+#4  0x00007ffe0e7ed846 in windhawk!GlobalHookSessionStart () from C:\Program Files\Windhawk\Engine\1.7.3\64\windhawk.dll
+#5  0x00007ffe0e7ed7d7 in windhawk!GlobalHookSessionStart () from C:\Program Files\Windhawk\Engine\1.7.3\64\windhawk.dll
+#6  0x00007ffe0e7ed7fc in windhawk!GlobalHookSessionStart () from C:\Program Files\Windhawk\Engine\1.7.3\64\windhawk.dll
+#7  0x00007ffe7ba1257d in KERNEL32!BaseThreadInitThunk () from C:\Windows\System32\kernel32.dll
+#8  0x00007ffe7cf6aa48 in ntdll!RtlUserThreadStart () from C:\Windows\SYSTEM32\ntdll.dll
+#9  0x0000000000000000 in ?? ()
+
+Thread 1 (Thread 267280.0x39e7c "main"):
+#0  0x00007ffe7b579580 in msvcrt!memmove () from C:\Windows\System32\msvcrt.dll
+#1  0x00007ff737305a69 in <core::option::IntoIter<&alloc::collections::btree::map::BTreeMap<u32, core::option::Option<u32>>> as core::iter::traits::iterator::Iterator>::flat_map::<core::iter::adapters::flatten::Flatten<core::iter::adapters::copied::Copied<alloc::collections::btree::map::Values<u32, core::option::Option<u32>>>>, <as_framework::android::services::executors::thread_local::Locals>::references::{closure#0}> ()
+#2  0x00007ff7375f1866 in <as_framework::android::services::executors::thread_local::Locals>::references ()
+#3  0x00007ff7373a48e0 in <as_framework::android::services::executors::Executors>::references ()
+#4  0x00007ff7371da468 in <as_framework::android::services::Services>::references ()
+#5  0x00007ff7372a957d in <as_framework::android::Android as rd_vm::framework_host::FrameworkHost>::references ()
+#6  0x00007ff7379a27d7 in <rd_vm::engine::Engine>::gc ()
+#7  0x00007ff737919571 in <rd_vm::engine::Engine>::maybe_gc::{closure#0} ()
+#8  0x00007ff737882375 in <bool>::then::<rd_vm::gc::GcStats, <rd_vm::engine::Engine>::maybe_gc::{closure#0}> ()
+#9  0x00007ff7379a2fd4 in <rd_vm::engine::Engine>::maybe_gc ()
+#10 0x00007ff7379e50a6 in rd_vm::interp::exec_frame ()
+#11 0x00007ff7379ac744 in <rd_vm::engine::Engine>::call_body ()
+#12 0x00007ff7379ab46a in <rd_vm::engine::Engine>::call ()
+#13 0x00007ff737a11e15 in rd_vm::interp::do_invoke ()
+#14 0x00007ff7379fb9f1 in rd_vm::interp::exec_frame ()
+#15 0x00007ff7379ac744 in <rd_vm::engine::Engine>::call_body ()
+[Inferior 1 (process 267280) detached]

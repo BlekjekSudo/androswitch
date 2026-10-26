@@ -50,6 +50,11 @@ six inherited modules to the product's collection owner, shared heap and
 Engine-owned regex state. The duplicate product builder map was removed.
 Eighty-five original VM sources remain outside the default device profile;
 this is a source inventory, not an API percentage.
+Its [checkpoint](reports/collections-text-20261026.json) records 706 reference
+tests, 995 product/desktop regressions and 135 JVM/DEX cases passing on host.
+The std NRO builds, while two Collections emulator attempts time out. UI/journal
+GC pressure is under investigation; this source checkpoint has no new emulator
+or hardware compatibility pass.
 
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
 257 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,

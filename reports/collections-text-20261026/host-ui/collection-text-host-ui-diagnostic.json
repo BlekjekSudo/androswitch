@@ -1,0 +1,8 @@
+{
+  "debugger_sample": "collection-text-host-ui-stack.log",
+  "status": "stopped_owned_diagnostic_after_slow_progress",
+  "runtime_commit": "7fca53267b76a699624d71a1c13745c02b1dc506",
+  "reason": "Ordinary UI/journal workload progressed slowly; debugger sample found GC. No full UI pass or API error is inferred.",
+  "session_id": "collection-text-host-ui",
+  "schema_version": 1
+}

@@ -127,8 +127,13 @@ builder map was removed. StringBuffer uses the actual VM monitor; Matcher and
 MatchResult references participate in GC. The Conformance source grows from the
 frozen 219-case hardware baseline to 257 development cases, with 135 actual JVM
 oracle rows. Full product DEX execution of those 135 pure cases passes at this
-checkpoint. The new catalog and source still require their own target and
-emulator receipts; the earlier hardware confirmation is not transferred.
+checkpoint. Its std NRO builds, but the two recorded Collections emulator
+attempts time out before completing the workflow. An ordinary host UI/journal
+diagnostic also advances slowly and samples in GC. Integrating the upstream
+pressure/backoff behavior is the next verification boundary. The new build has
+no completed emulator or hardware qualification; the earlier hardware
+confirmation is not transferred. See the
+[actual checkpoint](../reports/collections-text-20261026.json).
 
 The source-route audit now evaluates the actual shipping `std` feature
 declarations, including nested `all`/`any`/`not` guards. **85 original VM files

@@ -56,7 +56,8 @@ for case_id in exclusions:
 counts = collections.Counter(row['status'] for row in journal['cases'])
 if args.group and args.group not in {row['group'] for row in catalog['cases']}:
     raise SystemExit('Unknown selected catalog group')
-selected = [row for row in journal['cases'] if not args.group or row['group'] == args.group]
+groups = {row['id']: row['group'] for row in catalog['cases']}
+selected = [row for row in journal['cases'] if not args.group or groups[row['id']] == args.group]
 selected_completed = bool(selected) and all(row['status'] != 'NOT_RUN' or row['id'] in exclusions for row in selected)
 selected_passed = bool(selected) and all(row['status'] == 'PASS' for row in selected) and not any(row['id'] in exclusions for row in selected)
 allowed = {'PASS', 'FAIL', 'UNSUPPORTED', 'BLOCKED', 'NOT_RUN', 'INTERRUPTED', 'ERROR'}

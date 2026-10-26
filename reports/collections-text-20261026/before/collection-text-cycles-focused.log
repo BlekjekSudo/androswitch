@@ -1,0 +1,14 @@
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+   Compiling as-vm-render-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-render-testsupport)
+   Compiling as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+    Finished `test` profile [unoptimized] target(s) in 57.94s
+     Running ..\rd-vm\tests\arrays_303.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\upstream_arrays_303-f4ec0bccd53e6953.exe)
+
+running 4 tests
+test issue_303_arrays_deep_to_string_handles_self_and_mutual_cycles_and_shared_siblings ... ok
+test issue_303_copy_of_copy_of_range_and_vector_set_size_enforce_heap_budget ... ok
+test issue_303_host_classes_equals_and_hash_code_work_across_arrays_lists_sets_and_maps ... ok
+test issue_303_indirect_collection_and_map_cycles_throw_catchable_stack_overflow ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

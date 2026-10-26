@@ -12,8 +12,8 @@
     {
       "path": ".gitattributes",
       "blob": "b09e4443db294b69a2ce100c3ebffbea0113f108",
-      "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained.",
-      "sha256": "e230028449110f397fc76459d4d83d83a58c2d2e7ee2b4333eb91b697953f2a7"
+      "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained. Reviewed narrow raw-evidence rule for reports/collections-text-20261026: preserve byte hashes through Git checkout and exempt original log whitespace, without changing source policies.",
+      "sha256": "0940a53fa791c8fe4b8b62af7f9fd391244478f047c3f14c2092fabe422bfb4c"
     },
     {
       "path": ".github/CODEOWNERS",

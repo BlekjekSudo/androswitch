@@ -66,6 +66,20 @@ Core-only compilation, workspace/reference strict Clippy, formatting, 26 Python
 tests and the reviewed source gate pass. Zero-case native/JIT targets do not
 become verified through those totals. Target execution is recorded separately.
 
+The std NRO built from `7fca532` has SHA-256
+`1a577dd42a8fe673e511800f95d020995dd15e5ff6dc822818bc1081a39aca7c`.
+Two pinned headless Ryujinx Collections attempts timed out at 180 and 600 seconds.
+Their aggregate journals contained 17 and 14 PASS rows respectively; neither
+finished the launcher workflow. Both original SD trees were restored. No API
+failure or completed emulator qualification is inferred from those attempts.
+The Text group has not been run on this NRO. Host resource pressure was observed,
+but an ordinary host UI/journal diagnostic also progressed slowly. It was stopped
+after a debugger sample found the main thread in automatic GC. Original
+`gc.rs` has pinned-allocation pressure backoff that the product collector still
+needs to integrate and verify; the profile sample is not a complete root-cause
+proof. The partial journals, process diagnostic and raw stack remain in the
+[checkpoint report](../reports/collections-text-20261026.json).
+
 The combined product regression run caught older assertions that expected
 collection equality to fail and formatted integral float coordinates without
 Java's `.0` suffix. These now assert actual JVM value behavior. The same run

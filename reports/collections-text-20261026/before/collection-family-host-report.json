@@ -1,0 +1,305 @@
+{
+  "backend": "portable_host",
+  "cases": [
+    {
+      "detail": "b:1",
+      "elapsed_us": 4332,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.arraylist",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 1659,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.list-null",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "8",
+      "elapsed_us": 2534,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.list-iterator",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:7",
+      "elapsed_us": 2481,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.map",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 1646,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.set",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a:false:2",
+      "elapsed_us": 2996,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cow-snapshot",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a",
+      "elapsed_us": 1310,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cow-array-copy",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "unsupported",
+      "elapsed_us": 1733,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cow-remove-unsupported",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:false",
+      "elapsed_us": 1475,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.boxed-equals",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:1:2:3",
+      "elapsed_us": 1556,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.arraycopy",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:9",
+      "elapsed_us": 1317,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.array-clone",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "false:true",
+      "elapsed_us": 3076,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.abstract-subclass",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:true:true",
+      "elapsed_us": 2246,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.copy-set-dedup",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:2:2:2",
+      "elapsed_us": 2942,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.copy-list-variants",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:[a, b, a, b]",
+      "elapsed_us": 2126,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.self-add-all",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true:true",
+      "elapsed_us": 2410,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.bulk-filter",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:[a, b, null, x]",
+      "elapsed_us": 2011,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.typed-array",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[a, z, d]:[z, d]",
+      "elapsed_us": 5166,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.nested-sublist-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a:0:b:false:[b]",
+      "elapsed_us": 5354,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.list-iterator-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a",
+      "elapsed_us": 1509,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.iterator-remove-state",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NOT_FOUND [rd-vm]: método Lorg/androswitch/conformance/PureCases$ReadList;->indexOf(Ljava/lang/Object;)I não resolvido [pc 0x221: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 425, regs: [15, 1, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/PureCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String; — a classe pode depender de plataforma fora do escopo M2",
+      "elapsed_us": 3697,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.abstract-list",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NOT_FOUND [rd-vm]: método Lorg/androswitch/conformance/PureCases$ReadCollection;->contains(Ljava/lang/Object;)Z não resolvido [pc 0x1d9: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 417, regs: [15, 1, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/PureCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String; — a classe pode depender de plataforma fora do escopo M2",
+      "elapsed_us": 3146,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.abstract-collection",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "true:true:[a, b]",
+      "elapsed_us": 2932,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.object-contracts",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a:c:[c, b, a]",
+      "elapsed_us": 2988,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.sort-reverse-minmax",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "b",
+      "elapsed_us": 1670,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.singleton-map-immutable",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 1240,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.readonly-bulk",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:[a, b]",
+      "elapsed_us": 1335,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.static-add-all",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 914,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.indexed-add-all-bounds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "null",
+      "elapsed_us": 1268,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.constructor-null",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2",
+      "elapsed_us": 1105,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.sublist-bounds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[a, c, d, b]",
+      "elapsed_us": 2173,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.indexed-add-all",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NOT_FOUND [rd-vm]: método Ljava/lang/String;->compareTo(Ljava/lang/String;)I não resolvido [pc 0x3: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 187, regs: [2, 1, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/PureCases$5;->compare(Ljava/lang/String;Ljava/lang/String;)I\n  at Lorg/androswitch/conformance/PureCases$5;->compare(Ljava/lang/Object;Ljava/lang/Object;)I\n  at Lorg/androswitch/conformance/PureCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String; — a classe pode depender de plataforma fora do escopo M2",
+      "elapsed_us": 3296,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.comparator-gc",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    }
+  ],
+  "catalog": "local-artifacts/horizon-std/collection-family-host-catalog.json",
+  "completed": 32,
+  "elapsed_seconds": 0.7988376,
+  "reference_api": 26,
+  "schema_version": 1,
+  "scope": "Declared catalog only; native JNI/GPU/audio need actual Horizon or Android backend; not complete Android coverage",
+  "sensor_tests": false,
+  "suite": "AndroSwitch Conformance",
+  "total": 32
+}
