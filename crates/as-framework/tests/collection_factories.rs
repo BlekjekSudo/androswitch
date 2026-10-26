@@ -92,6 +92,43 @@ fn add(t: &mut Test, r: ObjRef, values: &[Value]) {
         );
     }
 }
+#[test]
+fn promoted_product_collection_owners_retain_young_side_state_during_minor_gc() {
+    let mut t = Test::new();
+    for class in [
+        "Ljava/util/ArrayList;",
+        "Ljava/util/HashSet;",
+        "Ljava/util/concurrent/CopyOnWriteArrayList;",
+    ] {
+        let owner = t.collection(class);
+        t.keep("current", owner);
+        t.app.vm.gc();
+        let child = t
+            .app
+            .vm
+            .heap
+            .alloc_string("young side-state child".into())
+            .unwrap();
+        add(&mut t, owner, &[Value::Obj(child)]);
+        let garbage = t
+            .app
+            .vm
+            .heap
+            .alloc_string("unreachable young payload".into())
+            .unwrap();
+        let stats = t.app.vm.gc_minor();
+        assert_eq!(stats.last_kind, "minor");
+        assert_eq!(
+            t.app.vm.heap.as_str(child).unwrap(),
+            "young side-state child"
+        );
+        assert_eq!(t.app.vm.heap.class_of(garbage), Ok(rd_vm::gc::FREED_CLASS));
+        assert_eq!(values(&mut t, owner), [Value::Obj(child)]);
+        t.call(owner, "clear", "()V", &[]);
+        t.app.vm.gc();
+        assert_eq!(t.app.vm.heap.class_of(child), Ok(rd_vm::gc::FREED_CLASS));
+    }
+}
 fn copied(t: &mut Test, class: &str, source: ObjRef) -> ObjRef {
     let r = t.app.vm.heap.alloc_instance(class.into(), vec![]).unwrap();
     t.app.vm.attach_host_state(class, r).unwrap();

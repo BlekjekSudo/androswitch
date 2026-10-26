@@ -36,9 +36,10 @@ python -X utf8 scripts/check-upstream-sync.py --require-device-parity
 The last command is **expected to fail** while device parity is unverified.
 
 The shipping source selector uses the real `std` profile independently of the
-desktop execution backend. Current shared collections/text work leaves 85
+desktop execution backend. Current shared collections/text/collector work leaves 84
 original VM sources outside the default product profile. See the
-[integration boundary record](UPSTREAM_COLLECTIONS_TEXT.md). Source selection
+[collection/text boundary record](UPSTREAM_COLLECTIONS_TEXT.md) and the
+[shared original collector integration](UPSTREAM_GC_SHARED.md). Source selection
 and host reference tests do not verify those APIs on Horizon.
 The ordinary source gate can pass while the device gate fails; this prevents
 source synchronization from being reported as runtime compatibility. The report

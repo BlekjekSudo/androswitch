@@ -78,6 +78,13 @@ pinned live watermark once its callback unwinds. The ordinary Collections
 UI/journal run now completes 34/34 host cases at 64 MiB. This does not complete
 the original collector's tracing/state integration or qualify unrun device APIs.
 
+The following [shared collector integration](UPSTREAM_GC_SHARED.md) removes the
+separate product collector and builds original `gc.rs` on both profiles. Heap,
+generation and weak/queue tests share unchanged upstream bodies. Platform roots
+and old side-state traversal remain explicit adapters; the remaining framework
+tables and public API dispatch still require integration. This closes a core
+implementation boundary without certifying complete API parity.
+
 | Boundary | Inherited reference state | Current product state | Remaining integration |
 | --- | --- | --- | --- |
 | Collections/iterators | `HostState.objects`, `jcollections`, `collections` | `as-framework/services/collections`, COW and map adapters | One owner for constructors, factories, views, callbacks and GC edges |

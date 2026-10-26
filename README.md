@@ -48,7 +48,7 @@ metadata is supplemental type information, not implementation coverage.
 The [shared collections/text port](docs/UPSTREAM_COLLECTIONS_TEXT.md) connects
 six inherited modules to the product's collection owner, shared heap and
 Engine-owned regex state. The duplicate product builder map was removed.
-Eighty-five original VM sources remain outside the default device profile;
+Eighty-four original VM sources remain outside the default device profile;
 this is a source inventory, not an API percentage.
 Its [checkpoint](reports/collections-text-20261026.json) records 706 reference
 tests, 995 product/desktop regressions and 135 JVM/DEX cases passing on host.
@@ -61,6 +61,13 @@ also pass in two completed headless Ryujinx runs of NRO `5876341`, including
 return to the launcher and original SD restoration. See the
 [retained checkpoint](reports/gc-pressure-20261027.json). These results do not
 qualify complete upstream behavior or physical hardware.
+
+The current [collector integration](docs/UPSTREAM_GC_SHARED.md) also removes
+the separate product collector. Both profiles compile original RustyDroid GC,
+with product roots and platform side-state adapters. Its host verification has
+710 reference tests, 1,001 product/desktop regressions, the five unchanged
+upstream heap scenarios and the same UI/JVM checks passing. Horizon qualification
+of this later implementation is recorded separately from NRO `5876341`.
 
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
 257 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,

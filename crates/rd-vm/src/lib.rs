@@ -16,7 +16,6 @@ use alloc::{
 };
 
 mod app_output;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 mod collection_clock;
 mod gc_policy;
 #[cfg(any(feature = "std", feature = "upstream-runtime"))]
@@ -128,10 +127,6 @@ pub mod engine;
 pub mod err;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod framework;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-pub mod gc;
-#[cfg(all(not(feature = "desktop-runtime"), not(feature = "upstream-runtime")))]
-#[path = "portable/gc.rs"]
 pub mod gc;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub mod gms;

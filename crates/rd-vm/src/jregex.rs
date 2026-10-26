@@ -74,7 +74,6 @@ pub(crate) struct MState {
 
 /// GC: objects that have state here (marking consults `gc_entry` only
 /// for these).
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) fn gc_keys(vm: &Engine, out: &mut Vec<ObjRef>) {
     vm.regex_tables
         .matchers

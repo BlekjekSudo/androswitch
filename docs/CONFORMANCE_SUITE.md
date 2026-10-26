@@ -11,6 +11,19 @@ The parsers, VM and original runtime foundation are credited to
 contributors. AndroSwitch adds the portable Horizon adapters and these original
 tests. Upstream attribution and licenses remain in [CREDITS](../CREDITS.md).
 
+## Bounded emulator runs
+
+`scripts/test-conformance-ryujinx.ps1` accepts up to 32 explicit wait segments,
+each at most 30 seconds, with the existing 1,800-second maximum outer timeout.
+The default remains one segment. Longer full-catalog attempts can use sixteen
+30-second segments and a 1,200-second outer timeout; the launcher/session and
+original-SD restoration gates still apply.
+
+The pinned diagnostic emulator has no PCV implementation for `host.cpu.clock_hz`,
+`host.gpu.clock_hz` and `host.memory.clock_hz`. Explicit baseline exclusions for
+those observations remain NOT_RUN in the ordinary APK journal and receipt.
+They are never converted into passes or inferred from other clock sources.
+
 ## Runtime acceptance target
 
 All **257 declared cases are runtime repair targets**. Producing an APK, visiting

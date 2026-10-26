@@ -2,7 +2,7 @@
 param(
     [ValidateRange(1,100)][int]$Launches=60,
     [ValidateRange(1000,30000)][int]$WaitMilliseconds=1000,
-    [ValidateRange(1,8)][int]$WaitSegments=1,
+    [ValidateRange(1,32)][int]$WaitSegments=1,
     [ValidateRange(30,1800)][int]$TimeoutSeconds=900,
     [string]$Ryujinx='D:/Dev/Switch/RyujinX/Ryujinx.exe',
     [string]$RyujinxProfile="$env:APPDATA/Ryujinx",

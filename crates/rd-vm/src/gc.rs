@@ -28,12 +28,14 @@
 //!   before growing, so the 2^20-slot cap bounds *live* objects, not
 //!   allocations. Every side table keyed by `ObjRef` is either a root, an
 //!   ephemeron, or purged at sweep, so a recycled slot inherits no state.
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 use crate::framework::HostObj;
 use crate::heap::{HeapObj, ObjRef};
 #[cfg(not(feature = "std"))]
 #[allow(unused_imports)]
 use crate::port_prelude::*;
 use crate::{Engine, Value};
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 use core::fmt::Write as _;
 
 /// Class descriptor of a collected slot.
@@ -66,7 +68,7 @@ pub struct GcStats {
 }
 
 /// Pushes every integer token of `s` that is a valid `ObjRef` (1..=n).
-#[cfg(test)]
+#[cfg(all(test, any(feature = "desktop-runtime", feature = "upstream-runtime")))]
 fn scan_refs(s: &str, n: usize, out: &mut Vec<ObjRef>) {
     let b = s.as_bytes();
     let mut i = 0;
@@ -89,6 +91,7 @@ fn scan_refs(s: &str, n: usize, out: &mut Vec<ObjRef>) {
 /// Tokenizes the exact conservative Debug byte stream without buffering it.
 /// A numeric token may span any number of write_str/write_char calls. The
 /// saturating arithmetic and emitted order match the original scan_refs.
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 struct RefScanner<F> {
     limit: u64,
     pending: u64,
@@ -96,6 +99,7 @@ struct RefScanner<F> {
     emit: F,
 }
 
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 impl<F: FnMut(ObjRef)> RefScanner<F> {
     fn new(n: usize, emit: F) -> Self {
         Self {
@@ -119,6 +123,7 @@ impl<F: FnMut(ObjRef)> RefScanner<F> {
     }
 }
 
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 impl<F: FnMut(ObjRef)> core::fmt::Write for RefScanner<F> {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.bytes = self.bytes.saturating_add(s.len());
@@ -168,7 +173,7 @@ impl<F: FnMut(ObjRef)> core::fmt::Write for RefScanner<F> {
 // formatter stream (no hashes and no large temporary copy); any change falls
 // back to the inherited conservative trace. Host-object ephemerons and the APK
 // are removed by the caller and are traced separately.
-#[cfg(not(feature = "desktop-runtime"))]
+#[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
 fn framework_is_default(state: &crate::framework::HostState) -> bool {
     static DEFAULT: rd_dex::sync::OnceLock<String> = rd_dex::sync::OnceLock::new();
     struct Compare<'a> {
@@ -212,6 +217,7 @@ impl Engine {
     /// Conservative root rendering: every engine structure outside the heap,
     /// except the weak host-object table (traced per reachable key). A generic
     /// sink lets collection scan the identical Debug text without allocating it.
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     fn write_gc_roots(&mut self, s: &mut impl core::fmt::Write) {
         for object in self.boxed_cache.values() {
             let _ = write!(s, "|{object}");
@@ -290,13 +296,11 @@ impl Engine {
             }
             m.stack.extend(self.heap.remembered());
         }
-        for r in self
-            .gc_frames
-            .iter()
-            .flatten()
-            .copied()
-            .chain(self.heap.gc_pinned_roots())
-        {
+        for r in self.heap.gc_pinned_roots() {
+            m.push(r);
+        }
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+        for r in self.gc_frames.iter().flatten().copied() {
             m.push(r);
         }
         #[cfg(not(feature = "desktop-runtime"))]
@@ -307,6 +311,11 @@ impl Engine {
                 .chain(self.portable.strings.values().copied())
                 .chain(self.portable.classes.values().copied())
                 .chain(self.portable.monitors.roots())
+                .chain(self.boxed_cache.values().copied())
+                .chain(self.statics.values().filter_map(|value| match value {
+                    Value::Obj(object) => Some(*object),
+                    _ => None,
+                }))
             {
                 m.push(r);
             }
@@ -322,6 +331,7 @@ impl Engine {
             }
         }
         let mut cand = Vec::new();
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         let _root_len = {
             let mut scanner = RefScanner::new(n, |r| m.push(r));
             self.write_gc_roots(&mut scanner);
@@ -332,19 +342,30 @@ impl Engine {
         let t_roots = t0.elapsed();
         // objects with side state (host half, gfx object, module tables):
         // one bitmap built per cycle instead of ~5 hash lookups per object
-        let mut side_keys: Vec<ObjRef> = Vec::new();
+        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
         let mut module_keys: Vec<ObjRef> = Vec::new();
+        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
         crate::jregex::gc_keys(self, &mut module_keys);
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::android_spannable::gc_keys(self, &mut module_keys);
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::jio_chars::gc_keys(self, &mut module_keys);
-        side_keys.extend(self.fw.objects.keys().copied());
-        side_keys.extend(self.gfx.objs.keys().copied());
+        #[cfg(not(any(feature = "std", feature = "upstream-runtime")))]
+        let module_keys: Vec<ObjRef> = Vec::new();
         let mut has_side = vec![0u8; n + 1];
-        for k in side_keys {
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+        for &k in self.fw.objects.keys().chain(self.gfx.objs.keys()) {
             if let Some(b) = has_side.get_mut(k as usize) {
                 *b |= 1;
             }
         }
+        // Platform adapters can mutate side-state references without a Heap
+        // write barrier. Until they expose exact dirty-owner keys, revisit old
+        // objects during a minor; no second reference framework is allocated.
+        #[cfg(not(feature = "desktop-runtime"))]
+        let platform_side_state = self.framework_host().is_some();
+        #[cfg(feature = "desktop-runtime")]
+        let platform_side_state = false;
         for k in module_keys {
             if let Some(b) = has_side.get_mut(k as usize) {
                 *b |= 2;
@@ -355,7 +376,7 @@ impl Engine {
             // Heap::get_mut. Scan these owners each minor; no missing barrier.
             // Arena indices are already unique; no auxiliary HashSet needed.
             for r in 1..=n as ObjRef {
-                if !self.heap.is_young(r) && has_side[r as usize] != 0 {
+                if !self.heap.is_young(r) && (has_side[r as usize] != 0 || platform_side_state) {
                     m.stack.push(r);
                 }
             }
@@ -372,6 +393,11 @@ impl Engine {
             if let Some(host) = self.framework_host() {
                 cand.extend(host.references(r));
             }
+            #[cfg(all(
+                feature = "std",
+                not(any(feature = "desktop-runtime", feature = "upstream-runtime"))
+            ))]
+            cand.extend(crate::jregex::references(self, r));
             traced_objects += 1;
             match self.heap.get(r) {
                 Ok(HeapObj::Instance { class, fields }) => {
@@ -413,6 +439,7 @@ impl Engine {
                 continue;
             }
             // ephemeron: the host half of a reachable host-backed object
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             match self.fw.objects.get(&r) {
                 // precise fast path for the most common host halves (their
                 // only fields are these values); everything else conservative
@@ -460,6 +487,7 @@ impl Engine {
                 None => {}
             }
             // module side tables keyed by object (Matcher, Spannable, Reader…)
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             if side & 2 != 0 {
                 let mut scanner = RefScanner::new(n, |x| cand.push(x));
                 crate::jregex::gc_entry(self, r, &mut scanner);
@@ -467,6 +495,7 @@ impl Engine {
                 crate::jio_chars::gc_entry(self, r, &mut scanner);
                 scanner.finish();
             }
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             if let Some(g) = self.gfx.objs.get(&r) {
                 let mut scanner = RefScanner::new(n, |x| cand.push(x));
                 let _ = write!(scanner, "{g:?}");
@@ -499,7 +528,11 @@ impl Engine {
                 }
             }
         }
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         let mut cleared_weak_keys = 0;
+        #[cfg(not(any(feature = "desktop-runtime", feature = "upstream-runtime")))]
+        let cleared_weak_keys = 0;
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         for (r, host) in &mut self.fw.objects {
             // Only Map host halves contain weak keys. Other host variants
             // never entered the clearing body, so avoid resolving their class
@@ -551,17 +584,30 @@ impl Engine {
         let marked = &m.marked;
         self.collection_views.collect(marked);
         let alive = |r: &ObjRef| marked.get(*r as usize).copied().unwrap_or(true);
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         self.fw.objects.retain(|r, _| alive(r));
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         self.gfx.objs.retain(|r, _| alive(r));
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         self.bignums.retain(|r, _| alive(r));
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         self.break_iters.retain(|r, _| alive(r));
         let alive_ref = |r: ObjRef| alive(&r);
+        #[cfg(any(feature = "std", feature = "upstream-runtime"))]
         crate::jregex::gc_purge(self, &alive_ref);
+        #[cfg(not(any(feature = "std", feature = "upstream-runtime")))]
+        let _ = alive_ref;
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::android_spannable::gc_purge(self, &alive_ref);
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::jio_chars::gc_purge(self, &alive_ref);
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::xml_res::gc_purge(self, &alive_ref);
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::jrandom::gc_purge(self, &alive_ref);
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::android_uri::gc_purge(self, &alive_ref);
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::jannotations::gc_purge(self, &alive_ref);
         #[cfg(feature = "desktop-runtime")]
         if crate::port_env::var("RD_GC_TRACE").is_ok() {
@@ -605,10 +651,7 @@ impl Engine {
     /// next tool call always has >= 50 % headroom before its safe point).
     /// `RD_GC=off` disables automatic collection. Safe point required.
     pub fn maybe_gc(&mut self) -> Option<GcStats> {
-        if crate::port_env::var("RD_GC")
-            .map(|v| v == "off" || v == "0")
-            .unwrap_or(false)
-        {
+        if automatic_gc_disabled() {
             return None;
         }
         if !self.gc_due() {
@@ -638,7 +681,11 @@ impl Engine {
         }
         #[cfg(not(feature = "desktop-runtime"))]
         {
-            !self.gc_frames.is_empty() || !self.execution_frames.is_empty()
+            #[cfg(feature = "upstream-runtime")]
+            if !self.gc_frames.is_empty() {
+                return true;
+            }
+            !self.execution_frames.is_empty()
         }
     }
 
@@ -652,9 +699,7 @@ impl Engine {
                 self.gc_slots_after,
                 self.has_gc_frames(),
             ))
-            && !crate::port_env::var("RD_GC")
-                .map(|v| v == "off" || v == "0")
-                .unwrap_or(false)
+            && !automatic_gc_disabled()
     }
 
     fn unpinned_boundary_due(&self) -> bool {
@@ -669,6 +714,7 @@ impl Engine {
 
     /// Protect allocations made by a Rust host dispatch while permitting a
     /// guest callback to collect its own allocations.
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) fn with_host_roots<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let depth = self.heap.gc_scope_depth();
         self.heap.gc_host_enter(false);
@@ -709,7 +755,27 @@ impl Engine {
     }
 }
 
-#[cfg(test)]
+fn automatic_gc_disabled() -> bool {
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+    {
+        crate::port_env::var("RD_GC")
+            .map(|v| v == "off" || v == "0")
+            .unwrap_or(false)
+    }
+    #[cfg(not(any(feature = "desktop-runtime", feature = "upstream-runtime")))]
+    {
+        false
+    }
+}
+
+#[cfg(all(
+    test,
+    not(any(feature = "desktop-runtime", feature = "upstream-runtime"))
+))]
+#[path = "portable/gc_contracts.rs"]
+mod pressure_contracts;
+
+#[cfg(all(test, any(feature = "desktop-runtime", feature = "upstream-runtime")))]
 mod tests {
     use super::*;
     #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]

@@ -128,14 +128,12 @@ impl Heap {
         }
     }
 
-    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) fn is_young(&self, r: ObjRef) -> bool {
         self.young
             .get(r.wrapping_sub(1) as usize)
             .copied()
             .unwrap_or(true)
     }
-    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     pub(crate) fn remembered(&self) -> impl Iterator<Item = ObjRef> + '_ {
         self.remembered.iter().copied()
     }

@@ -48,6 +48,11 @@ virtual-devices = ["upstream-runtime"]
 upstream-parity-tests = ["upstream-runtime", "advanced-components", "rd-render/upstream-tests"]
 
 [[test]]
+name = "shipping_gc_generations"
+path = "tests/shipping_gc_generations.rs"
+required-features = ["portable-test-support"]
+
+[[test]]
 name = "upstream_accessibility_virtual"
 path = "../rd-vm/tests/accessibility_virtual.rs"
 required-features = ["upstream-parity-tests"]
