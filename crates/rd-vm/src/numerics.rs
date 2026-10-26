@@ -777,92 +777,6 @@ fn char_type(c: Option<char>) -> i32 {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
-    #[allow(unused_imports)]
-    use crate::port_prelude::*;
-
-    #[test]
-    fn java_double_formatting() {
-        assert_eq!(java_double_to_string(1.0, false), "1.0");
-        assert_eq!(java_double_to_string(0.1, false), "0.1");
-        assert_eq!(java_double_to_string(1e7, false), "1.0E7");
-        assert_eq!(java_double_to_string(1.5e-4, false), "1.5E-4");
-        assert_eq!(java_double_to_string(123.456, false), "123.456");
-        assert_eq!(java_double_to_string(0.001, false), "0.001");
-        assert_eq!(java_double_to_string(-2.5, false), "-2.5");
-        assert_eq!(java_double_to_string(100.0, false), "100.0");
-        assert_eq!(java_double_to_string(0.1f32 as f64, true), "0.1");
-    }
-
-    #[test]
-    fn radix() {
-        assert_eq!(
-            parse_radix("-ff", 16, i32::MIN as i128, i32::MAX as i128).ok(),
-            Some(-255)
-        );
-        assert!(parse_radix("2147483648", 10, i32::MIN as i128, i32::MAX as i128).is_err());
-        assert!(parse_radix("", 10, 0, 10).is_err());
-        assert_eq!(to_radix(-255, 16), "-ff");
-    }
-
-    #[test]
-    fn compare_orders_zero_and_nan() {
-        assert_eq!(cmp_f64(-0.0, 0.0), -1);
-        assert_eq!(cmp_f64(f64::NAN, f64::INFINITY), 1);
-        assert_eq!(cmp_f64(f64::NAN, f64::NAN), 0);
-    }
-
-    #[test]
-    fn java_identifier_start_and_part_follow_java_categories() {
-        fn call(name: &str, sig: &str, code_point: char) -> Value {
-            let mut vm = Engine::new(vec![], crate::engine::VmConfig::default());
-            static_intrinsic(
-                &mut vm,
-                "Ljava/lang/Character;",
-                name,
-                sig,
-                &[Value::Int(code_point as i32)],
-            )
-            .unwrap()
-            .expect("Character intrinsic")
-        }
-
-        for c in ['A', 'π', 'Ⅰ', '$', '_', '€'] {
-            assert_eq!(
-                call("isJavaIdentifierStart", "(C)Z", c),
-                Value::Int(1),
-                "{c}"
-            );
-        }
-        for c in ['1', '-', '\u{0301}', '\n'] {
-            assert_eq!(
-                call("isJavaIdentifierStart", "(C)Z", c),
-                Value::Int(0),
-                "{c}"
-            );
-        }
-        for c in ['A', '7', '\u{0301}', '\u{200C}', '\u{0001}', '$'] {
-            assert_eq!(
-                call("isJavaIdentifierPart", "(I)Z", c),
-                Value::Int(1),
-                "{c}"
-            );
-        }
-        assert_eq!(call("isJavaIdentifierPart", "(I)Z", '\n'), Value::Int(0));
-        assert_eq!(
-            call("isIdentifierIgnorable", "(C)Z", '\u{200C}'),
-            Value::Int(1)
-        );
-        assert_eq!(
-            call("isIdentifierIgnorable", "(C)Z", '\u{0301}'),
-            Value::Int(0)
-        );
-    }
-}
-
 // Original Math arms and scalar helpers extracted from intrinsics.rs. Both
 // dispatchers now use this same source, including signed zero and FLOOR rules.
 fn math_base(class: &str, name: &str, sig: &str, args: &[Value]) -> Result<Option<Value>, VmExit> {
@@ -1074,4 +988,90 @@ fn java_round_f64(v: f64) -> i64 {
 fn java_pow(a: f64, b: f64) -> f64 {
     // Java Math.pow casos especiais mínimos cobertos por pow do Rust
     a.powf(b)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
+    #[allow(unused_imports)]
+    use crate::port_prelude::*;
+
+    #[test]
+    fn java_double_formatting() {
+        assert_eq!(java_double_to_string(1.0, false), "1.0");
+        assert_eq!(java_double_to_string(0.1, false), "0.1");
+        assert_eq!(java_double_to_string(1e7, false), "1.0E7");
+        assert_eq!(java_double_to_string(1.5e-4, false), "1.5E-4");
+        assert_eq!(java_double_to_string(123.456, false), "123.456");
+        assert_eq!(java_double_to_string(0.001, false), "0.001");
+        assert_eq!(java_double_to_string(-2.5, false), "-2.5");
+        assert_eq!(java_double_to_string(100.0, false), "100.0");
+        assert_eq!(java_double_to_string(0.1f32 as f64, true), "0.1");
+    }
+
+    #[test]
+    fn radix() {
+        assert_eq!(
+            parse_radix("-ff", 16, i32::MIN as i128, i32::MAX as i128).ok(),
+            Some(-255)
+        );
+        assert!(parse_radix("2147483648", 10, i32::MIN as i128, i32::MAX as i128).is_err());
+        assert!(parse_radix("", 10, 0, 10).is_err());
+        assert_eq!(to_radix(-255, 16), "-ff");
+    }
+
+    #[test]
+    fn compare_orders_zero_and_nan() {
+        assert_eq!(cmp_f64(-0.0, 0.0), -1);
+        assert_eq!(cmp_f64(f64::NAN, f64::INFINITY), 1);
+        assert_eq!(cmp_f64(f64::NAN, f64::NAN), 0);
+    }
+
+    #[test]
+    fn java_identifier_start_and_part_follow_java_categories() {
+        fn call(name: &str, sig: &str, code_point: char) -> Value {
+            let mut vm = Engine::new(vec![], crate::engine::VmConfig::default());
+            static_intrinsic(
+                &mut vm,
+                "Ljava/lang/Character;",
+                name,
+                sig,
+                &[Value::Int(code_point as i32)],
+            )
+            .unwrap()
+            .expect("Character intrinsic")
+        }
+
+        for c in ['A', 'π', 'Ⅰ', '$', '_', '€'] {
+            assert_eq!(
+                call("isJavaIdentifierStart", "(C)Z", c),
+                Value::Int(1),
+                "{c}"
+            );
+        }
+        for c in ['1', '-', '\u{0301}', '\n'] {
+            assert_eq!(
+                call("isJavaIdentifierStart", "(C)Z", c),
+                Value::Int(0),
+                "{c}"
+            );
+        }
+        for c in ['A', '7', '\u{0301}', '\u{200C}', '\u{0001}', '$'] {
+            assert_eq!(
+                call("isJavaIdentifierPart", "(I)Z", c),
+                Value::Int(1),
+                "{c}"
+            );
+        }
+        assert_eq!(call("isJavaIdentifierPart", "(I)Z", '\n'), Value::Int(0));
+        assert_eq!(
+            call("isIdentifierIgnorable", "(C)Z", '\u{200C}'),
+            Value::Int(1)
+        );
+        assert_eq!(
+            call("isIdentifierIgnorable", "(C)Z", '\u{0301}'),
+            Value::Int(0)
+        );
+    }
 }
