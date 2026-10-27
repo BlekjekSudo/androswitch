@@ -5267,16 +5267,7 @@ fn sb_append(vm: &mut Engine, recv: crate::heap::ObjRef, s: &str) -> Result<(), 
 }
 
 pub fn alloc_string(vm: &mut Engine, s: String) -> Result<crate::heap::ObjRef, VmExit> {
-    vm.heap.alloc_string(s).map_err(|oom| {
-        // issue #37: OOM de string também é OutOfMemoryError capturável
-        VmExit::Exception(Throwable::new(
-            "Ljava/lang/OutOfMemoryError;",
-            format!(
-                "alocação de {} bytes excede o heap de {} bytes",
-                oom.requested, oom.budget
-            ),
-        ))
-    })
+    crate::java_values::alloc_string(vm, s)
 }
 
 pub fn string_arg(vm: &Engine, v: &Value) -> Result<String, VmExit> {

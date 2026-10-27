@@ -83,6 +83,9 @@ pub struct Engine {
     /// Bounded Java valueOf identities, shared by desktop and device dispatch.
     /// The collectors retain these VM-owned constants until Engine teardown.
     pub(crate) boxed_cache: HashMap<(String, i64), ObjRef>,
+    /// Loaded DEX literals share identity for this Engine's classloader.
+    /// Runtime-created Strings are ordinary collectible heap objects.
+    pub(crate) literal_strings: HashMap<String, ObjRef>,
     clinit_done: HashSet<String>,
     #[cfg(feature = "desktop-runtime")]
     clinit_running: HashSet<String>,
@@ -242,6 +245,7 @@ impl Engine {
             config,
             statics: HashMap::new(),
             boxed_cache: HashMap::new(),
+            literal_strings: HashMap::new(),
             collection_views: Default::default(),
             clinit_done: HashSet::new(),
             clinit_running: Default::default(),
@@ -1123,7 +1127,7 @@ impl Engine {
                     // campo NÃO pode virar null silenciosamente
                     Some(rd_dex::annotations::EncodedValue::String(idx)) => {
                         let s = self.cp.dexes[dex_idx].string(*idx).to_string();
-                        Value::Obj(intrinsics::alloc_string(self, s)?)
+                        Value::Obj(crate::java_values::literal_string(self, s)?)
                     }
                     Some(ev) => crate::value_from_encoded(ev, &self.cp.dexes[dex_idx])
                         .unwrap_or_else(|| default_for(&ftype)),

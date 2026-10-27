@@ -1,6 +1,6 @@
 # AndroSwitch Conformance
 
-One normal, development-signed **Android API 26 / ARM64 APK**, with 296 original
+One normal, development-signed **Android API 26 / ARM64 APK**, with 299 original
 cases and no sensor tests. Install `AndroSwitchConformance.apk` once and use
 **Run all / resume**. Results persist in the app's ordinary internal storage.
 This is a growing, explicit catalog, not all Android behavior or official CTS.
@@ -12,14 +12,19 @@ earlier 219-case std package remains frozen and has its own user-reported
 [physical result](../../reports/conformance-std-hardware-20261026.json). That
 result does not qualify the changed catalog or a later NRO.
 
-The 274-case catalog adds seventeen shared I/O scenarios: Reader/Writer bounds,
+The I/O expansion added seventeen shared scenarios: Reader/Writer bounds,
 UTF-16 across flush/callbacks, DEX subclass templates and constructors, byte
 streams, typed GC edges, persistent files, channels and AtomicFile rollback.
 They use the same ordinary APK/UI; the JVM oracle is written as UTF-8 bytes.
 
+The numeric expansion adds twenty-two scenarios using inherited numeric/Math
+algorithms, exact metadata, code-point callbacks with GC and JVM edge cases.
+Three String-storage scenarios then verify dynamic identity, encoded literal
+identity and allocation churn. All 299 cases remain in this same APK.
+
 | Family | Cases | Examples |
 | --- | ---: | --- |
-| Java / DEX | 170 | arithmetic, exceptions, UTF-16, collections, reflection, TimeUnit, ThreadLocal, atomics, character/byte streams |
+| Java / DEX | 173 | arithmetic, exceptions, UTF-16, collections, reflection, TimeUnit, ThreadLocal, atomics, character/byte streams |
 | Android / platform | 93 | CPU access, host facts, Build, clocks, orientation, Activity/Application/Intent/Handler, files, preferences, Bundle, SQLite, audio, input editor, shared channels, AtomicFile |
 | JNI / native / graphics | 33 | ARM64 calling convention, references, callbacks, GC, native thread, shared files, libc/TLS/clocks, EGL/GLES rendering, Vulkan discovery |
 
@@ -40,7 +45,7 @@ From the runtime repository, with JDK, Python, Android SDK platform/build-tools
 ```
 
 The build produces `local-artifacts/conformance/AndroSwitchConformance.apk`,
-`catalog.json`, a 170-row **actual JDK oracle**, signature verification and a
+`catalog.json`, a 173-row **actual JDK oracle**, signature verification and a
 source/toolchain/artifact hash receipt. It signs with a local public development
 key; do not package the generated private key. Pure cases are compiled with
 Java release 8, DEX minSdk 26, and native code targets aarch64-linux-android26.

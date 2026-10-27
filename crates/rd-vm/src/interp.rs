@@ -310,7 +310,7 @@ pub(crate) fn exec_frame(
                     return bad_kind(insn);
                 };
                 let s = vm.cp.string(dex_idx, *i as u32);
-                let r = intrinsics::alloc_string(vm, s)?;
+                let r = crate::java_values::literal_string(vm, s)?;
                 regs[*a as usize] = Value::Obj(r);
             }
             0x1B => {
@@ -318,7 +318,7 @@ pub(crate) fn exec_frame(
                     return bad_kind(insn);
                 };
                 let s = vm.cp.string(dex_idx, *i);
-                let r = intrinsics::alloc_string(vm, s)?;
+                let r = crate::java_values::literal_string(vm, s)?;
                 regs[*a as usize] = Value::Obj(r);
             }
 
