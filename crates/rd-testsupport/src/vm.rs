@@ -353,7 +353,7 @@ impl DexBuilder {
             for unit in s.encode_utf16() {
                 match unit {
                     1..=0x7f => out.push(unit as u8),
-                    0..=0x7ff => out
+                    0 | 0x80..=0x7ff => out
                         .extend_from_slice(&[0xc0 | (unit >> 6) as u8, 0x80 | (unit & 0x3f) as u8]),
                     _ => out.extend_from_slice(&[
                         0xe0 | (unit >> 12) as u8,

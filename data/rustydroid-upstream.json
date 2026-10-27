@@ -693,7 +693,7 @@
     {
       "path": "crates/rd-testsupport/src/vm.rs",
       "blob": "8135e4f4317edb326b35bca8c501fce0a16629e0",
-      "sha256": "b10f8e5af9f3e9d849f661eec9cfbd124d3fab81b53e65cadf048c4c659a44b6",
+      "sha256": "e94cfd673e3141a53c5639878fc0bb6ec3962cde2032a2da388508c8fea079b3",
       "reason": " Shared String storage review against the pinned original and prior adaptation: Reviewed synthetic DEX fixture correction: encode string_data as modified UTF-8 over UTF-16 units, including NUL and supplementary pairs. The former plain UTF-8 writer made the new jumbo/non-BMP fixture invalid. Original test routes/builders remain in place; this does not modify external APKs or runtime decoding. See docs/UPSTREAM_STRING_STORAGE.md; no complete API parity claim."
     },
     {
