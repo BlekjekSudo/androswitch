@@ -181,3 +181,9 @@ overloads are shared by JNI and VM dispatch; CharSequence reads use actual
 callbacks with GC scopes. The development SDK grows to 296 cases with 170 JVM
 rows. Every verification layer remains recorded separately, and other ledger
 rows remain open.
+
+The [shared String storage integration](UPSTREAM_STRING_STORAGE.md) removes the
+product-wide cache of dynamic results and reuses the original allocation body.
+One Engine-owned DEX literal table supplies both profiles, normal/jumbo loads,
+encoded constants and collector roots. The central SDK grows to 299 cases and
+173 actual JVM rows; physical and emulator qualification remain artifact-specific.

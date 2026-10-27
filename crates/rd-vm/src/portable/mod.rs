@@ -83,7 +83,6 @@ pub(crate) struct State {
     pub host_depth: HashMap<u64, usize>,
     pub monitors: monitor::Monitors,
     pub classes: HashMap<String, ObjRef>,
-    pub strings: HashMap<String, ObjRef>,
     pub filesystem: Option<Box<dyn as_platform::vfs::GuestFileSystem>>,
     pub files: HashMap<ObjRef, FileState>,
     pub package: String,

@@ -1,5 +1,9 @@
 package org.androswitch.conformance;
 public final class PureCases {
+  public static final class LiteralHolder {
+    public static final String value = "string-pool-value";
+    public static String other = value;
+  }
   private static final class NumericSequence implements CharSequence {
     final String text = "a\uD83D\uDE42z";
     public int length() { return text.length(); }
@@ -860,6 +864,26 @@ public final class PureCases {
             + ":" + Double.hashCode(Double.NaN) + ":" + Double.doubleToRawLongBits(-0.0)
             + ":" + Double.doubleToRawLongBits(Math.signum(Double.longBitsToDouble(0x7ff8000000000123L)));
       }
+      case 170: {
+        String a = new StringBuilder().append("string-pool-value").toString();
+        String b = new StringBuilder().append("string-pool-value").toString();
+        String literal = "string-pool-value";
+        return (a == b) + ":" + a.equals(b) + ":" + (a == literal) + ":" + (literal == "string-pool-value");
+      }
+      case 171: {
+        String value = (String)LiteralHolder.class.getField("value").get(null);
+        System.gc();
+        return (value == "string-pool-value") + ":" + (LiteralHolder.other == value);
+      }
+      case 172: {
+        int aliased=0; String last=null;
+        for(int i=0;i<256;i++) {
+          String a=Integer.toString(i), b=Integer.toString(i);
+          if(a==b)aliased++; last=a;
+          if((i&15)==0)System.gc();
+        }
+        return aliased + ":" + last;
+      }
       default:
         throw new IllegalArgumentException("unknown pure case");
     }
@@ -869,7 +893,7 @@ public final class PureCases {
     // legacy encoding. A surrogate/Unicode test must preserve its real value.
     java.io.PrintWriter out = args.length == 0 ? new java.io.PrintWriter(System.out) :
         new java.io.PrintWriter(new java.io.OutputStreamWriter(new java.io.FileOutputStream(args[0]), "UTF-8"));
-    for (int i = 0; i < 170; i++) out.println(i + "\t" + run(i));
+    for (int i = 0; i < 173; i++) out.println(i + "\t" + run(i));
     out.flush(); if (args.length != 0) out.close();
   }
 }

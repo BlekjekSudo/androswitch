@@ -348,9 +348,21 @@ impl DexBuilder {
             align4(&mut out);
             string_data_offsets[i] = out.len() as u32;
             write_uleb(&mut out, s.encode_utf16().count() as u64);
-            let mut bytes = s.as_bytes().to_vec();
-            bytes.push(0);
-            out.extend_from_slice(&bytes);
+            // DEX string_data is modified UTF-8 over UTF-16 code units.
+            // NUL is C0 80; a supplementary scalar is two three-byte units.
+            for unit in s.encode_utf16() {
+                match unit {
+                    1..=0x7f => out.push(unit as u8),
+                    0..=0x7ff => out
+                        .extend_from_slice(&[0xc0 | (unit >> 6) as u8, 0x80 | (unit & 0x3f) as u8]),
+                    _ => out.extend_from_slice(&[
+                        0xe0 | (unit >> 12) as u8,
+                        0x80 | ((unit >> 6) & 0x3f) as u8,
+                        0x80 | (unit & 0x3f) as u8,
+                    ]),
+                }
+            }
+            out.push(0);
         }
 
         // type_lists
@@ -751,3 +763,20 @@ pub fn invoke(eng: &mut Engine, method: &str, sig: &str, args: &[Value]) -> Resu
 // ── testes ──────────────────────────────────────────────────────────────────
 // CONVENÇÃO ABI: parâmetros caem nos ÚLTIMOS `ins` registradores
 // (regs=5, ins=2 → args em v3,v4). Fixtures seguem isso à risca.
+
+#[cfg(test)]
+mod string_data_tests {
+    use super::*;
+    #[test]
+    fn dex_strings_encode_nul_bmp_and_surrogate_pairs_as_modified_utf8() {
+        let mut b = DexBuilder::new();
+        let text = "ASCII\0é\u{1f642}";
+        let index = b.intern(text);
+        let bytes = b.finish();
+        assert!(bytes.windows(2).any(|v| v == [0xc0, 0x80]));
+        assert!(bytes
+            .windows(6)
+            .any(|v| v == [0xed, 0xa0, 0xbd, 0xed, 0xb9, 0x82]));
+        assert_eq!(rd_dex::Dex::parse(bytes).unwrap().string(index), text);
+    }
+}

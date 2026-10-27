@@ -299,6 +299,9 @@ impl Engine {
         for r in self.heap.gc_pinned_roots() {
             m.push(r);
         }
+        for r in self.literal_strings.values().copied() {
+            m.push(r);
+        }
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         for r in self.gc_frames.iter().flatten().copied() {
             m.push(r);
@@ -308,7 +311,6 @@ impl Engine {
             for r in self
                 .execution_frames
                 .roots()
-                .chain(self.portable.strings.values().copied())
                 .chain(self.portable.classes.values().copied())
                 .chain(self.portable.monitors.roots())
                 .chain(self.boxed_cache.values().copied())

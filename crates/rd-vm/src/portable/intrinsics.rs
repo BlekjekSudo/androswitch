@@ -5,16 +5,7 @@ use crate::{Engine, ObjRef, Value, VmExit};
 use alloc::string::{String, ToString};
 
 pub fn alloc_string(vm: &mut Engine, text: String) -> Result<ObjRef, VmExit> {
-    #[cfg(feature = "upstream-runtime")]
-    if vm.framework_host().is_none() {
-        return crate::upstream_intrinsics::alloc_string(vm, text);
-    }
-    if let Some(object) = vm.portable.strings.get(&text) {
-        return Ok(*object);
-    }
-    let object = vm.heap.alloc_string(text.clone())?;
-    vm.portable.strings.insert(text, object);
-    Ok(object)
+    crate::java_values::alloc_string(vm, text)
 }
 
 pub fn call_native_loader(

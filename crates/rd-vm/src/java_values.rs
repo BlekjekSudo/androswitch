@@ -6,6 +6,30 @@ use alloc::{
     vec,
 };
 
+/// Original RustyDroid dynamic String allocation and catchable OOM contract.
+/// This does not intern or retain the result beyond the normal Java roots.
+pub(crate) fn alloc_string(vm: &mut Engine, text: String) -> Result<crate::ObjRef, VmExit> {
+    vm.heap.alloc_string(text).map_err(|oom| {
+        crate::Throwable::new(
+            "Ljava/lang/OutOfMemoryError;",
+            format!(
+                "alocação de {} bytes excede o heap de {} bytes",
+                oom.requested, oom.budget
+            ),
+        )
+        .into()
+    })
+}
+
+pub(crate) fn literal_string(vm: &mut Engine, text: String) -> Result<crate::ObjRef, VmExit> {
+    if let Some(reference) = vm.literal_strings.get(&text) {
+        return Ok(*reference);
+    }
+    let reference = alloc_string(vm, text.clone())?;
+    vm.literal_strings.insert(text, reference);
+    Ok(reference)
+}
+
 /// Igualdade JAVA para chaves/elementos de coleções (M8): Null==Null;
 /// String por conteúdo; boxes (Integer/Long/Boolean/Double/Float) por valor;
 /// senão identidade de referência (default de Object.equals). Classe de
@@ -128,4 +152,87 @@ pub(crate) fn default_to_string(class_desc: &str, r: crate::heap::ObjRef) -> Str
         .trim_end_matches(';')
         .replace('/', ".");
     format!("{name}@{r:x}")
+}
+
+#[cfg(test)]
+mod string_storage_tests {
+    use super::*;
+    use crate::VmConfig;
+
+    #[test]
+    fn dynamic_results_share_content_without_interning_or_global_roots() {
+        let mut vm = Engine::new(vec![], VmConfig::default());
+        let literal = literal_string(&mut vm, "value".into()).unwrap();
+        let a = crate::intrinsics::alloc_string(&mut vm, "value".into()).unwrap();
+        let b = crate::intrinsics::alloc_string(&mut vm, "value".into()).unwrap();
+        assert_ne!(a, b);
+        assert_ne!(literal, a);
+        assert_eq!(vm.heap.as_str(a).unwrap(), vm.heap.as_str(literal).unwrap());
+        vm.gc();
+        assert_eq!(vm.heap.class_of(a).unwrap(), crate::gc::FREED_CLASS);
+        assert_eq!(vm.heap.class_of(b).unwrap(), crate::gc::FREED_CLASS);
+        assert_eq!(vm.heap.as_str(literal).unwrap(), "value");
+    }
+
+    #[test]
+    fn literals_keep_identity_through_minor_and_major_collections() {
+        let mut vm = Engine::new(vec![], VmConfig::default());
+        let literal = literal_string(&mut vm, "a\u{1f642}z".into()).unwrap();
+        assert_eq!(
+            literal,
+            literal_string(&mut vm, "a\u{1f642}z".into()).unwrap()
+        );
+        vm.gc_minor();
+        vm.gc_minor();
+        vm.gc();
+        assert_eq!(
+            literal,
+            literal_string(&mut vm, "a\u{1f642}z".into()).unwrap()
+        );
+        assert_eq!(vm.literal_strings.len(), 1);
+    }
+
+    #[test]
+    fn transient_allocation_churn_does_not_grow_a_global_string_store() {
+        let mut vm = Engine::new(
+            vec![],
+            VmConfig {
+                heap_budget: 1024,
+                ..Default::default()
+            },
+        );
+        literal_string(&mut vm, "keep".into()).unwrap();
+        vm.gc();
+        let baseline = vm.heap.used();
+        for i in 0..512 {
+            crate::intrinsics::alloc_string(&mut vm, format!("transient-{i}")).unwrap();
+            vm.gc();
+            assert_eq!(vm.heap.used(), baseline, "after iteration {i}");
+        }
+        assert_eq!(vm.literal_strings.len(), 1);
+    }
+
+    #[test]
+    fn failed_allocations_are_catchable_and_never_publish_a_literal_entry() {
+        let mut vm = Engine::new(
+            vec![],
+            VmConfig {
+                heap_budget: 64,
+                ..Default::default()
+            },
+        );
+        for literal in [false, true] {
+            let error = if literal {
+                literal_string(&mut vm, "x".repeat(128))
+            } else {
+                crate::intrinsics::alloc_string(&mut vm, "x".repeat(128))
+            };
+            assert!(
+                matches!(error,Err(VmExit::Exception(ref e)) if e.class=="Ljava/lang/OutOfMemoryError;"),
+                "{error:?}"
+            );
+            assert_eq!(vm.heap.used(), 0);
+            assert!(vm.literal_strings.is_empty());
+        }
+    }
 }

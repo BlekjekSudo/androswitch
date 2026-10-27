@@ -678,5 +678,17 @@
   {
     "id": "numeric.ieee-order-hash",
     "group": "Numbers"
+  },
+  {
+    "id": "text.dynamic-string-identity",
+    "group": "Text"
+  },
+  {
+    "id": "text.encoded-literal-identity-gc",
+    "group": "Text"
+  },
+  {
+    "id": "text.dynamic-string-churn-gc",
+    "group": "Text"
   }
 ]
