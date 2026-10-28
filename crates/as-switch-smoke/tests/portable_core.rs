@@ -42,14 +42,19 @@ fn collector_preserves_transitive_roots_and_recycles_unreachable_slots() {
 }
 
 #[test]
-fn interned_strings_are_canonical_and_survive_collection() {
+fn dynamic_strings_have_distinct_identity_and_follow_actual_roots() {
     let mut vm = vm();
     let first = rd_vm::intrinsics::alloc_string(&mut vm, "same".to_string()).unwrap();
-    assert_eq!(vm.gc().last_freed_objects, 0);
-    assert_eq!(
-        rd_vm::intrinsics::alloc_string(&mut vm, "same".to_string()).unwrap(),
-        first
+    let second = rd_vm::intrinsics::alloc_string(&mut vm, "same".to_string()).unwrap();
+    assert_ne!(first, second);
+    vm.statics.insert(
+        ("LRoot;".to_string(), "text".to_string()),
+        Value::Obj(first),
     );
+    assert_eq!(vm.gc().last_freed_objects, 1);
+    assert_eq!(vm.heap.as_str(first).unwrap(), "same");
+    vm.statics.clear();
+    assert_eq!(vm.gc().last_freed_objects, 1);
 }
 
 #[test]
