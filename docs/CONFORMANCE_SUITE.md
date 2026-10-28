@@ -13,10 +13,10 @@ tests. Upstream attribution and licenses remain in [CREDITS](../CREDITS.md).
 
 ## Bounded emulator runs
 
-`scripts/test-conformance-ryujinx.ps1` accepts up to 32 explicit wait segments,
+`scripts/test-conformance-ryujinx.ps1` accepts up to 48 explicit wait segments,
 each at most 30 seconds, with the existing 1,800-second maximum outer timeout.
-The default remains one segment. Longer full-catalog attempts can use sixteen
-30-second segments and a 1,200-second outer timeout; the launcher/session and
+The default remains one segment. The enlarged catalog can use forty-eight
+30-second segments and a 1,800-second outer timeout; the launcher/session and
 original-SD restoration gates still apply.
 
 The pinned diagnostic emulator has no PCV implementation for `host.cpu.clock_hz`,

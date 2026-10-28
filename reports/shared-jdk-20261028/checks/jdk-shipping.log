@@ -1,0 +1,105 @@
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+   Compiling serde_json v1.0.151
+   Compiling as-vm-render-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-render-testsupport)
+   Compiling as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+    Finished `test` profile [unoptimized] target(s) in 33.67s
+     Running unittests ..\rd-vm\src\lib.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\rd_vm-2af28540702107e9.exe)
+
+running 56 tests
+test boxes::tests::float_double_semantics_match_jdk ... ok
+test classpath::tests::android_activity_is_android_context ... ok
+test classpath::tests::android_scroll_and_container_widgets_are_views ... ok
+test classpath::tests::array_subtyping_is_covariant_for_reference_elements ... ok
+test classpath::tests::borrowed_method_name_matches_owned_predicate_including_invalid_ids ... ok
+test classpath::tests::borrowed_subtype_walk_matches_legacy_with_cycles_interfaces_and_depth_caps ... ok
+test classpath::tests::host_collections_subtype_their_interfaces ... ok
+test classpath::tests::jutil_calendar_and_timezone_have_jdk_type_relations ... ok
+test collection_factories::tests::bound_framework_never_falls_back_to_reference_collection_storage ... ok
+test collection_factories::tests::malformed_factory_call_does_not_index_missing_arguments ... ok
+test gc::pressure_contracts::tests::an_unpinned_boundary_reclaims_a_heap_retained_by_the_previous_callback ... ok
+test gc::pressure_contracts::tests::live_heap_above_half_budget_waits_for_growth_before_recollecting ... ok
+test gc_policy::tests::an_unpinned_watermark_recheck_happens_once_and_never_drops_active_frames ... ok
+test gc_policy::tests::byte_pressure_uses_remaining_headroom_with_saturating_watermarks ... ok
+test gc_policy::tests::pinned_slot_pressure_backs_off_but_a_tool_boundary_can_reclaim ... ok
+test heap::tests::array_elem_kinds ... ok
+test heap::tests::budget_is_enforced_with_typed_oom ... ok
+test heap::tests::fields_roundtrip ... ok
+test heap::tests::objects_are_indexed_from_one ... ok
+test heap::tests::peak_is_high_water_mark_of_used ... ok
+test heap::tests::primitive_array_runtime_descriptors_are_preserved ... ok
+test interp::fetch_tests::sequential_cursor_differential_random_walk ... ok
+test interp::fetch_tests::sequential_cursor_matches_binary_lookup_for_branches_handlers_and_bad_pcs ... ok
+test java_values::string_storage_tests::dynamic_results_share_content_without_interning_or_global_roots ... ok
+test java_values::string_storage_tests::failed_allocations_are_catchable_and_never_publish_a_literal_entry ... ok
+test java_values::string_storage_tests::literals_keep_identity_through_minor_and_major_collections ... ok
+test java_values::string_storage_tests::transient_allocation_churn_does_not_grow_a_global_string_store ... ok
+test jlstring::tests::grouping_and_padding ... ok
+test jlstring::tests::replacement_syntax ... ok
+test jlstring::tests::split_follows_jdk ... ok
+test jlstring::tests::utf16_search ... ok
+test jregex::tests::java_split_semantics ... ok
+test jregex::tests::replacement_groups ... ok
+test jregex::tests::translates_java_syntax ... ok
+test jregex::tests::utf16_offsets ... ok
+test jsb::tests::raw_utf16_growth_checks_real_array_charge_and_keeps_previous_buffer_on_oom ... ok
+test jsb::tests::search ... ok
+test jsb::tests::sig_params ... ok
+test numerics::tests::compare_orders_zero_and_nan ... ok
+test numerics::tests::java_double_formatting ... ok
+test numerics::tests::java_identifier_start_and_part_follow_java_categories ... ok
+test numerics::tests::radix ... ok
+test portable::execution::contracts::guest_allocations_do_not_leak_into_another_owners_host_scope ... ok
+test portable::execution::contracts::heap_restore_and_allocation_pins_use_their_own_actual_owner ... ok
+test portable::execution::contracts::independent_frames_resume_and_unwind_in_non_lifo_order ... ok
+test portable::execution::contracts::owner_bound_is_checked_and_completed_owners_do_not_accumulate ... ok
+test portable::execution::contracts::real_gc_retains_suspended_owner_after_older_owner_publishes_and_unwinds ... ok
+test portable::execution::contracts::same_owner_nested_callbacks_keep_distinct_frame_tickets ... ok
+test repr::tests::double_matches_java_tostring ... ok
+test repr::tests::float_matches_java_tostring ... ok
+test sdk_types::tests::every_generated_declaration_is_reachable_by_exact_descriptor ... ok
+test tests::arg_parsing_matches_types ... ok
+test tests::stub_contract_gone_vm_has_real_api ... ok
+test value::tests::accessors_are_typed ... ok
+test value::tests::narrowing_follows_dalvik ... ok
+test value::tests::primitive_accessors_reinterpret_untyped_dalvik_bits ... ok
+
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+     Running tests\shipping_io_chars.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\shipping_io_chars-9bb044a74c4280ba.exe)
+
+running 6 tests
+test upstream_contracts::closed_reader_and_null_pointer_contracts_enforced ... ok
+test upstream_contracts::load_clamps_oversized_return_counts_from_dex_reader_and_input_stream ... ok
+test upstream_contracts::reader_and_bais_read_reject_negative_and_overflowing_bounds ... ok
+test upstream_contracts::runaway_infinite_reader_hits_io_exception_ceiling_without_heap_leak ... ok
+test upstream_contracts::utf16_surrogate_pairs_preserved_across_writers_and_print_streams ... ok
+test upstream_contracts::writer_append_and_slice_reject_overflowing_indices ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+     Running tests\shipping_numeric_catalog.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\shipping_numeric_catalog-ea82c2566d3e6640.exe)
+
+running 1 test
+test every_inherited_numeric_declaration_with_a_jvm_recipe_executes_the_same_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\shipping_numerics.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\shipping_numerics-7955f6c854f3c0e6.exe)
+
+running 5 tests
+test inherited::issue_319_character_digit_rejects_out_of_range_radix ... ok
+test inherited::issue_319_character_to_chars_validates_code_point_null_dst_and_negative_dst_index ... ok
+test inherited::issue_319_code_point_before_and_at_handle_min_value_and_null_sequence ... ok
+test inherited::issue_319_math_ulp_handles_infinity_max_value_nan_and_zero ... ok
+test inherited::issue_319_parse_float_and_double_reject_duplicate_and_nonfinite_suffixes ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\shipping_strings.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\shipping_strings-40afc350630dc6e5.exe)
+
+running 2 tests
+test normal_and_jumbo_literals_share_identity_across_dexes_and_survive_gc ... ok
+test one_dex_call_reclaims_many_times_its_heap_budget_in_dynamic_strings ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+

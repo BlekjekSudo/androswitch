@@ -1,0 +1,164 @@
+{
+  "commands": [
+    {
+      "kind": "frame"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    }
+  ],
+  "schema_version": 1,
+  "session_id": "1b0d86101e0d41aea2786354ea727501"
+}

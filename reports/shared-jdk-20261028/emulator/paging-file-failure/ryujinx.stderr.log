@@ -1,0 +1,18 @@
+Unhandled exception. System.SystemException: The paging file is too small for this operation to complete.
+   at Ryujinx.Memory.MemoryManagementWindows.Commit(IntPtr location, IntPtr size) in D:\a\src\src\src\Ryujinx.Memory\MemoryManagementWindows.cs:line 62
+   at Ryujinx.Memory.MemoryManagement.Commit(IntPtr address, UInt64 size, Boolean forJit) in D:\a\src\src\src\Ryujinx.Memory\MemoryManagement.cs:line 43
+   at Ryujinx.Memory.MemoryBlock.Commit(UInt64 offset, UInt64 size) in D:\a\src\src\src\Ryujinx.Memory\MemoryBlock.cs:line 108
+   at Ryujinx.HLE.HOS.Kernel.KernelContext.CommitMemory(UInt64 address, UInt64 size)
+   at Ryujinx.HLE.HOS.Kernel.Memory.KPageTable.MapPages(UInt64 address, KPageList pageList, KMemoryPermission permission, MemoryMapFlags flags, Boolean shouldFillPages, Byte fillValue)
+   at Ryujinx.HLE.HOS.Kernel.Memory.KPageTableBase.SetHeapSize(UInt64 size, UInt64& address)
+   at Ryujinx.HLE.HOS.Kernel.SupervisorCall.Syscall.SetHeapSize(UInt64& address, UInt64 size)
+   at Ryujinx.HLE.HOS.Kernel.SupervisorCall.SyscallDispatch.SetHeapSize64(Syscall syscall, IExecutionContext context)
+   at Ryujinx.HLE.HOS.Kernel.SupervisorCall.SyscallDispatch.Dispatch64(Syscall syscall, IExecutionContext context, Int32 id)
+   at Ryujinx.HLE.HOS.Kernel.SupervisorCall.SyscallHandler.SvcCall(IExecutionContext context, UInt64 address, Int32 id)
+   at Ryujinx.Cpu.Jit.JitExecutionContext.SupervisorCallHandler(ExecutionContext context, UInt64 address, Int32 imm) in D:\a\src\src\src\Ryujinx.Cpu\Jit\JitExecutionContext.cs:line 113
+   at ARMeilleure.Instructions.NativeInterface.SupervisorCall(UInt64 address, Int32 imm)
+   at ARMeilleure.Translation.Translator.Execute(ExecutionContext context, UInt64 address)
+   at Ryujinx.Cpu.Jit.JitCpuContext.Execute(IExecutionContext context, UInt64 address) in D:\a\src\src\src\Ryujinx.Cpu\Jit\JitCpuContext.cs:line 42
+   at Ryujinx.HLE.HOS.ArmProcessContext`1.Execute(IExecutionContext context, UInt64 codeAddress)
+   at Ryujinx.HLE.HOS.Kernel.Threading.KThread.ThreadStart()
+   at System.Threading.Thread.StartCallback()

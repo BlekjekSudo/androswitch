@@ -13,6 +13,7 @@ import json
 import re
 import subprocess
 import tomllib
+from collections import deque
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -25,24 +26,31 @@ RESULT = re.compile(
 
 def parse_cargo_log(text: str) -> list[dict]:
     suites, current = [], None
+    pending = deque()
     for line in text.splitlines():
+        candidate = None
         doc = re.match(r"^\s*Doc-tests (\S+)$", line)
         if doc:
-            if current is not None:
-                suites.append(current)
-            current = {"target": f"doc_{doc[1]}", "source": "doctests",
+            candidate = {"target": f"doc_{doc[1]}", "source": "doctests",
                        "status": "incomplete", "passed": 0, "failed": 0,
                        "ignored": 0, "measured": 0, "filtered": 0}
         start = RUN.match(line)
         if start:
-            if current is not None:
-                suites.append(current)
             label, executable = start.groups()
             filename = executable.replace("\\", "/").rsplit("/", 1)[-1]
             target = re.sub(r"-[0-9a-f]{16}(?:\.exe)?$", "", filename)
-            current = {"target": target, "source": label.replace("\\", "/"),
+            candidate = {"target": target, "source": label.replace("\\", "/"),
                        "status": "incomplete", "passed": 0, "failed": 0,
                        "ignored": 0, "measured": 0, "filtered": 0}
+        if candidate is not None:
+            # Cargo runs test binaries sequentially, but PowerShell's merged
+            # stdout/stderr can expose the next stderr header before the prior
+            # binary's stdout summary. Keep FIFO ownership; never attribute the
+            # previous summary to the new header or edit the raw capture.
+            if current is None:
+                current = candidate
+            else:
+                pending.append(candidate)
         result = RESULT.match(line)
         if result:
             if current is None:
@@ -56,9 +64,10 @@ def parse_cargo_log(text: str) -> list[dict]:
                 "zero_cases_unverified" if not current["passed"] else "passed"
             )
             suites.append(current)
-            current = None
+            current = pending.popleft() if pending else None
     if current is not None:
         suites.append(current)
+    suites.extend(pending)
     if not suites:
         raise ValueError("no test execution evidence")
     return suites

@@ -1,0 +1,8 @@
+   Compiling serde_core v1.0.229
+   Compiling serde v1.0.229
+    Checking miniz_oxide v0.9.1
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+    Checking rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-dex)
+    Checking rd-apk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-apk)
+    Checking as-platform v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-platform)
+    Finished `dev` profile [unoptimized] target(s) in 14.26s

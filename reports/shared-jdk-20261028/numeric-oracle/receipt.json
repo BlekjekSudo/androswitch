@@ -1,0 +1,8 @@
+{
+  "java": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\r\nOpenJDK Runtime Environment Microsoft-14941484 (build 21.0.12.1+1-LTS)\r\nOpenJDK 64-Bit Server VM Microsoft-14941484 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+  "rows": 450,
+  "schema": 1,
+  "catalog_sha256": "f2dbb4cad9fbe64a2b9f4831319d7703e555d6cb3c81986eecf6aae9d412fd11",
+  "source_sha256": "8d97dfdc4ef9ea46f557698c6bac44fcf674deb92c0506a40234f55d1fa201e4",
+  "scope": "Frozen independent JVM inputs/results; only exact inherited numeric metadata rows are compared by the VM test"
+}

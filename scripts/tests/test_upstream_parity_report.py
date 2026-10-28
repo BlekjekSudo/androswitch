@@ -15,6 +15,20 @@ def target(name, summary):
 
 
 class EvidenceAccounting(unittest.TestCase):
+    def test_early_next_stderr_header_preserves_fifo_summary_ownership(self):
+        first = target("upstream_first", "").splitlines()[0]
+        second = target("shipping_strings", "").splitlines()[0]
+        third = target("upstream_interrupted", "").splitlines()[0]
+        log = (first + "\nrunning 5 tests\n" + second + "\n"
+               "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;\n"
+               "running 2 tests\n" + third + "\n"
+               "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out;\n")
+        suites = REPORT.parse_cargo_log(log)
+        self.assertEqual([(s["target"], s["passed"], s["failed"], s["status"]) for s in suites],
+                         [("upstream_first", 5, 0, "passed"),
+                          ("shipping_strings", 1, 1, "failed"),
+                          ("upstream_interrupted", 0, 0, "incomplete")])
+
     def test_zero_skipped_failed_and_interrupted_are_never_passed(self):
         log = (target("upstream_native", "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out;")
                + target("upstream_partial", "test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out;")

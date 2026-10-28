@@ -1,0 +1,2740 @@
+{
+  "backend": "portable_host",
+  "cases": [
+    {
+      "detail": "-2147483648",
+      "elapsed_us": 3968,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.overflow",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-5:-2",
+      "elapsed_us": 757,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.division",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2147483647:2",
+      "elapsed_us": 1041,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.shift",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-9223372036854775808",
+      "elapsed_us": 677,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.long",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "4950",
+      "elapsed_us": 430,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.loop",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "seven",
+      "elapsed_us": 437,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.switch",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "3.75",
+      "elapsed_us": 554,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.double",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 545,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.nan",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 470,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.signed-zero",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-3",
+      "elapsed_us": 518,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.cast",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "bounds",
+      "elapsed_us": 780,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.bounds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "arithmetic",
+      "elapsed_us": 549,
+      "family": "jvm",
+      "group": "DEX",
+      "id": "dex.division-zero",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "4",
+      "elapsed_us": 342,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.utf16-length",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "bc",
+      "elapsed_us": 324,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.substring",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "8364",
+      "elapsed_us": 573,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.char-at",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 587,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.equals",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "x,true42",
+      "elapsed_us": 698,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.builder-char",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "one2",
+      "elapsed_us": 448,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.buffer",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "4:226",
+      "elapsed_us": 847,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.utf8",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "3:67",
+      "elapsed_us": 605,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.ascii",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "x:0007:%",
+      "elapsed_us": 984,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.format",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:4",
+      "elapsed_us": 670,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.index",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a+b+c",
+      "elapsed_us": 630,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.replace",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true",
+      "elapsed_us": 731,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.starts-ends",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "null",
+      "elapsed_us": 372,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.null-append",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "128512",
+      "elapsed_us": 437,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.surrogate",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "b:1",
+      "elapsed_us": 1197,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.arraylist",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 854,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.list-null",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "8",
+      "elapsed_us": 1488,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.list-iterator",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:7",
+      "elapsed_us": 1970,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.map",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 1587,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.set",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a:false:2",
+      "elapsed_us": 1752,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cow-snapshot",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a",
+      "elapsed_us": 1007,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cow-array-copy",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "unsupported",
+      "elapsed_us": 1155,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cow-remove-unsupported",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:false",
+      "elapsed_us": 709,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.boxed-equals",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:1:2:3",
+      "elapsed_us": 966,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.arraycopy",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:9",
+      "elapsed_us": 461,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.array-clone",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "false:true",
+      "elapsed_us": 2564,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.abstract-subclass",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "NANOSECONDS:0",
+      "elapsed_us": 1373,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.0",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "MICROSECONDS:1",
+      "elapsed_us": 801,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.1",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "MILLISECONDS:2",
+      "elapsed_us": 790,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.2",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "SECONDS:3",
+      "elapsed_us": 894,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.3",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "MINUTES:4",
+      "elapsed_us": 693,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.4",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "HOURS:5",
+      "elapsed_us": 568,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.5",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "DAYS:6",
+      "elapsed_us": 667,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.ordinal.6",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789",
+      "elapsed_us": 634,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.nanoseconds.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 372,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.nanoseconds.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 378,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.nanoseconds.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789000",
+      "elapsed_us": 804,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.microseconds.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123",
+      "elapsed_us": 381,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.microseconds.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 354,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.microseconds.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789000000",
+      "elapsed_us": 722,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.milliseconds.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456",
+      "elapsed_us": 491,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.milliseconds.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 384,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.milliseconds.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789000000000",
+      "elapsed_us": 1096,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.seconds.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789",
+      "elapsed_us": 872,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.seconds.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1428",
+      "elapsed_us": 381,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.seconds.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7407407340000000000",
+      "elapsed_us": 734,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.minutes.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7407407340",
+      "elapsed_us": 607,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.minutes.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "85733",
+      "elapsed_us": 511,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.minutes.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "9223372036854775807",
+      "elapsed_us": 760,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.hours.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "444444440400",
+      "elapsed_us": 687,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.hours.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "5144032",
+      "elapsed_us": 462,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.hours.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "9223372036854775807",
+      "elapsed_us": 661,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.days.nanoseconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "10666666569600",
+      "elapsed_us": 679,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.days.seconds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "123456789",
+      "elapsed_us": 565,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.convert.days.days",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "9223372036854775807",
+      "elapsed_us": 778,
+      "family": "jvm",
+      "group": "TimeUnit",
+      "id": "timeunit.saturation",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "detail",
+      "elapsed_us": 880,
+      "family": "jvm",
+      "group": "Exceptions",
+      "id": "exceptions.throw-catch",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "5",
+      "elapsed_us": 463,
+      "family": "jvm",
+      "group": "Exceptions",
+      "id": "exceptions.finally",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "null",
+      "elapsed_us": 472,
+      "family": "jvm",
+      "group": "Exceptions",
+      "id": "exceptions.null",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "cast",
+      "elapsed_us": 461,
+      "family": "jvm",
+      "group": "Exceptions",
+      "id": "exceptions.cast",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 622,
+      "family": "jvm",
+      "group": "Exceptions",
+      "id": "exceptions.message",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "org.androswitch.conformance.PureCases",
+      "elapsed_us": 1204,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.name",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 617,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.interface",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:false",
+      "elapsed_us": 1382,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.assignable",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "61",
+      "elapsed_us": 828,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.field-static",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "field",
+      "elapsed_us": 1344,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.field-instance",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "47",
+      "elapsed_us": 1132,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.private",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "missing",
+      "elapsed_us": 799,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.missing",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "12",
+      "elapsed_us": 1081,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.widening",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "hi you",
+      "elapsed_us": 1547,
+      "family": "jvm",
+      "group": "Reflection",
+      "id": "reflection.method",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7",
+      "elapsed_us": 1807,
+      "family": "jvm",
+      "group": "Threads",
+      "id": "threads.initial",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true",
+      "elapsed_us": 1616,
+      "family": "jvm",
+      "group": "Threads",
+      "id": "threads.stored-null",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7",
+      "elapsed_us": 1821,
+      "family": "jvm",
+      "group": "Threads",
+      "id": "threads.remove",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "reentrant",
+      "elapsed_us": 1021,
+      "family": "jvm",
+      "group": "Threads",
+      "id": "threads.monitor",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true",
+      "elapsed_us": 1163,
+      "family": "jvm",
+      "group": "Threads",
+      "id": "threads.atomic",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "3",
+      "elapsed_us": 550,
+      "family": "jvm",
+      "group": "Math",
+      "id": "math.abs.-3",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 369,
+      "family": "jvm",
+      "group": "Math",
+      "id": "math.abs.-1",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 319,
+      "family": "jvm",
+      "group": "Math",
+      "id": "math.abs.0",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 289,
+      "family": "jvm",
+      "group": "Math",
+      "id": "math.abs.1",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "3",
+      "elapsed_us": 292,
+      "family": "jvm",
+      "group": "Math",
+      "id": "math.abs.3",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 307,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.0",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1",
+      "elapsed_us": 289,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.1",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7f",
+      "elapsed_us": 288,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.127",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "80",
+      "elapsed_us": 384,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.128",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "ff",
+      "elapsed_us": 291,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.255",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7fff",
+      "elapsed_us": 283,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numbers.hex.32767",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:true:true",
+      "elapsed_us": 1198,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.copy-set-dedup",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:2:2:2",
+      "elapsed_us": 2670,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.copy-list-variants",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:[a, b, a, b]",
+      "elapsed_us": 1938,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.self-add-all",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true:true",
+      "elapsed_us": 2058,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.bulk-filter",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:[a, b, null, x]",
+      "elapsed_us": 1751,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.typed-array",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[a, z, d]:[z, d]",
+      "elapsed_us": 21018,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.nested-sublist-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a:0:b:false:[b]",
+      "elapsed_us": 7758,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.list-iterator-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a",
+      "elapsed_us": 952,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.iterator-remove-state",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:true:1:2",
+      "elapsed_us": 3321,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.abstract-list",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[a, b, a]:true:false",
+      "elapsed_us": 4687,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.abstract-collection",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true:[a, b]",
+      "elapsed_us": 1504,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.object-contracts",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a:c:[c, b, a]",
+      "elapsed_us": 2094,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.sort-reverse-minmax",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "b",
+      "elapsed_us": 1156,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.singleton-map-immutable",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 1435,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.readonly-bulk",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:[a, b]",
+      "elapsed_us": 1519,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.static-add-all",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0",
+      "elapsed_us": 1385,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.indexed-add-all-bounds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "null",
+      "elapsed_us": 516,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.constructor-null",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2",
+      "elapsed_us": 720,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.sublist-bounds",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[a, c, d, b]",
+      "elapsed_us": 1089,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.indexed-add-all",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[c, b, a]",
+      "elapsed_us": 20388,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.comparator-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-24:-1:-1987",
+      "elapsed_us": 866,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.compare-utf16",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0:true",
+      "elapsed_us": 623,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.compare-ignore-case",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true",
+      "elapsed_us": 726,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regions",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:bc",
+      "elapsed_us": 668,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.content-sequence",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a/b/a",
+      "elapsed_us": 1792,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.join-dex-iterable",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "abc:128512",
+      "elapsed_us": 658,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.trim-codepoint",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:ab:true",
+      "elapsed_us": 1982,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-flags",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:ok:2:4",
+      "elapsed_us": 1415,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-named-lookahead-utf16",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "aa:0:2:false",
+      "elapsed_us": 7882,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-match-result-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:b:0:2",
+      "elapsed_us": 8157,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-use-pattern-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "ba-ba:ba-ab",
+      "elapsed_us": 1305,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-replace-groups",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "x b x",
+      "elapsed_us": 14347,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-append-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[a, b, ]",
+      "elapsed_us": 925,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-split",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "state",
+      "elapsed_us": 483,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-result-state",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "syntax",
+      "elapsed_us": 458,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-syntax-error",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:11-22",
+      "elapsed_us": 2495,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.regex-string-shared",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "[]",
+      "elapsed_us": 1512,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cycle-string-unwind",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:true:1",
+      "elapsed_us": 2223,
+      "family": "jvm",
+      "group": "Collections",
+      "id": "collections.cycle-equals-hash-unwind",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "a:b:c:null",
+      "elapsed_us": 962,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.reader-line-endings",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:98:true",
+      "elapsed_us": 837,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.reader-mark-reset",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "closed:true",
+      "elapsed_us": 743,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.reader-closed",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "🙂",
+      "elapsed_us": 564,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.writer-surrogates",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "ell",
+      "elapsed_us": 652,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.writer-buffered-chain",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "acdnull",
+      "elapsed_us": 614,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.writer-append",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "AB:1:C",
+      "elapsed_us": 775,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.byte-output-reset",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:20:2",
+      "elapsed_us": 799,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.byte-input-mark",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "🙂",
+      "elapsed_us": 712,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.writer-encoding-split",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "ABDE",
+      "elapsed_us": 1095,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.writer-dex-template",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "97:2:bc",
+      "elapsed_us": 1308,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.reader-dex-template",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "state",
+      "elapsed_us": 14538,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.side-state-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "🙂",
+      "elapsed_us": 1055,
+      "family": "jvm",
+      "group": "I/O",
+      "id": "io.writer-dex-raw-utf16",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-2:-2:-2147483648:-2",
+      "elapsed_us": 839,
+      "family": "jvm",
+      "group": "Math",
+      "id": "numeric.floor-div",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-2:2:0:2",
+      "elapsed_us": 850,
+      "family": "jvm",
+      "group": "Math",
+      "id": "numeric.floor-mod-zero",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-1:0:9223372036854775807:-2:0:0",
+      "elapsed_us": 906,
+      "family": "jvm",
+      "group": "Math",
+      "id": "numeric.round",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2.0:4.0:-9223372036854775808",
+      "elapsed_us": 816,
+      "family": "jvm",
+      "group": "Math",
+      "id": "numeric.rint",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:1937768448:true",
+      "elapsed_us": 780,
+      "family": "jvm",
+      "group": "Math",
+      "id": "numeric.ulp",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-9223372036854775808:0:true",
+      "elapsed_us": 822,
+      "family": "jvm",
+      "group": "Math",
+      "id": "numeric.min-max",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0.0:1.0:3.0:0.0:0.0",
+      "elapsed_us": 838,
+      "family": "jvm",
+      "group": "Math",
+      "id": "numeric.transcendental",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "8.0:5.0:0.0:-2.0:-1.0",
+      "elapsed_us": 1415,
+      "family": "jvm",
+      "group": "Math",
+      "id": "numeric.pow-hypot",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-2147483648:0:true",
+      "elapsed_us": 1348,
+      "family": "jvm",
+      "group": "Math",
+      "id": "numeric.float-min-max",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true:true:true",
+      "elapsed_us": 8353,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.identifier-unicode",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "15:35:-1:-1",
+      "elapsed_us": 862,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.digit-radix",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "2:120:55357:56898:120",
+      "elapsed_us": 847,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.to-chars",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "55357:128578:128578",
+      "elapsed_us": 8474,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.builder-codepoint",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "128578:128578",
+      "elapsed_us": 37567,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.sequence-callback-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-ff:32:100:2147483647",
+      "elapsed_us": 877,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.integer-radix",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-8000000000000000:-9223372036854775808:64",
+      "elapsed_us": 818,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.long-radix",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-2.5:1.25:2:2",
+      "elapsed_us": 912,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.floating-parse",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "127:9223372036854775807:-2.5:1.25",
+      "elapsed_us": 14378,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.boxed-parse-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "65:97:true:false:true",
+      "elapsed_us": 889,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.character-classify",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7",
+      "elapsed_us": 335,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.to-chars-errors",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1:2:9:0",
+      "elapsed_us": 784,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.character-categories",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "-1:1:2146959360:-9223372036854775808:9221120237041090851",
+      "elapsed_us": 1419,
+      "family": "jvm",
+      "group": "Numbers",
+      "id": "numeric.ieee-order-hash",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "false:true:false:true",
+      "elapsed_us": 1581,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.dynamic-string-identity",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "true:true",
+      "elapsed_us": 8661,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.encoded-literal-identity-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "0:255",
+      "elapsed_us": 184905,
+      "family": "jvm",
+      "group": "Text",
+      "id": "text.dynamic-string-churn-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "allowedProcessors=8",
+      "elapsed_us": 1488,
+      "family": "android",
+      "group": "CPU",
+      "id": "cpu.available",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "same Runtime",
+      "elapsed_us": 8749,
+      "family": "android",
+      "group": "CPU",
+      "id": "cpu.singleton-gc",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "host fact unavailable on this backend",
+      "elapsed_us": 4165,
+      "family": "android",
+      "group": "Horizon",
+      "id": "host.cpu.allowed_mask",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "host fact unavailable on this backend",
+      "elapsed_us": 4226,
+      "family": "android",
+      "group": "Horizon",
+      "id": "host.cpu.clock_hz",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "host fact unavailable on this backend",
+      "elapsed_us": 4323,
+      "family": "android",
+      "group": "Horizon",
+      "id": "host.gpu.clock_hz",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "host fact unavailable on this backend",
+      "elapsed_us": 4362,
+      "family": "android",
+      "group": "Horizon",
+      "id": "host.memory.clock_hz",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "host fact unavailable on this backend",
+      "elapsed_us": 4135,
+      "family": "android",
+      "group": "Horizon",
+      "id": "host.tick.frequency_hz",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "host fact unavailable on this backend",
+      "elapsed_us": 4164,
+      "family": "android",
+      "group": "Horizon",
+      "id": "host.os.name",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "host fact unavailable on this backend",
+      "elapsed_us": 4321,
+      "family": "android",
+      "group": "Horizon",
+      "id": "host.os.version",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "host fact unavailable on this backend",
+      "elapsed_us": 4502,
+      "family": "android",
+      "group": "Horizon",
+      "id": "host.renderer.backend",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "AndroSwitch",
+      "elapsed_us": 1039,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.model",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "AndroSwitch",
+      "elapsed_us": 1024,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.manufacturer",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "androswitch",
+      "elapsed_us": 924,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.brand",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "androswitch",
+      "elapsed_us": 892,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.device",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "androswitch_horizon",
+      "elapsed_us": 1154,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.product",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "horizon",
+      "elapsed_us": 725,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.board",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "horizon",
+      "elapsed_us": 679,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.hardware",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "AS26",
+      "elapsed_us": 608,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.id",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "AndroSwitch API26 compatibility profile v1",
+      "elapsed_us": 754,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.display",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "androswitch/horizon/androswitch:8.0.0/AS26/0.1.0:eng/test-keys",
+      "elapsed_us": 728,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.fingerprint",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "eng",
+      "elapsed_us": 359,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.type",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "test-keys",
+      "elapsed_us": 602,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.tags",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "androswitch",
+      "elapsed_us": 787,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.user",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "horizon",
+      "elapsed_us": 499,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.host",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "buildTime=0",
+      "elapsed_us": 724,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.time",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "arm64-v8a count=1",
+      "elapsed_us": 885,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.abis",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "8.0.0",
+      "elapsed_us": 501,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.version.release",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "0.1.0-dev",
+      "elapsed_us": 634,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.version.incremental",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "REL",
+      "elapsed_us": 372,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.version.codename",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "",
+      "elapsed_us": 404,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.version.base_os",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "",
+      "elapsed_us": 339,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.version.security_patch",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "guestAPI=26",
+      "elapsed_us": 705,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.version.sdk",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "preview=0",
+      "elapsed_us": 1292,
+      "family": "android",
+      "group": "Android identity",
+      "id": "build.version.preview",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "1793201203674",
+      "elapsed_us": 1163,
+      "family": "android",
+      "group": "Clock",
+      "id": "clock.wall",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "5000",
+      "elapsed_us": 519,
+      "family": "android",
+      "group": "Clock",
+      "id": "clock.nano",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1073",
+      "elapsed_us": 720,
+      "family": "android",
+      "group": "Clock",
+      "id": "clock.elapsed",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "1078",
+      "elapsed_us": 677,
+      "family": "android",
+      "group": "Clock",
+      "id": "clock.uptime",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "640x360 density=1.0",
+      "elapsed_us": 2753,
+      "family": "android",
+      "group": "Display",
+      "id": "display.metrics",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "orientation=2 density=160 dp=640x360",
+      "elapsed_us": 2604,
+      "family": "android",
+      "group": "Display",
+      "id": "display.configuration",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "rotation=0",
+      "elapsed_us": 1963,
+      "family": "android",
+      "group": "Display",
+      "id": "display.rotation",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "requested=-1",
+      "elapsed_us": 1890,
+      "family": "android",
+      "group": "Display",
+      "id": "display.requested-orientation",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "landscape requested; physical rotation is separate",
+      "elapsed_us": 1887,
+      "family": "android",
+      "group": "Display",
+      "id": "display.landscape",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "portrait requested; physical rotation is separate",
+      "elapsed_us": 1730,
+      "family": "android",
+      "group": "Display",
+      "id": "display.portrait",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "window and decor",
+      "elapsed_us": 2222,
+      "family": "android",
+      "group": "Display",
+      "id": "display.window",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "API_UNAVAILABLE [rd-vm]: platform EGL backend [pc 0x795: Insn { opcode: 110, fmt: F35c, size: 3, kind: Invoke35c { count: 2, idx: 102, regs: [1, 2, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/AndroidCases;->run(ILandroid/app/Activity;)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 775,
+      "family": "android",
+      "group": "Display",
+      "id": "display.keep-screen-on",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "org.androswitch.conformance",
+      "elapsed_us": 2694,
+      "family": "android",
+      "group": "Package",
+      "id": "package.identity",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "0.1.0/1",
+      "elapsed_us": 3322,
+      "family": "android",
+      "group": "Package",
+      "id": "package.info",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "detail": "PK",
+      "elapsed_us": 1468,
+      "family": "android",
+      "group": "Package",
+      "id": "package.apk-stream",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "NameNotFoundException",
+      "elapsed_us": 1262,
+      "family": "android",
+      "group": "Package",
+      "id": "package.missing",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "AS asset",
+      "elapsed_us": 2356,
+      "family": "android",
+      "group": "Package",
+      "id": "package.assets",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "3,7,11,EOF",
+      "elapsed_us": 126930,
+      "family": "android",
+      "group": "Storage",
+      "id": "storage.write-read",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "1,2",
+      "elapsed_us": 172161,
+      "family": "android",
+      "group": "Storage",
+      "id": "storage.append",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "/data/user/0/org.androswitch.conformance/files",
+      "elapsed_us": 1613,
+      "family": "android",
+      "group": "Storage",
+      "id": "storage.name-parent",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "/data/user/0/org.androswitch.conformance/files/nested/a",
+      "elapsed_us": 2589,
+      "family": "android",
+      "group": "Storage",
+      "id": "storage.mkdir",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "deleted",
+      "elapsed_us": 22855,
+      "family": "android",
+      "group": "Storage",
+      "id": "storage.delete",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "seek/read",
+      "elapsed_us": 80927,
+      "family": "android",
+      "group": "Storage",
+      "id": "storage.random-access",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "committed",
+      "elapsed_us": 58056,
+      "family": "android",
+      "group": "Preferences",
+      "id": "preferences.int",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "committed",
+      "elapsed_us": 48315,
+      "family": "android",
+      "group": "Preferences",
+      "id": "preferences.long",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "committed",
+      "elapsed_us": 69778,
+      "family": "android",
+      "group": "Preferences",
+      "id": "preferences.boolean",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "committed",
+      "elapsed_us": 75689,
+      "family": "android",
+      "group": "Preferences",
+      "id": "preferences.float",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "escaped string",
+      "elapsed_us": 59537,
+      "family": "android",
+      "group": "Preferences",
+      "id": "preferences.string",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "removed",
+      "elapsed_us": 170099,
+      "family": "android",
+      "group": "Preferences",
+      "id": "preferences.remove",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "cleared",
+      "elapsed_us": 110132,
+      "family": "android",
+      "group": "Preferences",
+      "id": "preferences.clear",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "int",
+      "elapsed_us": 606,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.int",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "long",
+      "elapsed_us": 514,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.long",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "boolean",
+      "elapsed_us": 611,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.boolean",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "float",
+      "elapsed_us": 624,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.float",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "double",
+      "elapsed_us": 898,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.double",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "byte",
+      "elapsed_us": 959,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.byte",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "short",
+      "elapsed_us": 756,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.short",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "char",
+      "elapsed_us": 616,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.char",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "value",
+      "elapsed_us": 778,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.string",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "91",
+      "elapsed_us": 746,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.default",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "7",
+      "elapsed_us": 4998,
+      "family": "android",
+      "group": "Bundle",
+      "id": "bundle.nested",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "actual Context",
+      "elapsed_us": 5334,
+      "family": "android",
+      "group": "UI",
+      "id": "ui.view-context",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "test",
+      "elapsed_us": 828,
+      "family": "android",
+      "group": "UI",
+      "id": "ui.textview",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "401/button",
+      "elapsed_us": 1307,
+      "family": "android",
+      "group": "UI",
+      "id": "ui.button",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "aXd",
+      "elapsed_us": 1468,
+      "family": "android",
+      "group": "Input",
+      "id": "ui.input-connection",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "AZ",
+      "elapsed_us": 582,
+      "family": "android",
+      "group": "Input",
+      "id": "ui.editable-utf16",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "rows=1",
+      "elapsed_us": 431126,
+      "family": "android",
+      "group": "SQLite",
+      "id": "sqlite.insert",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "rows=0",
+      "elapsed_us": 91191,
+      "family": "android",
+      "group": "SQLite",
+      "id": "sqlite.rollback",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "rows=1",
+      "elapsed_us": 138112,
+      "family": "android",
+      "group": "SQLite",
+      "id": "sqlite.commit",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "bound string",
+      "elapsed_us": 126859,
+      "family": "android",
+      "group": "SQLite",
+      "id": "sqlite.bind",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "minimum=1920",
+      "elapsed_us": 786,
+      "family": "android",
+      "group": "Audio",
+      "id": "audio.minimum-buffer",
+      "kind": "observation",
+      "status": "PASS"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "API_UNAVAILABLE [rd-vm]: platform PCM output [pc 0x1a1: Insn { opcode: 118, fmt: F3rc, size: 3, kind: InvokeRange3rc { count: 7, idx: 54, start: 14 } }]\n  at Lorg/androswitch/conformance/AndroidCases;->run(ILandroid/app/Activity;)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 316,
+      "family": "android",
+      "group": "Audio",
+      "id": "audio.pcm-write",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "detail": "Actual child lifecycle=CSRPTD",
+      "elapsed_us": 2386014,
+      "family": "android",
+      "group": "Lifecycle",
+      "id": "activity.roundtrip",
+      "kind": "integration",
+      "status": "PASS"
+    },
+    {
+      "detail": "org.androswitch.conformance.Recorder",
+      "elapsed_us": 4133,
+      "family": "android",
+      "group": "Lifecycle",
+      "id": "activity.application",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "attached Intent",
+      "elapsed_us": 1628,
+      "family": "android",
+      "group": "Lifecycle",
+      "id": "activity.intent",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "Handler order=12",
+      "elapsed_us": 1211035,
+      "family": "android",
+      "group": "Lifecycle",
+      "id": "activity.handler-order",
+      "kind": "integration",
+      "status": "PASS"
+    },
+    {
+      "detail": "exclusive and parent",
+      "elapsed_us": 24678,
+      "family": "android",
+      "group": "I/O",
+      "id": "storage.file-exclusive",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "persistent character stream",
+      "elapsed_us": 124895,
+      "family": "android",
+      "group": "I/O",
+      "id": "storage.character-stream",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "shared channel owner",
+      "elapsed_us": 119082,
+      "family": "android",
+      "group": "I/O",
+      "id": "storage.channel-owner",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "detail": "durable atomic backup",
+      "elapsed_us": 218566,
+      "family": "android",
+      "group": "I/O",
+      "id": "storage.atomic-file",
+      "kind": "contract",
+      "status": "PASS"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 279,
+      "family": "native",
+      "group": "JNI",
+      "id": "jni.pointer-width",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 610,
+      "family": "native",
+      "group": "JNI",
+      "id": "jni.mixed-abi",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 391,
+      "family": "native",
+      "group": "JNI",
+      "id": "jni.string-utf8",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 620,
+      "family": "native",
+      "group": "JNI",
+      "id": "jni.array-copyback",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 406,
+      "family": "native",
+      "group": "JNI",
+      "id": "jni.exception",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 572,
+      "family": "native",
+      "group": "JNI",
+      "id": "jni.callback-gc",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 613,
+      "family": "native",
+      "group": "JNI",
+      "id": "jni.local-frame",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 419,
+      "family": "native",
+      "group": "JNI",
+      "id": "jni.thread-attach",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 565,
+      "family": "native",
+      "group": "JNI",
+      "id": "jni.native-file-sharing",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 390,
+      "family": "native",
+      "group": "Native",
+      "id": "native.monotonic",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 359,
+      "family": "native",
+      "group": "Native",
+      "id": "native.clock-resolution",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 392,
+      "family": "native",
+      "group": "Native",
+      "id": "native.process-cpu-count",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 605,
+      "family": "native",
+      "group": "Native",
+      "id": "native.errno",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 647,
+      "family": "native",
+      "group": "Native",
+      "id": "native.tls",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 398,
+      "family": "native",
+      "group": "Native",
+      "id": "native.malloc-realloc",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 517,
+      "family": "native",
+      "group": "Native",
+      "id": "native.locale-c",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 558,
+      "family": "native",
+      "group": "Native",
+      "id": "native.process-clock",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 382,
+      "family": "native",
+      "group": "Native",
+      "id": "native.abi",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 589,
+      "family": "native",
+      "group": "OpenGL ES",
+      "id": "gles.vendor",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 387,
+      "family": "native",
+      "group": "OpenGL ES",
+      "id": "gles.renderer",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 353,
+      "family": "native",
+      "group": "OpenGL ES",
+      "id": "gles.version",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 397,
+      "family": "native",
+      "group": "OpenGL ES",
+      "id": "gles.extensions",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 371,
+      "family": "native",
+      "group": "OpenGL ES",
+      "id": "gles.clear-readback",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 559,
+      "family": "native",
+      "group": "OpenGL ES",
+      "id": "gles.shader-valid",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 409,
+      "family": "native",
+      "group": "OpenGL ES",
+      "id": "gles.shader-invalid",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 352,
+      "family": "native",
+      "group": "OpenGL ES",
+      "id": "gles.buffer-roundtrip",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 388,
+      "family": "native",
+      "group": "OpenGL ES",
+      "id": "gles.texture-framebuffer",
+      "kind": "contract",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 404,
+      "family": "native",
+      "group": "Vulkan",
+      "id": "vulkan.loader",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 393,
+      "family": "native",
+      "group": "Vulkan",
+      "id": "vulkan.instance",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 597,
+      "family": "native",
+      "group": "Vulkan",
+      "id": "vulkan.physical-device",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 662,
+      "family": "native",
+      "group": "Vulkan",
+      "id": "vulkan.queue-families",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 403,
+      "family": "native",
+      "group": "Vulkan",
+      "id": "vulkan.logical-device",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    },
+    {
+      "boundary": "portable VM; no Android native/graphics/audio/worker backend",
+      "detail": "NATIVE_BACKEND_UNAVAILABLE [rd-vm]: System.loadLibrary requires native backend [pc 0x9: Insn { opcode: 113, fmt: F35c, size: 3, kind: Invoke35c { count: 1, idx: 362, regs: [1, 0, 0, 0, 0] } }]\n  at Lorg/androswitch/conformance/NativeCases;->load()V\n  at Lorg/androswitch/conformance/NativeCases;->run(I)Ljava/lang/String;\n  at Lorg/androswitch/conformance/RunBook;->execute(I)Ljava/lang/String;",
+      "elapsed_us": 380,
+      "family": "native",
+      "group": "Vulkan",
+      "id": "vulkan.memory-heaps",
+      "kind": "observation",
+      "status": "UNSUPPORTED"
+    }
+  ],
+  "catalog": "local-artifacts/conformance-strings-qualified/catalog.json",
+  "completed": 299,
+  "elapsed_seconds": 15.3026411,
+  "reference_api": 26,
+  "schema_version": 1,
+  "scope": "Declared catalog only; native JNI/GPU/audio need actual Horizon or Android backend; not complete Android coverage",
+  "sensor_tests": false,
+  "suite": "AndroSwitch Conformance",
+  "total": 299
+}

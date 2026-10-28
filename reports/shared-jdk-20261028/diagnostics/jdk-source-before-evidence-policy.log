@@ -1,0 +1,3 @@
+Upstream 3761815dc6a2a1427e9fc66b66e8471b78d1b170: 427 files; 275 identical, 152 reviewed adaptations, 9 relocated.
+ADAPTATION_DRIFT: .gitattributes; review diff and update its receipt
+Original VM source excluded on device: 82. Device behavior parity: NOT VERIFIED.

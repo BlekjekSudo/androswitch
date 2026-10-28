@@ -1,0 +1,227 @@
+[
+  {
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-shipping.log",
+    "sha256": "4dba8cb63bf03e0757afcbca94722d03481d0a870440e704f3e59e7566a7c7c8",
+    "program": "cargo",
+    "finished": "2026-10-28T15:14:10.2365243Z",
+    "expected_exit": 0,
+    "exit_code": 0,
+    "started": "2026-10-28T15:13:34.513365Z",
+    "name": "jdk-shipping",
+    "arguments": [
+      "test",
+      "-p",
+      "as-vm",
+      "--lib",
+      "--test",
+      "shipping_io_chars",
+      "--test",
+      "shipping_numerics",
+      "--test",
+      "shipping_numeric_catalog",
+      "--test",
+      "shipping_strings",
+      "--locked",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-gc.log",
+    "sha256": "8b080c25cb4c6e669ad5142ef3cfea883f9cd80a9c6b2f1389589749d601dea5",
+    "program": "cargo",
+    "finished": "2026-10-28T15:14:23.1777399Z",
+    "expected_exit": 0,
+    "exit_code": 0,
+    "started": "2026-10-28T15:14:10.2995492Z",
+    "name": "jdk-gc",
+    "arguments": [
+      "test",
+      "-p",
+      "as-vm",
+      "--features",
+      "portable-test-support",
+      "--test",
+      "shipping_gc_generations",
+      "--locked",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-workspace-clippy.log",
+    "sha256": "fc963f4304602e3381b4a4a8575163abdafabf434852702b6539132eebb44aea",
+    "program": "cargo",
+    "finished": "2026-10-28T15:20:03.7406268Z",
+    "expected_exit": 0,
+    "exit_code": 0,
+    "started": "2026-10-28T15:14:23.1814389Z",
+    "name": "jdk-workspace-clippy",
+    "arguments": [
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "as-framework/host,as-switch-smoke/host-cli,as-switch-smoke/portable-tests",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  {
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-reference-clippy.log",
+    "sha256": "686e7385cd93c0dd347933c311db19e7ebc8013e3650189aee388793918c502f",
+    "program": "cargo",
+    "finished": "2026-10-28T15:22:13.5964991Z",
+    "expected_exit": 0,
+    "exit_code": 0,
+    "started": "2026-10-28T15:20:03.7676248Z",
+    "name": "jdk-reference-clippy",
+    "arguments": [
+      "clippy",
+      "-p",
+      "as-vm",
+      "--features",
+      "upstream-parity-tests",
+      "--all-targets",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  {
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-fixture-tests.log",
+    "sha256": "ec24b48fe2adaf662d60ac5e442faa153bb15f73221c3cff2f5526e0cc89f7df",
+    "program": "cargo",
+    "finished": "2026-10-28T15:23:30.265063Z",
+    "expected_exit": 0,
+    "exit_code": 0,
+    "started": "2026-10-28T15:22:13.6021734Z",
+    "name": "jdk-fixture-tests",
+    "arguments": [
+      "test",
+      "-p",
+      "rd-testsupport",
+      "-p",
+      "as-vm-testsupport",
+      "--lib",
+      "--locked",
+      "--",
+      "--test-threads=1"
+    ]
+  },
+  {
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-core.log",
+    "sha256": "28b1a513bce919152f89df6caaab9e0f72e07fa58547d34b8d69d1c71b4eaa62",
+    "program": "cargo",
+    "finished": "2026-10-28T15:23:44.7291244Z",
+    "expected_exit": 0,
+    "exit_code": 0,
+    "started": "2026-10-28T15:23:30.2675531Z",
+    "name": "jdk-core",
+    "arguments": [
+      "check",
+      "-p",
+      "as-vm",
+      "--no-default-features",
+      "--locked"
+    ]
+  },
+  {
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-format.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "program": "cargo",
+    "finished": "2026-10-28T15:24:10.9888082Z",
+    "expected_exit": 0,
+    "exit_code": 0,
+    "started": "2026-10-28T15:23:44.7341336Z",
+    "name": "jdk-format",
+    "arguments": [
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ]
+  },
+  {
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-python.log",
+    "sha256": "9d7a9959376dd4e50b22f563eba67ba6f335f1a5aaecd25caf425283eaee444b",
+    "program": "python",
+    "finished": "2026-10-28T15:24:15.6393983Z",
+    "expected_exit": 0,
+    "exit_code": 0,
+    "started": "2026-10-28T15:24:10.9905729Z",
+    "name": "jdk-python",
+    "arguments": [
+      "-X",
+      "utf8",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "scripts/tests"
+    ]
+  },
+  {
+    "arguments": [
+      "-X",
+      "utf8",
+      "scripts/check-upstream-sync.py",
+      "--report",
+      "local-artifacts/upstream-numerics/jdk-source.json"
+    ],
+    "sha256": "6b58b75312e67863334dc354889dfd52fa4d97e5c226d4dae8ea7a5a3a425070",
+    "name": "jdk-source",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-source.log",
+    "program": "python",
+    "expected_exit": 0,
+    "finished": "2026-10-28T15:26:16.5096841Z",
+    "exit_code": 0,
+    "started": "2026-10-28T15:26:16.0670458Z"
+  },
+  {
+    "arguments": [
+      "-X",
+      "utf8",
+      "scripts/check-upstream-sync.py",
+      "--require-device-parity",
+      "--report",
+      "local-artifacts/upstream-numerics/jdk-device-gate.json"
+    ],
+    "sha256": "6b58b75312e67863334dc354889dfd52fa4d97e5c226d4dae8ea7a5a3a425070",
+    "name": "jdk-device-gate",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-device-gate.log",
+    "program": "python",
+    "expected_exit": 1,
+    "finished": "2026-10-28T15:26:17.0261687Z",
+    "exit_code": 1,
+    "started": "2026-10-28T15:26:16.5437712Z"
+  },
+  {
+    "arguments": [
+      "run",
+      "-p",
+      "as-framework",
+      "--features",
+      "host",
+      "--bin",
+      "as-conformance",
+      "--locked",
+      "--",
+      "local-artifacts/conformance-strings-qualified/AndroSwitchConformance.apk",
+      "local-artifacts/conformance-strings-qualified/catalog.json",
+      "local-artifacts/upstream-numerics/jdk-sdk-storage",
+      "local-artifacts/upstream-numerics/jdk-sdk-report.json"
+    ],
+    "sha256": "9fb9f161ff70490d1203bb0ca24c3e7c59b2e3f386d4f576d8dcc1e95081672a",
+    "name": "jdk-sdk",
+    "log": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\upstream-numerics\\jdk-sdk.log",
+    "program": "cargo",
+    "expected_exit": 0,
+    "finished": "2026-10-28T15:26:57.9459814Z",
+    "exit_code": 0,
+    "started": "2026-10-28T15:26:17.0329387Z"
+  }
+]

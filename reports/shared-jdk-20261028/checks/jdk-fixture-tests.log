@@ -1,0 +1,20 @@
+   Compiling rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-dex)
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+   Compiling rd-vm v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-vm)
+   Compiling rd-testsupport v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-testsupport)
+   Compiling as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+    Finished `test` profile [unoptimized] target(s) in 1m 15s
+     Running unittests ..\rd-testsupport\src\lib.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\as_vm_testsupport-176ed70d05850fd1.exe)
+
+running 1 test
+test vm::string_data_tests::dex_strings_encode_nul_bmp_and_surrogate_pairs_as_modified_utf8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (C:/Users/Administrator/.cache/androswitch/std-migration-host\debug\deps\rd_testsupport-b855416b4f1940bd.exe)
+
+running 1 test
+test vm::string_data_tests::dex_strings_encode_nul_bmp_and_surrogate_pairs_as_modified_utf8 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

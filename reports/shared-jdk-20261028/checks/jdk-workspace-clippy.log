@@ -1,0 +1,90 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+    Checking serde_core v1.0.229
+   Compiling syn v3.0.6
+   Compiling serde_derive v1.0.229
+    Checking serde v1.0.229
+    Checking memchr v2.8.3
+    Checking zmij v1.0.23
+    Checking itoa v1.0.18
+    Checking serde_json v1.0.151
+    Checking cfg-if v1.0.5
+    Checking simd-adler32 v0.3.10
+    Checking adler2 v2.0.1
+    Checking miniz_oxide v0.9.1
+    Checking crc32fast v1.5.2
+    Checking flate2 v1.1.10
+    Checking rd-apk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-apk)
+    Checking spin v0.9.9
+    Checking rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-dex)
+    Checking as-platform v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-platform)
+    Checking aho-corasick v1.1.5
+    Checking regex-syntax v0.8.11
+    Checking regex-automata v0.4.18
+    Checking bit-vec v0.6.3
+    Checking bit-set v0.5.3
+    Checking fancy-regex v0.13.0
+    Checking regex v1.13.1
+    Checking rd-jni v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-jni)
+    Checking rd-vm v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-vm)
+    Checking rd-testsupport v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-testsupport)
+    Checking typenum v1.20.1
+    Checking generic-array v0.14.7
+    Checking rd-render v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-render)
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.7
+    Checking digest v0.10.7
+    Checking cpufeatures v0.2.17
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+    Checking sha2 v0.10.9
+    Checking as-package v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-package)
+   Compiling as-sqlite v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-sqlite)
+    Checking xmlparser v0.13.6
+    Checking libm v0.2.15
+    Checking as-storage v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-storage)
+    Checking as-framework v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-framework)
+    Checking rd-ndk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-ndk)
+    Checking equivalent v1.0.2
+    Checking hashbrown v0.16.1
+    Checking indexmap v2.11.4
+    Checking toml_datetime v0.6.11
+    Checking serde_spanned v0.6.9
+   Compiling syn v2.0.119
+    Checking winnow v0.7.15
+    Checking toml_write v0.1.2
+    Checking toml_edit v0.22.27
+    Checking toml v0.8.23
+    Checking as-vm-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-testsupport)
+    Checking as-native v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-native)
+    Checking as-launcher v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-launcher)
+   Compiling thiserror v1.0.69
+    Checking rd-engine-registry v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-engine-registry)
+   Compiling thiserror-impl v1.0.69
+    Checking windows-link v0.2.1
+    Checking windows-sys v0.61.2
+    Checking as-switch-smoke v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-switch-smoke)
+    Checking utf8parse v0.2.2
+    Checking once_cell_polyfill v1.70.2
+    Checking anstyle v1.0.14
+    Checking anstyle-wincon v3.0.11
+    Checking anstyle-parse v0.2.7
+    Checking rd-framework v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-framework)
+    Checking anstyle-query v1.1.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking colorchoice v1.0.5
+    Checking anstream v0.6.21
+   Compiling heck v0.5.0
+    Checking strsim v0.11.1
+    Checking clap_lex v0.7.7
+   Compiling anyhow v1.0.104
+    Checking clap_builder v4.5.57
+   Compiling clap_derive v4.5.55
+    Checking clap v4.5.57
+    Checking rd-agent v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-agent)
+    Checking as-vm-render-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm-render-testsupport)
+    Checking as-testsupport v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-testsupport)
+    Checking as-runtime v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-runtime)
+    Checking as-cli v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-cli)
+    Checking rd-cli v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-cli)
+    Checking xtask v0.9.0 (D:\Dev\Switch\AndroSwitch\xtask)
+    Finished `dev` profile [unoptimized] target(s) in 5m 39s
