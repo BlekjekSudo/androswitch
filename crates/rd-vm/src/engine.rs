@@ -62,6 +62,8 @@ pub struct Engine {
     pub(crate) regex_tables: crate::jregex::Tables,
     #[cfg(any(feature = "std", feature = "upstream-runtime"))]
     pub(crate) io_tables: crate::jio_chars::Tables,
+    #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+    pub(crate) tokenizers: HashMap<ObjRef, crate::jstring_tokenizer::State>,
     pub(crate) collection_views: crate::jcollections::Views,
     pub(crate) output: alloc::rc::Rc<crate::app_output::Output>,
     #[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
@@ -228,6 +230,8 @@ impl Engine {
             regex_tables: Default::default(),
             #[cfg(any(feature = "std", feature = "upstream-runtime"))]
             io_tables: Default::default(),
+            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            tokenizers: Default::default(),
             output: Default::default(),
             #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             module_tables: Default::default(),

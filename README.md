@@ -73,7 +73,7 @@ completes the available SDK corpus in two guarded headless Ryujinx launches:
 PCV clock observations and physical testing of this binary remain open.
 
 A single [AndroSwitch Conformance APK](fixtures/conformance/README.md) now groups
-299 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,
+309 original sensor-free Java, Android, JNI and graphics tests. Run all, resume,
 inspect results and export JSON from one installation. See [scope and actual
 platform observations](docs/CONFORMANCE_SUITE.md); this is not official CTS or
 complete Android coverage.
@@ -88,8 +88,10 @@ The [numeric family](docs/UPSTREAM_NUMERICS.md) now shares inherited algorithms
 and exact JNI declarations on std, with 233 independent JVM comparisons across
 218 declarations. The [String storage port](docs/UPSTREAM_STRING_STORAGE.md)
 reuses upstream allocation, removes permanent dynamic-result retention and keeps
-one Engine-owned DEX literal table. These scoped results do not qualify unrun
-APIs or physical hardware; the current catalog has 173 JVM oracle rows.
+one Engine-owned DEX literal table. The [StringTokenizer family](docs/UPSTREAM_TOKENIZER.md)
+shares all nine inherited declarations and typed input/GC ownership, including
+DEX subclass callbacks. These scoped results do not qualify unrun APIs or
+physical hardware; the current catalog has 183 JVM oracle rows.
 
 Earlier 219-case unified-SDK Ryujinx baseline: **216 PASS, 3 NOT_RUN** across 20 sessions.
 The user subsequently confirmed **219/219 PASS on a physical Switch**; see the

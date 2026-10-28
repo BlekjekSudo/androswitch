@@ -54,7 +54,7 @@ fn text(vm: &Engine, v: &Value) -> Result<String> {
 fn string(vm: &mut Engine, s: impl Into<String>) -> Result<Value> {
     Ok(Value::Obj(vm.heap.alloc_string(s.into())?))
 }
-fn numerics_metadata(
+fn std_method_metadata(
     class: &str,
     name: &str,
     sig: &str,
@@ -62,6 +62,7 @@ fn numerics_metadata(
     #[cfg(feature = "std")]
     {
         rd_vm::numerics::method_metadata(class, name, sig)
+            .or_else(|| rd_vm::jstring_tokenizer::method_metadata(class, name, sig))
     }
     #[cfg(not(feature = "std"))]
     {
@@ -1533,7 +1534,7 @@ impl FrameworkHost for Android {
         sig: &str,
     ) -> Option<rd_vm::framework_host::HostMethodKind> {
         rd_vm::boxes::method_metadata(class, name, sig)
-            .or_else(|| numerics_metadata(class, name, sig))
+            .or_else(|| std_method_metadata(class, name, sig))
             .or_else(|| rd_vm::java_file::method_metadata(class, name, sig))
             .or_else(|| rd_vm::atomic_file::method_metadata(class, name, sig))
             .or_else(|| rd_vm::java_stream::method_metadata(class, name, sig))

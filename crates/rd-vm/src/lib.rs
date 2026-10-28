@@ -194,8 +194,8 @@ pub(crate) mod jsecurity;
 pub(crate) mod jsorted;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jsqlite;
-#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-pub(crate) mod jstring_tokenizer;
+#[cfg(any(feature = "std", feature = "upstream-runtime"))]
+pub mod jstring_tokenizer;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod jtext_format;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]

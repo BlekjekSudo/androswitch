@@ -159,7 +159,7 @@ confirmation is not transferred. See the
 [actual checkpoint](../reports/collections-text-20261026.json).
 
 The source-route audit now evaluates the actual shipping `std` feature
-declarations, including nested `all`/`any`/`not` guards. **82 original VM files
+declarations, including nested `all`/`any`/`not` guards. **81 original VM files
 remain excluded** in the default device profile. A compiled std source is still
 reported as behavior-unverified. This count is not an API percentage, and the
 full upstream dispatcher is still not enabled for the product's bound framework.
@@ -187,3 +187,11 @@ product-wide cache of dynamic results and reuses the original allocation body.
 One Engine-owned DEX literal table supplies both profiles, normal/jumbo loads,
 encoded constants and collector roots. The central SDK grows to 299 cases and
 173 actual JVM rows; physical and emulator qualification remain artifact-specific.
+
+The [StringTokenizer family](UPSTREAM_TOKENIZER.md) now selects the original
+module on std, removes its disconnected HostObj variant, and shares a typed
+Engine table with real input String/GC edges. All nine inherited declarations,
+Enumeration aliases, subclass callbacks and explicit super calls use that owner.
+Ten added JVM/DEX scenarios bring the central development corpus to 309 cases
+with 183 independent JVM rows. This closes one complete inherited family;
+the open boundaries above still prevent whole-runtime 1:1 parity.

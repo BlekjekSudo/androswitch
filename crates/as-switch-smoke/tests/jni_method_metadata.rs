@@ -96,6 +96,53 @@ fn app() -> (App, Rc<Identity>) {
     (app, native)
 }
 #[test]
+fn tokenizer_jni_uses_shared_exact_metadata_and_the_actual_vm_owner() {
+    let (mut app, _) = app();
+    let class = "Ljava/util/StringTokenizer;";
+    for (name, sig) in [
+        ("<init>", "(Ljava/lang/String;)V"),
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;)V"),
+        ("<init>", "(Ljava/lang/String;Ljava/lang/String;Z)V"),
+        ("countTokens", "()I"),
+        ("hasMoreTokens", "()Z"),
+        ("hasMoreElements", "()Z"),
+        ("nextToken", "()Ljava/lang/String;"),
+        ("nextToken", "(Ljava/lang/String;)Ljava/lang/String;"),
+        ("nextElement", "()Ljava/lang/Object;"),
+    ] {
+        assert_eq!(
+            method_owner(&mut app.vm, class, name, sig, false).unwrap(),
+            class
+        );
+        assert!(method_owner(&mut app.vm, class, name, sig, true).is_err());
+    }
+    assert!(method_owner(
+        &mut app.vm,
+        class,
+        "nextToken",
+        "()Ljava/lang/Object;",
+        false
+    )
+    .is_err());
+    let owner = app.vm.heap.alloc_instance(class.into(), vec![]).unwrap();
+    app.vm.attach_host_state(class, owner).unwrap();
+    app.vm
+        .invoke_instance(
+            owner,
+            "<init>",
+            "(Ljava/lang/String;)V",
+            &[Value::StrPlaceholder("actual shared state".into())],
+        )
+        .unwrap();
+    assert_eq!(
+        app.vm
+            .invoke_instance(owner, "countTokens", "()I", &[])
+            .unwrap(),
+        Value::Int(3)
+    );
+}
+
+#[test]
 fn inherited_numeric_jni_lookup_uses_exact_static_descriptors() {
     let (mut app, _) = app();
     for (class, name, sig) in [
