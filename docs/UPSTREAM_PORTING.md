@@ -3,8 +3,8 @@
 AndroSwitch is a history-preserving fork of **RustyDroid by nadabgfccvd and
 the RustyDroid contributors**. The original fork point is
 `6388281f66d254c8e01a0fdc7a5a9a30239bc762`. The synchronization target is now
-[`3761815dc6a2a1427e9fc66b66e8471b78d1b170`](https://github.com/nadabgfccvd/RustyDroid/commit/3761815dc6a2a1427e9fc66b66e8471b78d1b170),
-the latest upstream main checked on 2026-10-27. Both histories are retained;
+[`4489813db513b42c531979b079397c50edd54e25`](https://github.com/nadabgfccvd/RustyDroid/commit/4489813db513b42c531979b079397c50edd54e25),
+the latest upstream main checked on 2026-10-28. Its new commit only removes the desktop rd-sentinel tool; runtime/API source is unchanged from 3761815. Both histories are retained;
 this is a merge, not a source dump without attribution. See [credits](../CREDITS.md)
 and [notice](../NOTICE.md).
 

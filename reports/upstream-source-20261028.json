@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "previous_revision": "3761815dc6a2a1427e9fc66b66e8471b78d1b170",
+  "upstream_revision": "4489813db513b42c531979b079397c50edd54e25",
+  "upstream_tree": "79e6094e78406d54d856c57679b7edf571b4289b",
+  "scope": "Complete upstream source inventory; not device behavior parity",
+  "source_files_before": 427,
+  "source_files_after": 417,
+  "reviewed_delta": [
+    "D\ttools/rd-sentinel/README.md",
+    "D\ttools/rd-sentinel/rd_sentinel.py",
+    "D\ttools/rd-sentinel/sentinel/__init__.py",
+    "D\ttools/rd-sentinel/sentinel/audit.py",
+    "D\ttools/rd-sentinel/sentinel/campaigns.py",
+    "D\ttools/rd-sentinel/sentinel/cli.py",
+    "D\ttools/rd-sentinel/sentinel/github_api.py",
+    "D\ttools/rd-sentinel/sentinel/mcp_endurance.py",
+    "D\ttools/rd-sentinel/sentinel/model.py",
+    "D\ttools/rd-sentinel/tests/test_rd_sentinel.py"
+  ],
+  "runtime_api_source_changed": false,
+  "all_upstream_apis_1_to_1_on_horizon": false,
+  "attribution": "RustyDroid by nadabgfccvd and contributors; original fork point and both histories retained.",
+  "open_boundaries_document": "docs/UPSTREAM_PARITY_PLAN.md"
+}

@@ -2,8 +2,8 @@
   "schema": 1,
   "repository": "https://github.com/nadabgfccvd/RustyDroid.git",
   "original_base": "6388281f66d254c8e01a0fdc7a5a9a30239bc762",
-  "revision": "3761815dc6a2a1427e9fc66b66e8471b78d1b170",
-  "tree": "d3c85e3a0ce9a19e90f3f625b4bb0dd492d2e40b",
+  "revision": "4489813db513b42c531979b079397c50edd54e25",
+  "tree": "79e6094e78406d54d856c57679b7edf571b4289b",
   "files": [
     {
       "path": ".cargo/config.toml",
@@ -1969,46 +1969,6 @@
     {
       "path": "tests/suites/m8-compat.json",
       "blob": "ce01fa6d795ad352f0e6c22b4b131971a6ea8fd0"
-    },
-    {
-      "path": "tools/rd-sentinel/README.md",
-      "blob": "349398821d43ff60a0401b6dc85ed2038541f5c8"
-    },
-    {
-      "path": "tools/rd-sentinel/rd_sentinel.py",
-      "blob": "7b261499d2236bcc8bd1a9fd8099b934c7e3b9f3"
-    },
-    {
-      "path": "tools/rd-sentinel/sentinel/__init__.py",
-      "blob": "243489fc5ed7019425e784e833a5812aceb3332e"
-    },
-    {
-      "path": "tools/rd-sentinel/sentinel/audit.py",
-      "blob": "dca3eb2c7b0886c4c72091b3b2d9aced21db7211"
-    },
-    {
-      "path": "tools/rd-sentinel/sentinel/campaigns.py",
-      "blob": "2b4769f54383cfe729ed4bd2fee5f6cdaf10e515"
-    },
-    {
-      "path": "tools/rd-sentinel/sentinel/cli.py",
-      "blob": "943807f9db386f24b3631bfcb1298d9ee3fb1aad"
-    },
-    {
-      "path": "tools/rd-sentinel/sentinel/github_api.py",
-      "blob": "bc9ad395a5f6ee1396850cd91345d8ae81a07d68"
-    },
-    {
-      "path": "tools/rd-sentinel/sentinel/mcp_endurance.py",
-      "blob": "9c38fd65b3fbebc0835997f9e0cd432b842a1bb0"
-    },
-    {
-      "path": "tools/rd-sentinel/sentinel/model.py",
-      "blob": "80a52ce0ab4f6c5583d99a59b78324b26d50770b"
-    },
-    {
-      "path": "tools/rd-sentinel/tests/test_rd_sentinel.py",
-      "blob": "99f8f0e06dc3c12450a93343a46387088441e844"
     },
     {
       "path": "worklog.md",

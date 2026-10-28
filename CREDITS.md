@@ -11,7 +11,7 @@ The primary upstream credit belongs to
 | --- | --- |
 | Original repository | [nadabgfccvd/RustyDroid](https://github.com/nadabgfccvd/RustyDroid) |
 | Fork base | [`6388281f66d254c8e01a0fdc7a5a9a30239bc762`](https://github.com/nadabgfccvd/RustyDroid/commit/6388281f66d254c8e01a0fdc7a5a9a30239bc762) |
-| Latest synchronized upstream | [`3761815dc6a2a1427e9fc66b66e8471b78d1b170`](https://github.com/nadabgfccvd/RustyDroid/commit/3761815dc6a2a1427e9fc66b66e8471b78d1b170) |
+| Latest synchronized upstream | [`4489813db513b42c531979b079397c50edd54e25`](https://github.com/nadabgfccvd/RustyDroid/commit/4489813db513b42c531979b079397c50edd54e25) |
 | Base commit date | 22 October 2026 |
 | Original copyright | Copyright (c) 2026 RustyDroid contributors |
 | License | [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) |

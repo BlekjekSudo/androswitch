@@ -12,7 +12,7 @@ path. This is an initial family inventory, not an Android API coverage count or
 an execution claim.
 
 The latest upstream source was also inspected at
-[`3761815dc6a2a1427e9fc66b66e8471b78d1b170`](https://github.com/nadabgfccvd/RustyDroid/commit/3761815dc6a2a1427e9fc66b66e8471b78d1b170).
+[`4489813db513b42c531979b079397c50edd54e25`](https://github.com/nadabgfccvd/RustyDroid/commit/4489813db513b42c531979b079397c50edd54e25).
 It was initially fetched for comparison and is now merged; the original fork point remains in history. Neither that
 revision nor the frozen base implements EnumMap, EnumSet or sigaltstack. The
 latest tree contains one EnumMap comment, which is not an implementation.

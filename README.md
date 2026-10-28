@@ -13,7 +13,7 @@ See [credits and provenance](CREDITS.md) and [NOTICE](NOTICE.md).
 
 ## Current status
 
-The latest RustyDroid source is merged at **`3761815`** with its history and
+The latest RustyDroid source is merged at **`4489813`** with its history and
 original tests. The [full source audit](docs/UPSTREAM_PORTING.md) tracks all
 427 upstream files, reviewed adaptations and original VM sources still excluded
 from the device build. **Horizon behavior parity is not yet 1:1 with upstream.**
