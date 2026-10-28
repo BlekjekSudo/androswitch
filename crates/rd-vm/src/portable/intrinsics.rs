@@ -212,6 +212,18 @@ pub fn call_instance_intrinsic_mref(
     if let Some(value) = crate::shared_text::call(vm, value_class, name, sig, receiver, args)? {
         return Ok(Some(value));
     }
+    #[cfg(feature = "std")]
+    if let Some(value) = crate::jstring_tokenizer::instance_intrinsic(
+        vm,
+        receiver_class,
+        declaring_class,
+        name,
+        sig,
+        receiver,
+        args,
+    )? {
+        return Ok(Some(value));
+    }
     if let Some(value) = crate::portable::file::call(vm, value_class, name, sig, receiver, args)? {
         return Ok(Some(value));
     }

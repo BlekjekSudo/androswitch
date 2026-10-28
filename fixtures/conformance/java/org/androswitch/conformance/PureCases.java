@@ -1,5 +1,12 @@
 package org.androswitch.conformance;
 public final class PureCases {
+  private static final class TokenSubclass extends java.util.StringTokenizer {
+    int calls = 7;
+    TokenSubclass() { super("a,b", ","); }
+    public boolean hasMoreTokens() { System.gc(); calls++; return super.hasMoreTokens(); }
+    public String nextToken() { System.gc(); calls++; return super.nextToken(); }
+    public int countTokens() { return 100 + super.countTokens(); }
+  }
   public static final class LiteralHolder {
     public static final String value = "string-pool-value";
     public static String other = value;
@@ -884,6 +891,79 @@ public final class PureCases {
         }
         return aliased + ":" + last;
       }
+      case 173: {
+        java.util.StringTokenizer s = new java.util.StringTokenizer(" a\tb\nc\rd\fe ");
+        int a=s.countTokens(), b=s.countTokens(); StringBuilder out=new StringBuilder();
+        while(s.hasMoreTokens())out.append(s.nextToken());
+        return a + ":" + b + ":" + out + ":" + s.countTokens();
+      }
+      case 174: {
+        java.util.StringTokenizer s = new java.util.StringTokenizer("a\uD83D\uDE42b\uD83D\uDE43c", "\uD83D\uDE42", true);
+        StringBuilder out=new StringBuilder(); int n=s.countTokens();
+        while(s.hasMoreElements())out.append("[").append(s.nextElement()).append("]");
+        return n + ":" + out;
+      }
+      case 175: {
+        java.util.StringTokenizer s = new java.util.StringTokenizer("a,,b;c", ",");
+        String a=s.nextToken(); boolean more=s.hasMoreTokens(); int n=s.countTokens();
+        String b=s.nextToken(";"); String c=s.nextToken();
+        java.util.StringTokenizer exhausted=new java.util.StringTokenizer(",,", ",");
+        try { exhausted.nextToken(); } catch(java.util.NoSuchElementException expected) {}
+        return a+":"+more+":"+n+":"+b+":"+c+":"+exhausted.countTokens();
+      }
+      case 176: {
+        int caught=0;
+        try { new java.util.StringTokenizer(null); } catch(NullPointerException e) { caught+=1; }
+        java.util.StringTokenizer empty=new java.util.StringTokenizer("",null);
+        int count=empty.countTokens();
+        try { empty.hasMoreTokens(); } catch(NullPointerException e) { caught+=2; }
+        java.util.StringTokenizer value=new java.util.StringTokenizer("x",null,true);
+        try { value.countTokens(); } catch(NullPointerException e) { caught+=4; }
+        return caught+":"+count+":"+value.nextToken("");
+      }
+      case 177: {
+        java.util.StringTokenizer s=new java.util.StringTokenizer("a,b", ","); int caught=0;
+        try { s.nextToken(null); } catch(NullPointerException e) { caught+=1; }
+        try { s.hasMoreElements(); } catch(NullPointerException e) { caught+=2; }
+        String first=s.nextToken(","), second=s.nextToken();
+        try { s.nextElement(); } catch(java.util.NoSuchElementException e) { caught+=4; }
+        return caught+":"+first+":"+second;
+      }
+      case 178: {
+        java.util.StringTokenizer s=new java.util.StringTokenizer(
+            new StringBuilder().append("left").append(",").append("right").toString(),
+            new StringBuilder().append(",").toString());
+        System.gc(); String a=s.nextToken(); System.gc();
+        return a+":"+s.nextToken()+":"+s.hasMoreTokens();
+      }
+      case 179: {
+        TokenSubclass s=new TokenSubclass(); java.util.Enumeration<Object> e=s;
+        int count=s.countTokens(); boolean more=e.hasMoreElements();
+        Object first=e.nextElement(); String rest=s.nextToken("|");
+        return count+":"+more+":"+first+":"+rest+":"+s.calls;
+      }
+      case 180: {
+        java.util.StringTokenizer s=new java.util.StringTokenizer("\uD83D\uDE42a\uD83D\uDE43b", "\uD83D\uDE42");
+        String a=s.nextToken(); int caught=0;
+        try { s.nextToken(); } catch(java.util.NoSuchElementException e) { caught++; }
+        try { s.nextToken(""); } catch(java.util.NoSuchElementException e) { caught++; }
+        return a+":"+caught+":"+s.countTokens();
+      }
+      case 181: {
+        String input=new StringBuilder().append("whole input").toString();
+        java.util.StringTokenizer s=new java.util.StringTokenizer(input, "");
+        System.gc(); String value=s.nextToken();
+        return (input==value)+":"+value+":"+s.countTokens();
+      }
+      case 182: {
+        int total=0;
+        for(int i=0;i<128;i++) {
+          java.util.StringTokenizer s=new java.util.StringTokenizer(Integer.toString(i)+",tail", ",");
+          System.gc(); total+=Integer.parseInt(s.nextToken());
+          if(!s.nextToken().equals("tail"))throw new AssertionError();
+        }
+        return Integer.toString(total);
+      }
       default:
         throw new IllegalArgumentException("unknown pure case");
     }
@@ -893,7 +973,7 @@ public final class PureCases {
     // legacy encoding. A surrogate/Unicode test must preserve its real value.
     java.io.PrintWriter out = args.length == 0 ? new java.io.PrintWriter(System.out) :
         new java.io.PrintWriter(new java.io.OutputStreamWriter(new java.io.FileOutputStream(args[0]), "UTF-8"));
-    for (int i = 0; i < 173; i++) out.println(i + "\t" + run(i));
+    for (int i = 0; i < 183; i++) out.println(i + "\t" + run(i));
     out.flush(); if (args.length != 0) out.close();
   }
 }

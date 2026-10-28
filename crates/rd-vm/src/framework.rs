@@ -877,13 +877,6 @@ pub enum HostObj {
         elems: Vec<Value>,
         pos: usize,
     },
-    /// `java.util.StringTokenizer` source, UTF-16 delimiter set and cursor.
-    StringTokenizer {
-        source: Vec<u16>,
-        delimiters: Vec<u16>,
-        return_delimiters: bool,
-        cursor: usize,
-    },
     /// M8 (45º gap real — slf4j 2.x do primftpd): ServiceLoader host com os
     /// providers descobertos em `META-INF/services/<nome binário da
     /// interface>` (arquivo indexado de qualquer classes.dex do APK).

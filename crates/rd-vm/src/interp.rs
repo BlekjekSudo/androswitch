@@ -1813,6 +1813,7 @@ fn do_invoke(
         && matches!(
             mref.class.as_str(),
             "Ljava/lang/Enum;"
+                | "Ljava/util/StringTokenizer;"
                 | "Ljava/util/concurrent/atomic/AtomicBoolean;"
                 | "Ljava/util/concurrent/atomic/AtomicInteger;"
                 | "Ljava/util/concurrent/atomic/AtomicLong;"

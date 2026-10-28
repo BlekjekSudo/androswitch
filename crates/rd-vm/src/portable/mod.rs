@@ -150,6 +150,10 @@ impl Engine {
             if crate::java_io::supports(&current) {
                 return Ok(());
             }
+            #[cfg(any(feature = "std", feature = "upstream-runtime"))]
+            if current == crate::jstring_tokenizer::CLASS {
+                return Ok(());
+            }
             if atomic_number::supports(&current) {
                 return atomic_number::attach(self, &current, _object);
             }

@@ -36,7 +36,7 @@ python -X utf8 scripts/check-upstream-sync.py --require-device-parity
 The last command is **expected to fail** while device parity is unverified.
 
 The shipping source selector uses the real `std` profile independently of the
-desktop execution backend. Current shared collections/text/collector work leaves 84
+desktop execution backend. Current shared collections/text/collector work leaves 81
 original VM sources outside the default product profile. See the
 [collection/text boundary record](UPSTREAM_COLLECTIONS_TEXT.md) and the
 [shared original collector integration](UPSTREAM_GC_SHARED.md). Source selection
@@ -138,7 +138,7 @@ coverage percentage. Native descriptor ownership and the other platform/state
 boundaries below still need integration and behavior evidence.
 
 The later [numeric integration](UPSTREAM_NUMERICS.md) selects original numerics
-and the extracted Math base arms on std. The current source audit lists 82
+and the extracted Math base arms on std. That checkpoint's source audit lists 82
 excluded original VM paths. Its exact descriptor catalog is exercised against
 233 independent JVM rows across 218 declarations; this is scoped numeric
 verification, not a whole-runtime API percentage.

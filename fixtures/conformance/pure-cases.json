@@ -690,5 +690,45 @@
   {
     "id": "text.dynamic-string-churn-gc",
     "group": "Text"
+  },
+  {
+    "id": "tokenizer.default-count-stability",
+    "group": "Text"
+  },
+  {
+    "id": "tokenizer.unicode-returned-delimiters",
+    "group": "Text"
+  },
+  {
+    "id": "tokenizer.change-delimiters-after-peek",
+    "group": "Text"
+  },
+  {
+    "id": "tokenizer.nullable-construction",
+    "group": "Text"
+  },
+  {
+    "id": "tokenizer.nullable-mutation-recovery",
+    "group": "Text"
+  },
+  {
+    "id": "tokenizer.input-gc-retention",
+    "group": "Text"
+  },
+  {
+    "id": "tokenizer.subclass-virtual-super",
+    "group": "Text"
+  },
+  {
+    "id": "tokenizer.unicode-exhaustion",
+    "group": "Text"
+  },
+  {
+    "id": "tokenizer.whole-source-identity",
+    "group": "Text"
+  },
+  {
+    "id": "tokenizer.gc-churn",
+    "group": "Text"
   }
 ]

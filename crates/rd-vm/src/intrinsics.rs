@@ -3961,9 +3961,9 @@ fn instance_intrinsic_dispatch(
         return Ok(Some(v));
     }
     // java.util.StringTokenizer (jstring_tokenizer.rs)
-    if let Some(v) =
-        crate::jstring_tokenizer::instance_intrinsic(vm, mref_class, name, sig, recv, args)?
-    {
+    if let Some(v) = crate::jstring_tokenizer::instance_intrinsic(
+        vm, recv_class, mref_class, name, sig, recv, args,
+    )? {
         return Ok(Some(v));
     }
     // collection bulk ops + AbstractList/AbstractCollection templates (jcollections.rs)
