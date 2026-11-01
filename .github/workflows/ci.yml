@@ -92,6 +92,14 @@ jobs:
         run: |
           cargo build -p rd-cli
           ./target/debug/rd test tests/suites/contract-no-app.json --junit target/junit-contract-no-app.xml
+      # M11 S1b: bridge WasmBridge (feature wasm-engine, fora do --workspace padrão).
+      # Golden de VM + APK de demonstração (o TextView precisa mostrar 5 = add(2, 3)),
+      # o APK commitado tem de bater com o gerador, e `rd test` roda a suíte sobre ele.
+      - name: M11 WASM bridge (golden de VM e APK de demonstração)
+        run: |
+          cargo test -p rd-vm --features wasm-engine --test wasm_bridge --test wasm_demo_golden
+          cargo build -p rd-cli --features wasm-engine
+          ./target/debug/rd test golden/engines/wasm/suite.json --junit target/junit-wasm-demo.xml
       # issue #86: os parsers (DEX, AXML, ARSC, ZIP) são críticos no SECURITY.md
       # — `unsafe` fora de rd-ndk/rd-jni é erro de compilação (workspace lints)
       # e também é barrado aqui, caso a configuração de lint seja removida.

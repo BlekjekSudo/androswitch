@@ -51,3 +51,19 @@ fn demo_apk_bytes_are_deterministic() {
     assert_eq!(wasm_demo::apk(), wasm_demo::apk());
     assert_eq!(wasm_demo::wasm_module(), wasm_demo::wasm_module());
 }
+
+/// O APK commitado em `golden/engines/wasm/` é exatamente o gerado pelo fonte
+/// (`cargo run -p rd-testsupport --example wasm_demo_apk`): sem drift entre o
+/// artefato que a suíte `rd test` consome e o gerador.
+#[test]
+fn committed_demo_apk_matches_the_generator() {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../golden/engines/wasm/wasm-demo.apk"
+    );
+    let committed = std::fs::read(path).expect("golden/engines/wasm/wasm-demo.apk");
+    assert!(
+        committed == wasm_demo::apk(),
+        "APK commitado diverge do gerador; rode `cargo run -p rd-testsupport --example wasm_demo_apk`"
+    );
+}

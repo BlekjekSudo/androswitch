@@ -1,0 +1,16 @@
+{
+  "name": "wasm-engine-demo",
+  "scenarios": [
+    {
+      "name": "APK chama WasmBridge.call(add 2, 3) e mostra 5",
+      "steps": [
+        { "name": "install", "arguments": { "apk": "wasm-demo.apk" } },
+        { "name": "launch", "arguments": {} },
+        {
+          "name": "assert_text",
+          "arguments": { "resource_id": "io.rustydroid.wasmdemo:id/result", "expected": "5" }
+        }
+      ]
+    }
+  ]
+}

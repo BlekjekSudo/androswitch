@@ -25,7 +25,7 @@ pub const RESULT_ID: &str = "result";
 /// Valor numérico do id `RESULT_ID` na tabela de recursos do APK (ordem fixa:
 /// layout primeiro, id depois, como em [`apk`]).
 pub fn result_resource_id() -> u32 {
-    let mut arsc = ArscFix::new();
+    let mut arsc = ArscFix::with_package(PACKAGE);
     let _layout = arsc.add_layout("activity_main");
     arsc.add_id(RESULT_ID)
 }
@@ -110,7 +110,7 @@ pub fn dex() -> Vec<u8> {
     let s_export = b.intern(EXPORT) as u16;
 
     // Layout e ids são os mesmos montados no APK (ver `apk`).
-    let mut arsc = ArscFix::new();
+    let mut arsc = ArscFix::with_package(PACKAGE);
     let layout_id = arsc.add_layout("activity_main");
     let result_id = arsc.add_id(RESULT_ID);
 
@@ -147,7 +147,7 @@ pub fn dex() -> Vec<u8> {
 /// APK de demonstração completo: manifest, layout, `classes.dex` e
 /// `assets/demo.wasm`. Determinístico.
 pub fn apk() -> Vec<u8> {
-    let mut arsc = ArscFix::new();
+    let mut arsc = ArscFix::with_package(PACKAGE);
     let _layout = arsc.add_layout("activity_main");
     let _result = arsc.add_id(RESULT_ID);
     let layout_xml = AxNode::new(

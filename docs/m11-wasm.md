@@ -17,8 +17,11 @@ padrão). Dois goldens de VM a exercitam:
   demonstração de verdade (`rd_testsupport::wasm_demo`), com `classes.dex` e
   `assets/demo.wasm` lidos do ZIP. O `TextView` tem de mostrar `5` (`add(2, 3)`).
 
-**Ainda não** existem: suíte `rd test` sobre o APK de demonstração, a ligação no
-registro (`wasm` continua `runtime_status = "not_implemented"` em
+A suíte `rd test golden/engines/wasm/suite.json` roda sobre esse APK (install →
+launch → `assert_text`, PASS com `5`). Ela entra no CI no job `Rust (stable)`, com
+`--features wasm-engine`.
+
+**Ainda não** existem: a ligação no registro (`wasm` continua `runtime_status = "not_implemented"` em
 `data/engines.toml`) e a execução pela CLI (`rd engine check wasm` ainda responde
 `NOT_IMPLEMENTED`). Por isso o M11 **não** está concluído no [ROADMAP](ROADMAP.md).
 
@@ -135,9 +138,8 @@ medido lá.
 
 1. ~~APK demo construído do fonte com `.wasm` real~~ (feito: `golden/engines/wasm/`,
    teste `wasm_demo_golden`).
-2. Suíte `rd test` (JSON → JUnit) sobre o APK de demonstração, com
-   `install` / `launch` / `assert_text` (`docs/suite-format.md`). Requer a feature
-   `wasm-engine` propagada para `rd-agent` e `rd-cli`.
+2. ~~Suíte `rd test` sobre o APK de demonstração~~ (feito: `golden/engines/wasm/suite.json`,
+   feature `wasm-engine` em `rd-agent` e `rd-cli`, passo de CI no job `Rust (stable)`).
 3. Ligar `wasm-engine` em `rd-engine-registry` e `rd-cli`, e só então mudar o
    estado para "runtime parcial", com a frase
    **"WASM hospedado pelo RustyDroid via bridge documentada"**.

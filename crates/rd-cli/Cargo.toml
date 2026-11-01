@@ -33,6 +33,8 @@ rd-testsupport = { path = "../rd-testsupport" }
 
 [features]
 lang-01 = ["rd-engine-registry/lang-01", "rd-agent/lang-01"]
+# M11 S1b: `rd test` com o bridge WASM ligado (ADR 013). Off by default.
+wasm-engine = ["rd-agent/wasm-engine"]
 lang-02 = ["rd-engine-registry/lang-02", "rd-agent/lang-02"]
 lang-03 = ["rd-engine-registry/lang-03", "rd-agent/lang-03"]
 lang-04 = ["rd-engine-registry/lang-04", "rd-agent/lang-04"]
