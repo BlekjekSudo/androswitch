@@ -97,6 +97,8 @@ pub(crate) mod view_attach;
 pub(crate) mod view_layout;
 pub(crate) mod view_props;
 pub(crate) mod vto;
+#[cfg(feature = "wasm-engine")]
+pub mod wasm_bridge;
 pub(crate) mod window;
 pub(crate) mod xml_res;
 

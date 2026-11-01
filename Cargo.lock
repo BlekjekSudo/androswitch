@@ -578,6 +578,7 @@ dependencies = [
  "fancy-regex",
  "rd-apk",
  "rd-dex",
+ "rd-engine-wasm",
  "rd-jni",
  "rd-ndk",
  "rd-render",

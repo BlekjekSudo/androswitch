@@ -168,7 +168,7 @@ fn asset_manager(vm: &mut Engine) -> Result<ObjRef, VmExit> {
 /// segments, `.`/`..` traversal and backslashes. Keeping this check on THIS
 /// side of the zip lookup means an app can never pivot `assets/…` into an
 /// arbitrary ZIP entry.
-fn asset_path_is_hostile(file: &str) -> bool {
+pub(crate) fn asset_path_is_hostile(file: &str) -> bool {
     file.is_empty()
         || file.starts_with('/')
         || file.contains('\\')

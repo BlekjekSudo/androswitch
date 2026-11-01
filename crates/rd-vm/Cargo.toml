@@ -19,6 +19,7 @@ rd-dex = { workspace = true }
 # M3.2: LayoutInflater consome AXML/ARSC do APK aberto — rd-apk é a BASE do
 # workspace (nível 0), logo rd-vm → rd-apk segue apontando para baixo (sem ciclo).
 rd-apk = { workspace = true }
+rd-engine-wasm = { path = "../rd-engine-wasm", optional = true }
 regex = { workspace = true }
 
 rd-ndk = { path = "../rd-ndk", optional = true }
@@ -34,6 +35,8 @@ rd-testsupport = { path = "../rd-testsupport" }
 default = ["advanced-components"]
 advanced-components = ["virtual-devices"]
 virtual-devices = []
+# M11 S1b: bridge io.rustydroid.wasm.WasmBridge (ADR 013). Off by default.
+wasm-engine = ["dep:rd-engine-wasm"]
 native = ["dep:rd-ndk", "dep:rd-jni", "rd-ndk/native"]
 
 jit = ["dep:rd-jni", "rd-jni/jit"]

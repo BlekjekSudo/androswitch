@@ -5,13 +5,45 @@
 
 ## Status
 
-**Parcial.** O núcleo do S1 está implementado e testado em `crates/rd-engine-wasm`:
+**Parcial (S1 + S1b em nível de VM).** O núcleo está em `crates/rd-engine-wasm`:
 parser, validador, interpretador do subconjunto MVP i32/i64, limites, fuel e
-harness de fuzzing. **Ainda não** existem: APK golden em `golden/engines/wasm/`,
-a bridge `io.rustydroid.wasm.WasmBridge` do framework, a ligação no registro
-(`wasm` continua `runtime_status = "not_implemented"` em `data/engines.toml`) e a
-execução pela CLI (`rd engine check wasm` ainda responde `NOT_IMPLEMENTED`).
-Por isso o M11 **não** está concluído no [ROADMAP](ROADMAP.md).
+harness de fuzzing. A bridge `io.rustydroid.wasm.WasmBridge` está em
+`crates/rd-vm/src/wasm_bridge.rs`, atrás da feature `wasm-engine` (desligada por
+padrão), com um golden de VM em `crates/rd-vm/tests/wasm_bridge.rs`: um
+`Activity` real chama a bridge dentro de `onCreate`, via `launch_app`, e o
+resultado volta ao heap. **Ainda não** existem: APK golden de demonstração em
+`golden/engines/wasm/` com `rd test`, a ligação no registro (`wasm` continua
+`runtime_status = "not_implemented"` em `data/engines.toml`) e a execução pela
+CLI (`rd engine check wasm` ainda responde `NOT_IMPLEMENTED`). Por isso o M11
+**não** está concluído no [ROADMAP](ROADMAP.md).
+
+## Contrato da bridge (S1b, congelado)
+
+```text
+package io.rustydroid.wasm;
+public final class WasmBridge {
+    public static int call(String asset, String export, int a, int b);
+}
+```
+
+- `asset`: caminho relativo a `assets/` do APK. Caminhos absolutos, vazios,
+  com `..`, `.` ou barra invertida são rejeitados como
+  `FileNotFoundException`, antes de qualquer leitura do ZIP.
+- `export`: função exportada com tipo `(i32, i32) -> i32`. Os dois inteiros
+  são os argumentos; o resultado é o único `i32` devolvido.
+- Cada chamada instancia o módulo do zero. Nenhum estado persiste entre
+  chamadas. Orçamento de fuel por chamada: `limits::MAX_FUEL` (10 M).
+- Qualquer falha vira `java.lang.IllegalStateException` cuja mensagem começa
+  pelo código estável do `rd-engine-wasm` (`PARSE_ERROR`, `INVALID_FORMAT`,
+  `NOT_FOUND`, `FUEL_EXHAUSTED`, `TRAP`, ...). Export com assinatura diferente
+  de `i32` único também é `IllegalStateException` (`INVALID_ARG`).
+- Sem `System.loadLibrary`. Sem threads, sem memória compartilhada com o host.
+
+Testes (`cargo test -p rd-vm --features wasm-engine --test wasm_bridge`, 8/8):
+retorno correto, aritmética i32 com wrap, asset ausente, caminho hostil,
+export ausente, bytes inválidos, laço infinito esgotando o fuel e o ciclo de
+vida completo de `Activity`. Os módulos são montados byte a byte no próprio
+teste; nenhum `.wasm` binário é commitado.
 
 ## Escopo do que executa
 
@@ -94,14 +126,12 @@ medido lá.
   libFuzzer não foi feita neste ambiente, por falta de toolchain nightly.
 - Verificado no MSRV 1.76 (`cargo +1.76 test -p rd-engine-wasm`).
 
-## Próximos passos (S1 restante)
+## Próximos passos (S1b restante)
 
-1. `golden/engines/wasm/`: APK demo próprio, construído do fonte, com um `.wasm`
-   real; asserções via `rd test` (JSON → JUnit) com `observe`/`wait_for`.
-2. Bridge `io.rustydroid.wasm.WasmBridge` em `docs/m11-wasm.md` (contrato
-   público): assinaturas fixas e convenção de caminho em `assets/`. Sem
-   `System.loadLibrary`.
-3. Ligar `wasm-engine` (feature) em `rd-engine-registry` e `rd-cli`, e só então
-   mudar o estado para "runtime parcial", com a frase
+1. `golden/engines/wasm/`: APK demo de verdade, construído do fonte, com um
+   `.wasm` real (hoje o golden é de VM, e os módulos são montados no teste).
+   Asserções via `rd test` (JSON → JUnit) com `observe`/`wait_for`.
+2. Ligar `wasm-engine` em `rd-engine-registry` e `rd-cli`, e só então mudar o
+   estado para "runtime parcial", com a frase
    **"WASM hospedado pelo RustyDroid via bridge documentada"**.
-4. Só depois do merge do S1 começam S2 (React Native), S3 (Mono) e S4 (Flutter).
+3. Só depois do merge do S1b começam S2 (React Native), S3 (Mono) e S4 (Flutter).

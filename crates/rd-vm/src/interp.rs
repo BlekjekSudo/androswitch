@@ -1602,6 +1602,12 @@ fn resolve_or_run_host_invoke(
         if let Some(v) = crate::m10::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
             return Ok(InvokeTarget::Value(v));
         }
+        #[cfg(feature = "wasm-engine")]
+        if let Some(v) =
+            crate::wasm_bridge::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
+        {
+            return Ok(InvokeTarget::Value(v));
+        }
         if let Some(v) = {
             let _t0 = vm.trace_start();
             let r =
