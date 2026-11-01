@@ -40,6 +40,9 @@ pub struct VmConfig {
 /// Reserva mínima preservada acima da guard page nativa (512 KiB) e orçamento
 /// conservador de fallback quando `/proc` não está disponível (1,25 MiB).
 const NATIVE_STACK_GUARD_RESERVE: usize = 512 * 1024;
+/// Folga mínima abaixo do orçamento para o último salto antes da próxima
+/// checagem (#469). Só limita o orçamento quando a VMA é maior que a pilha real.
+const NATIVE_STACK_HEADROOM: usize = 1024 * 1024;
 const FALLBACK_NATIVE_STACK_BYTES: usize = 1_280 * 1024;
 const MAX_MAIN_NATIVE_STACK_BYTES: usize = 6 * 1024 * 1024;
 
@@ -104,9 +107,6 @@ fn detect_native_stack_budget(sp_now: usize) -> usize {
                     // profundo que ainda será empilhado depois da última
                     // checagem — e esse frame cresce com a versão do rustc em
                     // build debug. Nunca confiamos em mais de METADE da VMA.
-                    let free = sp_now
-                        .saturating_sub(lo)
-                        .saturating_sub(NATIVE_STACK_GUARD_RESERVE);
                     let half_vma = hi.saturating_sub(lo) / 2;
                     // O tamanho da VMA só é confiável quando ela é *uma pilha
                     // de thread de verdade*: a glibc mapeia uma página guarda
@@ -122,6 +122,16 @@ fn detect_native_stack_budget(sp_now: usize) -> usize {
                     } else {
                         half_vma.min(FALLBACK_NATIVE_STACK_BYTES)
                     };
+                    // #469: quando a VMA se funde com um mapeamento rw vizinho
+                    // acima da pilha, `half_vma` deixa de limitar e o orçamento
+                    // passa a ser `livre - reserva`. Com a reserva antiga
+                    // (512 KiB) sobrava pouco para o último salto host→host.
+                    // A reserva de 1 MiB garante ≥ 1 MiB de folga abaixo do
+                    // orçamento; na VMA exata de 2 MiB o teto `half_vma` (1 MiB)
+                    // continua valendo, então a profundidade legítima não muda.
+                    let free = sp_now
+                        .saturating_sub(lo)
+                        .saturating_sub(NATIVE_STACK_HEADROOM);
                     return free.min(ceiling).max(256 * 1024);
                 }
             }
@@ -1503,5 +1513,47 @@ mod stack_budget_tests {
             "7f305233e000-7f3052540000 rw-p 00000000 00:00 0",
         ];
         assert!(!guard_page_below(&lines, lo));
+    }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod native_stack_budget_tests {
+    use super::*;
+
+    /// #469: em thread de 2 MiB, o orçamento deixa pelo menos 1 MiB de folga
+    /// entre o orçamento e o início (base) da pilha — margem para o último
+    /// salto host→host antes da próxima checagem.
+    #[test]
+    fn two_mib_thread_budget_keeps_one_mib_headroom_469() {
+        let handle = std::thread::Builder::new()
+            .name("budget-469".into())
+            .stack_size(2 * 1024 * 1024)
+            .spawn(|| {
+                let sp = current_stack_addr();
+                let maps = std::fs::read_to_string("/proc/thread-self/maps").unwrap_or_default();
+                let lo = maps
+                    .lines()
+                    .filter_map(|l| {
+                        let (range, rest) = l.split_once(' ')?;
+                        let (lo_hex, hi_hex) = range.split_once('-')?;
+                        let (lo, hi) = (
+                            usize::from_str_radix(lo_hex, 16).ok()?,
+                            usize::from_str_radix(hi_hex, 16).ok()?,
+                        );
+                        (rest.starts_with("rw") && sp >= lo && sp <= hi).then_some(lo)
+                    })
+                    .next();
+                (detect_native_stack_budget(sp), lo, sp)
+            })
+            .expect("spawn 2 MiB thread");
+        let (budget, lo, sp) = handle.join().expect("budget thread");
+        if let Some(lo) = lo {
+            assert!(
+                sp - lo - budget >= NATIVE_STACK_HEADROOM,
+                "orçamento {budget} B deixa menos de 1 MiB de folga (pilha {} B)",
+                sp - lo
+            );
+        }
+        assert!(budget >= 256 * 1024, "orçamento {budget} B abaixo do piso");
     }
 }
