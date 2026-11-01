@@ -703,7 +703,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         },
         ToolDef {
             name: "tap",
-            description: "Toque simulado nas coordenadas (px do viewport 720×1440). Retorna se algum listener foi acionado.",
+            description: "Toque simulado nas coordenadas (px do viewport ativo: 720×1440 retrato, 1440×720 paisagem). Retorna se algum listener foi acionado.",
             schema: obj(
                 serde_json::json!({
                     "x": { "type": "integer" },
@@ -782,7 +782,7 @@ pub fn tool_defs() -> Vec<ToolDef> {
         ToolDef {
             name: "screenshot",
             description:
-                "Screenshot PNG determinístico 720×1440. Com `path` escreve o arquivo (DENTRO do sandbox — RD_MCP_SANDBOX; symlink no destino é recusado: SYMLINK_NOT_ALLOWED, issue #67); sem, devolve o PNG em base64 (conteúdo image).",
+                "Screenshot PNG determinístico do viewport ativo (720×1440 retrato, 1440×720 paisagem). Com `path` escreve o arquivo (DENTRO do sandbox — RD_MCP_SANDBOX; symlink no destino é recusado: SYMLINK_NOT_ALLOWED, issue #67); sem, devolve o PNG em base64 (conteúdo image).",
             schema: obj(
                 serde_json::json!({ "path": { "type": "string", "description": "arquivo de saída (.png) dentro do sandbox" } }),
                 &[],
@@ -1068,7 +1068,7 @@ impl AgentSession {
                         &agent_error(
                             "INVALID_FORMAT",
                             "tap exige x,y inteiros",
-                            Some("use {\"x\": <int>, \"y\": <int>} (px do viewport 720×1440)"),
+                            Some("use {\"x\": <int>, \"y\": <int>} (px do viewport ativo: 720×1440 retrato, 1440×720 paisagem)"),
                         ),
                     );
                 };
@@ -1080,7 +1080,7 @@ impl AgentSession {
                         "INVALID_FORMAT",
                         format!("tap: x/y fora da faixa de i32 (x={x}, y={y})"),
                         Some(
-                            "use {\"x\": <int>, \"y\": <int>} dentro de -2147483648..=2147483647 (px do viewport 720×1440)",
+                            "use {\"x\": <int>, \"y\": <int>} dentro de -2147483648..=2147483647 (px do viewport ativo: 720×1440 retrato, 1440×720 paisagem)",
                         ),
                     ));
                 };
@@ -1111,7 +1111,7 @@ impl AgentSession {
                         "INVALID_FORMAT",
                         format!("swipe: coordenada fora da faixa de i32 ({x1},{y1} → {x2},{y2})"),
                         Some(
-                            "use coordenadas dentro de -2147483648..=2147483647 (px do viewport 720×1440)",
+                            "use coordenadas dentro de -2147483648..=2147483647 (px do viewport ativo: 720×1440 retrato, 1440×720 paisagem)",
                         ),
                     ));
                 };

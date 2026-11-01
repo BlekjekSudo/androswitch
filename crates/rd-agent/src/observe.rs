@@ -728,7 +728,7 @@ impl AgentSession {
             {"uri": RES_SCREEN_TXT, "name": "screen.txt", "mimeType": "text/plain",
              "description": "A mesma tela em texto compacto (linhas por y, alvos com centro x,y). Assinável."},
             {"uri": RES_SCREEN_PNG, "name": "screen.png", "mimeType": "image/png",
-             "description": "PNG 720×1440 do frame atual (cacheado por versão). Assinável."},
+             "description": "PNG do frame atual no viewport ativo (720×1440 retrato, 1440×720 paisagem), cacheado por versão. Assinável."},
             {"uri": RES_LOGS, "name": "logs", "mimeType": "text/plain",
              "description": "System.out/logcat do app na sessão."},
         ]})

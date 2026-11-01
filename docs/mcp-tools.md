@@ -34,7 +34,7 @@ Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifec
 
 ### `tap`
 
-Toque simulado nas coordenadas (px do viewport 720×1440). Retorna se algum listener foi acionado.
+Toque simulado nas coordenadas (px do viewport ativo: 720×1440 retrato, 1440×720 paisagem). Retorna se algum listener foi acionado.
 
 - Parâmetros: `observe, x, y` · obrigatórios: `x, y`
 
@@ -76,7 +76,7 @@ Dump da UI corrente: `xml` (uiautomator, formato dos seletores) ou `text` (árvo
 
 ### `screenshot`
 
-Screenshot PNG determinístico 720×1440. Com `path` escreve o arquivo (DENTRO do sandbox — RD_MCP_SANDBOX; symlink no destino é recusado: SYMLINK_NOT_ALLOWED, issue #67); sem, devolve o PNG em base64 (conteúdo image).
+Screenshot PNG determinístico do viewport ativo (720×1440 retrato, 1440×720 paisagem). Com `path` escreve o arquivo (DENTRO do sandbox — RD_MCP_SANDBOX; symlink no destino é recusado: SYMLINK_NOT_ALLOWED, issue #67); sem, devolve o PNG em base64 (conteúdo image).
 
 - Parâmetros: `path`
 
