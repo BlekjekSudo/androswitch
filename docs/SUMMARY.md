@@ -53,3 +53,4 @@
 - [ADR 013 — M11 Engine Execution Strategy](./adr/013-m11-engine-execution-strategy.md)
 - [ADR 014 — LazyArsc & LazyStringPool](./adr/014-lazyarsc-lazystringpool.md)
 - [ADR 017 — Host Thread-Local State: Engine, Package and Session Boundaries](./adr/017-host-thread-local-state-engine-boundary.md)
+- [ADR 020 — M11 S2: React Native (proposta)](./adr/020-m11-s2-react-native.md)
