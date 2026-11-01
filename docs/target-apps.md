@@ -17,14 +17,15 @@ Para cada app, o DoD é reproduzível a partir do repositório, no formato do M6
 5. **Evidência**: screenshot ou árvore de UI, log e tempo, medidos nos orçamentos
    do moto-e5 (ADR 008). Números de host não contam como prova.
 
-## Política de aquisição (bloqueio de decisão)
+## Política de aquisição (decidida pelo dono em 2026-11-01)
 
-- `golden-apks/fetch.sh` (GH-05) só baixa APK OSS e redistribuível do F-Droid, e
-  **nenhum binário é commitado**.
-- A maioria dos itens abaixo é app proprietário da Play Store. Para esses, o repositório
-  não pode baixar nem versionar o APK. Seria preciso um APK fornecido pelo dono,
-  fora do repositório, por caminho em variável de ambiente, com decisão de licença
-  registrada.
+- Os APKs são usados **só em testes internos**, não publicados. O método de aquisição
+  não importa para o dono.
+- **Nenhum APK é commitado.** Eles ficam fora do git (por exemplo `golden-apks/*.apk`,
+  já ignorado, ou um diretório local fora do repositório) e entram nos testes por
+  caminho em variável de ambiente, nunca por caminho fixo.
+- `golden-apks/fetch.sh` (GH-05) continua sendo o caminho para OSS do F-Droid. Para os
+  apps proprietários, o registro de procedência (origem e sha256) fica fora do repositório.
 - Para itens sem app definido ("qualquer GTA clone", "um photo manager", "um password
   manager", "auto-clicker", "auto-scroll", "organizador de contatos") a escolha do app
   concreto é do dono. Sugestões de OSS são candidatas e precisam de confirmação.
@@ -39,12 +40,12 @@ Para cada app, o DoD é reproduzível a partir do repositório, no formato do M6
 | 4 | Plants vs. Zombies 1 | Play Store (proprietário) | jogo com render GPU; licenciamento e serviços Google | ⬜ não iniciado |
 | 5 | Brave | Play Store (proprietário) | mesmo caso do Chrome (Chromium) | ⬜ não iniciado |
 | 6 | Opera GX | Play Store (proprietário) | mesmo caso do Chrome (Chromium) | ⬜ não iniciado |
-| 7 | Lucky Patcher | fora da Play Store (APK de terceiro) | altera licença e pacotes de outros apps, pede privilégios que o RustyDroid não expõe; **risco legal e de ToS: exige decisão do dono antes de qualquer trabalho** | ⛔ bloqueado por decisão do dono |
+| 7 | Lucky Patcher | fora da Play Store (APK de terceiro) | altera licença e pacotes de outros apps; pede privilégios (package manager, acesso a outros pacotes) que o RustyDroid não expõe | 🟠 em andamento (dono aprovou prosseguir); aquisição do APK e primeiro launch |
 | 8 | Um clone de GTA | Play Store (a escolher) | jogo 3D com render GPU; tamanho de APK e de dados; escolha do app pendente | ⬜ app a escolher |
 | 9 | Photo manager | a escolher (candidato OSS: galeria do F-Droid, a confirmar) | MediaStore e ContentProvider; decodificação de imagem; file I/O | ⬜ app a escolher |
 | 10 | Password manager | a escolher (candidato OSS: KeePassDX, F-Droid, a confirmar) | Autofill framework; Android Keystore; criptografia; SQLite | ⬜ app a escolher |
 | 11 | Zombie Tsunami | Play Store (proprietário) | jogo com render GPU; serviços Google | ⬜ não iniciado |
-| 12 | Play Store | Google (proprietário) | Google Play Services e login de conta; Play Integrity. Há shims parciais de GMS (`rd-vm`, `gms`), mas não cobrem o app | ⬜ decisão do dono sobre GMS |
+| 12 | Play Store | Google (proprietário) | Google Play Services e login de conta; Play Integrity. Há shims parciais de GMS (`rd-vm`, `gms`). **Suporte a Google Play Services é um dos últimos itens** (ver a seção "Apps alvo" do ROADMAP) | ⬜ último item (depende de M9–M10 e dos apps acima) |
 | 13 | Comprix | https://github.com/nadabgfccvd/Comprix (app do dono) | launch termina antes do primeiro frame com erro tipado; ver [comprix-e2e.md](comprix-e2e.md) | 🟡 launch parcial |
 | 14 | Auto-clicker | a escolher (OSS, a confirmar) | AccessibilityService (`dispatchGesture`) e overlay; M9 accessibility parcial | ⬜ app a escolher |
 | 15 | Auto-scroll | a escolher (OSS, a confirmar) | AccessibilityService; overlay; mesmo caso do auto-clicker | ⬜ app a escolher |
@@ -68,8 +69,9 @@ Legenda: ⬜ não iniciado · 🟡 parcial, com evidência · ⛔ bloqueado por 
 
 ## Próximos passos
 
-1. O dono confirma: aquisição (APK fornecido ou só OSS), app concreto para os itens
-   "a escolher", e decisão sobre Lucky Patcher e GMS.
-2. Para cada app com APK acessível, criar o golden flow (suíte `rd test`) e registrar
+1. Lucky Patcher: aquisição do APK para teste interno e primeiro launch.
+2. Dono escolhe os apps concretos para os itens "a escolher".
+3. Para cada app com APK acessível, criar o golden flow (suíte `rd test`) e registrar
    o status com evidência.
-3. Atualizar este documento e `docs/ROADMAP.md` a cada fase concluída.
+4. Google Play Services: último item, depois que os demais tiverem golden flow.
+5. Atualizar este documento e `docs/ROADMAP.md` a cada fase concluída.

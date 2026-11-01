@@ -765,5 +765,10 @@ MCP: catálogo 32 → 39 tools (`component_service`, `widgets`,
 
 - Lista de 17 apps que devem rodar de ponta a ponta, com o status real de cada um:
   [docs/target-apps.md](target-apps.md). Nenhum deles está verificado como funcionando.
-- Decisões pendentes do dono: política de aquisição de APK proprietário, escolha dos
-  apps "a escolher", Lucky Patcher e serviços Google (GMS).
+- Política de aquisição (decidida pelo dono): APKs só para teste interno, nunca
+  commitados; ficam fora do git e entram por caminho em variável de ambiente.
+- Lucky Patcher: em andamento (dono aprovou prosseguir).
+- Decisão pendente do dono: escolha dos apps "a escolher" (GTA clone, photo manager,
+  password manager, auto-clicker, auto-scroll, contatos).
+- Suporte a Google Play Services (GMS): **um dos últimos itens**, depois dos golden
+  flows dos demais apps.
