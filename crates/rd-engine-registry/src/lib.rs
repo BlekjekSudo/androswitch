@@ -9,6 +9,8 @@ mod detect;
 #[cfg(feature = "native-execution")]
 mod native_execution;
 mod report;
+#[cfg(feature = "wasm-execution")]
+mod wasm_execution;
 
 pub use contract::{
     Adapter, AdapterProcess, Artifact, EngineAdapter, EngineEvent, EngineSyscall,
@@ -16,10 +18,25 @@ pub use contract::{
 };
 #[cfg(feature = "native-execution")]
 pub use native_execution::NativeProcess;
+#[cfg(feature = "wasm-execution")]
+pub use wasm_execution::WasmProcess;
 
 pub fn native_execution_available(id: &str) -> bool {
     cfg!(feature = "native-execution") && matches!(id, "c-ndk" | "cpp-ndk" | "rust-ndk")
 }
+
+/// M11 S1c: `wasm` (#28) executes an APK through the VM + `WasmBridge` only when
+/// `wasm-execution` is enabled. Other IDs never gain an adapter here.
+pub fn wasm_execution_available(id: &str) -> bool {
+    cfg!(feature = "wasm-execution") && id == "wasm"
+}
+
+/// Any registry adapter that really executes (native or wasm). Detection-only IDs
+/// stay `NOT_IMPLEMENTED`.
+pub fn execution_available(id: &str) -> bool {
+    native_execution_available(id) || wasm_execution_available(id)
+}
+
 pub use detect::{
     DetectionReport, Diagnostic, EngineFinding, Evidence, InspectionDetection, RuleEvidence,
 };
@@ -80,6 +97,8 @@ pub enum RuntimeStatus {
     PartialDex,
     /// Existing native feature: bounded ELF/JNI on x86_64/ARM64/ARMv7, not universal NDK.
     PartialNative,
+    /// M11 S1c: WebAssembly hospedado pelo RustyDroid via `WasmBridge` (ADR 013).
+    PartialWasm,
     NotImplemented,
 }
 
@@ -89,6 +108,9 @@ impl RuntimeStatus {
             Self::PartialDex => "DEX parcial (rd-vm); adaptador do registro ausente",
             Self::PartialNative => {
                 "ELF/JNI parcial; disponibilidade do adaptador depende da engine/feature"
+            }
+            Self::PartialWasm => {
+                "WASM hospedado pelo RustyDroid via bridge documentada (WasmBridge, i32 MVP); adaptador depende da feature wasm-execution"
             }
             Self::NotImplemented => "NOT_IMPLEMENTED",
         }
@@ -279,6 +301,7 @@ impl Registry {
                 "c-ndk" | "cpp-ndk" | "rust-ndk" | "objective-c-ndk" | "zig-llvm" => {
                     RuntimeStatus::PartialNative
                 }
+                "wasm" => RuntimeStatus::PartialWasm,
                 _ => RuntimeStatus::NotImplemented,
             };
             if e.runtime_status != expected {
@@ -362,7 +385,7 @@ impl Registry {
             feature_enabled: disabled_modules.is_empty(),
             required_modules,
             disabled_modules,
-            registry_adapter_status: if native_execution_available(&e.id) {
+            registry_adapter_status: if execution_available(&e.id) {
                 "AVAILABLE_BOUNDED"
             } else {
                 "NOT_IMPLEMENTED"

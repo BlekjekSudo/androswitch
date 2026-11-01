@@ -1,11 +1,11 @@
-# M11 — Engine WASM (slice S1)
+# M11 — Engine WASM (slices S1, S1b, S1c)
 
 > Decisão e critério de "rodar": [ADR 013](adr/013-m11-engine-execution-strategy.md).
 > Este documento descreve o que **já executa** e o que **ainda não** executa.
 
 ## Status
 
-**Parcial (S1 + S1b em nível de VM e de APK).** O núcleo está em `crates/rd-engine-wasm`:
+**Parcial (S1 + S1b + S1c: VM, APK e registro/CLI).** O núcleo está em `crates/rd-engine-wasm`:
 parser, validador, interpretador do subconjunto MVP i32/i64, limites, fuel e
 harness de fuzzing. A bridge `io.rustydroid.wasm.WasmBridge` está em
 `crates/rd-vm/src/wasm_bridge.rs`, atrás da feature `wasm-engine` (desligada por
@@ -21,9 +21,25 @@ A suíte `rd test golden/engines/wasm/suite.json` roda sobre esse APK (install �
 launch → `assert_text`, PASS com `5`). Ela entra no CI no job `Rust (stable)`, com
 `--features wasm-engine`.
 
-**Ainda não** existem: a ligação no registro (`wasm` continua `runtime_status = "not_implemented"` em
-`data/engines.toml`) e a execução pela CLI (`rd engine check wasm` ainda responde
-`NOT_IMPLEMENTED`). Por isso o M11 **não** está concluído no [ROADMAP](ROADMAP.md).
+**S1c (registro e CLI).** O adaptador `wasm` (engine #28) existe em
+`crates/rd-engine-registry/src/wasm_execution.rs`, atrás da feature
+`wasm-execution` (que liga `LANG-12`, `rd-vm/wasm-engine` e o parser DEX). Em
+`data/engines.toml` o estado é `partial_wasm`, com a frase **"WASM hospedado
+pelo RustyDroid via bridge documentada"**. Com a feature ligada:
+
+- `rd engine check wasm --json` responde `AVAILABLE_BOUNDED` com
+  `execution_claimed: false`. Isso informa existência do adaptador, não execução.
+- `rd engine run wasm <apk> --json` faz parse do APK, roda `launch` (a Activity
+  executa `onCreate` e a bridge é chamada) e devolve o relatório com a árvore de UI.
+  No APK de demonstração, o `TextView result` mostra `5`.
+- Sem a feature, `wasm` continua `NOT_IMPLEMENTED`, como antes.
+- Para APK inválido, o erro vem do parser compartilhado (`rd-apk`). APK sem
+  `assets/*.wasm`, sem launcher ou abaixo de `minSdk` 26 falha com erro tipado.
+
+A execução é limitada ao subconjunto da bridge. Não há loader standalone de
+`.wasm`, WASI, threads, JS/JNI bridge nem chamadas de `invoke` pelo registro.
+Por isso o M11 **não** está concluído no [ROADMAP](ROADMAP.md): faltam S2 (React
+Native), S3 (Mono) e S4 (Flutter).
 
 ## Contrato da bridge (S1b, congelado)
 
@@ -140,7 +156,7 @@ medido lá.
    teste `wasm_demo_golden`).
 2. ~~Suíte `rd test` sobre o APK de demonstração~~ (feito: `golden/engines/wasm/suite.json`,
    feature `wasm-engine` em `rd-agent` e `rd-cli`, passo de CI no job `Rust (stable)`).
-3. Ligar `wasm-engine` em `rd-engine-registry` e `rd-cli`, e só então mudar o
-   estado para "runtime parcial", com a frase
-   **"WASM hospedado pelo RustyDroid via bridge documentada"**.
-4. Só depois do merge do S1b começam S2 (React Native), S3 (Mono) e S4 (Flutter).
+3. ~~Ligar `wasm-engine` em `rd-engine-registry` e `rd-cli`, e mudar o estado para
+   "runtime parcial"~~ (feito no S1c: `wasm-execution`, `partial_wasm`, `rd engine run wasm`).
+   A frase usada no registro é **"WASM hospedado pelo RustyDroid via bridge documentada"**.
+4. Só depois do merge do S1c começam S2 (React Native), S3 (Mono) e S4 (Flutter).

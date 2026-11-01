@@ -44,6 +44,10 @@ impl Registry {
         if crate::native_execution_available(id) {
             return Ok(Adapter::Native(descriptor));
         }
+        #[cfg(feature = "wasm-execution")]
+        if crate::wasm_execution_available(id) {
+            return Ok(Adapter::Wasm(descriptor));
+        }
         Ok(Adapter::Unavailable(UnavailableAdapter {
             descriptor,
             disabled_modules: self.info(descriptor)?.disabled_modules,
@@ -96,6 +100,8 @@ pub enum Adapter<'a> {
     Unavailable(UnavailableAdapter<'a>),
     #[cfg(feature = "native-execution")]
     Native(&'a EngineDescriptor),
+    #[cfg(feature = "wasm-execution")]
+    Wasm(&'a EngineDescriptor),
 }
 #[derive(Debug)]
 pub enum AdapterProcess {
@@ -103,6 +109,8 @@ pub enum AdapterProcess {
     Unavailable,
     #[cfg(feature = "native-execution")]
     Native(Box<crate::native_execution::NativeProcess>),
+    #[cfg(feature = "wasm-execution")]
+    Wasm(Box<crate::wasm_execution::WasmProcess>),
 }
 impl AdapterProcess {
     pub fn report(&self) -> RdResult<serde_report::Report> {
@@ -114,15 +122,17 @@ impl AdapterProcess {
             )),
             #[cfg(feature = "native-execution")]
             Self::Native(p) => Ok(p.report()),
+            #[cfg(feature = "wasm-execution")]
+            Self::Wasm(p) => Ok(p.report()),
         }
     }
 }
 // Keep minimal builds independent from serde_json/VM.
-#[cfg(feature = "native-execution")]
+#[cfg(any(feature = "native-execution", feature = "wasm-execution"))]
 mod serde_report {
     pub type Report = serde_json::Value;
 }
-#[cfg(not(feature = "native-execution"))]
+#[cfg(not(any(feature = "native-execution", feature = "wasm-execution")))]
 mod serde_report {
     pub type Report = ();
 }
@@ -133,6 +143,8 @@ impl EngineAdapter for Adapter<'_> {
             Self::Unavailable(a) => a.descriptor(),
             #[cfg(feature = "native-execution")]
             Self::Native(d) => d,
+            #[cfg(feature = "wasm-execution")]
+            Self::Wasm(d) => d,
         }
     }
     fn parse(&self, artifact: Artifact<'_>) -> RdResult<Self::Process> {
@@ -141,6 +153,9 @@ impl EngineAdapter for Adapter<'_> {
             #[cfg(feature = "native-execution")]
             Self::Native(d) => crate::native_execution::NativeProcess::parse(&d.id, artifact)
                 .map(|p| AdapterProcess::Native(Box::new(p))),
+            #[cfg(feature = "wasm-execution")]
+            Self::Wasm(_) => crate::wasm_execution::WasmProcess::parse(artifact)
+                .map(|p| AdapterProcess::Wasm(Box::new(p))),
         }
     }
     fn event(&self, process: &mut Self::Process, event: EngineEvent<'_>) -> RdResult<()> {
@@ -157,6 +172,16 @@ impl EngineAdapter for Adapter<'_> {
                         ),
                 ),
             },
+            #[cfg(feature = "wasm-execution")]
+            Self::Wasm(d) => match process {
+                AdapterProcess::Wasm(p) => p.event(event),
+                _ => Err(
+                    RdError::new("INVALID_PROCESS", "process/engine mismatch", &d.modules[0])
+                        .with_suggestion(
+                            "pass the process returned by parse on this same engine adapter",
+                        ),
+                ),
+            },
         }
     }
     fn syscall(&self, process: &mut Self::Process, call: EngineSyscall<'_>) -> RdResult<()> {
@@ -166,6 +191,16 @@ impl EngineAdapter for Adapter<'_> {
             #[cfg(feature = "native-execution")]
             Self::Native(d) => match process {
                 AdapterProcess::Native(p) if p.engine_id() == d.id => p.syscall(call),
+                _ => Err(
+                    RdError::new("INVALID_PROCESS", "process/engine mismatch", &d.modules[0])
+                        .with_suggestion(
+                            "pass the process returned by parse on this same engine adapter",
+                        ),
+                ),
+            },
+            #[cfg(feature = "wasm-execution")]
+            Self::Wasm(d) => match process {
+                AdapterProcess::Wasm(p) => p.syscall(call),
                 _ => Err(
                     RdError::new("INVALID_PROCESS", "process/engine mismatch", &d.modules[0])
                         .with_suggestion(

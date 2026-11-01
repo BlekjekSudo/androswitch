@@ -56,7 +56,7 @@ distribuir o binário sozinho. MCP usa o catálogo embutido.
 | 25 | Qt / QML (C++) | libQt*.so; QML assets/recursos | LANG-09 | Qt headless + JNI futuros | Registro ✅; runtime NOT_IMPLEMENTED |
 | 26 | Avalonia (C#) | assemblies Avalonia; runtime managed | LANG-07 | Mono + render próprio futuros | Registro ✅; runtime NOT_IMPLEMENTED |
 | 27 | B4X / App Inventor / Thunkable | classes*.dex | LANG-01+LANG-11 | VM DEX; fixtures específicas futuras | Registro ✅; runtime DEX parcial |
-| 28 | WebAssembly in-app | assets/*.wasm (ou containers opacos) | LANG-12 | Runtime WASM + bridge JNI/JS futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 28 | WebAssembly in-app | assets/*.wasm (ou containers opacos) | LANG-12 | Runtime WASM + bridge JNI/JS futuros | Registro ✅; runtime WASM parcial (WasmBridge) |
 
 ## Features e dependências
 
@@ -318,8 +318,8 @@ Nenhum asset/lib é descomprimido, extraído, carregado ou executado.
 ### 28 — `wasm`
 
 - **Rota existente/futura:** `rd-engine-wasm`
-- **Runtime:** NOT_IMPLEMENTED
-- **Limite:** Extensão .wasm não valida magic/version/imports nem prova uso em runtime.
+- **Runtime:** WASM hospedado pelo RustyDroid via bridge documentada (WasmBridge, i32 MVP); adaptador depende da feature wasm-execution
+- **Limite:** WASM hospedado pelo RustyDroid via bridge documentada: APK com DEX + assets/*.wasm roda pela VM e pelo WasmBridge (feature wasm-execution, M11 S1c): i32, fuel por chamada, sem WASI, threads, JS/JNI bridge nem loader .wasm standalone. Extensão .wasm sozinha não prova execução.
 - **candidate:** all=[`suffix:.wasm`]; any=[] — Arquivo com extensão WASM; payload não validado.
 
 ## Contrato e erros

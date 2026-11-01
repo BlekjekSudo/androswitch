@@ -1,4 +1,4 @@
-# Golden do engine WASM (M11 S1b)
+# Golden do engine WASM (M11 S1b + S1c)
 
 APK de demonstração do ADR 013 §9–10: uma Activity chama
 `io.rustydroid.wasm.WasmBridge.call("demo.wasm", "add", 2, 3)` dentro de
@@ -24,12 +24,16 @@ cargo test -p rd-vm --features wasm-engine --test wasm_demo_golden
   é idêntico ao gerado.
 - Suíte `rd test golden/engines/wasm/suite.json` (install → launch → `assert_text`
   com `5`), com `cargo build -p rd-cli --features wasm-engine`.
+- Registro (S1c): `rd engine run wasm golden/engines/wasm/wasm-demo.apk --json`
+  (com `--features wasm-engine`) roda o mesmo APK pelo adaptador `wasm` e
+  devolve a árvore de UI com `text="5"`. `rd engine check wasm --json` responde
+  `AVAILABLE_BOUNDED`. O teste `crates/rd-engine-registry/tests/wasm_execution.rs`
+  (feature `wasm-execution`) cobre o mesmo caminho.
 
-## O que ainda falta (S1b restante)
+## O que ainda falta
 
-- Ligação no `rd-engine-registry`. Só depois disso `data/engines.toml` pode
-  sair de `not_implemented`, com a frase **"WASM hospedado pelo RustyDroid via
-  bridge documentada"**.
+- Nada no golden de WASM. As próximas fases (S2 React Native, S3 Mono, S4 Flutter)
+  têm golden próprio.
 
 Veja [docs/m11-wasm.md](../../../docs/m11-wasm.md) e
 [docs/ROADMAP.md](../../../docs/ROADMAP.md).

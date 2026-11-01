@@ -17,6 +17,7 @@ impl Registry {
             let runtime = match e.runtime_status {
                 RuntimeStatus::PartialDex => "DEX parcial",
                 RuntimeStatus::PartialNative => "ELF/JNI parcial (native)",
+                RuntimeStatus::PartialWasm => "WASM parcial (WasmBridge)",
                 RuntimeStatus::NotImplemented => "NOT_IMPLEMENTED",
             };
             out.push_str(&format!(

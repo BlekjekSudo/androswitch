@@ -160,3 +160,20 @@ gate (tirar a feature do `--all-features`) é proibido pela política no mesmo P
 - **Shim JNI genérica / caso especial no caminho de carga:** rejeitado (review
   finding #2); a bridge é contrato documentado implementado pelo framework, sem
   checagem de nome de biblioteca no load path.
+
+## Adendo S1c — registro e CLI para `wasm` (2026-11)
+
+- O adaptador `wasm` (engine #28) passa a existir no `rd-engine-registry`, atrás da
+  feature `wasm-execution` (liga `LANG-12`, `rd-vm/wasm-engine` e o parser DEX).
+  `rd-cli` `wasm-engine` a encaminha. Sem a feature, o estado continua
+  `NOT_IMPLEMENTED`.
+- Novo estado do contrato: `runtime_status = "partial_wasm"`, com a frase
+  "WASM hospedado pelo RustyDroid via bridge documentada". Ele descreve a bridge
+  existente (i32 MVP, `WasmBridge.call`), não WASI, JS/JNI bridge nem loader
+  `.wasm` standalone.
+- `rd engine check wasm` responde `AVAILABLE_BOUNDED` com `execution_claimed=false`
+  (existência do adaptador, não execução). `rd engine run wasm <apk>` executa o APK
+  pela VM e devolve `execution_claimed=true` só quando `launch` terminou sem exceção.
+  O resultado visível (UI) é o que prova a chamada à bridge.
+- Os testes de contrato passam a usar `execution_available(id)`, que cobre
+  native e wasm. Detecção continua sem autorizar execução (ADR 003).

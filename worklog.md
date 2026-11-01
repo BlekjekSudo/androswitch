@@ -74,6 +74,9 @@ cargo test --workspace            # ou -p <crate> durante o desenvolvimento
 
 ## 5. Armadilhas conhecidas
 
+- Adaptador de engine novo (`*-execution`) tem de entrar em `execution_available` / `Registry::adapter` (contract.rs), no `engine check`/`engine run` da CLI e nos testes de contrato (`registry.rs`, `engine_cli.rs`). Os testes antigos usam `native_execution_available`, que só enxerga os adaptadores nativos e dá falso `NOT_IMPLEMENTED`. Depois de mudar `runtime_status` ou `notes` em `data/engines.toml`, regenere `cargo xtask engine-report` e `cargo xtask compat-report`.
+- `wasm-execution` e `native-execution` não entram no build padrão do `rd-cli`. Teste o caminho de execução com `--features wasm-engine` (ou `native-engines`). Os testes de CLI que dependem disso decidem o esperado pela própria `execution_available`.
+
 - `cargo build --release` com todas as features consome muita RAM. Em sandbox, use `CARGO_BUILD_JOBS=1` e o perfil `profiling`.
 - Não rode dois builds cargo ao mesmo tempo no mesmo target dir.
 - Patch em diff puro: use `git apply --index`. `git am` só aceita o formato mailbox.
