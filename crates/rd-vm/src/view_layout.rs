@@ -1640,7 +1640,7 @@ impl Engine {
         let Some(content) = self.window_content_of(activity) else {
             return Ok(0);
         };
-        let (fw_, fh_) = (crate::graphics::FB_W as i32, crate::graphics::FB_H as i32);
+        let (fw_, fh_) = self.viewport_px();
         // 1. measure/layout top-most DEX views
         let mut dex_roots = Vec::new();
         self.collect_dex_roots(content, &mut dex_roots, 0);
@@ -1694,7 +1694,7 @@ impl Engine {
         dex_roots: &[ObjRef],
         dialogs: &[(ObjRef, ObjRef)],
     ) -> Result<(), VmExit> {
-        let (fw_, fh_) = (crate::graphics::FB_W as i32, crate::graphics::FB_H as i32);
+        let (fw_, fh_) = self.viewport_px();
         for v in dex_roots {
             let Some((x, y, w, h, _)) = bounds(self, *v) else {
                 continue;
@@ -1731,7 +1731,7 @@ impl Engine {
     /// the window LayoutParams size (MATCH_PARENT → screen, WRAP_CONTENT →
     /// AT_MOST screen, px → EXACTLY), centered on screen (Gravity.CENTER).
     fn layout_dialog_window(&mut self, dialog: ObjRef, root: ObjRef) -> Result<(), VmExit> {
-        let (fw_, fh_) = (crate::graphics::FB_W as i32, crate::graphics::FB_H as i32);
+        let (fw_, fh_) = self.viewport_px();
         let (lw, lh) = crate::m8::dialog_window_size(self, dialog);
         let spec = |want: i32, max: i32| match want {
             -1 => EXACTLY | max,

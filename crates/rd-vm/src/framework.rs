@@ -2769,7 +2769,8 @@ impl Engine {
         // (match_parent implícito = None → slot). Clamp de defesa: o inflate
         // já valida ≤ WINDOW_W, mas a API host (addView em árvore
         // programática) também pode chegar aqui com valores hostis.
-        let w = own_w_explicit.map_or(slot_w, |ew| ew.clamp(0, WINDOW_W));
+        let vw = self.viewport_px().0;
+        let w = own_w_explicit.map_or(slot_w, |ew| ew.clamp(0, vw));
         let mut acc_y = y;
         let mut acc_x = x;
         let mut max_h = 0i32;
@@ -2790,7 +2791,9 @@ impl Engine {
             let explicit: i32 = visible
                 .iter()
                 .filter_map(|c| self.w_explicit_of(*c))
-                .fold(0i32, |acc, ew| acc.saturating_add(ew.clamp(0, WINDOW_W)));
+                .fold(0i32, |acc, ew| {
+                    acc.saturating_add(ew.clamp(0, self.viewport_px().0))
+                });
             let free = visible.len()
                 - visible
                     .iter()
@@ -2804,7 +2807,7 @@ impl Engine {
         };
         for c in &visible {
             let child_w = match self.w_explicit_of(*c) {
-                Some(ew) => ew.clamp(0, WINDOW_W),
+                Some(ew) => ew.clamp(0, self.viewport_px().0),
                 None => default_w,
             };
             let (cx, cy) = match orientation {
@@ -5034,8 +5037,8 @@ pub(crate) fn set_content_view(
     crate::window::on_content_set(vm, w, content)?;
     vm.fw.traversal_pending = true;
     // layout do root com as dimensões da window
-    vm.layout(content, 0, 0, WINDOW_W);
-    let _ = WINDOW_H;
+    let (vw, _) = vm.viewport_px();
+    vm.layout(content, 0, 0, vw);
     Ok(())
 }
 
@@ -5231,9 +5234,10 @@ pub(crate) fn host_add_view(
     }
     attach_child_at(vm, parent, child, index)?;
     if !prevent_request_layout {
+        let (vw, _) = vm.viewport_px();
         let (px, py, pw) = match vm.fw.get(parent) {
-            Some(HostObj::View { x, y, w, .. }) => (*x, *y, if *w == 0 { WINDOW_W } else { *w }),
-            _ => (0, 0, WINDOW_W),
+            Some(HostObj::View { x, y, w, .. }) => (*x, *y, if *w == 0 { vw } else { *w }),
+            _ => (0, 0, vw),
         };
         vm.layout(parent, px, py, pw);
     }

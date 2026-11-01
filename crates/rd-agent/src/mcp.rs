@@ -1937,7 +1937,7 @@ impl AgentSession {
                         Ok(ToolResult::json(&serde_json::json!({
                             "path": out.display().to_string(),
                             "bytes": png.len(),
-                            "size": [720, 1440],
+                            "size": png_dims(&png),
                             "snapshot": true,
                         })))
                     }
@@ -1973,7 +1973,7 @@ impl AgentSession {
                 Ok(ToolResult::json(&serde_json::json!({
                     "path": out.display().to_string(),
                     "bytes": png.len(),
-                    "size": [720, 1440],
+                    "size": png_dims(&png),
                 })))
             }
             _ => {
@@ -3357,6 +3357,18 @@ include!("observe.rs");
 include!("snapshot.rs");
 include!("ui_tools.rs");
 include!("runtime_tools.rs");
+
+/// `[width, height]` read from a PNG's IHDR, so reported sizes match the bytes
+/// (portrait 720x1440 or landscape 1440x720).
+fn png_dims(png: &[u8]) -> [u32; 2] {
+    if png.len() < 24 {
+        return [0, 0];
+    }
+    [
+        u32::from_be_bytes([png[16], png[17], png[18], png[19]]),
+        u32::from_be_bytes([png[20], png[21], png[22], png[23]]),
+    ]
+}
 
 #[cfg(test)]
 mod tests {

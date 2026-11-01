@@ -1900,3 +1900,76 @@ fn android_attrs_carry_res_id_from_resource_map() {
         assert!(at.res_id.unwrap() & 0xFFFF_0000 == 0x0101_0000);
     }
 }
+
+/// issue #252: the inflate caps follow the active viewport. In `landscape`
+/// the width axis is 1440px and the height axis is 720px. So an 800px width
+/// (400dp) is accepted, and an 800px height is rejected on the height axis.
+#[test]
+fn landscape_viewport_swaps_the_axis_caps() {
+    let mut arsc = common::apkfix::ArscFix::new();
+    let l_wide = arsc.add_layout("w_wide");
+    let l_tall = arsc.add_layout("h_tall");
+    let s_hi = arsc.add_string("hi", "alto");
+
+    let dp400 = || AxVal::Dim {
+        raw: (400 << 8) | 1,
+    };
+    let container = |tv: AxNode| {
+        AxNode::new(
+            "LinearLayout",
+            vec![
+                a(true, "orientation", AxVal::Int(1)),
+                a(true, "layout_width", AxVal::Int(-1)),
+                a(true, "layout_height", AxVal::Int(-1)),
+            ],
+            vec![tv],
+        )
+    };
+    let tv = |width: AxVal, height: AxVal| {
+        container(AxNode::new(
+            "TextView",
+            vec![
+                a(true, "text", AxVal::Ref(s_hi)),
+                a(true, "layout_width", width),
+                a(true, "layout_height", height),
+            ],
+            vec![],
+        ))
+    };
+
+    let apk_bytes = build_apk(
+        "com.test.axis",
+        "LH;",
+        arsc.build(),
+        vec![
+            (
+                "res/layout/w_wide.xml",
+                build_axml(&tv(dp400(), AxVal::Int(-1))),
+            ),
+            (
+                "res/layout/h_tall.xml",
+                build_axml(&tv(AxVal::Int(-1), dp400())),
+            ),
+        ],
+    );
+
+    // Landscape: 800px width ≤ 1440 → ACCEPTED (portrait rejects it, see above).
+    let mut e = engine_with_layout(apk_bytes.clone(), "LH;", "com.test.axis", l_wide);
+    e.m10_set_orientation("landscape").expect("landscape");
+    e.launch_app("LH;", "com.test.axis", Vec::new())
+        .expect("800px width is legal in landscape");
+
+    // Landscape: 800px height > 720 → INFLATE citing the height axis.
+    let mut e = engine_with_layout(apk_bytes, "LH;", "com.test.axis", l_tall);
+    e.m10_set_orientation("landscape").expect("landscape");
+    let err = e
+        .launch_app("LH;", "com.test.axis", Vec::new())
+        .expect_err("800px height exceeds the 720px landscape height");
+    match err {
+        VmExit::Error(rde) => {
+            assert_eq!(rde.code, "INFLATE", "{rde}");
+            assert!(rde.cause.contains("altura"), "{rde}");
+        }
+        other => panic!("esperava INFLATE, veio {other:?}"),
+    }
+}

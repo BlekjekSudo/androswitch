@@ -22,16 +22,45 @@ use crate::value::Value;
 const WINDOW: &str = "Landroid/view/Window;";
 pub const ID_CONTENT: i32 = 0x0102_0002;
 
+impl Engine {
+    /// Active display size in px. Portrait 720x1440 by default; `landscape`
+    /// swaps the axes (see `m10_set_orientation`). Layout, the display list,
+    /// `ScreenModel` and the window decor all read this instead of the
+    /// portrait constants.
+    pub fn viewport_px(&self) -> (i32, i32) {
+        let s = &self.fw.vdev.sysconfig;
+        (s.width_px.max(1), s.height_px.max(1))
+    }
+}
+
+/// Resizes every window decor and content frame to the active viewport. Called
+/// after an orientation change so layout keeps matching the display.
+pub(crate) fn resize_window_decors(vm: &mut Engine) {
+    let (vw, vh) = vm.viewport_px();
+    let roots: Vec<ObjRef> = vm
+        .window_decor
+        .values()
+        .flat_map(|(decor, content)| [*decor, *content])
+        .collect();
+    for r in roots {
+        if let Some(HostObj::View { w, h, .. }) = vm.fw.objects.get_mut(&r) {
+            *w = vw;
+            *h = vh;
+        }
+    }
+}
+
 fn new_host_view(vm: &mut Engine, class: &str, id: i32) -> Result<ObjRef, VmExit> {
     let r = vm
         .heap
         .alloc_instance(class.to_string(), Vec::new())
         .map_err(crate::err::oom_throwable)?;
     vm.attach_host_state(class, r)?;
+    let (vw, vh) = vm.viewport_px();
     if let Some(HostObj::View { id: i, w, h, .. }) = vm.fw.objects.get_mut(&r) {
         *i = id;
-        *w = crate::framework::WINDOW_W;
-        *h = crate::framework::WINDOW_H;
+        *w = vw;
+        *h = vh;
     }
     Ok(r)
 }

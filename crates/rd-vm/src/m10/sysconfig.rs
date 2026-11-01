@@ -878,6 +878,7 @@ impl Engine {
             self.fw.vdev.sysconfig.width_px = max_d;
             self.fw.vdev.sysconfig.height_px = min_d;
         }
+        crate::window::resize_window_decors(self);
         self.with_host_roots(|vm| apply_sysconfig_to_vm(vm, true))
     }
 

@@ -161,7 +161,8 @@ impl Engine {
     /// Walks the last recorded window display list (see `draw_frame`) and
     /// returns a semantic [`ScreenModel`]. Empty when no frame was recorded.
     pub fn screen_model(&self) -> ScreenModel {
-        let (w, h) = (FB_W as f32, FB_H as f32);
+        let (vw, vh) = self.viewport_px();
+        let (w, h) = (vw as f32, vh as f32);
         let mut walk = ScreenWalk {
             items: Vec::new(),
             ops: 0,

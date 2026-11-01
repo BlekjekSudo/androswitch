@@ -367,9 +367,10 @@ impl AgentSession {
         #[cfg_attr(not(feature = "advanced-components"), allow(unused_mut))]
         let mut model = if finished {
             // no window any more: never serve the last frame as if it were live
+            let (vw, vh) = eng.viewport_px();
             ScreenModel {
-                width: 720,
-                height: 1440,
+                width: vw,
+                height: vh,
                 ..ScreenModel::default()
             }
         } else {
@@ -479,7 +480,8 @@ impl AgentSession {
             .view_tree()
             .ok_or_else(|| agent_error("INVALID_FORMAT", "sem activity/window para screenshot", None))?;
         let t_render = std::time::Instant::now();
-        let mut fb = rd_render::render_snapshot(&tree);
+        let (vw, vh) = eng.viewport_px();
+        let mut fb = rd_render::render_snapshot_sized(&tree, vw as usize, vh as usize);
         phase("render_snapshot", t_render);
         if eng.has_frame() {
             let t_rast = std::time::Instant::now();
