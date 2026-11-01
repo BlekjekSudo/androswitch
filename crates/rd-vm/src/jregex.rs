@@ -732,7 +732,7 @@ pub fn instance_intrinsic(
     let (src, flags) = pattern_of(vm, st.pattern);
     let re = compile(&src, flags)?;
     let no_match = || exc("Ljava/lang/IllegalStateException;", "No match found");
-    let set_caps = |st: &mut MState, caps: Option<fancy_regex::Captures<'_>>| match caps {
+    let set_caps = |st: &mut MState, caps: Option<fancy_regex::Captures<'_, String>>| match caps {
         Some(c) => {
             st.groups = (0..c.len())
                 .map(|i| c.get(i).map(|m| (m.start(), m.end())))
