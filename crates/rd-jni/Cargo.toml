@@ -20,7 +20,6 @@ cranelift-frontend = { version = "=0.104.3", optional = true }
 cranelift-jit = { version = "=0.104.3", optional = true }
 cranelift-module = { version = "=0.104.3", optional = true }
 serde.workspace = true
-serde_json.workspace = true
 
 [features]
 default = []

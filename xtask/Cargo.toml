@@ -17,5 +17,4 @@ rd-engine-registry.workspace = true
 rd-framework = { workspace = true }
 anyhow.workspace = true
 toml.workspace = true
-serde.workspace = true
 serde_json.workspace = true

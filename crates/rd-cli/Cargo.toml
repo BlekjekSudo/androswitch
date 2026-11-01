@@ -25,7 +25,6 @@ rd-render = { workspace = true }
 rd-agent = { workspace = true }
 rd-framework = { workspace = true }
 clap.workspace = true
-anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
