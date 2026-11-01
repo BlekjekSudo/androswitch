@@ -78,3 +78,5 @@ cargo test --workspace            # ou -p <crate> durante o desenvolvimento
 - Não rode dois builds cargo ao mesmo tempo no mesmo target dir.
 - Patch em diff puro: use `git apply --index`. `git am` só aceita o formato mailbox.
 - Com PR empilhado, quando o PR de baixo é mergeado o GitHub não troca a base sozinho se o branch não foi apagado. Troque a base para `main` manualmente.
+- Dependabot copia só o diretório do manifesto e as dependências por `path`. Crates que herdam `edition`/`version` do workspace raiz (ex.: `rd-dex`, `rd-apk`, usados por `fuzz/`) falham com `dependency_file_not_resolvable`. Por isso `/crates/*/fuzz` não tem entrada no `dependabot.yml`; atualize `libfuzzer-sys` à mão.
+- Adicionar uma ponte de host (`intrinsics`, `m8`, `androidx`, `gms`, `m10`) antes do `resolve_method` em `Engine::invoke_instance` exige o mesmo guarda de quadro de pilha (`enter_stack_frame(false)`) do fallback. Sem ele, ciclos de `toString`/`hashCode` em coleções estouram a pilha nativa (abort) em vez de lançar erro capturável (ver `arrays_303`).
