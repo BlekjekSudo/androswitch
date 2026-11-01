@@ -760,3 +760,10 @@ inicializa.
 
 MCP: catálogo 32 → 39 tools (`component_service`, `widgets`,
 `widget_screenshot`, `ime`, `accessibility`, `shortcuts`, `native_state`).
+
+## Apps alvo ponta a ponta (requisito do dono, 2026-11-01)
+
+- Lista de 17 apps que devem rodar de ponta a ponta, com o status real de cada um:
+  [docs/target-apps.md](target-apps.md). Nenhum deles está verificado como funcionando.
+- Decisões pendentes do dono: política de aquisição de APK proprietário, escolha dos
+  apps "a escolher", Lucky Patcher e serviços Google (GMS).

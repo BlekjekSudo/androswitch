@@ -50,6 +50,7 @@
 - [ADR 010 — RD Sentinel Anti-Regression Bot](./adr/010-rd-sentinel-anti-regression-bot.md)
 - [ADR 011 — M10 Programmable Virtual Devices](./adr/011-m10-virtual-devices.md)
 - [ADR 012 — Executable Appendices D & E Registries](./adr/012-appendix-d-e-registries.md)
+- [Target apps (end-to-end)](./target-apps.md)
 - [ADR 013 — M11 Engine Execution Strategy](./adr/013-m11-engine-execution-strategy.md)
 - [ADR 014 — LazyArsc & LazyStringPool](./adr/014-lazyarsc-lazystringpool.md)
 - [ADR 017 — Host Thread-Local State: Engine, Package and Session Boundaries](./adr/017-host-thread-local-state-engine-boundary.md)
