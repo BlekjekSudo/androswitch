@@ -8,6 +8,7 @@ proíbe pânico — falhas são sempre `RdError { code, cause, suggestion, modul
 
 - `crates/rd-apk/fuzz/` — targets `zip`, `axml`, `arsc`, `apk_full`
 - `crates/rd-dex/fuzz/` — target `dex` (parse + render das primeiras classes)
+- `crates/rd-engine-wasm/fuzz/` — target `wasm_module` (parser + validador + interpretador WASM, M11 S1). Entra na campanha noturna `fuzz.yml` e no job `fuzz-build`. `scripts/fuzz-campaign.sh` ainda não o inclui; essa ampliação fica para uma campanha própria.
 
 Os crates de fuzz ficam FORA do workspace principal (padrão cargo-fuzz) para
 não contaminar o MSRV nem o lockfile de produção.

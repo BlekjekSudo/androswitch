@@ -25,6 +25,7 @@
 - [M9 — Advanced Components & Isolated NDK](./m9.md)
 - [Real C, C++ & Rust APK Execution](./native-languages.md)
 - [M10 — Programmable Virtual Devices](./m10.md)
+- [M11 — WASM engine (slice S1)](./m11-wasm.md)
 - [Generational Garbage Collector](./gc.md)
 - [GC & Runtime Efficiency Verification](./performance-gc-20261020.md)
 - [Fuzzing Binary Parsers](./FUZZING.md)

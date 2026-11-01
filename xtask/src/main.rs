@@ -182,6 +182,7 @@ const CRATE_STATUS: &[(&str, &str, &str)] = &[
         "parser ELF32/64 limitado (x86_64/AArch64/ARM) + runtime `native` em worker Unicorn isolado (ADR 004)",
     ),
     ("rd-engine-registry", "Apêndice G", "registro/detecção dos 28 itens; features/contratos; NÃO executa engines"),
+    ("rd-engine-wasm", "M11 S1", "interpretador WASM MVP i32/i64 (ADR 013): parser + validador + interpretador com fuel e limites; SEM golden, bridge ou registro — a CLI ainda não executa WASM"),
 ];
 
 fn compat_report(root: &Path, out: &Path) -> Result<()> {

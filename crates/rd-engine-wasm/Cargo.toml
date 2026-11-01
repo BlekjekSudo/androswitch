@@ -1,0 +1,16 @@
+[package]
+name = "rd-engine-wasm"
+description = "RustyDroid: WebAssembly MVP interpreter (i32/i64 subset) for the M11 WASM engine (ADR 013)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+# issue #86: `unsafe` é erro de compilação neste crate (regra do CONTRIBUTING).
+[lints]
+workspace = true
+
+# ADR 013 §4/§7: zero dependências novas. O interpretador é código nosso.
+[dependencies]

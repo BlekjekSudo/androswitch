@@ -60,6 +60,9 @@ jobs:
           - package: rd-ndk-fuzz
             crate_dir: crates/rd-ndk
             target: elf
+          - package: rd-engine-wasm-fuzz
+            crate_dir: crates/rd-engine-wasm
+            target: wasm_module
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

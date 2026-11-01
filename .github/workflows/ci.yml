@@ -247,6 +247,9 @@ jobs:
       - name: Build fuzz targets rd-ndk (elf)
         working-directory: crates/rd-ndk
         run: cargo fuzz build
+      - name: Build fuzz targets rd-engine-wasm (wasm_module)
+        working-directory: crates/rd-engine-wasm
+        run: cargo fuzz build
 
   leaf-jit:
     name: Cranelift integer leaf JIT (opt-in)
