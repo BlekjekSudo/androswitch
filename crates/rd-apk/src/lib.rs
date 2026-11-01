@@ -96,7 +96,7 @@ impl Apk {
 
         // 2. resources.arsc (opcional em APKs de teste, obrigatório em produção)
         let arsc = match zip.read("resources.arsc") {
-            Ok(bytes) => Some(arsc::Arsc::parse(&bytes)?),
+            Ok(bytes) => Some(arsc::Arsc::parse_owned(bytes)?),
             Err(_) => None,
         };
 

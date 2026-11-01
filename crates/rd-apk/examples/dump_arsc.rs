@@ -12,20 +12,18 @@ fn main() {
 
     println!("global strings: {}", arsc.global_strings.len());
     for pkg in &arsc.packages {
+        // ADR 014: resids vêm do índice lazy (sem materializar entradas).
+        let ids = pkg.resource_ids();
         println!(
             "package id=0x{:02x} name={:?} types={} keys={} entries={}",
             pkg.id,
             pkg.name,
             pkg.type_strings.len(),
             pkg.key_strings.len(),
-            pkg.entries.len()
+            ids.len()
         );
         // distribuição de type ids
-        let mut type_ids: Vec<u16> = pkg
-            .entries
-            .keys()
-            .map(|r| ((r >> 16) & 0xFF) as u16)
-            .collect();
+        let mut type_ids: Vec<u16> = ids.iter().map(|r| ((r >> 16) & 0xFF) as u16).collect();
         type_ids.sort();
         type_ids.dedup();
         println!("  type ids presentes: {:?}", type_ids);
@@ -36,11 +34,18 @@ fn main() {
         println!("\nresolvendo 0x{resid:08x}:");
         let pkg = arsc.package_for(resid);
         println!("  package: {:?}", pkg.map(|p| p.name.clone()));
-        let entries = pkg.and_then(|p| p.entries.get(&resid));
+        // ADR 014: snapshot materializado do resid (diagnóstico).
+        let entries = pkg
+            .and_then(|p| {
+                p.entries_snapshot()
+                    .into_iter()
+                    .find(|(id, _)| *id == resid)
+            })
+            .map(|(_, es)| es);
         match entries {
-            Some(es) => {
+            Some(es) if !es.is_empty() => {
                 println!("  {} entradas:", es.len());
-                for e in es {
+                for e in &es {
                     println!(
                         "    cfg(lang={:?}, density={:?}, api={:?}) type={} data=0x{:x} string={:?}",
                         e.config.language, e.config.density, e.config.api_level,
@@ -50,7 +55,7 @@ fn main() {
                 println!("  resolve_string → {:?}", arsc.resolve_string(resid));
                 println!("  resolve_name   → {:?}", arsc.resolve_name(resid));
             }
-            None => println!("  SEM ENTRADAS para este resid"),
+            _ => println!("  SEM ENTRADAS para este resid"),
         }
     }
 }

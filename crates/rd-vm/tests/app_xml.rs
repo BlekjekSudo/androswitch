@@ -1329,7 +1329,8 @@ fn arsc_two_configs_parse_and_resolve() {
     let apk = rd_apk::Apk::from_bytes(apk_bytes).expect("apk parseia (typeSpec não quebra)");
     let a = apk.arsc.as_ref().expect("arsc presente");
     let pkg = a.packages.first().expect("package");
-    let entries = pkg.entries.get(&greet).expect("entry greet");
+    // ADR 014: snapshot materializado do resid (era o campo entries do eager)
+    let entries = pkg.entries_for(greet).expect("entry greet");
     assert_eq!(
         entries.len(),
         2,

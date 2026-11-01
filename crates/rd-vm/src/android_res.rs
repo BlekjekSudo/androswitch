@@ -494,9 +494,9 @@ fn identifier(vm: &Engine, name: &str, def_type: Option<&str>, def_pkg: Option<&
         {
             continue;
         }
-        for id in p.entries.keys() {
-            if p.resolve_name(*id).as_deref() == Some(want.as_str()) {
-                return *id as i32;
+        for id in p.resource_ids() {
+            if p.resolve_name(id).as_deref() == Some(want.as_str()) {
+                return id as i32;
             }
         }
     }
