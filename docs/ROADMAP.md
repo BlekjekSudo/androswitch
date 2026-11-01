@@ -49,7 +49,7 @@ seleção de runtimes no spec/manifest permanecem inalterados.
 responde erro tipado. **DoD de execução NÃO entregue:** cada engine futura precisa
 crate/adaptador real, golden flow de APK OSS e gate Moto E5 (ADR 003).
 
-## O que o M0 entregou (verificado em APK real: F-Droid 2.0.1)
+## O que o M0 entregou (verificado em APK real: F-Droid 2.0.1; reverificado em 2026-11-01 com F-Droid 2.0.2 — `rd inspect` sai com 0 e imprime componentes, permissões, features e SDK)
 
 - **Workspace Cargo** com 9 crates + xtask, dependências só apontam para baixo,
   MSRV 1.76, perfil release calibrado para hardware fraco.
