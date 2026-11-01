@@ -757,7 +757,7 @@ fn bundle(
         }
         ("isEmpty", "()Z") => {
             return Ok(Some(Value::Int(
-                map_of(vm, recv).map_or(true, |m| m.is_empty()) as i32,
+                map_of(vm, recv).is_none_or(|m| m.is_empty()) as i32,
             )))
         }
         ("clear", "()V") => {

@@ -92,11 +92,13 @@ fn hex(b: &[u8]) -> String {
     s
 }
 fn unhex(s: &str) -> Result<Vec<u8>> {
-    if s.len() % 2 != 0 || s.len() > 32 * 1024 * 1024 {
+    if !s.len().is_multiple_of(2) || s.len() > 32 * 1024 * 1024 {
         return Err(ioerr("invalid worker hex length"));
     }
     s.as_bytes()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|b| {
             let c = |v: u8| -> Result<u8> {
                 match v {
@@ -843,7 +845,9 @@ impl Runtime {
                 let pos = if w == 1 {
                     b.iter().position(|x| *x == a[1] as u8)
                 } else {
-                    b.chunks_exact(4)
+                    b.as_chunks::<4>()
+                        .0
+                        .iter()
                         .position(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]) == a[1] as u32)
                 };
                 match pos {

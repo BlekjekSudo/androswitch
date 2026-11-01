@@ -39,7 +39,7 @@ pub(crate) fn static_intrinsic(
     let v = match (name, sig) {
         ("isEmpty", "(Ljava/lang/CharSequence;)Z") => {
             let t = text(vm, args.first())?;
-            Value::Int(t.map_or(true, |t| t.is_empty()) as i32)
+            Value::Int(t.is_none_or(|t| t.is_empty()) as i32)
         }
         ("equals", "(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Z") => {
             let a = text(vm, args.first())?;

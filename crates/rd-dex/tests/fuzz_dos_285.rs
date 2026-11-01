@@ -85,7 +85,7 @@ impl SyntheticDex {
     }
 
     fn align4(&mut self) {
-        while self.buf.len() % 4 != 0 {
+        while !self.buf.len().is_multiple_of(4) {
             self.buf.push(0);
         }
     }
@@ -414,7 +414,7 @@ fn aliased_and_overlapping_string_data_off_rejected_fast() {
         data.extend_from_slice(&target_off.to_le_bytes());
     }
     push_uleb(str_len as u32, &mut data);
-    data.extend(std::iter::repeat(b'A').take(str_len));
+    data.extend(std::iter::repeat_n(b'A', str_len));
     data.push(0);
 
     let t0 = Instant::now();
@@ -438,7 +438,7 @@ fn aliased_and_overlapping_string_data_off_rejected_fast() {
         let off = (body_start + (i * 2).min(body_len - 2)) as u32;
         ov.extend_from_slice(&off.to_le_bytes());
     }
-    ov.extend(std::iter::repeat(b'A').take(body_len));
+    ov.extend(std::iter::repeat_n(b'A', body_len));
     ov.push(0);
 
     let t1 = Instant::now();
@@ -466,7 +466,7 @@ fn disasm_render_class_blocks_annotation_and_method_dag_amplification() {
     let ann_t = db.type_id("Lpkg/Tag;");
     let val_name = db.str_id("value");
 
-    let params: Vec<u32> = std::iter::repeat(int_t).take(64).collect();
+    let params: Vec<u32> = std::iter::repeat_n(int_t, 64).collect();
     let proto = db.proto_id(&params, void_t);
 
     let cls0 = db.type_id("Lpkg/Dag0;");
@@ -485,9 +485,9 @@ fn disasm_render_class_blocks_annotation_and_method_dag_amplification() {
         ann_elems.push(0x00);
     }
     let ann_item = db.annotation_item(1, ann_t, 1, &ann_elems);
-    let shared_set: Vec<u32> = std::iter::repeat(ann_item).take(64).collect();
+    let shared_set: Vec<u32> = std::iter::repeat_n(ann_item, 64).collect();
     let set_off = db.annotation_set(&shared_set);
-    let shared_refs: Vec<u32> = std::iter::repeat(set_off).take(64).collect();
+    let shared_refs: Vec<u32> = std::iter::repeat_n(set_off, 64).collect();
     let ref_list_off = db.annotation_set_ref_list(&shared_refs);
     let dir_off = db.annotations_directory(None, &[], &[(m0, set_off)], &[(m0, ref_list_off)]);
     let cd_off = db.aliased_direct_methods_class_data(m0, 200, code_rel);

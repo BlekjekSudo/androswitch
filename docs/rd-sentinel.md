@@ -185,7 +185,6 @@ Approval is deliberately label-based and human-applied:
 |---|---|
 | `sentinel:policy-approved` | maintainer reviewed bot code/policy/workflow changes |
 | `sentinel:baseline-approved` | maintainer reviewed before/after evidence for a baseline change |
-| `sentinel:dependency-major-approved` | maintainer reviewed a major dependency movement |
 | `sentinel:deep` | force the deep PR campaign |
 | `sentinel:mutants` | force changed-code mutation testing |
 

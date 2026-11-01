@@ -81,7 +81,7 @@ pub struct ResConfigInfo {
 
 impl ResConfigInfo {
     pub fn is_default(&self) -> bool {
-        self.language.is_none() && self.density.map_or(true, |d| d == 0 || d == 160)
+        self.language.is_none() && self.density.is_none_or(|d| d == 0 || d == 160)
     }
     fn specificity(&self) -> u8 {
         let mut s = 0;
@@ -478,7 +478,7 @@ fn parse_package(
                 };
                 if eoff
                     .checked_add(8)
-                    .map_or(true, |entry_end| entry_end > chunk_end)
+                    .is_none_or(|entry_end| entry_end > chunk_end)
                 {
                     return Ok(()); // entrada fora/truncada neste chunk: skip
                 }
@@ -534,7 +534,7 @@ fn parse_package(
                         return Ok(());
                     };
                     if v.checked_add(8)
-                        .map_or(true, |value_end| value_end > chunk_end)
+                        .is_none_or(|value_end| value_end > chunk_end)
                     {
                         return Ok(());
                     }
@@ -838,7 +838,7 @@ mod tests {
         global.extend_from_slice(&0u32.to_le_bytes()); // offset 0
         global.extend(varint2(slen));
         global.extend(varint2(slen));
-        global.extend(std::iter::repeat(b'A').take(slen));
+        global.extend(std::iter::repeat_n(b'A', slen));
         global.push(0);
         let gs = global.len() as u32;
         global[4..8].copy_from_slice(&gs.to_le_bytes());
@@ -856,7 +856,7 @@ mod tests {
         tc.extend_from_slice(&count.to_le_bytes());
         tc.extend_from_slice(&(entries_start as u32).to_le_bytes());
         tc.resize(cheader, 0); // config (zeros)
-        tc.extend(std::iter::repeat(0u8).take(count as usize * 2));
+        tc.extend(std::iter::repeat_n(0u8, count as usize * 2));
         // ResTable_entry {size 8, flags 0, key 0} + Res_value {8, 0, 3, 0}
         tc.extend_from_slice(&8u16.to_le_bytes());
         tc.extend_from_slice(&0u16.to_le_bytes());

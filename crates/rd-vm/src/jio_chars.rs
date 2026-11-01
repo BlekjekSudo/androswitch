@@ -743,7 +743,7 @@ fn load(vm: &mut Engine, recv: ObjRef) -> Result<RState, VmExit> {
                         .chars
                         .len()
                         .checked_add(take)
-                        .map_or(true, |total| total > MAX_STREAM_UNITS)
+                        .is_none_or(|total| total > MAX_STREAM_UNITS)
                     {
                         return Err(exc(
                             "Ljava/io/IOException;",
@@ -783,7 +783,7 @@ fn load(vm: &mut Engine, recv: ObjRef) -> Result<RState, VmExit> {
                 if bytes
                     .len()
                     .checked_add(take)
-                    .map_or(true, |total| total > MAX_STREAM_UNITS)
+                    .is_none_or(|total| total > MAX_STREAM_UNITS)
                 {
                     return Err(exc(
                         "Ljava/io/IOException;",

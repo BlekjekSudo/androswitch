@@ -44,8 +44,8 @@ pub(super) fn run(sub: &JetpackSub, dd: &DataDir) -> RdResult<()> {
             let libraries: Vec<_> = table
                 .library
                 .iter()
-                .filter(|l| category.as_deref().map_or(true, |c| l.category == c))
-                .filter(|l| wanted_status.map_or(true, |st| l.status == st))
+                .filter(|l| category.as_deref().is_none_or(|c| l.category == c))
+                .filter(|l| wanted_status.is_none_or(|st| l.status == st))
                 .collect();
             if *json {
                 println!(

@@ -62,7 +62,9 @@ pub(crate) fn decode_class_def(index: usize, b: &[u8]) -> ClassDef {
 pub fn parse_class_defs(data: &[u8], count: u32, off: u32) -> RdResult<Vec<ClassDef>> {
     let window = validate_class_defs_window(data, count, off)?;
     Ok(window
-        .chunks_exact(32)
+        .as_chunks::<32>()
+        .0
+        .iter()
         .enumerate()
         .map(|(i, b)| decode_class_def(i, b))
         .collect())

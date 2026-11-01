@@ -167,8 +167,8 @@ pub fn crc32(data: &[u8]) -> u32 {
     // Slicing-by-8 (ADR 008 Stage 1b): 8 table lookups per 8 input bytes;
     // bit-identical results to the byte-at-a-time form above.
     let mut c: u32 = 0xFFFF_FFFF;
-    let mut chunks = data.chunks_exact(8);
-    for ch in &mut chunks {
+    let (chunks, rem) = data.as_chunks::<8>();
+    for ch in chunks {
         let one = u32::from_le_bytes([ch[0], ch[1], ch[2], ch[3]]) ^ c;
         let two = u32::from_le_bytes([ch[4], ch[5], ch[6], ch[7]]);
         c = CRC_TABLES8[7][(one & 0xFF) as usize]
@@ -180,7 +180,7 @@ pub fn crc32(data: &[u8]) -> u32 {
             ^ CRC_TABLES8[1][((two >> 16) & 0xFF) as usize]
             ^ CRC_TABLES8[0][(two >> 24) as usize];
     }
-    for &b in chunks.remainder() {
+    for &b in rem {
         c = CRC_TABLE[((c ^ b as u32) & 0xFF) as usize] ^ (c >> 8);
     }
     c ^ 0xFFFF_FFFF

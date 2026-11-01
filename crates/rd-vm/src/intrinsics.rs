@@ -2040,7 +2040,7 @@ fn atomic_ref_array_intrinsic(
             .map_err(crate::err::oom_throwable)?;
         vm.heap
             .array_elems_mut(array)?
-            .extend(std::iter::repeat(Value::Null).take(len));
+            .extend(std::iter::repeat_n(Value::Null, len));
         crate::err::put_field_result(vm.heap.put_field(recv, "elements", Value::Obj(array)))?;
         return Ok(Some(Value::Null));
     }
@@ -5860,7 +5860,7 @@ mod utf16_optimization_tests {
                 state ^= state << 13;
                 state ^= state >> 7;
                 state ^= state << 17;
-                let value = if state % 3 == 0 {
+                let value = if state.is_multiple_of(3) {
                     (state % 128) as u32
                 } else {
                     (state % 0x110000) as u32

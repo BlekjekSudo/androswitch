@@ -1139,7 +1139,7 @@ fn new_filled_array(
         .alloc_array(elem, len, elem_class)
         .map_err(oom_exception)?;
     let elems = vm.heap.array_elems_mut(r)?;
-    elems.extend(std::iter::repeat(fill).take(len));
+    elems.extend(std::iter::repeat_n(fill, len));
     Ok(r)
 }
 
@@ -2166,7 +2166,7 @@ mod fetch_tests {
             state ^= state << 13;
             state ^= state >> 7;
             state ^= state << 17;
-            let pc = if state % 4 != 0 && cursor < instructions.len() {
+            let pc = if !state.is_multiple_of(4) && cursor < instructions.len() {
                 instructions[cursor].0
             } else {
                 (state as usize) % (instructions.len() * 3 + 16)

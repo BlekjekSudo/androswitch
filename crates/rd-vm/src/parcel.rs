@@ -334,7 +334,9 @@ impl PState {
             .ok_or_else(|| bad("Parcel under-run reading string: length overflow"))?;
         let bytes = self.read_padded(byte_len, "string")?;
         let units: Vec<u16> = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .take(n)
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
             .collect();

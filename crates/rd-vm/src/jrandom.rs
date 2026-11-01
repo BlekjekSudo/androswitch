@@ -63,7 +63,9 @@ fn next(r: ObjRef, bits: u32) -> i32 {
 }
 
 fn next_int_bound(r: ObjRef, bound: i32) -> i32 {
-    if bound & bound.wrapping_neg() == bound {
+    // Mesma máscara bit a bit de `bound & -bound == bound` (potência de 2,
+    // incl. 0 e i32::MIN), sem depender de `wrapping_neg` em i32.
+    if (bound as u32).isolate_lowest_one() == bound as u32 {
         return ((bound as i64 * next(r, 31) as i64) >> 31) as i32;
     }
     loop {

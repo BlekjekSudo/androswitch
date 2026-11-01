@@ -60,7 +60,7 @@ fn check_string_budget(vm: &Engine, byte_len: Option<usize>) -> Result<usize, Vm
     };
     if used
         .checked_add(heap_cost)
-        .map_or(true, |total| total > budget)
+        .is_none_or(|total| total > budget)
     {
         return Err(oom(heap_cost));
     }
@@ -248,8 +248,8 @@ pub(crate) fn encode(s: &str, cs: &str) -> Vec<u8> {
 
 fn decode_utf16_units(b: &[u8], little_endian: bool) -> String {
     let mut units = Vec::with_capacity(b.len() / 2);
-    let chunks = b.chunks_exact(2);
-    let has_rem = !chunks.remainder().is_empty();
+    let (chunks, rem) = b.as_chunks::<2>();
+    let has_rem = !rem.is_empty();
     for pair in chunks {
         let u = if little_endian {
             u16::from_le_bytes([pair[0], pair[1]])
@@ -804,7 +804,7 @@ fn group(digits: &str, sep: char) -> String {
     let n = digits.len();
     let mut out = String::new();
     for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (n - i) % 3 == 0 {
+        if i > 0 && (n - i).is_multiple_of(3) {
             out.push(sep);
         }
         out.push(c);

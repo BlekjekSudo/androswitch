@@ -11,11 +11,16 @@ use std::collections::VecDeque;
 
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::ir::{
-    types, AbiParam, Block, InstBuilder, JumpTableData, MemFlags, UserFuncName, Value,
+    types, AbiParam, Block, InstBuilder, JumpTableData, MemFlagsData, UserFuncName, Value,
 };
-use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Switch, Variable};
+use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Switch};
 use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{Linkage, Module};
+
+/// `MemFlags::trusted()` was removed in cranelift 0.137. Same meaning: notrap + aligned.
+fn trusted_flags() -> MemFlagsData {
+    MemFlagsData::new().with_notrap().with_aligned()
+}
 
 const MAX_REGISTERS: usize = 256;
 const MAX_PARAMS: usize = 32;
@@ -175,7 +180,7 @@ impl LeafJit {
             for i in 0..leaf.parameters {
                 regs[leaf.registers - leaf.parameters + i] =
                     b.ins()
-                        .load(types::I32, MemFlags::trusted(), args, (i * 4) as i32);
+                        .load(types::I32, trusted_flags(), args, (i * 4) as i32);
             }
             for op in &leaf.ops {
                 match *op {
@@ -186,7 +191,7 @@ impl LeafJit {
                     Op::Binary { dst, lhs, rhs, op } => {
                         let (x, mut y) = (regs[lhs], regs[rhs]);
                         if matches!(op, Binary::Shl | Binary::Shr | Binary::Ushr) {
-                            y = b.ins().band_imm(y, 31);
+                            y = b.ins().band_imm_s(y, 31);
                         }
                         regs[dst] = match op {
                             Binary::Add => b.ins().iadd(x, y),
@@ -213,13 +218,13 @@ impl LeafJit {
                                 let v = b.ins().ireduce(types::I16, x);
                                 b.ins().sextend(types::I32, v)
                             }
-                            Unary::Char => b.ins().band_imm(x, 65535),
+                            Unary::Char => b.ins().band_imm_s(x, 65535),
                         };
                     }
                 }
             }
             b.ins().return_(&[regs[leaf.result]]);
-            b.finalize();
+            b.finalize(module.target_config());
         }
         module
             .define_function(id, &mut ctx)
@@ -966,13 +971,13 @@ fn pack_ctx_u64(words: &mut [i32; METHOD_CTX_I32_WORDS], word_idx: usize, val: u
 fn load_ctx_u64(b: &mut FunctionBuilder, ctx_ptr: Value, word_idx: i32) -> Value {
     let lo32 = b
         .ins()
-        .load(types::I32, MemFlags::trusted(), ctx_ptr, word_idx * 4);
+        .load(types::I32, trusted_flags(), ctx_ptr, word_idx * 4);
     let hi32 = b
         .ins()
-        .load(types::I32, MemFlags::trusted(), ctx_ptr, (word_idx + 1) * 4);
+        .load(types::I32, trusted_flags(), ctx_ptr, (word_idx + 1) * 4);
     let lo64 = b.ins().uextend(types::I64, lo32);
     let hi64 = b.ins().uextend(types::I64, hi32);
-    let hi_shifted = b.ins().ishl_imm(hi64, 32);
+    let hi_shifted = b.ins().ishl_imm_s(hi64, 32);
     b.ins().bor(lo64, hi_shifted)
 }
 
@@ -997,7 +1002,7 @@ fn int_cc(c: IntCond) -> IntCC {
 
 fn emit_bin32(b: &mut FunctionBuilder, op: BinOp32, x: Value, mut y: Value) -> Value {
     if matches!(op, BinOp32::Shl | BinOp32::Shr | BinOp32::Ushr) {
-        y = b.ins().band_imm(y, 31);
+        y = b.ins().band_imm_s(y, 31);
     }
     match op {
         BinOp32::Add => b.ins().iadd(x, y),
@@ -1025,7 +1030,7 @@ fn emit_array_addr(
 ) -> Value {
     // Handles are 1-based (`0` = Java null). Verify `1 <= h <= table_count`.
     let h64 = b.ins().uextend(types::I64, handle_val);
-    let is_zero = b.ins().icmp_imm(IntCC::Equal, h64, 0);
+    let is_zero = b.ins().icmp_imm_s(IntCC::Equal, h64, 0);
     let too_high = b.ins().icmp(IntCC::UnsignedGreaterThan, h64, table_count);
     let bad_handle = b.ins().bor(is_zero, too_high);
     let ok_handle_bb = b.create_block();
@@ -1034,18 +1039,18 @@ fn emit_array_addr(
     b.switch_to_block(ok_handle_bb);
 
     // Load `RawArrayDesc { ptr, len }` at `(h - 1) * sizeof(RawArrayDesc)` (16 bytes on 64-bit).
-    let slot_idx = b.ins().iadd_imm(h64, -1);
-    let desc_byte_off = b.ins().ishl_imm(slot_idx, 4);
+    let slot_idx = b.ins().iadd_imm_s(h64, -1);
+    let desc_byte_off = b.ins().ishl_imm_s(slot_idx, 4);
     let off_ptr = if ptr_ty == types::I64 {
         desc_byte_off
     } else {
         b.ins().ireduce(ptr_ty, desc_byte_off)
     };
     let desc_addr = b.ins().iadd(table_ptr, off_ptr);
-    let base_ptr = b.ins().load(ptr_ty, MemFlags::trusted(), desc_addr, 0);
+    let base_ptr = b.ins().load(ptr_ty, trusted_flags(), desc_addr, 0);
     let arr_len64 = b.ins().load(
         types::I64,
-        MemFlags::trusted(),
+        trusted_flags(),
         desc_addr,
         ptr_ty.bytes() as i32,
     );
@@ -1065,7 +1070,7 @@ fn emit_array_addr(
     } else {
         idx_val
     };
-    let byte_off = b.ins().ishl_imm(idx_ptr, i64::from(elem_shift));
+    let byte_off = b.ins().ishl_imm_s(idx_ptr, i64::from(elem_shift));
     b.ins().iadd(base_ptr, byte_off)
 }
 
@@ -1131,16 +1136,14 @@ impl MethodJit {
             //   2*registers                -> I64 accumulated fuel
             let mut var_i32 = Vec::with_capacity(prog.registers);
             let mut var_i64 = Vec::with_capacity(prog.registers);
-            for r in 0..prog.registers {
-                let v32 = Variable::from_u32(r as u32);
-                let v64 = Variable::from_u32((prog.registers + r) as u32);
-                b.declare_var(v32, types::I32);
-                b.declare_var(v64, types::I64);
+            for _ in 0..prog.registers {
+                // cranelift 0.137: declare_var devolve a Variable (sem índice manual).
+                let v32 = b.declare_var(types::I32);
+                let v64 = b.declare_var(types::I64);
                 var_i32.push(v32);
                 var_i64.push(v64);
             }
-            let fuel_var = Variable::from_u32((prog.registers * 2) as u32);
-            b.declare_var(fuel_var, types::I64);
+            let fuel_var = b.declare_var(types::I64);
 
             // Prologue: unpack the 14-word read-only context packet & initialize SSA slots.
             b.switch_to_block(prologue_bb);
@@ -1166,12 +1169,9 @@ impl MethodJit {
             b.def_var(fuel_var, zero64);
 
             for (arg_idx, &(reg, kind)) in prog.params.iter().enumerate() {
-                let raw = b.ins().load(
-                    types::I64,
-                    MemFlags::trusted(),
-                    p_args,
-                    (arg_idx * 8) as i32,
-                );
+                let raw = b
+                    .ins()
+                    .load(types::I64, trusted_flags(), p_args, (arg_idx * 8) as i32);
                 match kind {
                     ParamKind::Int64 => {
                         b.def_var(var_i64[reg], raw);
@@ -1189,7 +1189,7 @@ impl MethodJit {
             for (bb_idx, blk) in prog.blocks.iter().enumerate() {
                 b.switch_to_block(cl_blocks[bb_idx]);
                 let cur_fuel = b.use_var(fuel_var);
-                let next_fuel = b.ins().iadd_imm(cur_fuel, i64::from(blk.dalvik_insns));
+                let next_fuel = b.ins().iadd_imm_s(cur_fuel, i64::from(blk.dalvik_insns));
                 let over = b
                     .ins()
                     .icmp(IntCC::UnsignedGreaterThan, next_fuel, fuel_budget);
@@ -1230,7 +1230,7 @@ impl MethodJit {
                                     let t = b.ins().ireduce(types::I16, x);
                                     b.ins().sextend(types::I32, t)
                                 }
-                                UnOp32::Char => b.ins().band_imm(x, 0xFFFF),
+                                UnOp32::Char => b.ins().band_imm_s(x, 0xFFFF),
                             };
                             b.def_var(var_i32[dst], res);
                         }
@@ -1315,7 +1315,7 @@ impl MethodJit {
                         JitInst::Shift64 { dst, lhs, amt, op } => {
                             let x = b.use_var(var_i64[lhs]);
                             let sh32 = b.use_var(var_i32[amt]);
-                            let sh_masked = b.ins().band_imm(sh32, 63);
+                            let sh_masked = b.ins().band_imm_s(sh32, 63);
                             let res = match op {
                                 ShiftOp64::Shl => b.ins().ishl(x, sh_masked),
                                 ShiftOp64::Shr => b.ins().sshr(x, sh_masked),
@@ -1341,7 +1341,7 @@ impl MethodJit {
                                 (p_arr32, p_arr32_cnt)
                             };
                             let h64 = b.ins().uextend(types::I64, h);
-                            let is_zero = b.ins().icmp_imm(IntCC::Equal, h64, 0);
+                            let is_zero = b.ins().icmp_imm_s(IntCC::Equal, h64, 0);
                             let too_high = b.ins().icmp(IntCC::UnsignedGreaterThan, h64, cnt);
                             let bad = b.ins().bor(is_zero, too_high);
                             let ok_bb = b.create_block();
@@ -1349,12 +1349,12 @@ impl MethodJit {
                             b.seal_block(ok_bb);
                             b.switch_to_block(ok_bb);
 
-                            let slot_idx = b.ins().iadd_imm(h64, -1);
-                            let desc_off = b.ins().ishl_imm(slot_idx, 4);
+                            let slot_idx = b.ins().iadd_imm_s(h64, -1);
+                            let desc_off = b.ins().ishl_imm_s(slot_idx, 4);
                             let desc_addr = b.ins().iadd(tbl, desc_off);
                             let len64 = b.ins().load(
                                 types::I64,
-                                MemFlags::trusted(),
+                                trusted_flags(),
                                 desc_addr,
                                 ptr_ty.bytes() as i32,
                             );
@@ -1374,7 +1374,7 @@ impl MethodJit {
                                 2,
                                 bailout_exit_bb,
                             );
-                            let val = b.ins().load(types::I32, MemFlags::trusted(), addr, 0);
+                            let val = b.ins().load(types::I32, trusted_flags(), addr, 0);
                             b.def_var(var_i32[dst], val);
                         }
                         JitInst::ArrayGet64 { dst, arr, idx } => {
@@ -1390,7 +1390,7 @@ impl MethodJit {
                                 3,
                                 bailout_exit_bb,
                             );
-                            let val = b.ins().load(types::I64, MemFlags::trusted(), addr, 0);
+                            let val = b.ins().load(types::I64, trusted_flags(), addr, 0);
                             b.def_var(var_i64[dst], val);
                         }
                         JitInst::ArrayPut32 {
@@ -1415,20 +1415,20 @@ impl MethodJit {
                             let narrowed = match elem {
                                 ArrElem32::Int => raw_v,
                                 ArrElem32::Bool => {
-                                    let nz = b.ins().icmp_imm(IntCC::NotEqual, raw_v, 0);
+                                    let nz = b.ins().icmp_imm_s(IntCC::NotEqual, raw_v, 0);
                                     b.ins().uextend(types::I32, nz)
                                 }
                                 ArrElem32::Byte => {
                                     let t = b.ins().ireduce(types::I8, raw_v);
                                     b.ins().sextend(types::I32, t)
                                 }
-                                ArrElem32::Char => b.ins().band_imm(raw_v, 0xFFFF),
+                                ArrElem32::Char => b.ins().band_imm_s(raw_v, 0xFFFF),
                                 ArrElem32::Short => {
                                     let t = b.ins().ireduce(types::I16, raw_v);
                                     b.ins().sextend(types::I32, t)
                                 }
                             };
-                            b.ins().store(MemFlags::trusted(), narrowed, addr, 0);
+                            b.ins().store(trusted_flags(), narrowed, addr, 0);
                         }
                         JitInst::ArrayPut64 { src, arr, idx } => {
                             let val = b.use_var(var_i64[src]);
@@ -1444,7 +1444,7 @@ impl MethodJit {
                                 3,
                                 bailout_exit_bb,
                             );
-                            b.ins().store(MemFlags::trusted(), val, addr, 0);
+                            b.ins().store(trusted_flags(), val, addr, 0);
                         }
                     }
                 }
@@ -1488,7 +1488,7 @@ impl MethodJit {
                     } => {
                         let x = b.use_var(var_i32[*src]);
                         let cc = if *eq { IntCC::Equal } else { IntCC::NotEqual };
-                        let c = b.ins().icmp_imm(cc, x, 0);
+                        let c = b.ins().icmp_imm_s(cc, x, 0);
                         b.ins()
                             .brif(c, cl_blocks[*then_bb], &[], cl_blocks[*else_bb], &[]);
                     }
@@ -1499,7 +1499,7 @@ impl MethodJit {
                         else_bb,
                     } => {
                         let x = b.use_var(var_i32[*src]);
-                        let c = b.ins().icmp_imm(int_cc(*cond), x, 0);
+                        let c = b.ins().icmp_imm_s(int_cc(*cond), x, 0);
                         b.ins()
                             .brif(c, cl_blocks[*then_bb], &[], cl_blocks[*else_bb], &[]);
                     }
@@ -1534,7 +1534,7 @@ impl MethodJit {
                     }
                     JitTerm::ReturnVoid => {
                         let used = b.use_var(fuel_var);
-                        b.ins().store(MemFlags::trusted(), used, p_out_io, 0);
+                        b.ins().store(trusted_flags(), used, p_out_io, 0);
                         let ok = b.ins().iconst(types::I32, STATUS_OK);
                         b.ins().return_(&[ok]);
                     }
@@ -1542,16 +1542,16 @@ impl MethodJit {
                         let used = b.use_var(fuel_var);
                         let v32 = b.use_var(var_i32[*src]);
                         let v64 = b.ins().uextend(types::I64, v32);
-                        b.ins().store(MemFlags::trusted(), used, p_out_io, 0);
-                        b.ins().store(MemFlags::trusted(), v64, p_out_io, 8);
+                        b.ins().store(trusted_flags(), used, p_out_io, 0);
+                        b.ins().store(trusted_flags(), v64, p_out_io, 8);
                         let ok = b.ins().iconst(types::I32, STATUS_OK);
                         b.ins().return_(&[ok]);
                     }
                     JitTerm::Return64 { src } => {
                         let used = b.use_var(fuel_var);
                         let v64 = b.use_var(var_i64[*src]);
-                        b.ins().store(MemFlags::trusted(), used, p_out_io, 0);
-                        b.ins().store(MemFlags::trusted(), v64, p_out_io, 8);
+                        b.ins().store(trusted_flags(), used, p_out_io, 0);
+                        b.ins().store(trusted_flags(), v64, p_out_io, 8);
                         let ok = b.ins().iconst(types::I32, STATUS_OK);
                         b.ins().return_(&[ok]);
                     }
@@ -1567,7 +1567,7 @@ impl MethodJit {
             b.ins().return_(&[st_bail]);
 
             b.seal_all_blocks();
-            b.finalize();
+            b.finalize(module.target_config());
         }
 
         module

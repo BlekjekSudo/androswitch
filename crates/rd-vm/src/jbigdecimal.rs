@@ -248,7 +248,7 @@ fn plain_string_checked(vm: &Engine, u: i128, s: i32) -> Result<String, VmExit> 
         .heap
         .used()
         .checked_add(requested)
-        .map_or(true, |n| n > vm.heap.budget())
+        .is_none_or(|n| n > vm.heap.budget())
     {
         return Err(crate::err::oom_throwable(crate::heap::OomError {
             requested,

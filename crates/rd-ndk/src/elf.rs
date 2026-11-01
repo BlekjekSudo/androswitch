@@ -251,7 +251,10 @@ impl Elf {
                 return Ok(());
             }
             let expected = (word * if rela { 3 } else { 2 }) as u64;
-            if entsize != expected || size % entsize != 0 || size / entsize > MAX_ENTRIES as u64 {
+            if entsize != expected
+                || !size.is_multiple_of(entsize)
+                || size / entsize > MAX_ENTRIES as u64
+            {
                 return Err(bad("invalid relocation table size"));
             }
             let off = vaoff(addr, size)?;

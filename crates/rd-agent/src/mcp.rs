@@ -2845,9 +2845,9 @@ fn collect_matches(
     let rid = rid.filter(|r| !r.trim().is_empty());
     let text = text.filter(|t| !t.trim().is_empty());
     let class = class.filter(|c| !c.trim().is_empty());
-    let rid_hit = rid.map_or(true, |r| n.resource_id.as_deref() == Some(r));
-    let text_hit = text.map_or(true, |t| n.text.contains(t));
-    let class_hit = class.map_or(true, |c| class_matches(&n.class, c));
+    let rid_hit = rid.is_none_or(|r| n.resource_id.as_deref() == Some(r));
+    let text_hit = text.is_none_or(|t| n.text.contains(t));
+    let class_hit = class.is_none_or(|c| class_matches(&n.class, c));
     if rid_hit && text_hit && class_hit {
         out.push(serde_json::json!({
             "class": n.class,

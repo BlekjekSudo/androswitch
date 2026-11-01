@@ -31,8 +31,10 @@ impl TypeIds {
     pub fn parse(data: &[u8], count: u32, off: u32) -> RdResult<TypeIds> {
         let window = Self::validate_window(data, count, off)?;
         let string_idx = window
-            .chunks_exact(4)
-            .map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|b| u32::from_le_bytes(*b))
             .collect();
         Ok(TypeIds { string_idx })
     }

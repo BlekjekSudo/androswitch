@@ -292,7 +292,7 @@ mod tests {
         }
         v.extend(varint2(slen));
         v.extend(varint2(slen));
-        v.extend(std::iter::repeat(b'A').take(slen));
+        v.extend(std::iter::repeat_n(b'A', slen));
         v.push(0);
         let size = v.len() as u32;
         v[4..8].copy_from_slice(&size.to_le_bytes());
@@ -329,7 +329,7 @@ mod tests {
         v.extend(0x1A80u16.to_le_bytes());
         let size = v.len() as u32;
         v[4..8].copy_from_slice(&size.to_le_bytes());
-        v.extend(std::iter::repeat(0u8).take(1024 * 1024)); // "chunk seguinte"
+        v.extend(std::iter::repeat_n(0u8, 1024 * 1024)); // "chunk seguinte"
         assert!(StringPool::parse(&v, 0).is_err());
     }
 }

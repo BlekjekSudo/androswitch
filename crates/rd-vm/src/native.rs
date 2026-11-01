@@ -409,7 +409,7 @@ fn ensure(vm: &mut Engine) -> std::result::Result<(), VmExit> {
             .filter(|w| !w.is_empty());
         let abi = [Abi::X86_64, Abi::Arm64, Abi::Arm]
             .into_iter()
-            .filter(|a| wanted.as_deref().map_or(true, |w| w == a.android_name()))
+            .filter(|a| wanted.as_deref().is_none_or(|w| w == a.android_name()))
             .find(|a| apk.abis.iter().any(|s| s == a.android_name()))
             .ok_or_else(|| {
                 vmerr(RdError::new(
@@ -1266,7 +1266,9 @@ fn bridge(vm: &mut Engine, rt: &mut Runtime, t: &Trap) -> Result<Return> {
             let n = n_i32 as usize;
             let b = rt.read(a(1), n * 2)?;
             let u: Vec<u16> = b
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|c| u16::from_le_bytes([c[0], c[1]]))
                 .collect();
             let s = String::from_utf16_lossy(&u);

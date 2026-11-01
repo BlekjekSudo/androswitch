@@ -52,7 +52,7 @@ fn main() {
             );
             report = Instant::now();
         }
-        if count % 4096 == 0 {
+        if count.is_multiple_of(4096) {
             std::thread::sleep(Duration::from_millis(1));
         }
     }

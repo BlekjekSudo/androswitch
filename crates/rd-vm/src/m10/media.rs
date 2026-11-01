@@ -943,7 +943,7 @@ fn audio_record_call(
             let off = off_raw as usize;
             let count = count_raw as usize;
             let arr_len = array_len(vm, dst)?;
-            if off.checked_add(count).map_or(true, |end| end > arr_len) {
+            if off.checked_add(count).is_none_or(|end| end > arr_len) {
                 return Ok(Some(Value::Int(-2)));
             }
             if cls == "[S" {
@@ -1088,7 +1088,7 @@ fn audio_track_call(
             let off = off_raw as usize;
             let count = count_raw as usize;
             let arr_len = array_len(vm, src)?;
-            if off.checked_add(count).map_or(true, |end| end > arr_len) {
+            if off.checked_add(count).is_none_or(|end| end > arr_len) {
                 return Ok(Some(Value::Int(-2)));
             }
             let bytes_written = if cls == "[S" {

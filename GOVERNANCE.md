@@ -74,7 +74,7 @@ before or alongside the implementation:
 A pull request is eligible for merge only when:
 
 1. **CI (`ci.yml`) is green:** `cargo fmt --check`, `cargo clippy -D warnings`,
-   workspace tests, MSRV **Rust 1.76.0** (`--all-features --locked`), `unsafe`
+   workspace tests, MSRV **Rust 1.97.0** (`--all-features --locked`), `unsafe`
    confinement (`rd-ndk`/`rd-jni` only), markdown link integrity, and `xtask`
    generated report sync (`docs/compat-matrix.md`, `docs/api-coverage.md`,
    `docs/engine-registry.md`, `docs/jetpack.md`, `docs/gms.md`).
@@ -98,7 +98,7 @@ A pull request is eligible for merge only when:
   - `1.0.0` (`M12` target) requires stable CLI exit codes, stable MCP tool
     schemas (`rd mcp --describe-tools`), green Tier-1 compatibility scoreboards,
     and Moto E5 budget compliance.
-- **MSRV Policy:** Workspace Minimum Supported Rust Version is **1.76.0**,
+- **MSRV Policy:** Workspace Minimum Supported Rust Version is **1.97.0**,
   enforced in CI with `--all-features --locked`. Raising MSRV requires a
   dedicated ADR and explicit owner approval.
 - **Generated Scoreboards:** `docs/compat-matrix.md`, `docs/api-coverage.md`,
@@ -140,7 +140,7 @@ tomadas no **RustyDroid**, refletindo a PARTE 3 (§3.3) da especificação mestr
 
 - **ADRs obrigatórios:** Qualquer decisão arquitetural relevante ou divergência
   documentada da spec exige registro em `docs/adr/NNN-slug.md`.
-- **Gates obrigatórios:** CI verde (incluindo MSRV **1.76.0** com
+- **Gates obrigatórios:** CI verde (incluindo MSRV **1.97.0** com
   `--all-features --locked`, `clippy -D warnings`, links markdown e relatórios
   `cargo xtask` sincronizados) + **RD Sentinel** sem bloqueios
   ([`docs/rd-sentinel.md`](./docs/rd-sentinel.md)).

@@ -2121,7 +2121,7 @@ fn gesture_obb_object(
 fn compute_gesture_obb(vm: &mut Engine, original: &[f32]) -> Result<Value, VmExit> {
     let centroid = gesture_centroid(original)?;
     let mut points = original.to_vec();
-    for pair in points.chunks_exact_mut(2) {
+    for pair in points.as_chunks_mut::<2>().0.iter_mut() {
         pair[0] -= centroid[0];
         pair[1] -= centroid[1];
     }
@@ -2132,7 +2132,7 @@ fn compute_gesture_obb(vm: &mut Engine, original: &[f32]) -> Result<Value, VmExi
         let angle = f64::from(target[1]).atan2(f64::from(target[0])) as f32;
         let cos = f64::from(-angle).cos() as f32;
         let sin = f64::from(-angle).sin() as f32;
-        for pair in points.chunks_exact_mut(2) {
+        for pair in points.as_chunks_mut::<2>().0.iter_mut() {
             let (x, y) = (pair[0], pair[1]);
             pair[0] = x * cos - y * sin;
             pair[1] = x * sin + y * cos;
@@ -2144,7 +2144,7 @@ fn compute_gesture_obb(vm: &mut Engine, original: &[f32]) -> Result<Value, VmExi
     // Java Float.MIN_VALUE is the smallest positive subnormal, not -MAX.
     let mut max_x = f32::from_bits(1);
     let mut max_y = f32::from_bits(1);
-    for pair in points.chunks_exact(2) {
+    for pair in points.as_chunks::<2>().0.iter() {
         if pair[0] < min_x {
             min_x = pair[0];
         }

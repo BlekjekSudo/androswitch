@@ -43,8 +43,8 @@ pub(super) fn run(sub: &ApiCoverageSub, dd: &DataDir) -> RdResult<()> {
             let surfaces: Vec<_> = table
                 .surface
                 .iter()
-                .filter(|s| domain.as_deref().map_or(true, |d| s.domain == d))
-                .filter(|s| wanted_status.map_or(true, |st| s.status == st))
+                .filter(|s| domain.as_deref().is_none_or(|d| s.domain == d))
+                .filter(|s| wanted_status.is_none_or(|st| s.status == st))
                 .collect();
             if *json {
                 println!(

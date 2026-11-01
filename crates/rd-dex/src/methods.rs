@@ -42,7 +42,12 @@ pub(crate) fn decode_method_id(b: &[u8]) -> MethodId {
 
 pub fn parse_method_ids(data: &[u8], count: u32, off: u32) -> RdResult<Vec<MethodId>> {
     let window = validate_method_window(data, count, off)?;
-    Ok(window.chunks_exact(8).map(decode_method_id).collect())
+    Ok(window
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .map(|b| decode_method_id(b))
+        .collect())
 }
 
 /// encoded_method (class_data): method_idx_diff + access_flags + code_off.

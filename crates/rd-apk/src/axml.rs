@@ -370,7 +370,7 @@ pub fn parse(data: &[u8]) -> RdResult<AxmlDocument> {
                     .collect::<RdResult<_>>()?;
             }
             RES_XML_START_NAMESPACE_TYPE => {
-                if payload.checked_add(8).map_or(true, |end| end > chunk_end) {
+                if payload.checked_add(8).is_none_or(|end| end > chunk_end) {
                     return Err(RdError::parse("axml: start namespace chunk truncated"));
                 }
                 let prefix_idx = u32_at(data, payload)?;
@@ -395,7 +395,7 @@ pub fn parse(data: &[u8]) -> RdResult<AxmlDocument> {
                 open_count += 1;
             }
             RES_XML_END_ELEMENT_TYPE => {
-                if payload.checked_add(8).map_or(true, |end| end > chunk_end) {
+                if payload.checked_add(8).is_none_or(|end| end > chunk_end) {
                     return Err(RdError::parse("axml: end element chunk truncated"));
                 }
                 let _name_idx = u32_at(data, payload + 4)?;
@@ -424,7 +424,7 @@ pub fn parse(data: &[u8]) -> RdResult<AxmlDocument> {
                 }
             }
             RES_XML_CDATA_TYPE => {
-                if payload.checked_add(4).map_or(true, |end| end > chunk_end) {
+                if payload.checked_add(4).is_none_or(|end| end > chunk_end) {
                     return Err(RdError::parse("axml: cdata chunk truncated"));
                 }
                 let text_idx = u32_at(data, payload)?;
@@ -469,7 +469,7 @@ fn parse_start_element(
     let attr_ext = base
         .checked_add(cheader)
         .ok_or_else(|| RdError::parse("axml: start element header overflow"))?;
-    if attr_ext.checked_add(20).map_or(true, |end| end > chunk_end) {
+    if attr_ext.checked_add(20).is_none_or(|end| end > chunk_end) {
         return Err(RdError::parse(
             "axml: start element ResXMLTree_attrExt truncated",
         ));
@@ -506,7 +506,7 @@ fn parse_start_element(
     let mut attrs = Vec::with_capacity(attribute_count.min(256));
     for i in 0..attribute_count {
         let a = attrs_base + i * attribute_size;
-        if a.checked_add(20).map_or(true, |end| end > chunk_end) {
+        if a.checked_add(20).is_none_or(|end| end > chunk_end) {
             return Err(RdError::parse(format!(
                 "axml: attribute #{i} of <{name}> out of bounds"
             )));

@@ -302,14 +302,16 @@ fn decode_xml_bytes(bytes: &[u8]) -> Result<String, VmExit> {
 }
 
 fn decode_utf16_xml(body: &[u8], little_endian: bool) -> Result<String, VmExit> {
-    if body.len() % 2 != 0 {
+    if !body.len().is_multiple_of(2) {
         return Err(exception(
             "Lorg/xml/sax/SAXException;",
             "truncated UTF-16 XML: odd byte count",
         ));
     }
     let units: Vec<u16> = body
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| {
             if little_endian {
                 u16::from_le_bytes([pair[0], pair[1]])

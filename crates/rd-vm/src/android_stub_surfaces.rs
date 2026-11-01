@@ -33197,6 +33197,9 @@ fn p41_dream_instance(
     Ok(Some(value))
 }
 
+// NaN: as comparações explícitas são falsas para NaN, como no AOSP;
+// `contains` mudaria a semântica. Por isso o lint é aceito aqui.
+#[allow(clippy::manual_range_contains)]
 fn p41_chooser_instance(
     vm: &mut Engine,
     class: &str,
@@ -38404,6 +38407,9 @@ fn p35c_location_convert_to_string(coordinate: f64, output_type: i32) -> Result<
     Ok(result)
 }
 
+// NaN: as comparações explícitas são falsas para NaN, como no AOSP;
+// `contains` mudaria a semântica. Por isso o lint é aceito aqui.
+#[allow(clippy::manual_range_contains)]
 fn p35c_location_convert_from_string(input: &str) -> Result<f64, VmExit> {
     let Some(first) = input.chars().next() else {
         return Err(throw("Ljava/lang/StringIndexOutOfBoundsException;", ""));
@@ -51199,7 +51205,7 @@ fn p36h_hex_encode(bytes: &[u8]) -> String {
 
 fn p36h_hex_decode(text: &str) -> Result<Vec<u8>, VmExit> {
     let chars: Vec<char> = text.chars().collect();
-    if chars.len() % 2 != 0 {
+    if !chars.len().is_multiple_of(2) {
         return Err(iae(format!("Invalid input length: {}", chars.len())));
     }
     let mut out = Vec::with_capacity(chars.len() / 2);

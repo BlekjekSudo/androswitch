@@ -434,7 +434,7 @@ impl GmsTable {
                             svc.id, svc.status
                         )));
                     }
-                    if svc.gap_id.as_deref().map_or(true, |g| g.trim().is_empty()) {
+                    if svc.gap_id.as_deref().is_none_or(|g| g.trim().is_empty()) {
                         return Err(data_err(format!(
                             "{} is {:?} but has no gap_id",
                             svc.id, svc.status
@@ -448,7 +448,7 @@ impl GmsTable {
                             svc.id
                         )));
                     }
-                    if svc.gap_id.as_deref().map_or(true, |g| g.trim().is_empty()) {
+                    if svc.gap_id.as_deref().is_none_or(|g| g.trim().is_empty()) {
                         return Err(data_err(format!(
                             "{} is not_implemented but has no gap_id",
                             svc.id

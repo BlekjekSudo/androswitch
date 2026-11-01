@@ -571,7 +571,7 @@ fn m10_hex_or_utf8(
         return Ok(default_bytes.to_vec());
     };
     let clean: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-    if clean.len() % 2 != 0 {
+    if !clean.len().is_multiple_of(2) {
         return Err(agent_error(
             "INVALID_ARG",
             format!("{key} must have an even number of hex digits"),

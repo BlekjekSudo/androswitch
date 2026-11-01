@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/nadabgfccvd/RustyDroid/actions/workflows/ci.yml"><img src="https://github.com/nadabgfccvd/RustyDroid/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
   <img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue" alt="License: MIT OR Apache-2.0"/>
-  <img src="https://img.shields.io/badge/MSRV-1.76.0-orange" alt="MSRV 1.76.0"/>
+  <img src="https://img.shields.io/badge/MSRV-1.97.0-orange" alt="MSRV 1.97.0"/>
   <img src="https://img.shields.io/badge/API-26%20%E2%86%92%2036-brightgreen" alt="Android API 26→36"/>
   <img src="https://img.shields.io/badge/floor-Motorola%20Moto%20E5-informational" alt="Floor: Motorola Moto E5"/>
 </p>
@@ -58,7 +58,7 @@ for Android") built from day one for headless automation and AI agents:
 | **Error discipline (Law 1)** | Structured `RdError { code, cause, suggestion, module_id }` everywhere; unmodeled surfaces return `NOT_IMPLEMENTED` |
 | **Determinism (Law 4)** | Fuel budgets, virtual clock, deterministic GC, reproducible PNG frames |
 | **Memory safety** | `unsafe_code = "forbid"` across the workspace except audited boundaries in `rd-ndk` and `rd-jni` |
-| **Rust MSRV** | **1.76.0** (`cargo check --workspace --all-features --locked`) |
+| **Rust MSRV** | **1.97.0** (`cargo check --workspace --all-features --locked`) |
 | **License** | Dual-licensed [`LICENSE-MIT`](./LICENSE-MIT) OR [`LICENSE-APACHE`](./LICENSE-APACHE) |
 
 ## 3. Quickstart

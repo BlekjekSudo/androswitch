@@ -21,7 +21,7 @@ pub fn crc32(data: &[u8]) -> u32 {
 }
 
 pub fn pad4(out: &mut Vec<u8>) {
-    while out.len() % 4 != 0 {
+    while !out.len().is_multiple_of(4) {
         out.push(0);
     }
 }

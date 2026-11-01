@@ -41,7 +41,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace            # ou -p <crate> durante o desenvolvimento
 ```
 
-- MSRV 1.76. Não use APIs mais novas.
+- MSRV 1.97 (era 1.76 até a subida feita para o #463). Não use APIs mais novas que 1.97.
 - Conventional Commits (`feat(vm): …`, `fix(agent): …`, `perf(rd-dex): …`).
 - Declare o uso de IA no PR e preencha o template.
 - O CI procura strings parecidas com tokens. **Nunca** faça commit de credenciais.

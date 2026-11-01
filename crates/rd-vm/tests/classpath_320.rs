@@ -25,7 +25,7 @@ fn attach_interfaces(dex: &mut Dex, edges: &[(String, Vec<String>)]) {
                     .class_idx
             })
             .collect();
-        while dex.data.len() % 4 != 0 {
+        while !dex.data.len().is_multiple_of(4) {
             dex.data.push(0);
         }
         let offset = dex.data.len() as u32;

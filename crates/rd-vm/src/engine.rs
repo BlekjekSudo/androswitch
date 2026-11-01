@@ -1314,7 +1314,7 @@ impl Engine {
             let matched = matched.or(handler.catch_all.map(|a| a as usize));
             if let Some(addr) = matched {
                 // mais interno = maior start_addr que ainda cobre o pc
-                if best.map_or(true, |(bs, _)| start as u32 >= bs) {
+                if best.is_none_or(|(bs, _)| start as u32 >= bs) {
                     best = Some((start as u32, addr));
                 }
             }
