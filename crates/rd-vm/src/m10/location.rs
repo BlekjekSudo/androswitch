@@ -85,6 +85,35 @@ impl Default for LocationState {
     }
 }
 
+/// Fix que os apps veem agora: o último escrito pelo host (`gms_set_location_fix`)
+/// ou pelo agente (`m10_set_location`), ambos gravados em `gms.location_fix`.
+/// Sem nenhum, vale o fix padrão do dispositivo virtual.
+fn current_fix(vm: &Engine) -> LocationFix {
+    let current = &vm.fw.vdev.location.current;
+    match vm.fw.gms.location_fix.as_ref() {
+        Some(f) => LocationFix {
+            provider: if f.provider.is_empty() {
+                current.provider.clone()
+            } else {
+                f.provider.clone()
+            },
+            latitude: f.lat,
+            longitude: f.lng,
+            altitude: f.altitude_m,
+            accuracy: f.accuracy_m,
+            speed: f.speed_mps,
+            bearing: f.bearing_deg,
+            time_ms: if f.time_ms != 0 {
+                f.time_ms
+            } else {
+                current.time_ms
+            },
+            elapsed_ns: current.elapsed_ns,
+        },
+        None => current.clone(),
+    }
+}
+
 fn build_location_obj(vm: &mut Engine, fix: &LocationFix) -> Result<ObjRef, VmExit> {
     let prov = str_val(vm, fix.provider.clone())?;
     alloc_with(
@@ -269,7 +298,7 @@ pub(super) fn instance_call(
                 if !enabled {
                     return Ok(Some(Value::Null));
                 }
-                let mut fix = vm.fw.vdev.location.current.clone();
+                let mut fix = current_fix(vm);
                 fix.provider = prov;
                 Ok(Some(Value::Obj(build_location_obj(vm, &fix)?)))
             }
@@ -315,7 +344,7 @@ pub(super) fn instance_call(
             "getCurrentLocation" => {
                 check_any_perm(vm, LOCATION_PERMS)?;
                 let prov = opt_str_arg(vm, args, 0)?.unwrap_or_else(|| "gps".into());
-                let mut fix = vm.fw.vdev.location.current.clone();
+                let mut fix = current_fix(vm);
                 fix.provider = prov;
                 let loc = build_location_obj(vm, &fix)?;
                 if let Some(consumer) = args.last().and_then(|v| match v {
@@ -529,7 +558,7 @@ pub(super) fn instance_call(
         FUSED_CLIENT => match name {
             "getLastLocation" | "getCurrentLocation" => {
                 check_any_perm(vm, LOCATION_PERMS)?;
-                let mut fix = vm.fw.vdev.location.current.clone();
+                let mut fix = current_fix(vm);
                 fix.provider = "fused".into();
                 let loc = build_location_obj(vm, &fix)?;
                 Ok(Some(Value::Obj(completed_task(vm, Value::Obj(loc))?)))
@@ -673,6 +702,19 @@ impl Engine {
             elapsed_ns,
         };
         self.fw.vdev.location.current = fix.clone();
+        // Espelho: `gms_set_location_fix` (host) e este método (agente) gravam
+        // o mesmo `gms.location_fix`, então vale a última escrita para todos os
+        // caminhos (issue #229: o fused client lia só o estado do M10).
+        self.fw.gms.location_fix = Some(crate::gms::FixCfg {
+            lat: fix.latitude,
+            lng: fix.longitude,
+            accuracy_m: fix.accuracy,
+            altitude_m: fix.altitude,
+            bearing_deg: fix.bearing,
+            speed_mps: fix.speed,
+            time_ms: fix.time_ms,
+            provider: fix.provider.clone(),
+        });
         self.m10_deliver_location_fix(&fix)
     }
 
