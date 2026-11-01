@@ -8,7 +8,7 @@ name: Fuzz (nightly)
 # nightly anti-rot run: prove every target still builds on nightly and execute
 # a bounded smoke on each, keeping the corpus warm between nights.
 #
-# Sentinel notes (tools/rd-sentinel/sentinel/audit.py `_workflow_findings`):
+# Sentinel notes (RD Sentinel `_workflow_findings`):
 # all actions are pinned to full commit SHAs and no `${{ }}` expression is
 # interpolated into a `run:` script (values arrive through `env:`).
 

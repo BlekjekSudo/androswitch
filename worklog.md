@@ -30,7 +30,6 @@
 | `rd-engine-registry` | Apêndice G (engines) |
 | `rd-cli` | binário `rd` |
 | `xtask` | geradores de relatório (`cargo xtask …`) |
-| `tools/rd-sentinel` | bot anti-regressão (ADR 010) |
 
 As dependências só apontam para baixo (rd-apk → rd-dex → rd-vm → …). Não crie ciclos.
 
@@ -61,7 +60,6 @@ cargo test --workspace            # ou -p <crate> durante o desenvolvimento
   - `unwrap`/`expect` novos em código de produção: troque por erro tipado.
   - "named test removed" / "public fn removed" num PR antigo: geralmente é a base desatualizada. Faça merge da `main` no branch.
   - Tamanho do binário: o gate por PR é +5% / +256 KiB. Mudança grande pede números de antes/depois.
-- A suíte do próprio Sentinel não roda no CI. Se mexer nele, rode `cd tools/rd-sentinel && python3 -m unittest discover -s tests`.
 
 ## 4. Regras de convivência
 

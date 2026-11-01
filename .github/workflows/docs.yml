@@ -13,7 +13,7 @@ name: Docs site (mdBook)
 # "Get Pages site failed" when Pages is not enabled, which used to turn every
 # docs commit on `main` red for a repository *setting* nobody had flipped.
 #
-# Sentinel notes (tools/rd-sentinel/sentinel/audit.py, `_workflow_findings`):
+# Sentinel notes (RD Sentinel `_workflow_findings`):
 # this job requests `pages: write` / `id-token: write`, so every action is
 # pinned to a full commit SHA (an unpinned ref next to a write permission is a
 # P1 finding). No `${{ }}` expression appears inside a `run:` script.

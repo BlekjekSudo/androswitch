@@ -11,7 +11,7 @@ name: Release
 #     proven in sync here instead of being trusted from the tag.
 #
 # Safety properties this file is written to satisfy (RD Sentinel
-# `_workflow_findings`, see tools/rd-sentinel/sentinel/audit.py):
+# `_workflow_findings`):
 #   * every action is pinned to a full commit SHA — the publish job holds a
 #     contents write grant, and an unpinned ref there is a P1 finding;
 #   * no `${{ }}` expression is interpolated into a `run:` script — untrusted

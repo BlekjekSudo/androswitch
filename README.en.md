@@ -108,7 +108,6 @@ cargo build --release -p rd-cli
 | `crates/rd-cli` | `rd` command-line binary (`inspect`, `dex`, `vm`, `app`, `mcp`, `test`, `perf`, `device`, `engine`, `jetpack`, `gms`) |
 | `crates/rd-testsupport` | Deterministic synthetic APK, DEX, AXML, ARSC, and ELF builders for tests |
 | `xtask` | Official generator for `compat-matrix.md`, `api-coverage.md`, `engine-registry.md`, `jetpack.md`, and `gms.md` |
-| `tools/rd-sentinel` | Anti-regression gate auditing diff risk, invariants, fuzzing, and performance ([`docs/rd-sentinel.md`](./docs/rd-sentinel.md)) |
 
 ## 5. Generated Scoreboards & Documentation
 
