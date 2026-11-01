@@ -5,17 +5,22 @@
 
 ## Status
 
-**Parcial (S1 + S1b em nível de VM).** O núcleo está em `crates/rd-engine-wasm`:
+**Parcial (S1 + S1b em nível de VM e de APK).** O núcleo está em `crates/rd-engine-wasm`:
 parser, validador, interpretador do subconjunto MVP i32/i64, limites, fuel e
 harness de fuzzing. A bridge `io.rustydroid.wasm.WasmBridge` está em
 `crates/rd-vm/src/wasm_bridge.rs`, atrás da feature `wasm-engine` (desligada por
-padrão), com um golden de VM em `crates/rd-vm/tests/wasm_bridge.rs`: um
-`Activity` real chama a bridge dentro de `onCreate`, via `launch_app`, e o
-resultado volta ao heap. **Ainda não** existem: APK golden de demonstração em
-`golden/engines/wasm/` com `rd test`, a ligação no registro (`wasm` continua
-`runtime_status = "not_implemented"` em `data/engines.toml`) e a execução pela
-CLI (`rd engine check wasm` ainda responde `NOT_IMPLEMENTED`). Por isso o M11
-**não** está concluído no [ROADMAP](ROADMAP.md).
+padrão). Dois goldens de VM a exercitam:
+
+- `crates/rd-vm/tests/wasm_bridge.rs`: DEX e módulo montados no teste, `Activity`
+  chama a bridge em `onCreate` via `launch_app`.
+- `crates/rd-vm/tests/wasm_demo_golden.rs` + `golden/engines/wasm/`: APK de
+  demonstração de verdade (`rd_testsupport::wasm_demo`), com `classes.dex` e
+  `assets/demo.wasm` lidos do ZIP. O `TextView` tem de mostrar `5` (`add(2, 3)`).
+
+**Ainda não** existem: suíte `rd test` sobre o APK de demonstração, a ligação no
+registro (`wasm` continua `runtime_status = "not_implemented"` em
+`data/engines.toml`) e a execução pela CLI (`rd engine check wasm` ainda responde
+`NOT_IMPLEMENTED`). Por isso o M11 **não** está concluído no [ROADMAP](ROADMAP.md).
 
 ## Contrato da bridge (S1b, congelado)
 
@@ -128,10 +133,12 @@ medido lá.
 
 ## Próximos passos (S1b restante)
 
-1. `golden/engines/wasm/`: APK demo de verdade, construído do fonte, com um
-   `.wasm` real (hoje o golden é de VM, e os módulos são montados no teste).
-   Asserções via `rd test` (JSON → JUnit) com `observe`/`wait_for`.
-2. Ligar `wasm-engine` em `rd-engine-registry` e `rd-cli`, e só então mudar o
+1. ~~APK demo construído do fonte com `.wasm` real~~ (feito: `golden/engines/wasm/`,
+   teste `wasm_demo_golden`).
+2. Suíte `rd test` (JSON → JUnit) sobre o APK de demonstração, com
+   `install` / `launch` / `assert_text` (`docs/suite-format.md`). Requer a feature
+   `wasm-engine` propagada para `rd-agent` e `rd-cli`.
+3. Ligar `wasm-engine` em `rd-engine-registry` e `rd-cli`, e só então mudar o
    estado para "runtime parcial", com a frase
    **"WASM hospedado pelo RustyDroid via bridge documentada"**.
-3. Só depois do merge do S1b começam S2 (React Native), S3 (Mono) e S4 (Flutter).
+4. Só depois do merge do S1b começam S2 (React Native), S3 (Mono) e S4 (Flutter).

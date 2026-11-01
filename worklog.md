@@ -51,6 +51,8 @@ cargo test --workspace            # ou -p <crate> durante o desenvolvimento
   - `docs/mcp-tools.md`: `rd mcp --gen-docs docs/mcp-tools.md` (mudou tool ou descrição do MCP?)
 - O job Docs-integrity confere textos em `RustyDroid.md` (versão da especificação, piso minSdk, `moto-e5`). Não os quebre.
 
+- Gate `benches (rd-dex parse tables)` (push em main, limite 110%): o runner compartilhado varia até ~2x entre execuções do mesmo código (1,8k–3,6k ns em 2026-11-01). Antes de atribuir regressão a um PR, re-execute o job e compare com o histórico do gh-pages (`dev/bench/data.js`).
+
 ### RD Sentinel (o relatório fica no comentário `rd-sentinel-report` do PR)
 - **Não enfraqueça** `.github/rd-sentinel/policy.json` nem `baseline.json`.
 - Os labels `sentinel:*-approved` são decisão **humana** do mantenedor. Agente não aplica label.
