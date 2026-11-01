@@ -117,15 +117,11 @@ pub(crate) fn new_array(
     k: ElemKind,
     items: Vec<Value>,
 ) -> Result<Value, VmExit> {
-    // alloc_array wants the element class for Obj arrays, the full desc otherwise
-    let elem_class = if k == ElemKind::Obj {
-        desc.strip_prefix('[').unwrap_or(desc).to_string()
-    } else {
-        desc.to_string()
-    };
+    // `desc` is the full array class (e.g. `[[I`). Passing it whole keeps every
+    // dimension; stripping one '[' here dropped a dimension for nested arrays (#379).
     let r = vm
         .heap
-        .alloc_array(k, items.len(), &elem_class)
+        .alloc_array(k, items.len(), desc)
         .map_err(crate::err::oom_throwable)?;
     let slot = vm
         .heap
