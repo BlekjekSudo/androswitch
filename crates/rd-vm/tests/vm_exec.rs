@@ -4223,6 +4223,62 @@ fn collections_synchronized_wrappers_are_identity() {
     .is_err());
 }
 
+/// KeePassDX 4.5.6 (`OnBackPressedDispatcher.hasEnabledCallbacks`) chama
+/// `ArrayDeque.descendingIterator()`. O iterador percorre do fim ao início e a
+/// deque continua intacta.
+#[test]
+fn array_deque_descending_iterator_walks_back_to_front() {
+    use rd_vm::intrinsics::call_instance_intrinsic;
+    use rd_vm::value::Value;
+    const DQ: &str = "Ljava/util/ArrayDeque;";
+    const IT: &str = "Ljava/util/Iterator;";
+
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    let d = e.heap.alloc_instance(DQ.to_string(), vec![]).unwrap();
+    let call = |e: &mut Engine, name: &str, sig: &str, recv, args: Vec<Value>| {
+        call_instance_intrinsic(e, DQ, name, sig, recv, &args)
+    };
+    call(&mut e, "<init>", "()V", d, vec![]).unwrap();
+    for v in [1, 2, 3] {
+        call(
+            &mut e,
+            "addLast",
+            "(Ljava/lang/Object;)V",
+            d,
+            vec![Value::Int(v)],
+        )
+        .unwrap();
+    }
+
+    let Some(Value::Obj(it)) = call(
+        &mut e,
+        "descendingIterator",
+        "()Ljava/util/Iterator;",
+        d,
+        vec![],
+    )
+    .unwrap() else {
+        panic!("descendingIterator deveria devolver um Iterator");
+    };
+    let mut seen = Vec::new();
+    while call_instance_intrinsic(&mut e, IT, "hasNext", "()Z", it, &[]).unwrap()
+        == Some(Value::Int(1))
+    {
+        match call_instance_intrinsic(&mut e, IT, "next", "()Ljava/lang/Object;", it, &[]).unwrap()
+        {
+            Some(Value::Int(x)) => seen.push(x),
+            other => panic!("elemento inesperado: {other:?}"),
+        }
+    }
+    assert_eq!(seen, vec![3, 2, 1]);
+    assert_eq!(
+        call(&mut e, "size", "()I", d, vec![]).unwrap(),
+        Some(Value::Int(3)),
+        "a deque não pode ser alterada pelo iterador"
+    );
+}
+
 /// M8 (compat real): ArrayDeque host — 15º gap do launch do org.primftpd.
 /// Deque sobre o estado List (frente = índice 0): addFirst/addLast, push/pop,
 /// peek/poll (null em vazio) vs get/remove (NoSuchElementException), rejeição

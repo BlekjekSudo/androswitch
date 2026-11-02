@@ -59,6 +59,8 @@ pub const HANDLER: &str = "Landroid/os/Handler;";
 pub const LOOPER: &str = "Landroid/os/Looper;";
 /// M8: relógio host (relógio virtual determinístico — ver `call_host_static`).
 pub const SYSTEM_CLOCK: &str = "Landroid/os/SystemClock;";
+/// API 30+: `android.os.ext.SdkExtensions` (KeePassDX 4.5.6 chama na inicialização).
+pub const SDK_EXTENSIONS: &str = "Landroid/os/ext/SdkExtensions;";
 /// Android Environment over the per-VM emulated shared-storage root.
 pub const ENVIRONMENT: &str = "Landroid/os/Environment;";
 /// M8: Thread host — a VM é single-threaded: existe UMA thread sintética
@@ -3068,6 +3070,10 @@ fn call_host_static_rooted(
             vm.drain_looper()?;
             Ok(Some(Value::Null))
         }
+        // SdkExtensions: o dispositivo virtual não publica extensões de SDK, então
+        // qualquer extensão responde 0 ("não fornecida"). Apps seguem o caminho de
+        // fallback em vez de receber uma versão inventada.
+        (SDK_EXTENSIONS, "getExtensionVersion") if _sig == "(I)I" => Ok(Some(Value::Int(0))),
         // ── M8: SystemClock (oitavo gap do launch real — org.primftpd) ────
         // O relógio é o VIRTUAL determinístico (`HostState.clock_ms`): mesmo
         // contrato do Looper/postDelayed — nada de tempo de parede (testes

@@ -3238,6 +3238,7 @@ fn deque_supported(name: &str, sig: &str) -> bool {
             | ("size", "()I")
             | ("isEmpty", "()Z")
             | ("clear", "()V")
+            | ("descendingIterator", "()Ljava/util/Iterator;")
     )
 }
 
@@ -3305,6 +3306,16 @@ fn deque_intrinsic(
             .insert(recv, HostObj::List { elems: Vec::new() });
     }
     match (name, sig) {
+        // descendingIterator(): snapshot invertido (frente = índice 0 ⇒ do fim ao
+        // início). Sem `jiterator::bind`: o remove() por índice não corresponde ao
+        // snapshot invertido, então o iterador é somente leitura.
+        ("descendingIterator", "()Ljava/util/Iterator;") => {
+            let mut elems = list_elems(vm, recv)?.clone();
+            elems.reverse();
+            let it = vm.heap.alloc_instance(ITERATOR.to_string(), vec![])?;
+            vm.fw.objects.insert(it, HostObj::Iter { elems, pos: 0 });
+            Ok(Some(Value::Obj(it)))
+        }
         ("addFirst", _) | ("push", _) | ("offerFirst", _) => {
             if matches!(args[0], Value::Null) {
                 return Err(deque_null_rejected());

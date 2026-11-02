@@ -875,6 +875,30 @@ fn system_clock_host_statics() {
     );
 }
 
+/// SdkExtensions (API 30+): o dispositivo virtual não publica extensões de SDK,
+/// então `getExtensionVersion` responde 0 para qualquer extensão. KeePassDX 4.5.6
+/// falhava na inicialização com `método SdkExtensions->getExtensionVersion não resolvido`.
+#[test]
+fn sdk_extensions_host_static_reports_no_extension() {
+    use rd_vm::framework::{call_host_static, SDK_EXTENSIONS};
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    for ext in [1, 30, 31, 1_000_000] {
+        assert_eq!(
+            call_host_static(
+                &mut e,
+                SDK_EXTENSIONS,
+                "getExtensionVersion",
+                "(I)I",
+                &[Value::Int(ext)]
+            )
+            .expect("host static"),
+            Some(Value::Int(0)),
+            "extensão {ext}"
+        );
+    }
+}
+
 /// M8 (compat real): Looper.getThread/Thread host — 11º gap do launch do
 /// org.primftpd. VM single-threaded ⇒ UMA thread sintética "main" (id 1,
 /// não-daemon): getThread/currentThread devolvem sempre o mesmo objeto.
