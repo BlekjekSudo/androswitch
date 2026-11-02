@@ -29,4 +29,4 @@ reports/gc-shared-20261027/** -text whitespace=-blank-at-eol,-blank-at-eof
 reports/shared-io-20261027/** -text whitespace=-blank-at-eol,-blank-at-eof
 reports/shared-jdk-20261028/** -text whitespace=-blank-at-eol,-blank-at-eof
 reports/upstream-merge-20261102/** -text whitespace=-blank-at-eol,-blank-at-eof
-reports/upstream-merge-20261102.json -text
+reports/upstream-merge-20261102.json -text whitespace=cr-at-eol
