@@ -346,9 +346,12 @@ fn compile_so() -> Vec<u8> {
     let src_path = dir.join(format!("rd_jni_318_{pid}_{id}.c"));
     let so_path = dir.join(format!("rd_jni_318_{pid}_{id}.so"));
     std::fs::write(&src_path, C_SRC).expect("write C fixture");
+    // Pin the x86-64 baseline: CI runners (Ubuntu 26.04) default to x86-64-v3, whose
+    // VEX code the native worker rejects (issue #400). Same pin as golden/native/build.sh.
     let status = Command::new("gcc")
         .args([
             "-shared",
+            "-march=x86-64",
             "-fPIC",
             "-O1",
             "-nostdlib",

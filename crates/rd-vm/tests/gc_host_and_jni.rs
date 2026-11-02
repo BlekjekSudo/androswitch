@@ -597,9 +597,12 @@ jobject Java_test_JniHost_makeNormalizedBooleans(JNIEnv *e, jclass c) {
         let src_path = dir.join(format!("rd_jni_host_{}_{}.c", std::process::id(), id));
         let so_path = dir.join(format!("rd_jni_host_{}_{}.so", std::process::id(), id));
         std::fs::write(&src_path, C_SRC).expect("write C fixture");
+        // Pin the x86-64 baseline: CI runners (Ubuntu 26.04) default to x86-64-v3, whose
+        // VEX code the native worker rejects (issue #400). Same pin as golden/native/build.sh.
         let status = Command::new("gcc")
             .args([
                 "-shared",
+                "-march=x86-64",
                 "-fPIC",
                 "-O1",
                 "-nostdlib",

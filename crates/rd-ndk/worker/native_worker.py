@@ -30,6 +30,25 @@ try:
 except ValueError:
     CALL_SECS = 30.0
 
+
+# x86-64 legacy/REX prefixes that may precede a VEX (C4/C5) or EVEX (62) escape.
+_X86_LEGACY_PREFIXES = frozenset((0x66, 0x67, 0xf0, 0xf2, 0xf3, 0x2e, 0x36, 0x3e, 0x26, 0x64, 0x65))
+
+
+def x86_vex_or_evex(b):
+    """True when the instruction bytes start with a VEX (AVX) or EVEX encoding.
+
+    In 64-bit mode C4/C5 are always VEX and 62 is always EVEX (BOUND is invalid),
+    so no baseline (SSE2) instruction starts with these bytes after its prefixes.
+    """
+    i = 0
+    while i < len(b) and b[i] in _X86_LEGACY_PREFIXES:
+        i += 1
+    while i < len(b) and 0x40 <= b[i] <= 0x4f:
+        i += 1
+    return i < len(b) and b[i] in (0xc4, 0xc5, 0x62)
+
+
 def main():
     from unicorn import Uc, UcError, UC_ARCH_X86, UC_ARCH_ARM64, UC_ARCH_ARM, UC_MODE_64, UC_MODE_ARM, UC_PROT_ALL, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED
     from unicorn.x86_const import UC_X86_REG_FS_BASE, UC_X86_REG_RIP, UC_X86_REG_RSP, UC_X86_REG_RAX, UC_X86_REG_RDI, UC_X86_REG_RSI, UC_X86_REG_RDX, UC_X86_REG_RCX, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_XMM0
@@ -72,6 +91,12 @@ def main():
             b = bytes(emu.mem_read(address, size))
             if (abi == 'x86_64' and (b[:2] in (b'\x0f\x05', b'\x0f\x34') or b[:1] == b'\xcd')) or (abi == 'arm64-v8a' and len(b) == 4 and (int.from_bytes(b, 'little') & 0xffe0001f) == 0xd4000001) or (abi == 'armeabi-v7a' and arm_svc(emu, b)):
                 event = {'event': 'error', 'code': 'NOT_IMPLEMENTED', 'cause': 'guest syscall/SVC is not permitted'}
+                emu.emu_stop()
+            elif abi == 'x86_64' and x86_vex_or_evex(b):
+                # Issue #400: Unicorn 2.1.4 mis-executes VEX/EVEX (AVX) scalar code
+                # and leaves XMM state stale after a trap (floor(5.5)+0.25 gave 0.25).
+                # A wrong result is worse than none: fail closed with a typed error.
+                event = {'event': 'error', 'code': 'NOT_IMPLEMENTED', 'cause': 'guest AVX (VEX/EVEX) instruction is not supported by the native worker; build the library for the x86-64 baseline (issue #400)'}
                 emu.emu_stop()
 
     def arm_svc(emu, b):
