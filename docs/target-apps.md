@@ -40,7 +40,7 @@ Para cada app, o DoD é reproduzível a partir do repositório, no formato do M6
 | 4 | Plants vs. Zombies 1 | Play Store (proprietário) | jogo com render GPU; licenciamento e serviços Google | ⬜ não iniciado |
 | 5 | Brave | Play Store (proprietário) | mesmo caso do Chrome (Chromium) | ⬜ não iniciado |
 | 6 | Opera GX | Play Store (proprietário) | mesmo caso do Chrome (Chromium) | ⬜ não iniciado |
-| 7 | Lucky Patcher | fora da Play Store (APK de terceiro) | altera licença e pacotes de outros apps; pede privilégios (package manager, acesso a outros pacotes) que o RustyDroid não expõe | 🟠 em andamento (dono aprovou prosseguir); aquisição do APK e primeiro launch |
+| 7 | Lucky Patcher | fora da Play Store (APK de terceiro) | altera licença e pacotes de outros apps; pede privilégios (package manager, acesso a outros pacotes) que o RustyDroid não expõe. **Bloqueio de aquisição:** as páginas encontradas (luckypatchers.app, .co, .br) são sites de terceiros, e o download aponta para um host de terceiros; não há checksum nem assinatura do desenvolvedor para conferir. Nenhum APK foi baixado nem commitado (GH-05). | 🟠 em andamento; aquisição **não verificada**, nenhum launch. Próximo passo: o dono fornece o APK (com SHA-256 conferido) ou aprova uma fonte específica |
 | 8 | Um clone de GTA | Play Store (a escolher) | jogo 3D com render GPU; tamanho de APK e de dados; escolha do app pendente | ⬜ app a escolher |
 | 9 | Photo manager | a escolher (candidato OSS: galeria do F-Droid, a confirmar) | MediaStore e ContentProvider; decodificação de imagem; file I/O | ⬜ app a escolher |
 | 10 | Password manager | a escolher (candidato OSS: KeePassDX, F-Droid, a confirmar) | Autofill framework; Android Keystore; criptografia; SQLite | ⬜ app a escolher |
@@ -69,7 +69,7 @@ Legenda: ⬜ não iniciado · 🟡 parcial, com evidência · ⛔ bloqueado por 
 
 ## Próximos passos
 
-1. Lucky Patcher: aquisição do APK para teste interno e primeiro launch.
+1. Lucky Patcher: aquisição do APK bloqueada pela verificação de origem (ver linha 7). Aguarda o dono fornecer o APK com SHA-256 ou aprovar a fonte; depois, primeiro launch.
 2. Dono escolhe os apps concretos para os itens "a escolher".
 3. Para cada app com APK acessível, criar o golden flow (suíte `rd test`) e registrar
    o status com evidência.
