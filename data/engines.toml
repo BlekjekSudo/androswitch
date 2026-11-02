@@ -685,8 +685,8 @@ artifact = "assets/*.wasm (ou containers opacos)"
 modules = ["LANG-12"]
 strategy = "Runtime WASM + bridge JNI/JS futuros"
 adapter_crate = "rd-engine-wasm"
-runtime_status = "not_implemented"
-notes = "Extensão .wasm não valida magic/version/imports nem prova uso em runtime."
+runtime_status = "partial_wasm"
+notes = "WASM hospedado pelo RustyDroid via bridge documentada: APK com DEX + assets/*.wasm roda pela VM e pelo WasmBridge (feature wasm-execution, M11 S1c): i32, fuel por chamada, sem WASI, threads, JS/JNI bridge nem loader .wasm standalone. Extensão .wasm sozinha não prova execução."
 
 [[engine.rule]]
 state = "candidate"

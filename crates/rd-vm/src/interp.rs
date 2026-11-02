@@ -16,7 +16,7 @@ use alloc::{
 };
 use rd_dex::code::{CodeItem, Insn, Kind, Payload};
 
-use crate::engine::{default_for, ACC_STATIC};
+use crate::engine::{default_for, ACC_NATIVE, ACC_STATIC};
 use crate::err::{Throwable, VmExit};
 use crate::heap::ElemKind;
 use crate::intrinsics;
@@ -155,12 +155,128 @@ pub(crate) fn exec_frame(
                 }
             }};
         }
+        {
+            match insn.opcode {
+                0x22 => {
+                    let Kind::RegIndex(a, i) = &insn.kind else {
+                        return bad_kind(insn);
+                    };
+                    let class = vm.cp.type_str(dex_idx, *i as u32);
+                    step!(vm.ensure_initialized(&class));
+                    let obj = step!(finish_new_instance(vm, &class));
+                    regs[*a as usize] = obj;
+                }
+                0x60..=0x66 => {
+                    let Kind::RegIndex(a, i) = &insn.kind else {
+                        return bad_kind(insn);
+                    };
+                    let (ref_class, fname, ftype) = vm.cp.field_ref(dex_idx, *i as u32)?;
+                    let owner = step!(vm.resolve_static_owner(&ref_class, &fname));
+                    step!(vm.ensure_initialized(&owner));
+                    let v = step!(finish_sget(vm, &owner, &fname, &ftype));
+                    let wide = matches!(v, Value::Long(_) | Value::Double(_));
+                    regs[*a as usize] = v;
+                    if wide {
+                        regs[*a as usize + 1] = Value::WideHi;
+                    }
+                }
+                0x67..=0x6D => {
+                    let Kind::RegIndex(a, i) = &insn.kind else {
+                        return bad_kind(insn);
+                    };
+                    let (ref_class, fname, _ftype) = vm.cp.field_ref(dex_idx, *i as u32)?;
+                    let owner = step!(vm.resolve_static_owner(&ref_class, &fname));
+                    step!(vm.ensure_initialized(&owner));
+                    #[cfg(not(feature = "desktop-runtime"))]
+                    if vm.cp.find_class(&owner).is_none() {
+                        return Err(err::vm_error(
+                            "API_UNAVAILABLE",
+                            format!("sput {owner}->{fname} requires a platform implementation"),
+                        )
+                        .into());
+                    }
+                    vm.statics.insert((owner, fname), regs[*a as usize].clone());
+                }
+                0x6E..=0x72 | 0x74..=0x78 => {
+                    let (midx, slots) = extract_invoke_args(insn, &regs)?;
+                    let invoke_op = insn.opcode;
+                    match do_invoke(vm, dex_idx, frame_super, invoke_op, midx, &slots) {
+                        Ok(v) => last_result = v,
+                        Err(VmExit::Exception(t)) => throw!(t),
+                        Err(e) => return Err(e),
+                    }
+                }
+                _ => match exec_leaf_insn(
+                    vm,
+                    dex_idx,
+                    &code,
+                    cur_pc,
+                    insn,
+                    &mut regs,
+                    &mut last_result,
+                    &mut pending_exc,
+                    pc,
+                )? {
+                    LeafResult::Next(next_pc) => pc = next_pc,
+                    LeafResult::Return(ret) => return Ok(ret),
+                },
+            }
+        }
+    }
+
+    enum LeafResult {
+        Next(usize),
+        Return(Value),
+    }
+
+    #[inline(never)]
+    #[allow(clippy::too_many_arguments)]
+    fn exec_leaf_insn(
+        vm: &mut Engine,
+        dex_idx: usize,
+        code: &Arc<CodeItem>,
+        cur_pc: usize,
+        insn: &Insn,
+        regs: &mut [Value],
+        last_result: &mut Value,
+        pending_exc: &mut Option<Throwable>,
+        pc_in: usize,
+    ) -> Result<LeafResult, VmExit> {
+        let mut pc = pc_in;
+        macro_rules! step {
+            ($e:expr) => {
+                match $e {
+                    Ok(v) => v,
+                    Err(VmExit::Exception(t)) => {
+                        match vm.enter_handler(dex_idx, code, cur_pc, t.clone()) {
+                            Ok(addr) => {
+                                *pending_exc = Some(t);
+                                return Ok(LeafResult::Next(addr));
+                            }
+                            Err(e) => return Err(e),
+                        }
+                    }
+                    Err(e) => return Err(e),
+                }
+            };
+        }
+        macro_rules! throw {
+            ($t:expr) => {{
+                let t: Throwable = $t;
+                match vm.enter_handler(dex_idx, code, cur_pc, t.clone()) {
+                    Ok(addr) => {
+                        *pending_exc = Some(t);
+                        return Ok(LeafResult::Next(addr));
+                    }
+                    Err(e) => return Err(e),
+                }
+            }};
+        }
         macro_rules! throw_exc {
             ($class:expr, $msg:expr) => {
                 throw!(vm.vm_exception($class, &$msg)?)
             };
         }
-
         match insn.opcode {
             // ── nop (0x00) — opcode REAL (format 10x, nenhum efeito):
             // padding executável e código ofuscado legítimo. Não cai no braço
@@ -203,13 +319,13 @@ pub(crate) fn exec_frame(
                 let Kind::Reg(a) = &insn.kind else {
                     return bad_kind(insn);
                 };
-                regs[*a as usize] = last_result.clone();
+                regs[*a as usize] = (*last_result).clone();
             }
             0x0B => {
                 let Kind::Reg(a) = &insn.kind else {
                     return bad_kind(insn);
                 };
-                regs[*a as usize] = last_result.clone();
+                regs[*a as usize] = (*last_result).clone();
                 regs[*a as usize + 1] = Value::WideHi;
             }
             0x0D => {
@@ -237,12 +353,12 @@ pub(crate) fn exec_frame(
             }
 
             // ── return family (0E..11) ──────────────────────────────────────
-            0x0E => return Ok(Value::Null),
+            0x0E => return Ok(LeafResult::Return(Value::Null)),
             0x0F..=0x11 => {
                 let Kind::Reg(a) = &insn.kind else {
                     return bad_kind(insn);
                 };
-                return Ok(regs[*a as usize].clone());
+                return Ok(LeafResult::Return(regs[*a as usize].clone()));
             }
 
             // ── const family (12..19) ─ tabela canônica validada vs baksmali
@@ -309,7 +425,12 @@ pub(crate) fn exec_frame(
                 let Kind::RegIndex(a, i) = &insn.kind else {
                     return bad_kind(insn);
                 };
-                let s = vm.cp.string(dex_idx, *i as u32);
+                let s = {
+                    let _t0 = vm.trace_start();
+                    let s = vm.cp.string(dex_idx, *i as u32);
+                    vm.trace_string(_t0);
+                    s
+                };
                 let r = crate::java_values::literal_string(vm, s)?;
                 regs[*a as usize] = Value::Obj(r);
             }
@@ -317,7 +438,12 @@ pub(crate) fn exec_frame(
                 let Kind::RegIndex32(a, i) = &insn.kind else {
                     return bad_kind(insn);
                 };
-                let s = vm.cp.string(dex_idx, *i);
+                let s = {
+                    let _t0 = vm.trace_start();
+                    let s = vm.cp.string(dex_idx, *i);
+                    vm.trace_string(_t0);
+                    s
+                };
                 let r = crate::java_values::literal_string(vm, s)?;
                 regs[*a as usize] = Value::Obj(r);
             }
@@ -422,26 +548,6 @@ pub(crate) fn exec_frame(
                     }
                 }
             }
-            0x22 => {
-                let Kind::RegIndex(a, i) = &insn.kind else {
-                    return bad_kind(insn);
-                };
-                let class = vm.cp.type_str(dex_idx, *i as u32);
-                // issue #25: criar instância é “ação ativa” (JLS 12.4.2) —
-                // <clinit> da classe roda ANTES do construtor; sem isto, o
-                // efeito do <clinit> só era observável no primeiro sget
-                // issue #41: exceção de <clinit> (EIIE) é despachada na MESMA
-                // frame (try/catch do método corrente) — `?` bypassava o handler
-                step!(vm.ensure_initialized(&class));
-                let r = step!(match vm.heap.alloc_instance(class.clone(), Vec::new()) {
-                    Ok(r) => Ok(r),
-                    Err(e) => Err(oom_exception(e)),
-                });
-                // M3: anexa estado host p/ classes de plataforma (Activity,
-                // View/TextView/Button/LinearLayout, Handler, Intent, Bundle)
-                step!(vm.attach_host_state(&class, r));
-                regs[*a as usize] = Value::Obj(r);
-            }
             0x23 => {
                 let Kind::RegRegIndex(a, b, i) = &insn.kind else {
                     return bad_kind(insn);
@@ -505,7 +611,7 @@ pub(crate) fn exec_frame(
                         vm.heap.array_elems_mut(r)?[i] = v;
                     }
                 }
-                last_result = Value::Obj(r);
+                *last_result = Value::Obj(r);
             }
             0x26 => {
                 // fill-array-data vAA, +payload (payload em +offset)
@@ -813,215 +919,6 @@ pub(crate) fn exec_frame(
                 )));
             }
 
-            // ── sget (60..66) / sput (67..6D) ───────────────────────────────
-            0x60..=0x66 => {
-                let Kind::RegIndex(a, i) = &insn.kind else {
-                    return bad_kind(insn);
-                };
-                let (ref_class, fname, ftype) = vm.cp.field_ref(dex_idx, *i as u32)?;
-                // issue #57: JVMS 5.4.3.2 — o slot static é da classe
-                // DECLARANTE (sobe superclasses/interfaces; miss final =
-                // NoSuchFieldError capturável). Antes: statics keyados pela
-                // classe do ref — sget de campo herdado via ref da subclasse
-                // lia default silenciosamente e sput criava slot divergente.
-                let owner = step!(vm.resolve_static_owner(&ref_class, &fname));
-                // issue #41: EIIE de <clinit> despacha na frame corrente
-                // (JVMS 5.5: init é disparado no DECLARANTE — via ref da
-                // subclasse NÃO inicializa a subclasse)
-                step!(vm.ensure_initialized(&owner));
-                // issues #43/#48: System.out/.err materializam um PrintStream
-                // embutido na primeira leitura (println/print são intrínsecos;
-                // saída vai para stdout/stderr do host, spec PrintStream: nunca lança)
-                #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-                {
-                    if owner == "Ljava/lang/System;" && (fname == "out" || fname == "err") {
-                        let key = (owner.clone(), fname.clone());
-                        if let crate::maps::Entry::Vacant(e) = vm.statics.entry(key) {
-                            let fd = if fname == "err" { 2 } else { 1 };
-                            let r = step!(vm
-                                .heap
-                                .alloc_instance(
-                                    "Ljava/io/PrintStream;".to_string(),
-                                    vec![("fd".to_string(), Value::Int(fd))],
-                                )
-                                .map_err(oom_exception));
-                            e.insert(Value::Obj(r));
-                        }
-                    }
-                    if owner == "Ljava/util/concurrent/TimeUnit;"
-                        && !vm.statics.contains_key(&(owner.clone(), fname.clone()))
-                        && matches!(
-                            fname.as_str(),
-                            "NANOSECONDS"
-                                | "MICROSECONDS"
-                                | "MILLISECONDS"
-                                | "SECONDS"
-                                | "MINUTES"
-                                | "HOURS"
-                                | "DAYS"
-                        )
-                    {
-                        let unit = step!(vm.time_unit_obj(&fname));
-                        vm.statics
-                            .insert((owner.clone(), fname.clone()), Value::Obj(unit));
-                    }
-                    // JDK constants not backed by any DEX (Boolean.TRUE/FALSE,
-                    // MAX_VALUE, NaN, ...) are materialized on first read.
-                    // Host-static resolution needs `&mut Engine`; keeping a map Entry
-                    // live across those calls would conflict with the mutable borrow.
-                    #[allow(clippy::map_entry)]
-                    if !vm.statics.contains_key(&(owner.clone(), fname.clone())) {
-                        if let Some(c) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::jnormalizer::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::jbigdecimal::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::jtext_format::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::android_colorspace::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::android_env::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::android_build::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::graphics::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::parcel::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::android_util::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::platform_base::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) =
-                            step!(crate::collections::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        } else if let Some(c) = step!(crate::jtime::host_static(vm, &owner, &fname))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), c);
-                        }
-                        #[cfg(feature = "virtual-devices")]
-                        if !vm.statics.contains_key(&(owner.clone(), fname.clone())) {
-                            if let Some(c) = step!(crate::m10::host_static(vm, &owner, &fname)) {
-                                vm.statics.insert((owner.clone(), fname.clone()), c);
-                            }
-                        }
-                    }
-                }
-                #[cfg(not(feature = "desktop-runtime"))]
-                if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
-                    && vm.cp.find_class(&owner).is_none()
-                    && crate::boxes::static_field_descriptor(&owner, &fname) == Some(ftype.as_str())
-                {
-                    if let Some(value) = step!(crate::boxes::host_static(vm, &owner, &fname)) {
-                        vm.statics.insert((owner.clone(), fname.clone()), value);
-                    }
-                }
-                #[cfg(not(feature = "desktop-runtime"))]
-                if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
-                    && vm.cp.find_class(&owner).is_none()
-                {
-                    if let Some(framework) = vm.framework_host() {
-                        if let Some(value) =
-                            step!(framework.static_field(vm, &owner, &fname, &ftype))
-                        {
-                            vm.statics.insert((owner.clone(), fname.clone()), value);
-                        }
-                    }
-                }
-                #[cfg(not(feature = "desktop-runtime"))]
-                if !vm.statics.contains_key(&(owner.clone(), fname.clone()))
-                    && vm.cp.find_class(&owner).is_none()
-                {
-                    return Err(err::vm_error(
-                        "API_UNAVAILABLE",
-                        format!("sget {owner}->{fname}:{ftype} requires a platform implementation"),
-                    )
-                    .into());
-                }
-                let v = vm
-                    .statics
-                    .get(&(owner, fname))
-                    .cloned()
-                    // issue #37: default POR TIPO declarado — Int(0) genérico
-                    // quebrava sget-wide (Long lido como Int → VM_TYPE_ERROR)
-                    .unwrap_or_else(|| default_for(&ftype));
-                regs[*a as usize] = v;
-                if matches!(regs[*a as usize], Value::Long(_) | Value::Double(_)) {
-                    regs[*a as usize + 1] = Value::WideHi; // sget-wide
-                }
-            }
-            0x67..=0x6D => {
-                let Kind::RegIndex(a, i) = &insn.kind else {
-                    return bad_kind(insn);
-                };
-                let (ref_class, fname, _ftype) = vm.cp.field_ref(dex_idx, *i as u32)?;
-                // issue #57: grava no slot da classe DECLARANTE (JVMS 5.4.3.2)
-                // — refs pela subclasse e pela superclasse vêem o MESMO valor.
-                let owner = step!(vm.resolve_static_owner(&ref_class, &fname));
-                // issue #41: EIIE de <clinit> despacha na frame corrente
-                step!(vm.ensure_initialized(&owner));
-                #[cfg(not(feature = "desktop-runtime"))]
-                if vm.cp.find_class(&owner).is_none() {
-                    return Err(err::vm_error(
-                        "API_UNAVAILABLE",
-                        format!("sput {owner}->{fname} requires a platform implementation"),
-                    )
-                    .into());
-                }
-                vm.statics.insert((owner, fname), regs[*a as usize].clone());
-            }
-
-            // ── invokes (6E..72, 74..78) ────────────────────────────────────
-            0x6E..=0x72 | 0x74..=0x78 => {
-                let (midx, slots) = match &insn.kind {
-                    Kind::Invoke35c {
-                        count,
-                        idx,
-                        regs: rr,
-                    } => (
-                        *idx as u32,
-                        rr[..*count as usize]
-                            .iter()
-                            .map(|r| regs[*r as usize].clone())
-                            .collect::<Vec<_>>(),
-                    ),
-                    Kind::InvokeRange3rc { count, idx, start } => {
-                        let s = *start as usize;
-                        let n = *count as usize;
-                        (*idx as u32, regs[s..s + n].to_vec())
-                    }
-                    _ => return bad_kind(insn),
-                };
-                let invoke_op = insn.opcode;
-                match do_invoke(vm, dex_idx, frame_super, invoke_op, midx, &slots) {
-                    Ok(v) => last_result = v,
-                    Err(VmExit::Exception(t)) => throw!(t),
-                    Err(e) => return Err(e),
-                }
-            }
-
             // ── unop (7B..8F) ───────────────────────────────────────────────
             0x7B..=0x8F => {
                 let Kind::Regs(a, b) = &insn.kind else {
@@ -1042,7 +939,7 @@ pub(crate) fn exec_frame(
                 let x = regs[*b as usize].clone();
                 let y = regs[*c as usize].clone();
                 let v = step!(binop(vm, insn.opcode, x, y));
-                write_binop(&mut regs, *a, v);
+                write_binop(regs, *a, v);
             }
             0xB0..=0xCF => {
                 let Kind::Regs(a, b) = &insn.kind else {
@@ -1052,7 +949,7 @@ pub(crate) fn exec_frame(
                 let y = regs[*b as usize].clone();
                 // 2addr: mesmo grupo, offset -0x20
                 let v = step!(binop(vm, insn.opcode - 0x20, x, y));
-                write_binop(&mut regs, *a, v);
+                write_binop(regs, *a, v);
             }
             0xD0..=0xD7 => {
                 // lit16: add, rsub, mul, div, rem, and, or, xor
@@ -1070,7 +967,7 @@ pub(crate) fn exec_frame(
                     0xD6 => step!(binop(vm, 0x96, x, Value::Int(*lit as i32))), // or
                     op => step!(binop(vm, op_to_base(op), x, Value::Int(*lit as i32))), // xor
                 };
-                write_binop(&mut regs, *a, v);
+                write_binop(regs, *a, v);
             }
             0xD8..=0xE2 => {
                 // lit8: add, rsub, mul, div, rem, and, or, xor, shl, shr, ushr
@@ -1092,7 +989,7 @@ pub(crate) fn exec_frame(
                     0xE1 => step!(binop(vm, 0x99, x, lit)), // shr
                     op => step!(binop(vm, op_to_base(op), x, lit)), // ushr (0xE2)
                 };
-                write_binop(&mut regs, *a, v);
+                write_binop(regs, *a, v);
             }
 
             _ => {
@@ -1109,6 +1006,86 @@ pub(crate) fn exec_frame(
                 }
             }
         }
+        Ok(LeafResult::Next(pc))
+    }
+}
+
+#[inline(never)]
+fn finish_new_instance(vm: &mut Engine, class: &str) -> Result<Value, VmExit> {
+    let r = vm
+        .heap
+        .alloc_instance(class.to_string(), Vec::new())
+        .map_err(oom_exception)?;
+    vm.attach_host_state(class, r)?;
+    Ok(Value::Obj(r))
+}
+
+#[inline(never)]
+fn finish_sget(vm: &mut Engine, owner: &str, fname: &str, ftype: &str) -> Result<Value, VmExit> {
+    let key = (owner.to_string(), fname.to_string());
+    if let Some(value) = vm.statics.get(&key) {
+        return Ok(value.clone());
+    }
+    #[cfg(not(feature = "desktop-runtime"))]
+    {
+        if vm.cp.find_class(owner).is_some() {
+            return Ok(default_for(ftype));
+        }
+        if crate::boxes::static_field_descriptor(owner, fname) == Some(ftype) {
+            if let Some(value) = crate::boxes::host_static(vm, owner, fname)? {
+                vm.statics.insert(key, value.clone());
+                return Ok(value);
+            }
+        }
+        if let Some(host) = vm.framework_host() {
+            if let Some(value) = host.static_field(vm, owner, fname, ftype)? {
+                vm.statics.insert(key, value.clone());
+                return Ok(value);
+            }
+            return Err(err::vm_error(
+                "API_UNAVAILABLE",
+                format!("sget {owner}->{fname}:{ftype} requires a platform implementation"),
+            )
+            .into());
+        }
+    }
+    // #330: fonte ÚNICA de host statics, compartilhada com a reflexão
+    // (`Class.getField` / `Field.get(null)` em intrinsics.rs). Antes este
+    // caminho tinha uma cadeia de providers própria; as duas divergiam e o
+    // bytecode lia 0/Null em campos que a reflexão enxergava (Locale.US,
+    // WebSettings.LOAD_DEFAULT, Byte.MAX_VALUE, …).
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+    return Ok(vm
+        .resolve_host_static(owner, fname)?
+        .unwrap_or_else(|| default_for(ftype)));
+    #[cfg(not(any(feature = "desktop-runtime", feature = "upstream-runtime")))]
+    Err(err::vm_error(
+        "API_UNAVAILABLE",
+        format!("sget {owner}->{fname}:{ftype} requires a platform implementation"),
+    )
+    .into())
+}
+
+#[inline(never)]
+fn extract_invoke_args(insn: &Insn, regs: &[Value]) -> Result<(u32, Vec<Value>), VmExit> {
+    match &insn.kind {
+        Kind::Invoke35c {
+            count,
+            idx,
+            regs: rr,
+        } => Ok((
+            *idx as u32,
+            rr[..*count as usize]
+                .iter()
+                .map(|r| regs[*r as usize].clone())
+                .collect::<Vec<_>>(),
+        )),
+        Kind::InvokeRange3rc { count, idx, start } => {
+            let s = *start as usize;
+            let n = *count as usize;
+            Ok((*idx as u32, regs[s..s + n].to_vec()))
+        }
+        _ => bad_kind(insn),
     }
 }
 
@@ -1169,7 +1146,7 @@ fn branch_target(cur_pc: usize, off: i64) -> Result<usize, VmExit> {
     Ok(target as usize)
 }
 
-fn bad_kind(insn: &Insn) -> Result<Value, VmExit> {
+fn bad_kind<T>(insn: &Insn) -> Result<T, VmExit> {
     Err(err::vm_error(
         "INVALID_FORMAT",
         format!(
@@ -1239,7 +1216,7 @@ fn new_filled_array(
         .alloc_array(elem, len, elem_class)
         .map_err(oom_exception)?;
     let elems = vm.heap.array_elems_mut(r)?;
-    elems.extend(core::iter::repeat(fill).take(len));
+    elems.extend(core::iter::repeat_n(fill, len));
     Ok(r)
 }
 
@@ -1621,14 +1598,38 @@ fn fill_array(
 
 // ── invokes ─────────────────────────────────────────────────────────────────
 
+enum InvokeTarget {
+    Value(Value),
+    Dex(
+        usize,
+        rd_dex::classes::ClassDef,
+        rd_dex::methods::EncodedMethod,
+    ),
+}
+
 fn do_invoke(
     vm: &mut Engine,
     dex_idx: usize,
     frame_super: Option<&str>,
     invoke_op: u8,
     method_idx: u32,
-    slots: &[Value],
+    raw: &[Value],
 ) -> Result<Value, VmExit> {
+    match resolve_or_run_host_invoke(vm, dex_idx, frame_super, invoke_op, method_idx, raw)? {
+        InvokeTarget::Value(v) => Ok(v),
+        InvokeTarget::Dex(d2, def, m) => vm.call(d2, def, &m, raw.to_vec()),
+    }
+}
+
+#[inline(never)]
+fn resolve_or_run_host_invoke(
+    vm: &mut Engine,
+    dex_idx: usize,
+    frame_super: Option<&str>,
+    invoke_op: u8,
+    method_idx: u32,
+    slots: &[Value],
+) -> Result<InvokeTarget, VmExit> {
     let mref = vm.cp.method_ref(dex_idx, method_idx)?;
     // Host dispatch (intrinsics, m8/m9, framework, native loader) receives
     // LOGICAL arguments: one Value per parameter. Register slots carry a
@@ -1637,7 +1638,6 @@ fn do_invoke(
     // AtomicLongFieldUpdater.compareAndSet(o, J, J) wrote 0 on every CAS,
     // which made kotlinx.coroutines' lock-free queue spin forever.
     // DEX callees still get the raw register form.
-    let raw = slots;
     // Fast path (ADR 008 Stage 1b): most invokes carry no wide values, so
     // the register slots are already the logical arguments — no allocation.
     let logical: Vec<Value>;
@@ -1670,26 +1670,36 @@ fn do_invoke(
         if let Some(v) =
             intrinsics::call_native_loader(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
-            return Ok(v);
+            return Ok(InvokeTarget::Value(v));
         }
         #[cfg(feature = "advanced-components")]
         if let Some(v) = crate::m9::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
-            return Ok(v);
+            return Ok(InvokeTarget::Value(v));
         }
         #[cfg(feature = "virtual-devices")]
         if let Some(v) = crate::m10::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
-            return Ok(v);
+            return Ok(InvokeTarget::Value(v));
         }
+        #[cfg(feature = "wasm-engine")]
         if let Some(v) =
-            intrinsics::call_static_intrinsic(vm, &mref.class, &mref.name, &mref.proto, slots)?
+            crate::wasm_bridge::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
-            return Ok(v);
+            return Ok(InvokeTarget::Value(v));
+        }
+        if let Some(v) = {
+            let _t0 = vm.trace_start();
+            let r =
+                intrinsics::call_static_intrinsic(vm, &mref.class, &mref.name, &mref.proto, slots);
+            vm.trace_intrinsic(_t0, &mref.class);
+            r
+        }? {
+            return Ok(InvokeTarget::Value(v));
         }
         // M8: subsistemas de compat real (OkHttp/WorkManager/Room/Uri…)
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if let Some(v) = crate::m8::call_m8_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
-            return Ok(v);
+            return Ok(InvokeTarget::Value(v));
         }
         // Apêndice D: shims host AndroidX (FileProvider, AppInitializer,
         // DataStore keys, MultiDex.install…) — `None` mantém o DEX real.
@@ -1697,14 +1707,14 @@ fn do_invoke(
         if let Some(v) =
             crate::androidx::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)?
         {
-            return Ok(v);
+            return Ok(InvokeTarget::Value(v));
         }
         // Apêndice E (Google Play Services / Firebase, modo "sem GMS"
         // honesto): só responde por classes GMS/Firebase/Billing, antes do
         // host `Landroid` genérico — `None` continua para DEX.
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         if let Some(v) = crate::gms::call_static(vm, &mref.class, &mref.name, &mref.proto, slots)? {
-            return Ok(v);
+            return Ok(InvokeTarget::Value(v));
         }
         // M3: classes android/* são HOST (framework.rs) — nunca estão no DEX
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
@@ -1716,7 +1726,7 @@ fn do_invoke(
                 &mref.proto,
                 slots,
             )? {
-                Some(v) => Ok(v),
+                Some(v) => Ok(InvokeTarget::Value(v)),
                 None => {
                     Err(
                         crate::classpath::unresolved_method(&mref.class, &mref.name, &mref.proto)
@@ -1726,7 +1736,10 @@ fn do_invoke(
             };
         }
         vm.ensure_initialized(&mref.class)?;
-        let Some((d2, def, m)) = vm.cp.resolve_method(&mref.class, &mref.name, &mref.proto) else {
+        let _t0 = vm.trace_start();
+        let resolved = vm.cp.resolve_method(&mref.class, &mref.name, &mref.proto);
+        vm.trace_resolve(_t0);
+        let Some((d2, def, m)) = resolved else {
             return Err(
                 crate::classpath::unresolved_method(&mref.class, &mref.name, &mref.proto).into(),
             );
@@ -1741,7 +1754,7 @@ fn do_invoke(
             )
             .into());
         }
-        return vm.call(d2, def, &m, raw.to_vec());
+        return Ok(InvokeTarget::Dex(d2, def, m));
     }
 
     // não-static: receiver é o primeiro slot
@@ -1751,7 +1764,7 @@ fn do_invoke(
     // java/lang/Object.<init> é no-op (raiz de toda hierarquia de usuário)
     #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     if mref.class == "Ljava/lang/Object;" && mref.name == "<init>" {
-        return Ok(Value::Null);
+        return Ok(InvokeTarget::Value(Value::Null));
     }
     // issue #25: construtores são “ação ativa” (JLS 12.4.2) — normalmente já
     // inicializada pelo new-instance imediatamente anterior (no-op aqui)
@@ -1784,7 +1797,7 @@ fn do_invoke(
             .into());
         }
         if mref.class == "Ljava/lang/Object;" && mref.name == "<init>" {
-            return Ok(Value::Null);
+            return Ok(InvokeTarget::Value(Value::Null));
         }
     }
 
@@ -1797,7 +1810,9 @@ fn do_invoke(
         && mref.proto == "(Ljava/lang/Object;)Z"
     {
         let other = slots.get(1).and_then(|slot| slot.as_ref().ok()).flatten();
-        return Ok(Value::Int((other == Some(recv)) as i32));
+        return Ok(InvokeTarget::Value(Value::Int(
+            (other == Some(recv)) as i32,
+        )));
     }
 
     // intrínseco de instância (String/StringBuilder/Throwable/Object)
@@ -1824,16 +1839,21 @@ fn do_invoke(
     } else {
         recv_class.as_str()
     };
-    if let Some(v) = intrinsics::call_instance_intrinsic_mref(
-        vm,
-        intrinsic_class,
-        &mref.class,
-        &mref.name,
-        &mref.proto,
-        recv,
-        &slots[1..],
-    )? {
-        return Ok(v);
+    if let Some(v) = {
+        let _t0 = vm.trace_start();
+        let r = intrinsics::call_instance_intrinsic_mref(
+            vm,
+            intrinsic_class,
+            &mref.class,
+            &mref.name,
+            &mref.proto,
+            recv,
+            &slots[1..],
+        );
+        vm.trace_intrinsic(_t0, &mref.class);
+        r
+    }? {
+        return Ok(InvokeTarget::Value(v));
     }
     // Covariant bridge: `Appendable.append(..)Appendable` on a host
     // StringBuilder (or any host method whose declared return is a supertype
@@ -1845,43 +1865,75 @@ fn do_invoke(
             && vm.cp.is_subtype(&recv_class, ret)
         {
             let bridged = format!("{params}){recv_class}");
-            if let Some(v) = intrinsics::call_instance_intrinsic_mref(
-                vm,
-                &recv_class,
-                &recv_class,
-                &mref.name,
-                &bridged,
-                recv,
-                &slots[1..],
-            )? {
-                return Ok(v);
+            if let Some(v) = {
+                let _t0 = vm.trace_start();
+                let r = intrinsics::call_instance_intrinsic_mref(
+                    vm,
+                    &recv_class,
+                    &recv_class,
+                    &mref.name,
+                    &bridged,
+                    recv,
+                    &slots[1..],
+                );
+                vm.trace_intrinsic(_t0, &recv_class);
+                r
+            }? {
+                return Ok(InvokeTarget::Value(v));
             }
         }
     }
 
-    #[cfg(feature = "advanced-components")]
-    if let Some(v) =
-        crate::m9::call_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
-    {
-        return Ok(v);
+    // #315 (item 3): overrides concretos da app no DEX (`recv_class`, ou o
+    // nível intermediário num `invoke-super`) vencem os shims host de
+    // `m9`/`m10`/`m8`/`androidx`/`gms`, preservando a prioridade do host sobre
+    // classes empacotadas da própria biblioteca shimmed (`Landroidx/*`,
+    // `Lcom/google/*`, etc.).
+    // Nota do port: o `m9::call_instance` que existia aqui é redundante —
+    // `call_host_shim_layer` já começa por `m9` (ver a definição abaixo).
+    if !is_direct {
+        let poly_target = if is_super {
+            frame_super.map_or_else(
+                || {
+                    vm.cp
+                        .superclass_of(&mref.class)
+                        .unwrap_or_else(|| mref.class.clone())
+                },
+                str::to_string,
+            )
+        } else {
+            recv_class.clone()
+        };
+        if let Some((d2, def, m)) = vm.cp.resolve_method(&poly_target, &mref.name, &mref.proto) {
+            let has_impl = m.code_off != 0 || (m.access_flags & ACC_NATIVE) != 0;
+            if has_impl && (m.access_flags & ACC_STATIC) == 0 {
+                let decl = vm.cp.type_str(d2, def.class_idx);
+                // #315 (item 3) + regressão encontrada no CI deste port: só
+                // overrides de classes da APP (ou de bibliotecas empacotadas,
+                // excluídas logo abaixo) vencem o host. Uma implementação de
+                // PLATAFORMA — `Landroid/content/SharedPreferencesImpl;->getInt`
+                // — precisa continuar caindo no shim host; desviá-la para o DEX
+                // do framework quebra APKs reais (NOT_FOUND em getInt).
+                if !is_bundled_shim_owner(&decl)
+                    && !decl.starts_with("Landroid/")
+                    && !decl.starts_with("Ljava/")
+                {
+                    // Devolve `InvokeTarget::Dex`: `do_invoke` chama `vm.call` com os
+                    // registradores brutos (`raw`, com `WideHi` após long/double). `slots`
+                    // aqui são os argumentos lógicos, e passá-los a `call` quebra o frame
+                    // (`INVALID_FORMAT ... argumentos para ... registradores`) em APKs
+                    // reais com parâmetros long (ex.: logback `setTotalSizeCap(J)V`).
+                    return Ok(InvokeTarget::Dex(d2, def, m));
+                }
+            }
+        }
     }
 
-    #[cfg(feature = "virtual-devices")]
     if let Some(v) =
-        crate::m10::call_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+        call_host_shim_layer(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
     {
-        return Ok(v);
+        return Ok(InvokeTarget::Value(v));
     }
-
-    // M8: compat real — host sequestra só os métodos listados em m8.rs;
-    // `None` cai para o DEX real da biblioteca (androidx/okhttp no APK).
-    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-    if let Some(v) =
-        crate::m8::call_m8_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
-    {
-        return Ok(v);
-    }
-
     #[cfg(not(feature = "desktop-runtime"))]
     if let Some(host) = vm.framework_host() {
         // Preserve virtual overrides and direct/super constructor dispatch.
@@ -1898,32 +1950,22 @@ fn do_invoke(
             if let Some(value) =
                 host.call(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
             {
-                return Ok(value);
+                return Ok(InvokeTarget::Value(value));
             }
         }
     }
-    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
-    {
-        // Apêndice D: shims host AndroidX por módulo (lifecycle, livedata,
-        // viewmodel, collection, datastore valores, work Data, navigation,
-        // startup, biometria, futures) — `None` mantém o DEX real da lib.
-        if let Some(v) = crate::androidx::call_instance(
-            vm,
-            &mref.class,
-            &mref.name,
-            &mref.proto,
-            recv,
-            &slots[1..],
-        )? {
-            return Ok(v);
-        }
-        // Apêndice E: objetos seguidos pelo shim GMS/Firebase e classes
-        // `Lcom/google/android/gms/`, `Lcom/google/firebase/`,
-        // `Lcom/android/billingclient/` — `None` continua para o host/DEX.
+    // #315 (item 4): dispatch polimórfico por interface/superclasse sobre
+    // objetos host concretos (ex.: `AutoCloseable.close()` em `Image`,
+    // `ImageReader`, `CameraDevice`, `CameraCaptureSession`).
+    // Nota do port: os blocos explícitos de `m8`/`androidx`/`gms` que existiam
+    // aqui foram removidos a favor desta resolução por `recv_class`, porque
+    // `call_host_shim_layer` (chamado logo abaixo com `mref.class`) já é a
+    // cadeia completa m9→m10→m8→androidx→gms.
+    if !is_direct && !is_super && recv_class != mref.class {
         if let Some(v) =
-            crate::gms::call_instance(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+            call_host_shim_layer(vm, &recv_class, &mref.name, &mref.proto, recv, &slots[1..])?
         {
-            return Ok(v);
+            return Ok(InvokeTarget::Value(v));
         }
     }
 
@@ -1932,14 +1974,38 @@ fn do_invoke(
     #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
     if mref.class.starts_with("Landroid/") {
         if !is_direct && !is_super {
-            if let Some((d2, def, m)) = vm.cp.resolve_method(&recv_class, &mref.name, &mref.proto) {
-                return vm.call(d2, def, &m, raw.to_vec());
+            if let Some((d2, def, m)) = {
+                let _t0 = vm.trace_start();
+                let r = vm.cp.resolve_method(&recv_class, &mref.name, &mref.proto);
+                vm.trace_resolve(_t0);
+                r
+            } {
+                // #315 (item 3): só devolve o alvo DEX se houver implementação
+                // real; método abstrato cai para o host/DEX do super.
+                if m.code_off != 0 || (m.access_flags & ACC_NATIVE) != 0 {
+                    return Ok(InvokeTarget::Dex(d2, def, m));
+                }
             }
         }
+        let host_start = if !is_direct && !is_super {
+            &recv_class
+        } else {
+            &mref.class
+        };
         if let Some(value) =
-            inherited_android_host(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+            inherited_android_host(vm, host_start, &mref.name, &mref.proto, recv, &slots[1..])?
         {
-            return Ok(value);
+            return Ok(InvokeTarget::Value(value));
+        }
+        // Receiver-first, then the declaring class: platform implementations such as
+        // `Landroid/content/SharedPreferencesImpl;` may have no shim of their own, while
+        // the declaring interface (`Landroid/content/SharedPreferences;`) does (CI #315).
+        if host_start != &mref.class {
+            if let Some(value) =
+                inherited_android_host(vm, &mref.class, &mref.name, &mref.proto, recv, &slots[1..])?
+            {
+                return Ok(InvokeTarget::Value(value));
+            }
         }
         // Generic property storage is strictly last: it must not swallow
         // inherited View IDs, EditText text, or Activity/Context state.
@@ -1952,7 +2018,7 @@ fn do_invoke(
             recv,
             &slots[1..],
         )? {
-            return Ok(value);
+            return Ok(InvokeTarget::Value(value));
         }
         return Err(crate::classpath::unresolved_method_on(
             &mref.class,
@@ -1988,7 +2054,10 @@ fn do_invoke(
         recv_class.clone()
     };
 
-    let Some((d2, def, m)) = vm.cp.resolve_method(&start_class, &mref.name, &mref.proto) else {
+    let _t0 = vm.trace_start();
+    let resolved = vm.cp.resolve_method(&start_class, &mref.name, &mref.proto);
+    vm.trace_resolve(_t0);
+    let Some((d2, def, m)) = resolved else {
         // D8 may use an app subclass as the inherited Android method owner.
         // DEX overrides above always win; direct app constructors stay direct.
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
@@ -2001,7 +2070,7 @@ fn do_invoke(
                 recv,
                 &slots[1..],
             )? {
-                return Ok(value);
+                return Ok(InvokeTarget::Value(value));
             }
         }
         return Err(
@@ -2019,7 +2088,74 @@ fn do_invoke(
         )
         .into());
     }
-    vm.call(d2, def, &m, raw.to_vec())
+    // #315 (item 4): método declarado abstrato/nativo-less subindo a
+    // superclasse — tenta a camada host herdada antes de entregar ao DEX.
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+    if m.code_off == 0 && (m.access_flags & ACC_NATIVE) == 0 && (!is_direct || is_super) {
+        if let Some(value) =
+            inherited_android_host(vm, &start_class, &mref.name, &mref.proto, recv, &slots[1..])?
+        {
+            return Ok(InvokeTarget::Value(value));
+        }
+    }
+    Ok(InvokeTarget::Dex(d2, def, m))
+}
+
+fn is_bundled_shim_owner(cls: &str) -> bool {
+    cls.starts_with("Landroidx/")
+        || cls.starts_with("Lcom/google/android/gms/")
+        || cls.starts_with("Lcom/google/android/play/")
+        || cls.starts_with("Lcom/google/firebase/")
+        || cls.starts_with("Lcom/android/billingclient/")
+        || cls.starts_with("Lcom/google/common/util/concurrent/")
+        || cls.starts_with("Lokhttp3/")
+}
+
+fn call_host_shim_layer(
+    vm: &mut Engine,
+    class: &str,
+    name: &str,
+    sig: &str,
+    recv: crate::heap::ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    #[cfg(not(feature = "desktop-runtime"))]
+    if vm.framework_host().is_some() {
+        return Ok(None);
+    }
+    #[cfg(feature = "advanced-components")]
+    if let Some(v) = crate::m9::call_instance(vm, class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+
+    #[cfg(feature = "virtual-devices")]
+    if let Some(v) = crate::m10::call_instance(vm, class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+
+    // M8: compat real — host sequestra só os métodos listados em m8.rs;
+    // `None` cai para o DEX real da biblioteca (androidx/okhttp no APK).
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+    if let Some(v) = crate::m8::call_m8_instance(vm, class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+
+    // Apêndice D: shims host AndroidX por módulo (lifecycle, livedata,
+    // viewmodel, collection, datastore valores, work Data, navigation,
+    // startup, biometria, futures) — `None` mantém o DEX real da lib.
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+    if let Some(v) = crate::androidx::call_instance(vm, class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    // Apêndice E: objetos seguidos pelo shim GMS/Firebase e classes
+    // `Lcom/google/android/gms/`, `Lcom/google/firebase/`,
+    // `Lcom/android/billingclient/` — `None` continua para o host/DEX.
+    #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+    if let Some(v) = crate::gms::call_instance(vm, class, name, sig, recv, args)? {
+        return Ok(Some(v));
+    }
+    let _ = (class, name, sig, recv, args);
+    Ok(None)
 }
 
 /// Resolve only real inherited Android hosts; never invent an app method.
@@ -2035,6 +2171,9 @@ pub(crate) fn inherited_android_host(
     let mut ancestor = start.to_string();
     let mut property_fallback_class = None;
     let mut visited = alloc::collections::BTreeSet::new();
+    // Receiver concrete class for the per-ancestor DEX-override gates
+    // (issue #228 saved-state handler).
+    let recv_class = vm.heap.class_of(recv)?.to_string();
     for _ in 0..16 {
         if !visited.insert(ancestor.clone()) {
             break;
@@ -2063,7 +2202,25 @@ pub(crate) fn inherited_android_host(
             {
                 return Ok(Some(value));
             }
+            // issue #228: AbsSavedState/BaseSavedState state (superState
+            // storage and the final getSuperState) reached through the
+            // inherited walk when the method ref names a DEX subclass.
+            if let Some(value) = crate::platform_base::saved_state_instance(
+                vm,
+                &recv_class,
+                &ancestor,
+                name,
+                sig,
+                recv,
+                args,
+            )? {
+                return Ok(Some(value));
+            }
             if let Some(value) = crate::platform_base::instance_intrinsic(&ancestor, name, sig) {
+                return Ok(Some(value));
+            }
+        } else if is_bundled_shim_owner(&ancestor) {
+            if let Some(value) = call_host_shim_layer(vm, &ancestor, name, sig, recv, args)? {
                 return Ok(Some(value));
             }
         }
@@ -2179,7 +2336,7 @@ mod fetch_tests {
             state ^= state << 13;
             state ^= state >> 7;
             state ^= state << 17;
-            let pc = if state % 4 != 0 && cursor < instructions.len() {
+            let pc = if !state.is_multiple_of(4) && cursor < instructions.len() {
                 instructions[cursor].0
             } else {
                 (state as usize) % (instructions.len() * 3 + 16)

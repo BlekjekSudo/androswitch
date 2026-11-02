@@ -25,7 +25,6 @@ rd-render = { workspace = true }
 rd-agent = { workspace = true }
 rd-framework = { workspace = true }
 clap.workspace = true
-anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
@@ -34,6 +33,9 @@ rd-testsupport = { path = "../rd-testsupport" }
 
 [features]
 lang-01 = ["rd-engine-registry/lang-01", "rd-agent/lang-01"]
+# M11 S1b: `rd test` com o bridge WASM ligado (ADR 013). M11 S1c: `rd engine run wasm`
+# via adapter registrado. Off by default.
+wasm-engine = ["rd-agent/wasm-engine", "rd-engine-registry/wasm-execution"]
 lang-02 = ["rd-engine-registry/lang-02", "rd-agent/lang-02"]
 lang-03 = ["rd-engine-registry/lang-03", "rd-agent/lang-03"]
 lang-04 = ["rd-engine-registry/lang-04", "rd-agent/lang-04"]

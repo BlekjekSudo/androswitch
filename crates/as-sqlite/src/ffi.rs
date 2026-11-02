@@ -65,6 +65,20 @@ extern "C" {
     fn sqlite3_malloc64(n: u64) -> *mut c_void;
     fn sqlite3_free(p: *mut c_void);
     fn sqlite3_limit(db: *mut c_void, id: c_int, value: c_int) -> c_int;
+    fn sqlite3_set_authorizer(
+        db: *mut c_void,
+        callback: Option<
+            unsafe extern "C" fn(
+                *mut c_void,
+                c_int,
+                *const c_char,
+                *const c_char,
+                *const c_char,
+                *const c_char,
+            ) -> c_int,
+        >,
+        context: *mut c_void,
+    ) -> c_int;
     fn sqlite3_progress_handler(
         db: *mut c_void,
         interval: c_int,
@@ -130,6 +144,28 @@ unsafe extern "C" fn progress(context: *mut c_void) -> c_int {
     let remaining = unsafe { &mut *context.cast::<u32>() };
     *remaining = remaining.saturating_sub(1);
     i32::from(*remaining == 0)
+}
+
+// Match the upstream SQLite adapter's database-ownership contract at SQLite's
+// parsed-action boundary, including quoted/mixed-case pragmas. No SQL text
+// matching or host path access is involved. The callback keeps no pointers and
+// must not call back into the connection. See sqlite.org/c3ref/set_authorizer.html.
+unsafe extern "C" fn authorize(
+    _context: *mut c_void,
+    action: c_int,
+    name: *const c_char,
+    _argument: *const c_char,
+    _database: *const c_char,
+    _source: *const c_char,
+) -> c_int {
+    const SQLITE_PRAGMA: c_int = 19;
+    const SQLITE_ATTACH: c_int = 24;
+    const SQLITE_DETACH: c_int = 25;
+    let forbidden = matches!(action, SQLITE_ATTACH | SQLITE_DETACH)
+        || (action == SQLITE_PRAGMA && !name.is_null()
+            // SAFETY: SQLite supplies a NUL-terminated name for this callback.
+            && unsafe { CStr::from_ptr(name) }.to_bytes().eq_ignore_ascii_case(b"writable_schema"));
+    i32::from(forbidden) // SQLITE_DENY = 1; SQLITE_OK = 0.
 }
 
 pub struct Connection(*mut c_void);
@@ -202,6 +238,16 @@ impl Connection {
                 sqlite3_limit(db, 7, 0); // ATTACH cannot bypass snapshot ownership
                 sqlite3_limit(db, 9, 999); // bound parameters
                 sqlite3_limit(db, 10, 16); // trigger depth
+            }
+            // Install after internal snapshot restore, before any guest SQL is
+            // prepared. SQLite retains the static callback until close.
+            let rc = unsafe { sqlite3_set_authorizer(db, Some(authorize), ptr::null_mut()) };
+            if rc != 0 {
+                let result = unsafe { error(db, rc) };
+                unsafe {
+                    sqlite3_close(db);
+                }
+                return Err(result);
             }
             db
         };

@@ -1,0 +1,138 @@
+name: Fuzz (nightly)
+
+# RustyDroid.md §3.2: "fuzz.yml | nightly | cargo-fuzz nos parsers
+# (dex/axml/arsc/zip/elf) + corpus persistido".
+#
+# What this does NOT do: it is not the 24 h M1 campaign (that one is
+# scripts/fuzz-campaign.sh on a dedicated box, see docs/FUZZING.md). This is the
+# nightly anti-rot run: prove every target still builds on nightly and execute
+# a bounded smoke on each, keeping the corpus warm between nights.
+#
+# Sentinel notes (RD Sentinel `_workflow_findings`):
+# all actions are pinned to full commit SHAs and no `${{ }}` expression is
+# interpolated into a `run:` script (values arrive through `env:`).
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # 03:17 UTC, off the top of the hour
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: "Seconds of fuzzing per target"
+        required: false
+        default: "180"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-nightly
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fuzz:
+    name: fuzz ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: rd-apk-fuzz
+            crate_dir: crates/rd-apk
+            target: zip
+          - package: rd-apk-fuzz
+            crate_dir: crates/rd-apk
+            target: axml
+          - package: rd-apk-fuzz
+            crate_dir: crates/rd-apk
+            target: arsc
+          - package: rd-apk-fuzz
+            crate_dir: crates/rd-apk
+            target: apk_full
+          - package: rd-dex-fuzz
+            crate_dir: crates/rd-dex
+            target: dex
+          - package: rd-ndk-fuzz
+            crate_dir: crates/rd-ndk
+            target: elf
+          - package: rd-engine-wasm-fuzz
+            crate_dir: crates/rd-engine-wasm
+            target: wasm_module
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable @ 2026-10-25
+        with:
+          toolchain: nightly
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: ${{ matrix.crate_dir }}/fuzz -> target
+
+      # The corpus is the point of "corpus persistido": without it every night
+      # restarts from the same seeds and finds the same edges.
+      - name: Restore corpus
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ matrix.crate_dir }}/fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
+
+      - name: Install cargo-fuzz (pinned)
+        run: cargo install cargo-fuzz --locked --version 0.13.2
+
+      # cargo-fuzz runs from the crate that owns `fuzz/` (same as ci.yml
+      # fuzz-build and scripts/fuzz-campaign.sh), not from the workspace root.
+      - name: Build target
+        working-directory: ${{ matrix.crate_dir }}
+        env:
+          TARGET: ${{ matrix.target }}
+        run: cargo +nightly fuzz build "$TARGET"
+
+      - name: Smoke run
+        timeout-minutes: 15
+        env:
+          TARGET: ${{ matrix.target }}
+          CRATE_DIR: ${{ matrix.crate_dir }}
+          SECONDS_INPUT: ${{ github.event.inputs.seconds }}
+        run: |
+          set -euo pipefail
+          budget="${SECONDS_INPUT:-180}"
+          case "$budget" in
+            ''|*[!0-9]*) echo "::error::seconds must be a positive integer (got '$budget')"; exit 1 ;;
+          esac
+          cd "$CRATE_DIR"
+          # -rss_limit_mb keeps one runaway input from eating the runner;
+          # -max_total_time bounds the wall clock (cargo-fuzz/libFuzzer flag).
+          cargo +nightly fuzz run "$TARGET" -- -max_total_time="$budget" -rss_limit_mb=2048
+
+      - name: Fail on crashes, upload them
+        if: always()
+        env:
+          TARGET: ${{ matrix.target }}
+          CRATE_DIR: ${{ matrix.crate_dir }}
+        run: |
+          set -euo pipefail
+          artifacts="$CRATE_DIR/fuzz/artifacts/$TARGET"
+          if [ -d "$artifacts" ] && find "$artifacts" -type f -name 'crash-*' | grep -q .; then
+            echo "::error::fuzz target $TARGET produced crashes (Lei 1: no panic on untrusted input)"
+            find "$artifacts" -type f -name 'crash-*' -printf '%p %s bytes\n'
+            exit 1
+          fi
+          echo "no crash-* artifacts for $TARGET"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: ${{ matrix.crate_dir }}/fuzz/artifacts/${{ matrix.target }}
+          if-no-files-found: ignore
+          retention-days: 14

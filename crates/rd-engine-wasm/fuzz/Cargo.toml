@@ -1,0 +1,24 @@
+# workspace próprio (padrão cargo-fuzz: fora do workspace principal)
+[workspace]
+
+[package]
+name = "rd-engine-wasm-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.rd-engine-wasm]
+path = ".."
+
+[[bin]]
+name = "wasm_module"
+path = "fuzz_targets/wasm_module.rs"
+test = false
+doc = false
+bench = false

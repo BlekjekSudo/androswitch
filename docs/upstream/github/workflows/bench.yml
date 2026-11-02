@@ -1,0 +1,65 @@
+name: Bench (regression gate)
+
+# RustyDroid.md §3.2: "bench.yml | push main | criterion + github-action-benchmark
+# (fail em regressão > 10%)".
+#
+# Benches live in the crates themselves (`harness = false`, libtest-format output
+# so the `cargo` tool of github-action-benchmark can parse them; no criterion
+# dependency, so cargo-deny stays unchanged). History is stored on the `gh-pages`
+# branch, which must exist (see docs/ROADMAP.md M12 / GH-06).
+#
+# Only push-to-main stores data and gates. Manual runs measure and report only.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bench-main
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  bench:
+    name: benches (rd-dex parse tables)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # write só para o job: github-action-benchmark grava o histórico no gh-pages
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Run benches
+        run: |
+          set -euo pipefail
+          cargo bench -p rd-dex --bench parse_tables --locked | tee bench-output.txt
+          grep -q '^test ' bench-output.txt || { echo "::error::no bench results"; exit 1; }
+
+      # github-action-benchmark compares with the previous stored run and fails
+      # when the slowdown reaches the threshold (110% = a 10% regression).
+      - name: Compare with history and gate
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
+        with:
+          name: rd-dex parse tables
+          tool: cargo
+          output-file-path: bench-output.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ github.event_name == 'push' }}
+          alert-threshold: "110%"
+          comment-on-alert: false
+          fail-on-alert: true

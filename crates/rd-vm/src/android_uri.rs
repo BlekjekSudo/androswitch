@@ -197,8 +197,38 @@ pub(crate) fn new_uri(vm: &mut Engine, s: String) -> Result<Value, VmExit> {
         .heap
         .alloc_instance(URI.to_string(), Vec::new())
         .map_err(crate::err::oom_throwable)?;
-    vm.fw.m8.uris.insert(r, s);
+    remember_uri(vm, r, s)?;
     Ok(Value::Obj(r))
+}
+
+/// Registra o texto de um `Uri` já alocado. O texto também vive numa `String`
+/// do heap guest (campo `encoded`), então entra na conta do `heap_budget` e
+/// é liberado pelo GC junto com o `Uri` (#367). O mapa do host é só um
+/// índice; `gc_purge` o limpa para objetos mortos.
+pub(crate) fn remember_uri(vm: &mut Engine, r: ObjRef, s: String) -> Result<(), VmExit> {
+    let mirror = vm
+        .heap
+        .alloc_string(s.clone())
+        .map_err(crate::err::oom_throwable)?;
+    crate::err::put_field_result(vm.heap.put_field(r, "encoded", Value::Obj(mirror)))?;
+    vm.fw.m8.uris.insert(r, s);
+    Ok(())
+}
+
+/// Conta o texto atual de um `Uri$Builder` no heap guest, trocando a `String`
+/// anterior pela nova (só a diferença entra no orçamento). Sem isto, o builder
+/// guardava `String`s no host sem limite (#367).
+fn charge_builder(vm: &mut Engine, recv: ObjRef, s: String) -> Result<(), VmExit> {
+    match vm.heap.get_field(recv, "content") {
+        Ok(Value::Obj(m)) => vm
+            .heap
+            .initialize_string(m, s)
+            .map_err(crate::err::oom_throwable),
+        _ => {
+            let m = vm.heap.alloc_string(s).map_err(crate::err::oom_throwable)?;
+            crate::err::put_field_result(vm.heap.put_field(recv, "content", Value::Obj(m)))
+        }
+    }
 }
 
 fn builder_from_parts(p: Parts) -> B {
@@ -393,9 +423,19 @@ pub fn instance_intrinsic(
         "getPort" => {
             let port = p.authority.as_deref().and_then(|a| {
                 let a = a.rsplit_once('@').map(|(_, h)| h).unwrap_or(a);
-                let a = a.rsplit_once(']').map(|(_, r)| r).unwrap_or(a);
-                a.rsplit_once(':')
-                    .and_then(|(_, port)| port.parse::<i32>().ok())
+                // An IPv6 literal ends at ']'; the port follows it. An unclosed
+                // '[' has no port (#367).
+                let after_host = if a.starts_with('[') {
+                    a.split_once(']').map(|(_, r)| r)?
+                } else {
+                    a
+                };
+                let (_, port) = after_host.rsplit_once(':')?;
+                // Digits only: no sign, no empty port.
+                if port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit()) {
+                    return None;
+                }
+                port.parse::<i32>().ok()
             });
             Value::Int(port.unwrap_or(-1))
         }
@@ -614,8 +654,25 @@ fn builder(
             Value::Null
         }
         "appendQueryParameter" => {
-            let k = a0.unwrap_or_default();
-            let v = sval(vm, args.get(1)).unwrap_or_else(|| "null".into());
+            // Objects.requireNonNull(key/value) in AOSP (#367).
+            let k = match args.first() {
+                Some(Value::Obj(_)) => sval(vm, args.first()).unwrap_or_default(),
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "key".to_string(),
+                    )))
+                }
+            };
+            let v = match args.get(1) {
+                Some(Value::Obj(_)) => sval(vm, args.get(1)).unwrap_or_default(),
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "value".to_string(),
+                    )))
+                }
+            };
             let pair = format!("{}={}", encode(&k, ""), encode(&v, ""));
             b.query = Some(match b.query.take().filter(|q| !q.is_empty()) {
                 Some(q) => format!("{q}&{pair}"),
@@ -657,6 +714,7 @@ fn builder(
         }
         _ => return Ok(None),
     };
+    charge_builder(vm, recv, build_string(&b))?;
     vm.module_tables
         .android_uri_builders
         .clone()

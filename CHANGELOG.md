@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **M12 Community, Governance & Docs Site Foundation (`GH-02`, `GH-03`, `GH-04`):**
   [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md), [`GOVERNANCE.md`](./GOVERNANCE.md),
   [`SUPPORT.md`](./SUPPORT.md), [`README.en.md`](./README.en.md), `CHANGELOG.md`,
-  [`.github/ISSUE_TEMPLATE/perf_regression.yml`](./.github/ISSUE_TEMPLATE/perf_regression.yml),
+  [`.github/ISSUE_TEMPLATE/perf-regression.yml`](./.github/ISSUE_TEMPLATE/perf-regression.yml),
   [`.github/FUNDING.yml`](./.github/FUNDING.yml), and `mdBook` configuration (`docs/book.toml`,
   `docs/SUMMARY.md`, `docs/index.md`).
 

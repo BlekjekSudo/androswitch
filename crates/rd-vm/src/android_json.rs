@@ -737,7 +737,8 @@ impl<'a> ReaderState<'a> {
             if ch == quote {
                 return Ok(String::from_utf16_lossy(&units));
             }
-            if ch == '\n' {
+            // Newline literal só é erro no modo estrito (#364).
+            if ch == '\n' && !self.lenient {
                 return Err(self.malformed("Unterminated string"));
             }
             if ch == '\\' {
@@ -949,7 +950,12 @@ impl<'a> ReaderState<'a> {
                     }
                 }
                 Token::Name => {
+                    // AOSP: at depth 0 only the property name is skipped; its value
+                    // stays for the caller (#364).
                     self.take_peeked();
+                    if depth == 0 {
+                        return Ok(());
+                    }
                 }
                 Token::String | Token::Number | Token::Boolean | Token::Null => {
                     self.take_peeked();
@@ -1775,6 +1781,27 @@ fn json_writer(
             None
         };
 
+    // #364 item 2: o texto de um argumento é expandido no host (escapes de até
+    // 6 bytes por caractere) antes de chegar ao writer. Cobrar o pior caso
+    // contra o orçamento do heap antes da expansão.
+    let worst = args
+        .iter()
+        .filter_map(|v| match v {
+            Value::Obj(r) => vm.heap.as_str(*r).ok().map(|t| t.len()),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0);
+    let cost = worst.saturating_mul(6).saturating_add(32);
+    if vm.heap.used().saturating_add(cost) > vm.heap.budget() {
+        return Err(throw(
+            "Ljava/lang/OutOfMemoryError;",
+            format!(
+                "JSON escaping of {cost} bytes exceeds heap of {} bytes",
+                vm.heap.budget()
+            ),
+        ));
+    }
     let mut state = writer_load(vm, recv);
     let result = (|| -> Result<WriterOut, VmExit> {
         Ok(match (name, sig) {
@@ -1786,17 +1813,17 @@ fn json_writer(
                 WriterOut::Null
             }
             ("setLenient", "(Z)V") => {
-                state.lenient = matches!(args.first(), Some(Value::Int(1)));
+                state.lenient = matches!(args.first(), Some(Value::Int(v)) if *v != 0);
                 WriterOut::Null
             }
             ("isLenient", "()Z") => WriterOut::Bool(state.lenient),
             ("setHtmlSafe", "(Z)V") => {
-                state.html_safe = matches!(args.first(), Some(Value::Int(1)));
+                state.html_safe = matches!(args.first(), Some(Value::Int(v)) if *v != 0);
                 WriterOut::Null
             }
             ("isHtmlSafe", "()Z") => WriterOut::Bool(state.html_safe),
             ("setSerializeNulls", "(Z)V") => {
-                state.serialize_nulls = matches!(args.first(), Some(Value::Int(1)));
+                state.serialize_nulls = matches!(args.first(), Some(Value::Int(v)) if *v != 0);
                 WriterOut::Null
             }
             ("getSerializeNulls", "()Z") => WriterOut::Bool(state.serialize_nulls),
@@ -1831,7 +1858,7 @@ fn json_writer(
                 WriterOut::This
             }
             ("value", "(Z)Landroid/util/JsonWriter;") => {
-                let value = matches!(args.first(), Some(Value::Int(1)));
+                let value = matches!(args.first(), Some(Value::Int(v)) if *v != 0);
                 state.raw_value(if value { "true" } else { "false" })?;
                 WriterOut::This
             }

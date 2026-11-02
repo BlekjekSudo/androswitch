@@ -54,7 +54,7 @@ fn minimal_dex_with_map(
     d[36..40].copy_from_slice(&112u32.to_le_bytes());
     d[40..44].copy_from_slice(&0x1234_5678u32.to_le_bytes());
     d.extend_from_slice(payload);
-    while d.len() % 4 != 0 {
+    while !d.len().is_multiple_of(4) {
         d.push(0);
     }
     let map_off = d.len() as u32;
@@ -148,7 +148,7 @@ fn disasm_render_class_charges_proto_sig_steps_and_validates_method_type_u16_332
     let type_str_idxs = [0u32, 1, 2, 3];
 
     // type_list for proto 1 (500 x type_id 0 = "I")
-    while data_sec.len() % 4 != 0 {
+    while !data_sec.len().is_multiple_of(4) {
         data_sec.push(0);
     }
     let tl_rel = data_sec.len() as u32;
@@ -158,7 +158,7 @@ fn disasm_render_class_charges_proto_sig_steps_and_validates_method_type_u16_332
     }
 
     // code_item for caller(): 200 x `invoke-static {}, method@1` (35c: 0x0071, 0x0001, 0x0000) + `return-void` (0x000e)
-    while data_sec.len() % 4 != 0 {
+    while !data_sec.len().is_multiple_of(4) {
         data_sec.push(0);
     }
     let code_rel = data_sec.len() as u32;

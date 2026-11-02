@@ -1,0 +1,222 @@
+name: Release
+
+# Tag-driven release for the `rd` CLI (M12 — GitHub ecosystem end-to-end).
+#
+# Why a separate workflow and not more steps in ci.yml:
+#   * ci.yml is the pull-request gate and must stay read-only and fast;
+#     publishing needs write access to repository contents, which must not
+#     exist on a PR run.
+#   * the release payload is the *evidence* the project promises (binary +
+#     official scoreboard + spec), so the scoreboard is regenerated and
+#     proven in sync here instead of being trusted from the tag.
+#
+# Safety properties this file is written to satisfy (RD Sentinel
+# `_workflow_findings`):
+#   * every action is pinned to a full commit SHA — the publish job holds a
+#     contents write grant, and an unpinned ref there is a P1 finding;
+#   * no `${{ }}` expression is interpolated into a `run:` script — untrusted
+#     inputs are bound to `env:` first (`workflow-template-injection`);
+#   * top-level `permissions: contents: read`, write only on the publish job;
+#   * `persist-credentials: false` on every checkout;
+#   * the tag must be an ancestor of origin/main (no releasing from a branch);
+#   * no third-party release action: `gh` is preinstalled on the runner, so no
+#     mutable action ever receives the token.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)publish, e.g. v0.9.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build (all features, locked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    # attestations: a procedência é assinada via OIDC (id-token), sem segredo de escrita
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable @ 2026-10-25
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Resolve tag under release
+        id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          tag="${INPUT_TAG:-$REF_NAME}"
+          case "$tag" in
+            v*) ;;
+            *) echo "::error::release tags must start with 'v' (got '$tag')"; exit 1 ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the tag and prove it is an ancestor of origin/main
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # `actions/checkout` follows the ref that triggered the run: a tag on
+          # `push`, but the branch tip on `workflow_dispatch`. Validate the tag
+          # AND build from it — validating one commit and compiling another is
+          # exactly how a release ends up with the wrong binary.
+          git rev-parse --verify "refs/tags/$TAG" >/dev/null
+          git checkout --detach "refs/tags/$TAG"
+          commit="$(git rev-parse HEAD)"
+          if [ "$commit" != "$(git rev-list -n1 "refs/tags/$TAG")" ]; then
+            echo "::error::HEAD ($commit) is not tag $TAG"
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$commit" origin/main; then
+            echo "::error::tag $TAG ($commit) is not an ancestor of origin/main"
+            exit 1
+          fi
+          echo "releasing $TAG from $commit"
+
+      - name: Build the CLI
+        run: cargo build --release --locked --all-features -p rd-cli
+
+      # SBOM CycloneDX do binário `rd` (RustyDroid.md §3.2 / M12: SBOM + provenance).
+      # cargo-cyclonedx pinned: a versão do gerador não muda sem commit.
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          set -euo pipefail
+          cargo install cargo-cyclonedx --version 0.5.9 --locked
+          cargo cyclonedx --manifest-path crates/rd-cli/Cargo.toml --format json \
+            --all-features --describe binaries
+          test -f crates/rd-cli/rd_bin.cdx.json
+          mv crates/rd-cli/rd_bin.cdx.json rd-sbom.cdx.json
+
+      - name: Official scoreboard must match the tag
+        run: |
+          set -euo pipefail
+          cargo xtask compat-report /tmp/compat-matrix.md
+          diff -u docs/compat-matrix.md /tmp/compat-matrix.md
+
+      - name: Assemble payload
+        id: payload
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          name="rustydroid-${TAG}-linux-x86_64"
+          mkdir -p "dist/$name"
+          install -m 0755 target/release/rd "dist/$name/rd"
+          install -m 0644 rd-sbom.cdx.json "dist/$name/sbom.cdx.json"
+          install -m 0644 RustyDroid.md docs/compat-matrix.md README.md \
+                          LICENSE-MIT LICENSE-APACHE "dist/$name/"
+          if [ -f CHANGELOG.md ]; then install -m 0644 CHANGELOG.md "dist/$name/"; fi
+          ./target/release/rd --version > "dist/$name/VERSION.txt" 2>&1 || true
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+          ( cd dist && sha256sum "$name.tar.gz" > SHA256SUMS.txt )
+          cat dist/SHA256SUMS.txt
+          echo "archive=dist/$name.tar.gz" >> "$GITHUB_OUTPUT"
+
+      # Procedência (SLSA) do tarball: prova de qual commit/workflow gerou o binário.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.payload.outputs.archive }}
+
+      - name: Upload payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-payload-${{ steps.tag.outputs.tag }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve tag under release
+        id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "tag=${INPUT_TAG:-$REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the tag too (release notes read the CHANGELOG at that commit)
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git checkout --detach "refs/tags/$TAG"
+
+      # The notes generator runs below with the write token in scope: prove the
+      # helper scripts at this exact tag behave before trusting their output.
+      - name: Self-test release scripts
+        run: bash tests/scripts/release_scripts_test.sh
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-payload-${{ steps.tag.outputs.tag }}
+          path: dist
+
+      - name: Create or update the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          assets=(dist/*.tar.gz dist/SHA256SUMS.txt)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            notes="$(scripts/release-notes.sh "$TAG")"
+            gh release create "$TAG" "${assets[@]}" \
+              --verify-tag \
+              --title "RustyDroid $TAG" \
+              --notes "$notes"
+          fi
+
+      - name: Summary
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          {
+            echo "### RustyDroid $TAG published"
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

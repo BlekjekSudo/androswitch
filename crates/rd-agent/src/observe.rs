@@ -272,9 +272,7 @@ impl AgentSession {
         match r {
             Ok(r) => r,
             Err(p) => {
-                let msg = p.downcast_ref::<String>().cloned()
-                    .or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()))
-                    .unwrap_or_else(|| "panic".into());
+                let msg = Self::panic_message(&*p);
                 // Capture context before dropping the failed process. Never
                 // inspect guest frames/heap or acquire the log lock here.
                 let result = self.tool_error_result(name, &agent_error(
@@ -282,16 +280,73 @@ impl AgentSession {
                     format!("runtime panic durante '{name}': {msg} — o app foi encerrado; a sessão continua"),
                     Some("relance com `launch` e reporte o bug (logs tem a mensagem)"),
                 ));
-                self.engine = None;
-                self.engine_package = None;
-                self.native_engine = None;
-                self.activity = None;
-                self.screen.snap = None;
-                self.screen.dirty = true;
-                self.logs.lock()
-                    .map(|mut l| l.extend_from_slice(format!("E/RustyDroid: runtime panic in '{name}': {msg}\n").as_bytes()))
-                    .ok();
+                self.teardown_after_panic(name, &msg);
                 result
+            }
+        }
+    }
+
+    fn panic_message(p: &(dyn std::any::Any + Send)) -> String {
+        p.downcast_ref::<String>()
+            .cloned()
+            .or_else(|| p.downcast_ref::<&str>().map(|s| s.to_string()))
+            .unwrap_or_else(|| "panic".into())
+    }
+
+    /// Estado pós-panic de runtime: o app morreu; a sessão continua.
+    fn teardown_after_panic(&mut self, name: &str, msg: &str) {
+        self.engine = None;
+        self.engine_package = None;
+        self.native_engine = None;
+        self.activity = None;
+        self.screen.snap = None;
+        self.screen.dirty = true;
+        self.logs
+            .lock()
+            .map(|mut l| {
+                l.extend_from_slice(
+                    format!("E/RustyDroid: runtime panic in '{name}': {msg}\n").as_bytes(),
+                )
+            })
+            .ok();
+    }
+
+    /// Issue #317: `screen_after_call` roda FORA do `catch_unwind` da
+    /// chamada (em `tools/call`), mas executa `screen_refresh` →
+    /// desenho de frame, que roda código guest. Um panic ali escapava
+    /// do isolamento e derrubava o servidor MCP. Mesmo teardown do
+    /// caminho da tool: o app é encerrado, a sessão vive.
+    pub fn screen_after_call_isolated(&mut self, tool: &str, ms: f64) {
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.screen_after_call(tool, ms)
+        }));
+        if let Err(p) = r {
+            let msg = Self::panic_message(&*p);
+            self.teardown_after_panic(tool, &msg);
+        }
+    }
+
+    /// Issue #317: `resources/read` executa `screen_refresh` /
+    /// `screen_png` (código guest) — isolado como as tools: panic
+    /// vira erro JSON-RPC tipado + teardown do app, nunca crash
+    /// do servidor MCP.
+    pub fn resource_read_isolated(
+        &mut self,
+        uri: &str,
+    ) -> Result<serde_json::Value, (i64, String)> {
+        let r =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.resource_read(uri)));
+        match r {
+            Ok(r) => r,
+            Err(p) => {
+                let msg = Self::panic_message(&*p);
+                self.teardown_after_panic("resources/read", &msg);
+                Err((
+                    -32002,
+                    format!(
+                        "INTERNAL_PANIC: runtime panic em resources/read '{uri}': {msg} — o app foi encerrado; a sessão continua"
+                    ),
+                ))
             }
         }
     }
@@ -306,11 +361,16 @@ impl AgentSession {
         let eng = self.require_engine()?;
         let finished = eng.activity_is_finished();
         let mut draw_error = None;
+        // Só é mutado no bloco de acessibilidade virtual (feature
+        // advanced-components); sem ela, o `mut` é desnecessário. O allow
+        // vale apenas nesse combo, para o lint continuar ativo no default.
+        #[cfg_attr(not(feature = "advanced-components"), allow(unused_mut))]
         let mut model = if finished {
             // no window any more: never serve the last frame as if it were live
+            let (vw, vh) = eng.viewport_px();
             ScreenModel {
-                width: 720,
-                height: 1440,
+                width: vw,
+                height: vh,
                 ..ScreenModel::default()
             }
         } else {
@@ -373,10 +433,16 @@ impl AgentSession {
         };
         if let Some(msg) = &draw_error {
             if self.screen.draw_error.as_deref() != Some(msg) {
+                // Issue #317: log é best-effort — buffer envenenado não
+                // pode transformar um erro de desenho em panic.
                 self.logs
                     .lock()
-                    .expect("logs")
-                    .extend_from_slice(format!("W/RustyDroid: draw pass failed: {msg}\n").as_bytes());
+                    .map(|mut l| {
+                        l.extend_from_slice(
+                            format!("W/RustyDroid: draw pass failed: {msg}\n").as_bytes(),
+                        )
+                    })
+                    .ok();
             }
         }
         self.screen.draw_error = draw_error;
@@ -414,7 +480,8 @@ impl AgentSession {
             .view_tree()
             .ok_or_else(|| agent_error("INVALID_FORMAT", "sem activity/window para screenshot", None))?;
         let t_render = std::time::Instant::now();
-        let mut fb = rd_render::render_snapshot(&tree);
+        let (vw, vh) = eng.viewport_px();
+        let mut fb = rd_render::render_snapshot_sized(&tree, vw as usize, vh as usize);
         phase("render_snapshot", t_render);
         if eng.has_frame() {
             let t_rast = std::time::Instant::now();
@@ -478,8 +545,80 @@ impl AgentSession {
         }
     }
 
+    /// Issue #259 (item 2): com um snapshot ADR-009 apresentado e o
+    /// engine ainda não materializado, o `observe` serve as strings
+    /// ARMAZENADAS (`observe_text`/`observe_json` da captura) em vez
+    /// de forçar `screen_refresh` → `require_engine` — o fluxo mais
+    /// comum (launch → observe) não pode anular o fast-path. Devolve
+    /// `None` quando não há snapshot pendente (caminho normal).
+    /// A materialização continua preguiçosa: tap e demais tools de
+    /// engine seguem materializando no primeiro uso.
+    fn observe_from_pending_snapshot(
+        &mut self,
+        args: &serde_json::Map<String, serde_json::Value>,
+        t0: std::time::Instant,
+    ) -> Option<Result<ToolResult, RdError>> {
+        if self.engine.is_some() {
+            return None;
+        }
+        let pending = self.pending_snapshot.as_ref()?;
+        let stored_text = pending.loaded.observe_text.clone();
+        let stored_json = pending.loaded.observe_json.clone();
+        let format = args.get("format").and_then(|v| v.as_str()).unwrap_or("text");
+        let diff = args.get("diff").and_then(|v| v.as_bool()).unwrap_or(true);
+        let v = self.screen.version;
+        let mut j: serde_json::Value =
+            serde_json::from_str(&stored_json).unwrap_or_else(|_| serde_json::json!({}));
+        let cur: Vec<String> = j["texts"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|t| t["text"].as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let out = match format {
+            "json" => {
+                j["version"] = serde_json::json!(v);
+                j["snapshot"] = serde_json::json!(true);
+                if diff {
+                    if let Some((pv, prev)) = &self.screen.observed {
+                        j["changed"] = serde_json::json!(*pv != v);
+                        j["since"] = serde_json::json!(pv);
+                        j["added"] = serde_json::json!(
+                            cur.iter().filter(|t| !prev.contains(t)).collect::<Vec<_>>()
+                        );
+                        j["removed"] = serde_json::json!(
+                            prev.iter().filter(|t| !cur.contains(t)).collect::<Vec<_>>()
+                        );
+                    }
+                }
+                j["observe_ms"] =
+                    serde_json::json!((t0.elapsed().as_secs_f64() * 10000.0).round() / 10.0);
+                Ok(ToolResult::json(&j))
+            }
+            "text" => {
+                let mut s = stored_text;
+                if diff {
+                    s.push_str(&self.diff_line(&cur));
+                }
+                Ok(ToolResult::text(s))
+            }
+            other => Err(agent_error(
+                "INVALID_FORMAT",
+                format!("observe: format '{other}' desconhecido"),
+                Some("use format \"text\" (compacto, default) ou \"json\""),
+            )),
+        };
+        self.screen.observed = Some((v, cur));
+        Some(out)
+    }
+
     fn tool_observe(&mut self, args: &serde_json::Map<String, serde_json::Value>) -> Result<ToolResult, RdError> {
         let t0 = std::time::Instant::now();
+        if let Some(out) = self.observe_from_pending_snapshot(args, t0) {
+            return out;
+        }
         self.screen_refresh()?;
         let format = args.get("format").and_then(|v| v.as_str()).unwrap_or("text");
         let diff = args.get("diff").and_then(|v| v.as_bool()).unwrap_or(true);
@@ -487,7 +626,10 @@ impl AgentSession {
             "json" => {
                 let boxes = args.get("boxes").and_then(|v| v.as_bool()).unwrap_or(false);
                 let v = self.screen.version;
-                let snap = self.screen.snap.as_ref().expect("snap");
+                // Issue #317: invariante quebrada vira erro tipado.
+                let snap = self.screen.snap.as_ref().ok_or_else(|| {
+                    agent_error("NOT_RUNNING", "sem frame de tela disponível", None)
+                })?;
                 let mut j = snap.to_json(v, boxes);
                 let cur: Vec<String> = snap.texts().iter().map(|t| t.text.clone()).collect();
                 if diff {
@@ -526,7 +668,10 @@ impl AgentSession {
         let exact = args.get("exact").and_then(|v| v.as_bool()).unwrap_or(false);
         let nth = args.get("nth").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
         self.screen_refresh()?;
-        let snap = self.screen.snap.as_ref().expect("snap");
+        // Issue #317: invariante quebrada vira erro tipado.
+        let snap = self.screen.snap.as_ref().ok_or_else(|| {
+            agent_error("NOT_RUNNING", "sem frame de tela disponível", None)
+        })?;
         let w = norm(want);
         let hit = |label: &str| {
             let l = norm(label);
@@ -583,7 +728,7 @@ impl AgentSession {
             {"uri": RES_SCREEN_TXT, "name": "screen.txt", "mimeType": "text/plain",
              "description": "A mesma tela em texto compacto (linhas por y, alvos com centro x,y). Assinável."},
             {"uri": RES_SCREEN_PNG, "name": "screen.png", "mimeType": "image/png",
-             "description": "PNG 720×1440 do frame atual (cacheado por versão). Assinável."},
+             "description": "PNG do frame atual no viewport ativo (720×1440 retrato, 1440×720 paisagem), cacheado por versão. Assinável."},
             {"uri": RES_LOGS, "name": "logs", "mimeType": "text/plain",
              "description": "System.out/logcat do app na sessão."},
         ]})
@@ -594,13 +739,28 @@ impl AgentSession {
         let content = match uri {
             RES_SCREEN => {
                 self.screen_refresh().map_err(err)?;
-                let snap = self.screen.snap.as_ref().expect("snap");
+                // Issue #317: nada de `expect` em caminho de servidor —
+                // se o refresh não produziu frame, o read falha tipado.
+                let Some(snap) = self.screen.snap.as_ref() else {
+                    return Err(err(agent_error(
+                        "NOT_RUNNING",
+                        "sem frame de tela disponível — lance um app primeiro",
+                        None,
+                    )));
+                };
                 serde_json::json!({"uri": uri, "mimeType": "application/json",
                     "text": snap.to_json(self.screen.version, true).to_string()})
             }
             RES_SCREEN_TXT => {
                 self.screen_refresh().map_err(err)?;
-                let snap = self.screen.snap.as_ref().expect("snap");
+                // Issue #317: sem `expect` em caminho de servidor.
+                let Some(snap) = self.screen.snap.as_ref() else {
+                    return Err(err(agent_error(
+                        "NOT_RUNNING",
+                        "sem frame de tela disponível — lance um app primeiro",
+                        None,
+                    )));
+                };
                 serde_json::json!({"uri": uri, "mimeType": "text/plain", "text": snap.to_text(self.screen.version)})
             }
             RES_SCREEN_PNG => {
@@ -608,7 +768,14 @@ impl AgentSession {
                 serde_json::json!({"uri": uri, "mimeType": "image/png", "blob": base64_encode(&png)})
             }
             RES_LOGS => {
-                let buf = self.logs.lock().expect("logs");
+                // Issue #317: buffer envenenado degrada tipado, sem panic.
+                let buf = self.logs.lock().map_err(|_| {
+                    err(agent_error(
+                        "LOG_BUFFER_UNAVAILABLE",
+                        "buffer de logs indisponível (mutex envenenado por panic anterior)",
+                        None,
+                    ))
+                })?;
                 serde_json::json!({"uri": uri, "mimeType": "text/plain", "text": String::from_utf8_lossy(&buf).to_string()})
             }
             other => return Err((-32002, format!("resource '{other}' não existe (veja resources/list)"))),
@@ -710,9 +877,18 @@ impl AgentSession {
 fn live_serve_conn(mut stream: std::net::TcpStream, sh: &LiveShared) {
     use std::io::{Read, Write};
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(5)));
-    let mut buf = [0u8; 4096];
-    let n = stream.read(&mut buf).unwrap_or(0);
-    let req = String::from_utf8_lossy(&buf[..n]);
+    // Lê o cabeçalho HTTP inteiro (até CRLFCRLF). Uma única `read` pode devolver
+    // só parte da requisição; fechar o socket com bytes não lidos no buffer de
+    // recepção envia RST e o cliente vê ConnectionReset.
+    let mut buf: Vec<u8> = Vec::with_capacity(1024);
+    let mut chunk = [0u8; 1024];
+    while buf.len() < 16 * 1024 && !buf.windows(4).any(|w| w == b"\r\n\r\n") {
+        match stream.read(&mut chunk) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => buf.extend_from_slice(&chunk[..n]),
+        }
+    }
+    let req = String::from_utf8_lossy(&buf);
     let path = req.split_whitespace().nth(1).unwrap_or("/").to_string();
     let (route, query) = path.split_once('?').unwrap_or((path.as_str(), ""));
     let (ctype, body): (&str, Vec<u8>) = match route {

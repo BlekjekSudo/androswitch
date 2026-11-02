@@ -94,11 +94,13 @@ fn hex(b: &[u8]) -> String {
     s
 }
 fn unhex(s: &str) -> Result<Vec<u8>> {
-    if s.len() % 2 != 0 || s.len() > 32 * 1024 * 1024 {
+    if !s.len().is_multiple_of(2) || s.len() > 32 * 1024 * 1024 {
         return Err(ioerr("invalid worker hex length"));
     }
     s.as_bytes()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|b| {
             let c = |v: u8| -> Result<u8> {
                 match v {
@@ -652,7 +654,19 @@ impl Runtime {
                     }
                 }
                 _ => {
-                    let bits = t.fp.get(i).copied().unwrap_or(0);
+                    // A missing FP argument register is a trap-capture bug, not a
+                    // zero: fail loudly instead of computing a silently wrong result
+                    // (issue #393).
+                    let bits = t.fp.get(i).copied().ok_or_else(|| {
+                        RdError::new(
+                            "NATIVE_ABI",
+                            format!("libm {name}: FP argument register {i} missing from trap"),
+                        )
+                    });
+                    let bits = match bits {
+                        Ok(b) => b,
+                        Err(e) => return Some(Err(e)),
+                    };
                     if single {
                         f32::from_bits(bits as u32) as f64
                     } else {
@@ -716,6 +730,14 @@ impl Runtime {
         }))
     }
     fn libc(&mut self, name: &str, t: &Trap) -> Result<Return> {
+        if std::env::var_os("RD_NDK_TRAP_DUMP").is_some() {
+            eprintln!(
+                "RD_NDK_TRAP_DUMP abi={:?} name={name} args={:x?} fp={:x?}",
+                self.abi,
+                &t.args[..t.args.len().min(6)],
+                &t.fp[..t.fp.len().min(8)],
+            );
+        }
         if let Some(r) = self.libm(name, t) {
             return r;
         }
@@ -858,7 +880,9 @@ impl Runtime {
                 let pos = if w == 1 {
                     b.iter().position(|x| *x == a[1] as u8)
                 } else {
-                    b.chunks_exact(4)
+                    b.as_chunks::<4>()
+                        .0
+                        .iter()
                         .position(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]) == a[1] as u32)
                 };
                 match pos {

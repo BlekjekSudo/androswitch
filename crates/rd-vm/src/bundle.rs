@@ -135,12 +135,34 @@ fn new_string_set(vm: &mut Engine, keys: Vec<String>) -> Result<Value, VmExit> {
     Ok(Value::Obj(set))
 }
 
+/// AOSP's old-format `parseUri` normalizes a relative class (leading dot)
+/// against the component package before building the `ComponentName`.
+fn normalize_component_class(pkg: &str, cls: &str) -> String {
+    if let Some(rest) = cls.strip_prefix('.') {
+        format!("{pkg}.{rest}")
+    } else {
+        cls.to_string()
+    }
+}
+
 /// `BaseBundle.dumpStats(IndentingPrintWriter, BaseBundle)`: report, one
 /// indentation level in, every entry whose `writeValue` size exceeds
 /// AOSP's 1 KiB threshold as `key [size=N]`, recursing into nested
 /// Bundles; a null bundle prints `[null]`. The writer is a guest object;
 /// its indent/println methods are invoked virtually.
-fn dump_stats(vm: &mut Engine, writer: ObjRef, bundle: Option<ObjRef>) -> Result<(), VmExit> {
+///
+/// A self-referential Bundle (or one nested past `MAX_DUMP_DEPTH`) prints
+/// a single `<recursion>` marker instead of recursing forever: the host
+/// must survive any guest graph shape.
+const MAX_DUMP_DEPTH: usize = 32;
+
+fn dump_stats(
+    vm: &mut Engine,
+    writer: ObjRef,
+    bundle: Option<ObjRef>,
+    visited: &mut std::collections::HashSet<ObjRef>,
+    depth: usize,
+) -> Result<(), VmExit> {
     const INDENTING_WRITER: &str = "Lcom/android/internal/util/IndentingPrintWriter;";
     vm.invoke_instance(
         writer,
@@ -159,11 +181,35 @@ fn dump_stats(vm: &mut Engine, writer: ObjRef, bundle: Option<ObjRef>) -> Result
             )?;
         }
         Some(bundle) => {
+            if !visited.insert(bundle) || depth >= MAX_DUMP_DEPTH {
+                // Cycle or cap: one marker line, no recursion, and the
+                // indent pair stays balanced with the increaseIndent above.
+                vm.invoke_instance(
+                    writer,
+                    "decreaseIndent",
+                    &format!("(){INDENTING_WRITER}"),
+                    &[],
+                )?;
+                let line = crate::intrinsics::alloc_string(vm, "<recursion>".to_string())?;
+                vm.invoke_instance(
+                    writer,
+                    "println",
+                    "(Ljava/lang/String;)V",
+                    &[Value::Obj(line)],
+                )?;
+                return Ok(());
+            }
             // Iterating the entries materializes a parcelled Bundle, as in
             // AOSP (size/entry access goes through `unparcel`).
             crate::parcel::unparcel_bundle(vm, bundle)?;
             for (key, value) in map_of(vm, bundle).unwrap_or_default() {
-                let size = crate::parcel::value_size(vm, &value)?;
+                // A value whose serialization trips the parcel write cap (a
+                // cyclic self-inclusive Bundle, or nesting past the cap)
+                // cannot be measured: the walk must survive any guest graph
+                // shape, so the size line is skipped and the recursion below
+                // prints the cycle/cap marker instead. Host-only path: the
+                // error comes from the write guards, not guest code.
+                let size = crate::parcel::value_size(vm, &value).ok();
                 let nested = match &value {
                     Value::Obj(o)
                         if matches!(vm.fw.get(*o), Some(HostObj::Bundle { .. }))
@@ -173,7 +219,7 @@ fn dump_stats(vm: &mut Engine, writer: ObjRef, bundle: Option<ObjRef>) -> Result
                     }
                     _ => None,
                 };
-                if size > 1024 {
+                if let Some(size) = size.filter(|&s| s > 1024) {
                     let key = if key == NULL_KEY { "null" } else { &key };
                     let line = crate::intrinsics::alloc_string(vm, format!("{key} [size={size}]"))?;
                     vm.invoke_instance(
@@ -184,7 +230,7 @@ fn dump_stats(vm: &mut Engine, writer: ObjRef, bundle: Option<ObjRef>) -> Result
                     )?;
                 }
                 if let Some(nested) = nested {
-                    dump_stats(vm, writer, Some(nested))?;
+                    dump_stats(vm, writer, Some(nested), visited, depth + 1)?;
                 }
             }
         }
@@ -238,7 +284,8 @@ pub(crate) fn static_intrinsic(
         Some(Value::Obj(o)) => Some(*o),
         _ => None,
     };
-    dump_stats(vm, writer, bundle)?;
+    let mut visited = std::collections::HashSet::new();
+    dump_stats(vm, writer, bundle, &mut visited, 0)?;
     Ok(Some(Value::Null))
 }
 
@@ -324,7 +371,13 @@ fn typed_access(
             let stored = read(vm);
             return Ok(Some(class_filtered_get(vm, name, args, stored)?));
         }
-        let cur = read(vm).map(|v| coerce_stored(vm, v, &ret)).transpose()?;
+        // A null or type-mismatched stored value takes the default path,
+        // exactly like a missing key (AOSP logs the ClassCastException and
+        // returns the default — it never hands the raw value back).
+        let cur = read(vm)
+            .filter(|v| stored_fits_ret(vm, v, &ret))
+            .map(|v| coerce_stored(vm, v, &ret))
+            .transpose()?;
         return Ok(Some(match (cur, params.len()) {
             (Some(v), _) => v,
             // getX(key, default)
@@ -333,6 +386,51 @@ fn typed_access(
         }));
     }
     Ok(None)
+}
+
+/// Whether a stored map value may flow into a getter declared to return
+/// `ret`. AOSP renders a type mismatch as a ClassCastException warning and
+/// the typed default; returning the stored value raw would put, say, a
+/// boxed Integer into a String register (type corruption). Primitives
+/// accept the boxed wrappers; String/Bundle getters demand the matching
+/// type; untyped getters (Object/Serializable/…) keep AOSP's as-stored
+/// behavior.
+fn stored_fits_ret(vm: &Engine, v: &Value, ret: &str) -> bool {
+    match ret {
+        "J" | "I" | "Z" | "S" | "B" | "C" | "F" | "D" => match v {
+            Value::Obj(o) => match vm.heap.class_of(*o) {
+                Ok(c) => {
+                    c == "Ljava/lang/Integer;"
+                        || c == "Ljava/lang/Long;"
+                        || c == "Ljava/lang/Short;"
+                        || c == "Ljava/lang/Byte;"
+                        || c == "Ljava/lang/Float;"
+                        || c == "Ljava/lang/Double;"
+                        || c == "Ljava/lang/Boolean;"
+                        || c == "Ljava/lang/Character;"
+                        || c == "Ljava/lang/Number;"
+                }
+                Err(_) => false,
+            },
+            Value::Int(_) | Value::Long(_) | Value::Float(_) | Value::Double(_) => true,
+            _ => false,
+        },
+        "Ljava/lang/String;" => {
+            matches!(
+                v,
+                Value::Obj(o) if vm.heap.class_of(*o).is_ok_and(|c| c == "Ljava/lang/String;")
+            )
+        }
+        "Landroid/os/Bundle;" | "Landroid/os/BaseBundle;" | "Landroid/os/PersistableBundle;" => {
+            match v {
+                Value::Obj(o) => {
+                    matches!(vm.fw.get(*o), Some(HostObj::Bundle { .. }))
+                }
+                _ => false,
+            }
+        }
+        _ => true,
+    }
 }
 
 /// The descriptor a `java.lang.Class` object stands for (the canonical
@@ -662,7 +760,7 @@ fn bundle(
         }
         ("isEmpty", "()Z") => {
             return Ok(Some(Value::Int(
-                map_of(vm, recv).map_or(true, |m| m.is_empty()) as i32,
+                map_of(vm, recv).is_none_or(|m| m.is_empty()) as i32,
             )))
         }
         ("clear", "()V") => {
@@ -692,11 +790,56 @@ fn bundle(
                 .collect();
             return Ok(Some(new_string_set(vm, keys)?));
         }
-        ("deepCopy", _) | ("clone", "()Ljava/lang/Object;") => {
+        ("clone", "()Ljava/lang/Object;") => {
+            // AOSP `Bundle.clone()` is the shallow copy constructor: values
+            // are shared with the original.
             let src = map_of(vm, recv).unwrap_or_default();
             let class = vm.heap.class_of(recv)?.to_string();
             let b = vm.heap.alloc_instance(class, Vec::new())?;
             vm.fw.objects.insert(b, HostObj::Bundle { map: src });
+            return Ok(Some(Value::Obj(b)));
+        }
+        ("deepCopy", _) => {
+            // AOSP `BaseBundle.deepCopy()`: nested Bundle values are copied
+            // recursively. Cycles and depth past `MAX_DEEP_COPY_DEPTH` share
+            // the already-built copy instead of recursing forever: the host
+            // must survive any guest graph shape.
+            const MAX_DEEP_COPY_DEPTH: usize = 32;
+            fn deep_copy_map(
+                vm: &mut Engine,
+                src: ObjRef,
+                seen: &mut std::collections::HashMap<ObjRef, ObjRef>,
+                depth: usize,
+            ) -> Result<Vec<(String, Value)>, VmExit> {
+                let src_map = map_of(vm, src).unwrap_or_default();
+                let mut out = Vec::with_capacity(src_map.len());
+                for (k, v) in src_map {
+                    let v = match v {
+                        Value::Obj(o) if matches!(vm.fw.get(o), Some(HostObj::Bundle { .. })) => {
+                            if let Some(&copy) = seen.get(&o) {
+                                Value::Obj(copy)
+                            } else if depth >= MAX_DEEP_COPY_DEPTH {
+                                Value::Obj(o)
+                            } else {
+                                let class = vm.heap.class_of(o)?.to_string();
+                                let copy = vm.heap.alloc_instance(class, Vec::new())?;
+                                seen.insert(o, copy);
+                                let inner = deep_copy_map(vm, o, seen, depth + 1)?;
+                                vm.fw.objects.insert(copy, HostObj::Bundle { map: inner });
+                                Value::Obj(copy)
+                            }
+                        }
+                        other => other,
+                    };
+                    out.push((k, v));
+                }
+                Ok(out)
+            }
+            let mut seen = std::collections::HashMap::new();
+            let map = deep_copy_map(vm, recv, &mut seen, 0)?;
+            let class = vm.heap.class_of(recv)?.to_string();
+            let b = vm.heap.alloc_instance(class, Vec::new())?;
+            vm.fw.objects.insert(b, HostObj::Bundle { map });
             return Ok(Some(Value::Obj(b)));
         }
         ("toString", "()Ljava/lang/String;") => {
@@ -791,12 +934,12 @@ fn intent(
             this
         }
         ("hasExtra", "(Ljava/lang/String;)Z") => {
-            let k = key_of(vm, args.first())?.unwrap_or_default();
+            let k = key_of(vm, args.first())?.unwrap_or_else(|| NULL_KEY.to_string());
             let has = matches!(vm.fw.get(recv), Some(HostObj::Intent { extras, .. }) if extras.iter().any(|(x, _)| *x == k));
             Some(Value::Int(has as i32))
         }
         ("removeExtra", "(Ljava/lang/String;)V") => {
-            let k = key_of(vm, args.first())?.unwrap_or_default();
+            let k = key_of(vm, args.first())?.unwrap_or_else(|| NULL_KEY.to_string());
             if let Some(HostObj::Intent { extras, .. }) = vm.fw.objects.get_mut(&recv) {
                 extras.retain(|(x, _)| *x != k);
             }
@@ -858,6 +1001,24 @@ fn intent(
             this
         }
         ("setComponent", "(Landroid/content/ComponentName;)Landroid/content/Intent;") => {
+            // Single source of truth: the ComponentName drives both the meta
+            // view (getComponent/toUri) and the internal descriptor the
+            // launch path reads — no split-brain between the two setters.
+            let desc = match &a0 {
+                Value::Obj(cn) => vm
+                    .heap
+                    .get_field(*cn, "rd_cls")
+                    .ok()
+                    .and_then(|v| match v {
+                        Value::Obj(s) => vm.heap.as_str(s).ok().map(str::to_string),
+                        _ => None,
+                    })
+                    .map(|dotted| format!("L{};", dotted.replace('.', "/"))),
+                _ => None,
+            };
+            if let Some(HostObj::Intent { component, .. }) = vm.fw.objects.get_mut(&recv) {
+                *component = desc;
+            }
             intent_meta(vm, recv).component_obj = Some(a0);
             this
         }
@@ -909,6 +1070,29 @@ fn intent(
                 let desc = format!("L{};", dotted.replace('.', "/"));
                 if let Some(HostObj::Intent { component, .. }) = vm.fw.objects.get_mut(&recv) {
                     *component = Some(desc);
+                }
+                // Mirror AOSP: setClassName installs a real ComponentName so
+                // getComponent() observes it (same truth as setComponent).
+                // Scoped to the (String, String) overload: the Context form
+                // keeps its legacy descriptor-only behavior (the package
+                // would need a guest getPackageName round-trip).
+                if let Some(Value::Obj(p)) = args.first() {
+                    if sig == "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;" {
+                        let pkg = vm.heap.as_str(*p)?.to_string();
+                        let component = vm.heap.alloc_instance(
+                            "Landroid/content/ComponentName;".to_string(),
+                            Vec::new(),
+                        )?;
+                        let pkg_v = guest_string(vm, pkg)?;
+                        let cls_v = guest_string(vm, dotted)?;
+                        vm.invoke_instance(
+                            component,
+                            "<init>",
+                            "(Ljava/lang/String;Ljava/lang/String;)V",
+                            &[pkg_v, cls_v],
+                        )?;
+                        intent_meta(vm, recv).component_obj = Some(Value::Obj(component));
+                    }
                 }
             }
             this
@@ -1482,8 +1666,11 @@ fn parse_uri_old(vm: &mut Engine, uri: &str, flags: i32) -> Result<ObjRef, VmExi
         }
         let sep = u.index_of('!', i);
         if sep >= 0 && sep < j {
+            // `component(pkg!cls)`: explicit split — a leading-dot class is
+            // resolved against the package (AOSP's legacy setComponentClassName).
             let pkg = u.sub(i, sep)?;
             let cls = u.sub(sep + 1, j)?;
+            let cls = normalize_component_class(&pkg, &cls);
             let component = vm
                 .heap
                 .alloc_instance("Landroid/content/ComponentName;".to_string(), Vec::new())?;
@@ -1498,6 +1685,23 @@ fn parse_uri_old(vm: &mut Engine, uri: &str, flags: i32) -> Result<ObjRef, VmExi
             intent_meta(vm, r).component_obj = Some(Value::Obj(component));
             if let Some(HostObj::Intent { component: c, .. }) = vm.fw.objects.get_mut(&r) {
                 *c = None;
+            }
+        } else {
+            // `component(flat)`: AOSP's legacy fallback — the flattened form
+            // goes through `ComponentName.unflattenFromString`, which owns
+            // the leading-dot normalization.
+            let flat = guest_string(vm, u.sub(i, j)?)?;
+            let component = vm.invoke_static(
+                "Landroid/content/ComponentName;",
+                "unflattenFromString",
+                "(Ljava/lang/String;)Landroid/content/ComponentName;",
+                &[flat],
+            )?;
+            if !matches!(component, Value::Null) {
+                intent_meta(vm, r).component_obj = Some(component);
+                if let Some(HostObj::Intent { component: c, .. }) = vm.fw.objects.get_mut(&r) {
+                    *c = None;
+                }
             }
         }
         i = j + 1;

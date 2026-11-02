@@ -250,6 +250,28 @@ fn is_jetpack_root(fqcn: &str) -> bool {
     JETPACK_ROOTS.iter().any(|r| fqcn.starts_with(r))
 }
 
+/// Single source of truth for "is this type in the Appendix D ecosystem?"
+/// (all `JETPACK_ROOTS`: androidx, Material, OkHttp, coroutines, Dagger, …).
+/// Accepts an FQCN or a DEX descriptor and never allocates, so static
+/// scanners (MCP `get_api_usage`) do not keep a drifting copy of the roots.
+pub fn is_jetpack_ecosystem(raw: &str) -> bool {
+    JETPACK_ROOTS.iter().any(|r| under_root(raw, r))
+}
+
+/// `raw` (FQCN `a.b.C` or descriptor `La/b/C;`) starts with the dotted
+/// ecosystem `root`, without allocating (descriptor `/` matches root `.`).
+fn under_root(raw: &str, root: &str) -> bool {
+    let raw = raw.trim();
+    let s = match raw.strip_prefix('L') {
+        Some(inner) if inner.contains('/') => inner,
+        _ => raw,
+    };
+    s.len() >= root.len()
+        && s.bytes()
+            .zip(root.bytes())
+            .all(|(a, b)| a == b || (a == b'/' && b == b'.'))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JetpackClassification {
     pub fqcn: String,
@@ -449,7 +471,7 @@ impl JetpackTable {
                             lib.id, lib.status
                         )));
                     }
-                    if lib.gap_id.as_deref().map_or(true, |g| g.trim().is_empty()) {
+                    if lib.gap_id.as_deref().is_none_or(|g| g.trim().is_empty()) {
                         return Err(data_err(format!(
                             "{} is {:?} but has no gap_id",
                             lib.id, lib.status
@@ -463,7 +485,7 @@ impl JetpackTable {
                             lib.id
                         )));
                     }
-                    if lib.gap_id.as_deref().map_or(true, |g| g.trim().is_empty()) {
+                    if lib.gap_id.as_deref().is_none_or(|g| g.trim().is_empty()) {
                         return Err(data_err(format!(
                             "{} is not_implemented but has no gap_id",
                             lib.id
@@ -894,5 +916,44 @@ mod tests {
         table.library.retain(|l| l.id != "androidx-room");
         let err = table.validate().unwrap_err();
         assert!(err.cause.contains("androidx-room"), "{}", err.cause);
+    }
+
+    /// Fonte única das raízes para scanners estáticos (#234): FQCN e
+    /// descritor DEX, todas as raízes, sem falsos positivos de prefixo.
+    #[test]
+    fn is_jetpack_ecosystem_covers_all_roots_in_fqcn_and_descriptor_form() {
+        assert!(
+            is_jetpack_ecosystem("androidx.room.Room"),
+            "androidx.room.Room"
+        );
+        assert!(
+            is_jetpack_ecosystem("Landroidx/room/Room;"),
+            "Landroidx/room/Room;"
+        );
+        assert!(
+            is_jetpack_ecosystem("Lokhttp3/OkHttpClient;"),
+            "Lokhttp3/OkHttpClient;"
+        );
+        assert!(
+            is_jetpack_ecosystem("Lkotlinx/coroutines/Job;"),
+            "Lkotlinx/coroutines/Job;"
+        );
+        assert!(
+            is_jetpack_ecosystem("com.google.android.material.button.MaterialButton"),
+            "com.google.android.material.button.MaterialButton"
+        );
+        assert!(is_jetpack_ecosystem("Ldagger/Module;"), "Ldagger/Module;");
+        assert!(
+            !is_jetpack_ecosystem("android.app.Activity"),
+            "android.app.Activity"
+        );
+        assert!(
+            !is_jetpack_ecosystem("Lcom/google/android/gms/tasks/Task;"),
+            "Lcom/google/android/gms/tasks/Task;"
+        );
+        assert!(
+            !is_jetpack_ecosystem("Landroid/view/View;"),
+            "Landroid/view/View;"
+        );
     }
 }

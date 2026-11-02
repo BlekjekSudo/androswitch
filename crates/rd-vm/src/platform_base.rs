@@ -14,7 +14,8 @@
 //! when no host view is wired to an accessibility service.
 
 use crate::engine::Engine;
-use crate::err::VmExit;
+use crate::err::{Throwable, VmExit};
+use crate::heap::ObjRef;
 #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
 #[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
 use crate::port_prelude::*;
@@ -81,7 +82,145 @@ pub(crate) fn host_static(
         let r = vm.heap.alloc_instance(owner.to_string(), Vec::new())?;
         return Ok(Some(Value::Obj(r)));
     }
+    // issue #228: AbsSavedState.EMPTY_STATE — the AOSP shared singleton every
+    // default onSaveInstanceState returns (non-null, superState-less). The
+    // sget chain caches the first materialization in the class statics, so
+    // identity is stable across reads.
+    if owner == "Landroid/view/AbsSavedState;" && field == "EMPTY_STATE" {
+        return Ok(Some(Value::Obj(empty_state(vm)?)));
+    }
     Ok(None)
+}
+
+/// `AbsSavedState.EMPTY_STATE` (AOSP: `new AbsSavedState() {}` with a null
+/// superState). Canonical identity per Engine: allocated once and cached in
+/// the class statics.
+pub(crate) fn empty_state(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+    let key = (
+        "Landroid/view/AbsSavedState;".to_string(),
+        "EMPTY_STATE".to_string(),
+    );
+    if let Some(Value::Obj(r)) = vm.statics.get(&key) {
+        return Ok(*r);
+    }
+    let r = vm
+        .heap
+        .alloc_instance("Landroid/view/AbsSavedState;".to_string(), Vec::new())?;
+    vm.statics.insert(key, Value::Obj(r));
+    Ok(r)
+}
+
+const ABS_SAVED_STATE: &str = "Landroid/view/AbsSavedState;";
+const BASE_SAVED_STATE: &str = "Landroid/view/View$BaseSavedState;";
+
+/// AOSP `AbsSavedState` / `View$BaseSavedState` state (issue #228).
+///
+/// DEX subclasses (`TextView$SavedState`, Material widgets, app views) call
+/// `super(Parcelable)` / `super(Parcel)` and read `getSuperState()`. The
+/// constructor is reached through invoke-direct on the platform base (the
+/// receiver class declares its own `<init>`, so the generic dex-override
+/// gate must not hide it — hence this handler runs before that gate).
+/// AOSP storage rules:
+/// - `AbsSavedState(superState)`: null → IllegalArgumentException;
+///   `EMPTY_STATE` normalizes to null (the empty singleton itself);
+/// - `AbsSavedState(Parcel)` / `(Parcel, ClassLoader)`: the superState is
+///   `readParcelable(loader)`, null → `EMPTY_STATE`;
+/// - `getSuperState()` is final in AOSP and returns the stored value.
+pub(crate) fn saved_state_instance(
+    vm: &mut Engine,
+    recv_class: &str,
+    mref_class: &str,
+    name: &str,
+    sig: &str,
+    recv: ObjRef,
+    args: &[Value],
+) -> Result<Option<Value>, VmExit> {
+    if mref_class != ABS_SAVED_STATE && mref_class != BASE_SAVED_STATE {
+        return Ok(None);
+    }
+    if name != "<init>" && vm.cp.resolve_method(recv_class, name, sig).is_some() {
+        // Overridable surface (writeToParcel/describeContents): a DEX
+        // override wins; only the inherited base default answers here.
+        return Ok(None);
+    }
+    match (name, sig) {
+        ("<init>", "(Landroid/os/Parcelable;)V") => {
+            let super_state = match args.first() {
+                Some(Value::Obj(super_state)) => Some(*super_state),
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/IllegalArgumentException;",
+                        "superState must not be null",
+                    )))
+                }
+            };
+            let empty = empty_state(vm)?;
+            // AOSP: superState != EMPTY_STATE ? superState : null
+            let stored = match super_state {
+                Some(s) if s != empty => Value::Obj(s),
+                _ => Value::Null,
+            };
+            crate::err::put_field_result(vm.heap.put_field(recv, "mSuperState", stored))?;
+            Ok(Some(Value::Null))
+        }
+        ("<init>", "(Landroid/os/Parcel;)V")
+        | ("<init>", "(Landroid/os/Parcel;Ljava/lang/ClassLoader;)V") => {
+            // AOSP: superState = source.readParcelable(loader); null → EMPTY_STATE
+            let loader = args.get(1).cloned().unwrap_or(Value::Null);
+            let parcel = match args.first() {
+                Some(Value::Obj(p)) => *p,
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "AbsSavedState(Parcel): parcel is null",
+                    )))
+                }
+            };
+            let read = vm.invoke_instance(
+                parcel,
+                "readParcelable",
+                "(Ljava/lang/ClassLoader;)Landroid/os/Parcelable;",
+                &[loader],
+            )?;
+            let super_state = match read {
+                Value::Obj(super_state) => Value::Obj(super_state),
+                _ => Value::Obj(empty_state(vm)?),
+            };
+            crate::err::put_field_result(vm.heap.put_field(recv, "mSuperState", super_state))?;
+            Ok(Some(Value::Null))
+        }
+        // AOSP final: returns the stored superState (null for EMPTY_STATE).
+        ("getSuperState", "()Landroid/os/Parcelable;") => Ok(Some(
+            vm.heap
+                .get_field(recv, "mSuperState")
+                .unwrap_or(Value::Null),
+        )),
+        ("describeContents", "()I") => Ok(Some(Value::Int(0))),
+        // AOSP AbsSavedState.writeToParcel: writes the superState (nullable).
+        ("writeToParcel", "(Landroid/os/Parcel;I)V") => {
+            let parcel = match args.first() {
+                Some(Value::Obj(p)) => *p,
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "writeToParcel: parcel is null",
+                    )))
+                }
+            };
+            let super_state = vm
+                .heap
+                .get_field(recv, "mSuperState")
+                .unwrap_or(Value::Null);
+            vm.invoke_instance(
+                parcel,
+                "writeParcelable",
+                "(Landroid/os/Parcelable;I)V",
+                &[super_state, Value::Int(0)],
+            )?;
+            Ok(Some(Value::Null))
+        }
+        _ => Ok(None),
+    }
 }
 
 pub(crate) fn instance_intrinsic(mref_class: &str, name: &str, sig: &str) -> Option<Value> {

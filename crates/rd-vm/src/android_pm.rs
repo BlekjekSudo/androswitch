@@ -21,11 +21,13 @@
 
 use crate::engine::Engine;
 use crate::err::{Throwable, VmExit};
-use crate::heap::ObjRef;
+use crate::heap::{ElemKind, ObjRef};
 #[cfg(all(not(feature = "std"), feature = "upstream-runtime"))]
 #[allow(unused_imports)] // A single explicit alloc prelude for inherited modules.
 use crate::port_prelude::*;
 use crate::value::Value;
+
+use rd_apk::manifest::ComponentKind;
 
 pub(crate) const PM: &str = "Landroid/content/pm/PackageManager;";
 pub(crate) const APM: &str = "Landroid/app/ApplicationPackageManager;";
@@ -155,12 +157,283 @@ fn app_info(vm: &mut Engine) -> Result<ObjRef, VmExit> {
     alloc(vm, APP_INFO, fields)
 }
 
-fn package_info(vm: &mut Engine) -> Result<ObjRef, VmExit> {
+/// Bits GET_* do AOSP PackageManager (getPackageInfo(String, int) e
+/// PackageManager$PackageInfoFlags.getValue()) — issue #361: antes eram
+/// ignorados e TODOS os arrays de PackageInfo vinham Null.
+const GET_ACTIVITIES: u64 = 0x0000_0001;
+const GET_RECEIVERS: u64 = 0x0000_0002;
+const GET_SERVICES: u64 = 0x0000_0004;
+const GET_PROVIDERS: u64 = 0x0000_0008;
+const GET_PERMISSIONS: u64 = 0x0000_1000;
+/// MATCH_DISABLED_COMPONENTS (0x200; inclui o legado GET_DISABLED_COMPONENTS):
+/// sem o bit, componentes com enabled=false ficam fora (AOSP).
+const MATCH_DISABLED_COMPONENTS: u64 = 0x0000_0200;
+/// Bits de requestedPermissionsFlags (AOSP): REQUIRED=1, GRANTED=2. A VM
+/// host concede tudo o que o manifesto pede (semântica de emulador), então
+/// cada entrada nasce REQUIRED|GRANTED.
+const REQUESTED_PERMISSION_REQUIRED: i32 = 1;
+const REQUESTED_PERMISSION_GRANTED: i32 = 2;
+
+/// Extrai o long de flags do 2º argumento de getPackageInfo: Int (forma
+/// clássica) ou PackageManager$PackageInfoFlags (API 33 — backing field
+/// `value`; alocado por PackageManager$PackageInfoFlags.of(long)).
+fn package_info_flags(vm: &Engine, v: Option<&Value>) -> u64 {
+    match v {
+        Some(Value::Int(f)) => (*f as u32) as u64,
+        Some(Value::Long(l)) => *l as u64,
+        Some(Value::Obj(r)) => match vm.heap.get_field(*r, "value") {
+            Ok(Value::Long(l)) => l as u64,
+            Ok(Value::Int(i)) => (i as u32) as u64,
+            _ => 0,
+        },
+        _ => 0,
+    }
+}
+
+/// Item (ActivityInfo/ServiceInfo/ProviderInfo) de um componente DECLARADO
+/// no manifesto (issue #361) — a fonte de verdade é apk.manifest
+/// (`exported_effective`/`enabled`/`authorities`/`permission`), não o
+/// classpath: o componente pode não estar carregado no DEX do host.
+fn manifest_component_info(
+    vm: &mut Engine,
+    info_class: &str,
+    comp: &ComponentSpec,
+) -> Result<ObjRef, VmExit> {
+    let m = meta(vm);
+    let ai = app_info(vm)?;
+    let enabled = i32::from(comp.enabled != Some(false));
+    let exported = i32::from(comp.exported_effective);
+    let process = comp.process.clone().unwrap_or_else(|| m.package.clone());
+    let fields = vec![
+        ("name", jstr(vm, &comp.class_name)?),
+        ("packageName", jstr(vm, &m.package)?),
+        ("processName", jstr(vm, &process)?),
+        ("applicationInfo", Value::Obj(ai)),
+        ("enabled", Value::Int(enabled)),
+        ("exported", Value::Int(exported)),
+        ("metaData", Value::Null),
+        (
+            "authority",
+            match &comp.authorities {
+                Some(a) => jstr(vm, a)?,
+                None => Value::Null,
+            },
+        ),
+        (
+            "permission",
+            match &comp.permission {
+                Some(p) => jstr(vm, p)?,
+                None => Value::Null,
+            },
+        ),
+        (
+            "targetActivity",
+            match &comp.target_activity {
+                Some(t) => jstr(vm, t)?,
+                None => Value::Null,
+            },
+        ),
+        ("theme", Value::Int(0)),
+        ("labelRes", Value::Int(0)),
+        ("screenOrientation", Value::Int(-1)),
+        ("launchMode", Value::Int(0)),
+        ("flags", Value::Int(0)),
+        ("configChanges", Value::Int(0)),
+        ("softInputMode", Value::Int(0)),
+    ];
+    alloc(vm, info_class, fields)
+}
+
+/// Array tipado de componentes para os bits GET_* (issue #361). AOSP: flag
+/// NÃO setada → null; flag setada → array alocado (MESMO VAZIO quando o
+/// manifesto não declara nada daquele kind). MATCH_DISABLED_COMPONENTS
+/// controla a inclusão de enabled=false (default: excluir). Alocações
+/// passam pelo heap normal (orçadas — flagship tem 1.006 uses-permission).
+fn component_array(
+    vm: &mut Engine,
+    info_class: &str,
+    arr_desc: &str,
+    kind: ComponentKind,
+    include_disabled: bool,
+) -> Result<Value, VmExit> {
+    // coleta os dados do manifesto ANTES de alocar (o manifesto é emprestado
+    // do engine; as alocações dos itens precisam de &mut)
+    let specs: Vec<ComponentSpec> = vm
+        .fw
+        .resources
+        .as_ref()
+        .map(|apk| {
+            apk.manifest
+                .application
+                .components
+                .iter()
+                .filter(|c| c.kind == kind)
+                .filter(|c| include_disabled || c.enabled != Some(false))
+                .map(ComponentSpec::of)
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut items: Vec<Value> = Vec::with_capacity(specs.len());
+    for spec in &specs {
+        let item = manifest_component_info(vm, info_class, spec)?;
+        items.push(Value::Obj(item));
+    }
+    crate::arrays::new_array(vm, arr_desc, ElemKind::Obj, items)
+}
+
+/// Snapshot imutável dos campos de componente que os itens precisam
+/// (desacopla o empréstimo do manifesto das alocações no heap).
+struct ComponentSpec {
+    class_name: String,
+    process: Option<String>,
+    authorities: Option<String>,
+    permission: Option<String>,
+    target_activity: Option<String>,
+    exported_effective: bool,
+    enabled: Option<bool>,
+}
+
+impl ComponentSpec {
+    fn of(c: &rd_apk::manifest::Component) -> Self {
+        Self {
+            class_name: c.class_name.clone(),
+            process: c.process.clone(),
+            authorities: c.authorities.clone(),
+            permission: c.permission.clone(),
+            target_activity: c.target_activity.clone(),
+            exported_effective: c.exported_effective,
+            enabled: c.enabled,
+        }
+    }
+}
+
+/// (permissions, requestedPermissions, requestedPermissionsFlags) para
+/// GET_PERMISSIONS — arrays de `m.declared_permissions` (PermissionInfo[],
+/// <permission> do app), `m.uses_permissions` (String[]) e o paralelo int[]
+/// REQUIRED|GRANTED (issue #361).
+fn permissions_arrays(vm: &mut Engine) -> Result<(Value, Value, Value), VmExit> {
+    let m = meta(vm);
+    // coleta ANTES de alocar (mesmo padrão do component_array)
+    let (ups, dps): (Vec<String>, Vec<(String, u32)>) = vm
+        .fw
+        .resources
+        .as_ref()
+        .map(|apk| {
+            (
+                apk.manifest
+                    .uses_permissions
+                    .iter()
+                    .map(|up| up.name.clone())
+                    .collect(),
+                apk.manifest
+                    .declared_permissions
+                    .iter()
+                    .map(|dp| (dp.name.clone(), dp.protection_level_raw.unwrap_or(0)))
+                    .collect(),
+            )
+        })
+        .unwrap_or_default();
+    let mut requested: Vec<Value> = Vec::with_capacity(ups.len());
+    let mut requested_flags: Vec<Value> = Vec::with_capacity(ups.len());
+    for name in &ups {
+        requested.push(jstr(vm, name)?);
+        requested_flags.push(Value::Int(
+            REQUESTED_PERMISSION_REQUIRED | REQUESTED_PERMISSION_GRANTED,
+        ));
+    }
+    let mut declared: Vec<Value> = Vec::with_capacity(dps.len());
+    for (name, protection) in &dps {
+        let fields = vec![
+            ("name", jstr(vm, name)?),
+            ("packageName", jstr(vm, &m.package)?),
+            ("protectionLevel", Value::Int(*protection as i32)),
+        ];
+        declared.push(Value::Obj(alloc(
+            vm,
+            "Landroid/content/pm/PermissionInfo;",
+            fields,
+        )?));
+    }
+    let req = crate::arrays::new_array(vm, "[Ljava/lang/String;", ElemKind::Obj, requested)?;
+    let req_flags = crate::arrays::new_array(vm, "[I", ElemKind::Int, requested_flags)?;
+    let decl = crate::arrays::new_array(
+        vm,
+        "[Landroid/content/pm/PermissionInfo;",
+        ElemKind::Obj,
+        declared,
+    )?;
+    Ok((decl, req, req_flags))
+}
+
+fn package_info(vm: &mut Engine, flags: u64) -> Result<ObjRef, VmExit> {
     let m = meta(vm);
     let ai = app_info(vm)?;
     let vn = match &m.version_name {
         Some(v) => jstr(vm, v)?,
         None => Value::Null,
+    };
+    let include_disabled = flags & MATCH_DISABLED_COMPONENTS != 0;
+    // AOSP: activities cobre <activity> E <activity-alias>; receivers também
+    // são ActivityInfo[]; flag não setada → null (issue #361)
+    let activities = if flags & GET_ACTIVITIES != 0 {
+        component_array(
+            vm,
+            "Landroid/content/pm/ActivityInfo;",
+            "[Landroid/content/pm/ActivityInfo;",
+            ComponentKind::Activity,
+            include_disabled,
+        )?
+    } else {
+        Value::Null
+    };
+    let aliases = if flags & GET_ACTIVITIES != 0 {
+        component_array(
+            vm,
+            "Landroid/content/pm/ActivityInfo;",
+            "[Landroid/content/pm/ActivityInfo;",
+            ComponentKind::ActivityAlias,
+            include_disabled,
+        )?
+    } else {
+        Value::Null
+    };
+    let receivers = if flags & GET_RECEIVERS != 0 {
+        component_array(
+            vm,
+            "Landroid/content/pm/ActivityInfo;",
+            "[Landroid/content/pm/ActivityInfo;",
+            ComponentKind::Receiver,
+            include_disabled,
+        )?
+    } else {
+        Value::Null
+    };
+    let services = if flags & GET_SERVICES != 0 {
+        component_array(
+            vm,
+            "Landroid/content/pm/ServiceInfo;",
+            "[Landroid/content/pm/ServiceInfo;",
+            ComponentKind::Service,
+            include_disabled,
+        )?
+    } else {
+        Value::Null
+    };
+    let providers = if flags & GET_PROVIDERS != 0 {
+        component_array(
+            vm,
+            "Landroid/content/pm/ProviderInfo;",
+            "[Landroid/content/pm/ProviderInfo;",
+            ComponentKind::Provider,
+            include_disabled,
+        )?
+    } else {
+        Value::Null
+    };
+    let (permissions, requested_perms, requested_flags) = if flags & GET_PERMISSIONS != 0 {
+        permissions_arrays(vm)?
+    } else {
+        (Value::Null, Value::Null, Value::Null)
     };
     let fields = vec![
         ("packageName", jstr(vm, &m.package)?),
@@ -170,16 +443,47 @@ fn package_info(vm: &mut Engine) -> Result<ObjRef, VmExit> {
         ("applicationInfo", Value::Obj(ai)),
         ("firstInstallTime", Value::Long(1_700_000_000_000)),
         ("lastUpdateTime", Value::Long(1_700_000_000_000)),
-        ("activities", Value::Null),
-        ("services", Value::Null),
-        ("providers", Value::Null),
-        ("receivers", Value::Null),
-        ("permissions", Value::Null),
-        ("requestedPermissions", Value::Null),
+        // issue #361: arrays mesclados (Activity + ActivityAlias) em
+        // activities, como o PackageParser do AOSP faz
+        ("activities", merge_obj_arrays(vm, activities, aliases)?),
+        ("services", services),
+        ("providers", providers),
+        ("receivers", receivers),
+        ("permissions", permissions),
+        ("requestedPermissions", requested_perms),
+        ("requestedPermissionsFlags", requested_flags),
         ("signatures", Value::Null),
         ("signingInfo", Value::Null),
     ];
     alloc(vm, PACKAGE_INFO, fields)
+}
+
+/// Concatena dois arrays de objetos (um pode ser Null) num array novo do
+/// mesmo descritor — mescla de <activity> + <activity-alias> em activities.
+fn merge_obj_arrays(vm: &mut Engine, a: Value, b: Value) -> Result<Value, VmExit> {
+    let (desc, items) = match (a, b) {
+        (Value::Null, Value::Null) => {
+            return Ok(Value::Null);
+        }
+        (Value::Null, v @ Value::Obj(_)) | (v @ Value::Obj(_), Value::Null) => {
+            return Ok(v);
+        }
+        (Value::Obj(x), Value::Obj(y)) => {
+            let desc = vm
+                .heap
+                .class_of(x)
+                .unwrap_or("[Ljava/lang/Object;")
+                .to_string();
+            let mut items: Vec<Value> = Vec::new();
+            for r in [x, y] {
+                let (elems, _) = vm.heap.as_array_elems(r)?;
+                items.extend_from_slice(elems);
+            }
+            (desc, items)
+        }
+        _ => return Ok(Value::Null),
+    };
+    crate::arrays::new_array(vm, &desc, ElemKind::Obj, items)
 }
 
 fn component_info(
@@ -279,7 +583,10 @@ pub fn instance_intrinsic(
         }
         "getPackageInfo" => {
             own(vm, args.first())?;
-            Value::Obj(package_info(vm)?)
+            // issue #361: extrai os bits GET_* (Int clássico ou
+            // PackageInfoFlags API 33) e popula os arrays do manifesto
+            let flags = package_info_flags(vm, args.get(1));
+            Value::Obj(package_info(vm, flags)?)
         }
         "getApplicationInfo" => {
             own(vm, args.first())?;

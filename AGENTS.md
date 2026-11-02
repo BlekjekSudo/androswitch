@@ -10,7 +10,7 @@ v0.1 is offline. One application runs at a time.
 
 The repository is a history-preserving fork of RustyDroid at
 `6388281f66d254c8e01a0fdc7a5a9a30239bc762`, synchronized through upstream
-`4489813db513b42c531979b079397c50edd54e25`. Keep upstream attribution and
+`33e76456643e157458d97087d2626045498725db`. Keep upstream attribution and
 licenses. `README.rustydroid.md`, `RustyDroid.md`, and the original roadmap and
 compatibility documents describe upstream, not verified Switch capabilities.
 AndroSwitch's contracts and status live in `docs/ANDROSWITCH_ROADMAP.md`,

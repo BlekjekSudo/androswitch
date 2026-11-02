@@ -16,6 +16,7 @@ workspace = true
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 flate2 = { workspace = true, optional = true }
 miniz_oxide = { version = "=0.9.1", default-features = false, features = ["with-alloc"] }
+spin = { version = "0.9", default-features = false, features = ["once", "mutex", "spin_mutex"] }
 
 [dev-dependencies]
 serde_json.workspace = true

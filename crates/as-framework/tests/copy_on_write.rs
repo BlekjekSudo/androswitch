@@ -161,8 +161,20 @@ fn builder_scalar_overloads_keep_raw_units_until_a_surrogate_pair_is_complete() 
                 .unwrap(),
             Value::Int(0xd800)
         );
-        let incomplete = vm.invoke_instance(builder, "toString", "()Ljava/lang/String;", &[]);
-        assert!(matches!(incomplete, Err(VmExit::Error(ref e)) if e.code == "API_UNAVAILABLE"));
+        // Match upstream's UTF-8 String materialization while keeping the
+        // builder's raw UTF-16 units intact for the later low surrogate.
+        let incomplete = vm
+            .invoke_instance(builder, "toString", "()Ljava/lang/String;", &[])
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .unwrap();
+        assert_eq!(vm.heap.as_str(incomplete).unwrap(), ",truefalse\0é\u{fffd}");
+        assert_eq!(
+            vm.invoke_instance(builder, "charAt", "(I)C", &[Value::Int(12)])
+                .unwrap(),
+            Value::Int(0xd800)
+        );
         vm.statics.insert(
             ("Ltests/Builders;".into(), "pending".into()),
             Value::Obj(builder),

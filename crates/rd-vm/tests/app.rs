@@ -784,6 +784,47 @@ fn launch_app_rejects_activity_missing_from_dex() {
         .expect("LMain; está no DEX");
 }
 
+/// Rodada end-to-end APK-Tester (PR-Agent): MainActivity que estende
+/// java.lang.Object (41 APKs de engines) lançava com SUCESSO e tela vazia —
+/// a classe existe no DEX (passa no check do #82), mas não é Activity: no
+/// Android o launch morre com ClassCastException na instrumentação. O
+/// launch precisa falhar com erro estruturado; subclasse INDIRETA de
+/// Activity continua lançando (hierarquia transitiva do classpath).
+#[test]
+fn launch_app_rejects_class_that_is_not_an_activity() {
+    let mut b = DexBuilder::new();
+    register_platform_classes(&mut b);
+    b.class("LNotActivity;", "Ljava/lang/Object;");
+    b.class("LBase;", "Landroid/app/Activity;");
+    b.class("LSubActivity;", "LBase;");
+    let mut e = engine_of(&b);
+
+    let err = e
+        .launch_app("LNotActivity;", "com.exemplo.trivial", Vec::new())
+        .expect_err("classe que não estende Activity não pode lançar");
+    let rd = match err {
+        rd_vm::err::VmExit::Error(rd) => rd,
+        other => panic!("esperava erro estruturado da VM, veio {other:?}"),
+    };
+    assert_eq!(rd.code, "VM_TYPE_ERROR", "{rd:?}");
+    assert!(
+        rd.cause.contains("LNotActivity;"),
+        "cause cita a classe: {rd:?}"
+    );
+    assert!(
+        rd.cause.contains("android.app.Activity"),
+        "cause cita Activity: {rd:?}"
+    );
+    assert!(
+        rd.suggestion.is_some(),
+        "erro de launch traz suggestion: {rd:?}"
+    );
+
+    // subclasse indireta de Activity lança normal (sem regressão)
+    e.launch_app("LSubActivity;", "com.exemplo.trivial", Vec::new())
+        .expect("LSubActivity; estende Activity via LBase;");
+}
+
 /// M8 (compat real): SystemClock host — oitavo gap do launch do org.primftpd
 /// (`uptimeMillis`). Relógio VIRTUAL determinístico: uptimeMillis/
 /// elapsedRealtime(+Nanos)/currentThreadTimeMillis leem `HostState.clock_ms`;
@@ -832,6 +873,30 @@ fn system_clock_host_statics() {
         call(&mut e, "uptimeMillis", vec![]),
         Some(Value::Long(2000))
     );
+}
+
+/// SdkExtensions (API 30+): o dispositivo virtual não publica extensões de SDK,
+/// então `getExtensionVersion` responde 0 para qualquer extensão. KeePassDX 4.5.6
+/// falhava na inicialização com `método SdkExtensions->getExtensionVersion não resolvido`.
+#[test]
+fn sdk_extensions_host_static_reports_no_extension() {
+    use rd_vm::framework::{call_host_static, SDK_EXTENSIONS};
+    let b = DexBuilder::new();
+    let mut e = engine_of(&b);
+    for ext in [1, 30, 31, 1_000_000] {
+        assert_eq!(
+            call_host_static(
+                &mut e,
+                SDK_EXTENSIONS,
+                "getExtensionVersion",
+                "(I)I",
+                &[Value::Int(ext)]
+            )
+            .expect("host static"),
+            Some(Value::Int(0)),
+            "extensão {ext}"
+        );
+    }
 }
 
 /// M8 (compat real): Looper.getThread/Thread host — 11º gap do launch do

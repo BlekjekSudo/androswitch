@@ -245,6 +245,8 @@ pub(crate) mod view_layout;
 pub(crate) mod view_props;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod vto;
+#[cfg(feature = "wasm-engine")]
+pub mod wasm_bridge;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 pub(crate) mod window;
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]

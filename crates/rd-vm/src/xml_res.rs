@@ -55,38 +55,79 @@ pub(crate) struct ParserState {
     pos: isize,
 }
 
+/// Estimativa dos bytes de host de um parser: caminho, eventos, nomes, textos e atributos.
+fn parser_host_cost(file: &str, events: &[Ev]) -> usize {
+    events.iter().fold(
+        file.len() + core::mem::size_of::<ParserState>(),
+        |acc, ev| {
+            let payload = match ev {
+                Ev::Start { name, attrs, .. } => {
+                    name.len() + attrs.len() * core::mem::size_of::<XmlAttribute>()
+                }
+                Ev::Text(s, _) => s.len(),
+                Ev::End { name, .. } => name.len(),
+            };
+            acc + core::mem::size_of::<Ev>() + payload
+        },
+    )
+}
+
+fn parser_host_release(vm: &Engine, cost: usize) {
+    vm.module_tables
+        .xml_res_host_bytes
+        .clone()
+        .with(|b| b.set(b.get().saturating_sub(cost)));
+}
+
 /// GC: drop state of collected objects (slots are reused).
 pub(crate) fn gc_purge(vm: &Engine, alive: &dyn Fn(ObjRef) -> bool) {
-    vm.module_tables
-        .xml_res_parsers
-        .clone()
-        .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
+    vm.module_tables.xml_res_parsers.clone().with(|m| {
+        m.borrow_mut().retain(|k, v| {
+            if alive(*k) {
+                return true;
+            }
+            parser_host_release(vm, parser_host_cost(&v.file, &v.events));
+            false
+        })
+    });
     vm.module_tables
         .xml_res_arrays
         .clone()
         .with(|m| m.borrow_mut().retain(|k, _| alive(*k)));
 }
 
-// Issue #230: this state now belongs to Engine.module_tables and dies with its heap.
-
-fn flatten(e: &XmlElement, depth: i32, out: &mut Vec<Ev>) {
-    out.push(Ev::Start {
-        name: e.name.clone(),
-        attrs: e.attrs.clone(),
-        depth,
-    });
-    if let Some(t) = &e.text {
-        if !t.trim().is_empty() {
-            out.push(Ev::Text(t.clone(), depth));
+/// Achata a árvore em eventos na mesma ordem de antes (Start, Text, filhos, End),
+/// com pilha explícita: uma árvore profunda não estoura a stack do host (#370 item 4).
+fn flatten(root: &XmlElement, depth: i32, out: &mut Vec<Ev>) {
+    enum Step<'a> {
+        Open(&'a XmlElement, i32),
+        Close(&'a str, i32),
+    }
+    let mut stack = vec![Step::Open(root, depth)];
+    while let Some(step) = stack.pop() {
+        match step {
+            Step::Open(e, d) => {
+                out.push(Ev::Start {
+                    name: e.name.clone(),
+                    attrs: e.attrs.clone(),
+                    depth: d,
+                });
+                if let Some(t) = &e.text {
+                    if !t.trim().is_empty() {
+                        out.push(Ev::Text(t.clone(), d));
+                    }
+                }
+                stack.push(Step::Close(&e.name, d));
+                for c in e.children.iter().rev() {
+                    stack.push(Step::Open(c, d + 1));
+                }
+            }
+            Step::Close(name, d) => out.push(Ev::End {
+                name: name.to_string(),
+                depth: d,
+            }),
         }
     }
-    for c in &e.children {
-        flatten(c, depth + 1, out);
-    }
-    out.push(Ev::End {
-        name: e.name.clone(),
-        depth,
-    });
 }
 
 fn exc(class: &str, msg: impl Into<String>) -> VmExit {
@@ -153,11 +194,28 @@ fn open_xml(vm: &mut Engine, id: i32) -> Result<Value, VmExit> {
     })?;
     let mut events = Vec::new();
     flatten(&doc.root, 1, &mut events);
+    // #370: a árvore vive no host com pouco custo no heap guest; cobra-se o
+    // total retido contra o orçamento antes de guardar o parser.
+    let cost = parser_host_cost(&path, &events);
+    let held = vm
+        .module_tables
+        .xml_res_host_bytes
+        .clone()
+        .with(|b| b.get());
+    if vm.heap.used().saturating_add(held).saturating_add(cost) > vm.heap.budget() {
+        return Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/OutOfMemoryError;",
+            format!(
+                "XML parser for {path} needs {cost} host bytes; heap_budget is {}",
+                vm.heap.budget()
+            ),
+        )));
+    }
     let r = vm
         .heap
         .alloc_instance(PARSER.to_string(), Vec::new())
         .map_err(crate::err::oom_throwable)?;
-    vm.module_tables.xml_res_parsers.clone().with(|p| {
+    let old = vm.module_tables.xml_res_parsers.clone().with(|p| {
         p.borrow_mut().insert(
             r,
             ParserState {
@@ -167,6 +225,13 @@ fn open_xml(vm: &mut Engine, id: i32) -> Result<Value, VmExit> {
             },
         )
     });
+    if let Some(old) = old {
+        parser_host_release(vm, parser_host_cost(&old.file, &old.events));
+    }
+    vm.module_tables
+        .xml_res_host_bytes
+        .clone()
+        .with(|b| b.set(b.get().saturating_add(cost)));
     Ok(Value::Obj(r))
 }
 
@@ -362,8 +427,22 @@ fn as_i32(vm: &Engine, v: &AttrValue) -> Option<i32> {
         R::Str(s) => {
             let t = s.trim();
             if let Some(h) = t.strip_prefix('#') {
-                let n = u32::from_str_radix(h, 16).ok()?;
-                (if h.len() <= 6 { n | 0xFF00_0000 } else { n }) as i32
+                // #RGB / #ARGB expand each nibble (#f00 == #ff0000), #RRGGBB / #AARRGGBB as-is.
+                // Android aceita só #RGB, #ARGB, #RRGGBB e #AARRGGBB, todos hex
+                // (#370 item 3). `from_str_radix` aceitaria um `+` inicial.
+                if !matches!(h.len(), 3 | 4 | 6 | 8) || !h.chars().all(|c| c.is_ascii_hexdigit()) {
+                    return None;
+                }
+                let expanded: String = match h.len() {
+                    3 | 4 => h.chars().flat_map(|c| [c, c]).collect(),
+                    _ => h.to_string(),
+                };
+                let n = u32::from_str_radix(&expanded, 16).ok()?;
+                (if expanded.len() <= 6 {
+                    n | 0xFF00_0000
+                } else {
+                    n
+                }) as i32
             } else {
                 t.parse().ok()?
             }
@@ -597,36 +676,47 @@ pub fn instance_intrinsic(
     };
     let v = match name {
         "next" | "nextToken" | "nextTag" => {
+            // XmlPullParser: once END_DOCUMENT is reached, next() keeps returning
+            // END_DOCUMENT; nextTag() must throw instead.
             if pos >= len {
-                return Err(exc(
-                    "Lorg/xmlpull/v1/XmlPullParserException;",
-                    "END_DOCUMENT reached",
-                ));
-            }
-            let mut np = pos + 1;
-            if name == "nextTag" {
-                while np < len
-                    && matches!(
-                        vm.module_tables
-                            .xml_res_parsers
-                            .clone()
-                            .with(|p| p.borrow()[&recv].events.get(np as usize).cloned()),
-                        Some(Ev::Text(..))
-                    )
-                {
-                    np += 1;
+                if name == "nextTag" {
+                    return Err(exc(
+                        "Lorg/xmlpull/v1/XmlPullParserException;",
+                        "END_DOCUMENT reached",
+                    ));
                 }
+                Value::Int(1)
+            } else {
+                let mut np = pos + 1;
+                if name == "nextTag" {
+                    // Only whitespace text may be skipped by nextTag().
+                    while np < len
+                        && matches!(
+                            vm.module_tables.xml_res_parsers.clone().with(|p| p.borrow()[&recv].events.get(np as usize).cloned()),
+                            Some(Ev::Text(ref t, _)) if t.trim().is_empty()
+                        )
+                    {
+                        np += 1;
+                    }
+                }
+                vm.module_tables
+                    .xml_res_parsers
+                    .clone()
+                    .with(|p| p.borrow_mut().get_mut(&recv).map(|s| s.pos = np));
+                let nev = vm
+                    .module_tables
+                    .xml_res_parsers
+                    .clone()
+                    .with(|p| p.borrow()[&recv].events.get(np as usize).cloned());
+                let t = event_type(np, &nev);
+                if name == "nextTag" && t != 2 && t != 3 {
+                    return Err(exc(
+                        "Lorg/xmlpull/v1/XmlPullParserException;",
+                        "expected START_TAG or END_TAG",
+                    ));
+                }
+                Value::Int(t)
             }
-            vm.module_tables
-                .xml_res_parsers
-                .clone()
-                .with(|p| p.borrow_mut().get_mut(&recv).map(|s| s.pos = np));
-            let nev = vm
-                .module_tables
-                .xml_res_parsers
-                .clone()
-                .with(|p| p.borrow()[&recv].events.get(np as usize).cloned());
-            Value::Int(event_type(np, &nev))
         }
         "getEventType" => Value::Int(event_type(pos, &ev)),
         "getName" => {
@@ -663,13 +753,78 @@ pub fn instance_intrinsic(
         "getLineNumber" => Value::Int((pos + 1) as i32),
         "getColumnNumber" => Value::Int(-1),
         "close" => {
-            vm.module_tables
-                .xml_res_parsers
-                .clone()
-                .with(|p| p.borrow_mut().remove(&recv));
+            // Idempotent: keep the parser registered and drop its events, so
+            // later close()/getEventType() calls still answer (END_DOCUMENT).
+            vm.module_tables.xml_res_parsers.clone().with(|p| {
+                if let Some(st) = p.borrow_mut().get_mut(&recv) {
+                    st.events.clear();
+                    st.pos = 0;
+                }
+            });
             Value::Null
         }
-        "require" => Value::Null,
+        // XmlPullParser.require(type, namespace, name): throws on any mismatch (#370).
+        "require" => {
+            let want_type = match args.first() {
+                Some(Value::Int(i)) => *i,
+                _ => -1,
+            };
+            let want_ns = str_arg(vm, args.get(1));
+            let want_name = str_arg(vm, args.get(2));
+            let cur_name = match &ev {
+                Some(Ev::Start { name, .. }) | Some(Ev::End { name, .. }) => Some(name.clone()),
+                _ => None,
+            };
+            let cur_type = event_type(pos, &ev);
+            // The parser has no namespaces: only null or "" matches.
+            let ns_ok = match want_ns.as_deref() {
+                None => true,
+                Some(n) => n.is_empty(),
+            };
+            let name_ok = want_name.is_none() || want_name == cur_name;
+            if cur_type != want_type || !ns_ok || !name_ok {
+                return Err(exc(
+                    "Lorg/xmlpull/v1/XmlPullParserException;",
+                    format!("expected type {want_type} name {want_name:?}"),
+                ));
+            }
+            Value::Null
+        }
+        // XmlPullParser.nextText(): the element must hold only text; leaves the parser on END_TAG (#370).
+        "nextText" => {
+            if event_type(pos, &ev) != 2 {
+                return Err(exc(
+                    "Lorg/xmlpull/v1/XmlPullParserException;",
+                    "parser must be on START_TAG to read next text",
+                ));
+            }
+            let st_events = vm
+                .module_tables
+                .xml_res_parsers
+                .clone()
+                .with(|p| p.borrow()[&recv].events.clone());
+            let mut np = (pos + 1) as usize;
+            let mut text = String::new();
+            if let Some(Ev::Text(t, _)) = st_events.get(np) {
+                text = t.clone();
+                np += 1;
+            }
+            match st_events.get(np) {
+                Some(Ev::End { .. }) => {
+                    vm.module_tables
+                        .xml_res_parsers
+                        .clone()
+                        .with(|p| p.borrow_mut().get_mut(&recv).map(|s| s.pos = np as isize));
+                    str_val(vm, text)?
+                }
+                _ => {
+                    return Err(exc(
+                        "Lorg/xmlpull/v1/XmlPullParserException;",
+                        "type START_TAG is not text-only; END_TAG expected",
+                    ))
+                }
+            }
+        }
         "getAttributeCount" => Value::Int(
             current_attrs(vm, recv)
                 .map(|a| a.len() as i32)
@@ -769,4 +924,101 @@ pub fn static_intrinsic(
         return Ok(None);
     }
     Ok(Some(args.first().cloned().unwrap_or(Value::Null)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn color(s: &str) -> Option<i32> {
+        let vm = Engine::new(Vec::new(), crate::VmConfig::default());
+        as_i32(&vm, &AttrValue::String(s.to_string()))
+    }
+
+    /// #370: `#RGB` / `#ARGB` expand each nibble; `#RRGGBB` / `#AARRGGBB` are taken as written.
+    #[test]
+    fn hex_color_shorthand_expands_each_nibble() {
+        assert_eq!(color("#f00"), Some(0xFFFF_0000u32 as i32));
+        assert_eq!(color("#abc"), Some(0xFFAA_BBCCu32 as i32));
+        assert_eq!(color("#8f00"), Some(0x88FF_0000u32 as i32));
+        assert_eq!(color("#ff0000"), Some(0xFFFF_0000u32 as i32));
+        assert_eq!(color("#80ff0000"), Some(0x80FF_0000u32 as i32));
+    }
+}
+
+#[cfg(test)]
+mod color_tests {
+    use super::*;
+
+    fn color(text: &str) -> Option<i32> {
+        let vm = Engine::new(Vec::new(), crate::VmConfig::default());
+        as_i32(&vm, &AttrValue::String(text.to_string()))
+    }
+
+    #[test]
+    fn issue_370_shorthand_colors_expand_each_nibble() {
+        assert_eq!(color("#fff"), Some(0xFFFF_FFFFu32 as i32));
+        assert_eq!(color("#f00"), Some(0xFFFF_0000u32 as i32));
+        assert_eq!(color("#f08c"), Some(0xFF00_88CCu32 as i32));
+        assert_eq!(color("#ff0000"), Some(0xFFFF_0000u32 as i32));
+        assert_eq!(color("#80ff0000"), Some(0x80FF_0000u32 as i32));
+    }
+
+    #[test]
+    fn issue_370_invalid_color_lengths_and_signs_are_rejected() {
+        for bad in ["#1", "#12", "#12345", "#1234567", "#+12", "#+12345", "#zzz"] {
+            assert_eq!(color(bad), None, "{bad} must not parse as a color");
+        }
+    }
+}
+
+#[cfg(test)]
+mod flatten_tests {
+    use super::*;
+    use rd_apk::axml::XmlElement;
+
+    fn el(name: &str, children: Vec<XmlElement>) -> XmlElement {
+        XmlElement {
+            name: name.to_string(),
+            attrs: Vec::new(),
+            children,
+            text: None,
+        }
+    }
+
+    #[test]
+    fn issue_370_flatten_keeps_document_order_and_depths() {
+        let mut root = el(
+            "a",
+            vec![el("b", vec![el("c", Vec::new())]), el("d", Vec::new())],
+        );
+        root.text = Some("hi".to_string());
+        let mut out = Vec::new();
+        flatten(&root, 1, &mut out);
+        let names: Vec<String> = out
+            .iter()
+            .map(|ev| match ev {
+                Ev::Start { name, depth, .. } => format!("<{name}@{depth}"),
+                Ev::End { name, depth } => format!("</{name}@{depth}"),
+                Ev::Text(t, depth) => format!("#{t}@{depth}"),
+            })
+            .collect();
+        assert_eq!(
+            names,
+            vec!["<a@1", "#hi@1", "<b@2", "<c@3", "</c@3", "</b@2", "<d@2", "</d@2", "</a@1"]
+        );
+    }
+
+    #[test]
+    fn issue_370_deep_tree_flattens_without_stack_overflow() {
+        const DEPTH: usize = 200_000;
+        let mut node = el("leaf", Vec::new());
+        for _ in 0..DEPTH {
+            node = el("n", vec![node]);
+        }
+        let mut out = Vec::new();
+        flatten(&node, 1, &mut out);
+        assert_eq!(out.len(), 2 * (DEPTH + 1));
+        assert!(matches!(out.last(), Some(Ev::End { depth: 1, .. })));
+    }
 }

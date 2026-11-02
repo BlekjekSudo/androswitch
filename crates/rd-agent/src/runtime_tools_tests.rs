@@ -209,6 +209,39 @@ fn isolated_panic_retains_context_and_diagnostics_survive_a_poisoned_log_buffer(
 }
 
 #[test]
+fn batch_isolates_a_panicking_step_and_continues() {
+    // Issue #317: o batch chamava `call_tool` cru — um panic em
+    // qualquer passo escapava do isolamento e matava o lote inteiro
+    // (e o processo). Cada passo agora é isolado: o que explode vira
+    // INTERNAL_PANIC no próprio passo e o lote continua. (O helper
+    // `call` dos testes chama call_tool CRU: se o isolamento sumir
+    // do batch, ESTE teste entra em panic em vez de falhar limpo.)
+    let _guard = SESSION_LOCK.lock().unwrap();
+    let mut s = AgentSession::new();
+    // Mesmo gatilho do teste de isolamento acima: buffer de logs
+    // envenenado faz a tool `logs` entrar em panic.
+    let logs = s.logs.clone();
+    let _ = std::thread::spawn(move || {
+        let _guard = logs.lock().unwrap();
+        panic!("injected log poison");
+    })
+    .join();
+    let (v, err) = call(
+        &mut s,
+        "batch",
+        serde_json::json!({"stop_on_error": false, "calls": [
+            {"name": "logs", "arguments": {}},
+            {"name": "session_info", "arguments": {}}
+        ]}),
+    );
+    assert!(!err, "batch: {v}");
+    assert_eq!(v["executed"], 2, "{v}");
+    assert_eq!(v["steps"][0]["ok"], false, "{v}");
+    assert_eq!(v["steps"][0]["result"]["code"], "INTERNAL_PANIC", "{v}");
+    assert_eq!(v["steps"][1]["ok"], true, "{v}");
+}
+
+#[test]
 fn runtime_diagnostics_preserve_ui_revision_clock_fuel_and_gc_state() {
     let _guard = SESSION_LOCK.lock().unwrap();
     let mut s = AgentSession::new();

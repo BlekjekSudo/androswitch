@@ -327,7 +327,7 @@ fn assemble_number(f: &Fmt, neg: bool, ip: &str, fp: &str) -> String {
         let digits: Vec<char> = ip.chars().collect();
         let mut out = String::new();
         for (k, c) in digits.iter().enumerate() {
-            if k > 0 && (digits.len() - k) % g == 0 {
+            if k > 0 && (digits.len() - k).is_multiple_of(g) {
                 out.push(f.group);
             }
             out.push(*c);

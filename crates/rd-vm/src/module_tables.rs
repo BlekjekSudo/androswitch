@@ -15,6 +15,7 @@ pub(crate) struct ModuleTables {
     pub(crate) jrandom_seeds: Local<RefCell<HashMap<ObjRef, u64>>>,
     pub(crate) jrandom_uniq: Local<RefCell<u64>>,
     pub(crate) juuid_rng: Local<Cell<u64>>,
+    pub(crate) xml_res_host_bytes: Local<Cell<usize>>,
     pub(crate) xml_res_parsers: Local<RefCell<HashMap<ObjRef, xml_res::ParserState>>>,
     pub(crate) xml_res_arrays:
         Local<RefCell<HashMap<ObjRef, Vec<Option<rd_apk::axml::XmlAttribute>>>>>,
@@ -28,6 +29,7 @@ impl Default for ModuleTables {
             jrandom_seeds: Local::new(RefCell::new(HashMap::new())),
             jrandom_uniq: Local::new(RefCell::new(0)),
             juuid_rng: Local::new(Cell::new(juuid::initial_seed())),
+            xml_res_host_bytes: Local::new(Cell::new(0)),
             xml_res_parsers: Local::new(RefCell::new(HashMap::new())),
             xml_res_arrays: Local::new(RefCell::new(HashMap::new())),
         }

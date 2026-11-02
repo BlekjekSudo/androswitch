@@ -68,12 +68,12 @@ fn real_apk_inspect_end_to_end() {
     );
     assert!(apk.signing.is_signed(), "fixture é assinada");
 
-    // piso de API da spec
+    // piso de API da spec (ADR 016) — via constante, sem literal mágico
     match apk.floor_status() {
-        FloorStatus::Ok => assert!(apk.manifest.min_sdk >= 26),
+        FloorStatus::Ok => assert!(apk.manifest.min_sdk >= rd_apk::FLOOR_MIN_SDK),
         FloorStatus::BelowFloor { min_sdk, floor } => {
-            assert_eq!(floor, 26);
-            assert!(min_sdk < 26);
+            assert_eq!(floor, rd_apk::FLOOR_MIN_SDK);
+            assert!(min_sdk < rd_apk::FLOOR_MIN_SDK);
         }
     }
 

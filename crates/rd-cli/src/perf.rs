@@ -14,7 +14,7 @@
 //!
 //! Orçamentos avaliados:
 //! - startup cold emulado (pior das execuções) `< 2000 ms` (ROADMAP M7 DoD);
-//! - RSS de pico do processo `≤ ram_process_cap_mb` (512 MB, moto-e5);
+//! - RSS de pico do processo `≤ ram_process_cap_mb` (1024 MB, moto-e5 — ADR 015);
 //! - heap do app `≤ ram_app_heap_mb` (256 MB): marca d'água da arena da VM
 //!   (`runtime_health.heap_peak_bytes`), lida fora do cronômetro.
 //!
@@ -183,7 +183,9 @@ fn call_json(
     name: &str,
     args: &serde_json::Value,
 ) -> Result<serde_json::Value, RdError> {
-    let r = s.call_tool(name, args);
+    // Issue #317: `rd perf` também isola — panic de runtime vira
+    // PERF_FAILED tipado neste passo, não crash do processo.
+    let r = s.call_tool_isolated(name, args);
     if r.is_error {
         return Err(RdError::new(
             "PERF_FAILED",
@@ -428,6 +430,21 @@ mod tests {
         assert!(rss_within_budget(Some(512.0), 512));
         assert!(!rss_within_budget(Some(512.1), 512));
         assert!(!rss_within_budget(None, 512));
+    }
+
+    /// ADR 015 (owner decision 2026-10-25): the moto-e5 process cap is
+    /// 1024 MB, so a run peaking between 512 and 1024 MB now passes and one
+    /// above 1024 MB still fails closed. The cap comes from the embedded
+    /// `data/devices.toml`, the same table `rd perf` uses.
+    #[test]
+    fn moto_e5_rss_cap_is_1024_mb_adr_015() {
+        let table = rd_framework::fd_devices::DeviceTable::embedded().expect("devices.toml");
+        let e5 = table.hardware_floor().expect("moto-e5 floor profile");
+        assert_eq!(e5.ram_process_cap_mb, 1024);
+        assert_eq!(e5.ram_app_heap_mb, 256, "guest heap unchanged by ADR 015");
+        assert!(rss_within_budget(Some(900.0), e5.ram_process_cap_mb));
+        assert!(rss_within_budget(Some(1024.0), e5.ram_process_cap_mb));
+        assert!(!rss_within_budget(Some(1024.1), e5.ram_process_cap_mb));
     }
 
     #[test]

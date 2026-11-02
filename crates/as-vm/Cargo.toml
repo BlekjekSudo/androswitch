@@ -24,9 +24,10 @@ rd-apk = { path = "../rd-apk", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 
 as-sqlite = { path = "../as-sqlite", optional = true }
+rd-engine-wasm = { path = "../rd-engine-wasm", optional = true }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
 regex = { version = "1.13.1", default-features = false, features = ["unicode-perl", "unicode-case"], optional = true }
-fancy-regex = { version = "=0.13.0", default-features = false, features = ["unicode"], optional = true }
+fancy-regex = { version = "=0.20.0", default-features = false, features = ["unicode"], optional = true }
 libm = { version = "0.2", optional = true }
 siphasher = { version = "1.0", default-features = false, optional = true }
 
@@ -39,6 +40,7 @@ rd-testsupport = { package = "as-vm-testsupport", path = "../as-vm-testsupport" 
 default = ["std"]
 std = ["as-platform/std", "rd-dex/std", "rd-apk/std", "serde/std", "dep:regex", "dep:fancy-regex"]
 portable-test-support = []
+wasm-engine = ["std", "upstream-runtime", "dep:rd-engine-wasm"]
 upstream-runtime = ["dep:as-sqlite", "dep:serde_json", "dep:regex", "dep:fancy-regex", "dep:libm", "dep:siphasher"]
 
 # Complete virtual/reference surfaces remain explicit; enabling them never
@@ -325,4 +327,229 @@ required-features = ["upstream-parity-tests"]
 [[test]]
 name = "upstream_xml_269"
 path = "../rd-vm/tests/xml_269.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_host_static_330"
+path = "../rd-vm/tests/android_host_static_330.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_pm_361"
+path = "../rd-vm/tests/android_pm_361.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_uri_367"
+path = "../rd-vm/tests/android_uri_367.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_util_304"
+path = "../rd-vm/tests/android_util_304.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_android_view_state"
+path = "../rd-vm/tests/android_view_state.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_androidx_367"
+path = "../rd-vm/tests/androidx_367.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_androidx_viewmodel_232"
+path = "../rd-vm/tests/androidx_viewmodel_232.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_arrays_379"
+path = "../rd-vm/tests/arrays_379.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_bigdecimal_375"
+path = "../rd-vm/tests/bigdecimal_375.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_bundle_intent_290"
+path = "../rd-vm/tests/bundle_intent_290.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_classpath_320"
+path = "../rd-vm/tests/classpath_320.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_classpath_363"
+path = "../rd-vm/tests/classpath_363.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_dispatch_315"
+path = "../rd-vm/tests/dispatch_315.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_dispatch_315_wide"
+path = "../rd-vm/tests/dispatch_315_wide.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_engine_host_init_232"
+path = "../rd-vm/tests/engine_host_init_232.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_gc_host_and_jni"
+path = "../rd-vm/tests/gc_host_and_jni.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jio_366"
+path = "../rd-vm/tests/jio_366.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jio_366b"
+path = "../rd-vm/tests/jio_366b.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jit_fuzz"
+path = "../rd-vm/tests/jit_fuzz.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jlstring_378"
+path = "../rd-vm/tests/jlstring_378.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jni_318"
+path = "../rd-vm/tests/jni_318.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jregex_374"
+path = "../rd-vm/tests/jregex_374.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jregex_374b"
+path = "../rd-vm/tests/jregex_374b.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jsb_376"
+path = "../rd-vm/tests/jsb_376.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jsb_376_codepoint"
+path = "../rd-vm/tests/jsb_376_codepoint.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jsb_376_null"
+path = "../rd-vm/tests/jsb_376_null.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_json_364b"
+path = "../rd-vm/tests/json_364b.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_json_364c"
+path = "../rd-vm/tests/json_364c.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_json_skip_364"
+path = "../rd-vm/tests/json_skip_364.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jsqlite_321"
+path = "../rd-vm/tests/jsqlite_321.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_jtime_291"
+path = "../rd-vm/tests/jtime_291.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_location_fused_229"
+path = "../rd-vm/tests/location_fused_229.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_m8_m10_security_329"
+path = "../rd-vm/tests/m8_m10_security_329.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_reflect_379"
+path = "../rd-vm/tests/reflect_379.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_spannable_369"
+path = "../rd-vm/tests/spannable_369.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_spannable_369b"
+path = "../rd-vm/tests/spannable_369b.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_spannable_369c"
+path = "../rd-vm/tests/spannable_369c.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_sqlite_helper_321"
+path = "../rd-vm/tests/sqlite_helper_321.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_stack_overflow_313"
+path = "../rd-vm/tests/stack_overflow_313.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_uri_budget_367"
+path = "../rd-vm/tests/uri_budget_367.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_viewport_252"
+path = "../rd-vm/tests/viewport_252.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_wasm_bridge"
+path = "../rd-vm/tests/wasm_bridge.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_wasm_demo_golden"
+path = "../rd-vm/tests/wasm_demo_golden.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_xml_parser_370"
+path = "../rd-vm/tests/xml_parser_370.rs"
+required-features = ["upstream-parity-tests"]
+
+[[test]]
+name = "upstream_xml_parser_370b"
+path = "../rd-vm/tests/xml_parser_370b.rs"
 required-features = ["upstream-parity-tests"]

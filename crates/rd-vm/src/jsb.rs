@@ -163,17 +163,21 @@ fn set(vm: &mut Engine, r: ObjRef, u: &[u16]) -> Result<(), VmExit> {
     };
     crate::err::put_field_result(vm.heap.put_field(r, "buf", Value::Obj(s)))
 }
-fn string_text(units: &[u16]) -> Result<String, VmExit> {
-    String::from_utf16(units).map_err(|_| {
-        crate::err::vm_error(
-            "API_UNAVAILABLE",
-            "an isolated surrogate String requires the UTF-16 String heap",
-        )
-        .into()
-    })
-}
 fn int(args: &[Value], i: usize) -> i32 {
     args.get(i).and_then(|v| v.as_int().ok()).unwrap_or(0)
+}
+
+/// Text argument that must not be null (`replace`, `indexOf`, `lastIndexOf`,
+/// `compareTo`): the JDK throws `NullPointerException`. `append`/`insert` keep
+/// `text_of`, where `null` means "null" (#376).
+fn required_text(vm: &mut Engine, v: Option<&Value>) -> Result<Vec<u16>, VmExit> {
+    match v {
+        None | Some(Value::Null) => Err(VmExit::Exception(Throwable::new(
+            "Ljava/lang/NullPointerException;",
+            "argument is null".to_string(),
+        ))),
+        _ => text_of(vm, v),
+    }
 }
 
 fn text_of(vm: &mut Engine, v: Option<&Value>) -> Result<Vec<u16>, VmExit> {
@@ -363,19 +367,23 @@ pub fn instance_intrinsic(
             Value::Obj(recv)
         }
         "appendCodePoint" => {
+            // Como a JDK: qualquer valor em 0..=0x10FFFF é aceito. Um surrogate
+            // isolado (0xD800..=0xDFFF) é anexado como uma unidade UTF-16; só
+            // valores fora do intervalo lançam IllegalArgumentException.
             let cp = int(args, 0);
-            if !(0..=0x10ffff).contains(&cp) {
+            if !(0..=0x10FFFF).contains(&cp) {
                 return Err(VmExit::Exception(Throwable::new(
                     "Ljava/lang/IllegalArgumentException;",
-                    "Not a valid Unicode code point",
+                    format!("Not a valid Unicode code point: 0x{:X}", cp as u32),
                 )));
             }
+            let cp = cp as u32;
             if cp < 0x10000 {
                 u.push(cp as u16);
             } else {
-                let cp = cp as u32 - 0x10000;
-                u.push((0xd800 + (cp >> 10)) as u16);
-                u.push((0xdc00 + (cp & 0x3ff)) as u16);
+                let c = char::from_u32(cp).unwrap_or('\u{FFFD}');
+                let mut b = [0u16; 2];
+                u.extend_from_slice(c.encode_utf16(&mut b));
             }
             set(vm, recv, &u)?;
             Value::Obj(recv)
@@ -431,7 +439,7 @@ pub fn instance_intrinsic(
             if start < 0 || start as usize > len || start > end {
                 return Err(sioobe(format!("start {start}, end {end}, length {len}")));
             }
-            let add = text_of(vm, args.get(2))?;
+            let add = required_text(vm, args.get(2))?;
             u.splice(start as usize..end as usize, add);
             set(vm, recv, &u)?;
             Value::Obj(recv)
@@ -493,20 +501,23 @@ pub fn instance_intrinsic(
             if i < 0 || i as usize >= len {
                 return Err(sioobe(format!("index {i},length {len}")));
             }
-            let at = i as usize;
-            let high = u[at];
-            Value::Int(
-                if (0xd800..=0xdbff).contains(&high)
-                    && u.get(at + 1).is_some_and(|u| (0xdc00..=0xdfff).contains(u))
+            // Como a JDK: par válido vira o code point; surrogate isolado vira o
+            // próprio valor da unidade (não U+FFFD).
+            let i = i as usize;
+            let hi = u[i] as u32;
+            let cp = match u.get(i + 1) {
+                Some(&lo)
+                    if (0xD800..0xDC00).contains(&hi)
+                        && (0xDC00..0xE000).contains(&(lo as u32)) =>
                 {
-                    0x10000 + ((i32::from(high) - 0xd800) << 10) + i32::from(u[at + 1]) - 0xdc00
-                } else {
-                    i32::from(high)
-                },
-            )
+                    ((hi - 0xD800) << 10) + (lo as u32 - 0xDC00) + 0x10000
+                }
+                _ => hi,
+            };
+            Value::Int(cp as i32)
         }
         "indexOf" | "lastIndexOf" => {
-            let needle = text_of(vm, args.first())?;
+            let needle = required_text(vm, args.first())?;
             if name == "indexOf" {
                 Value::Int(find(
                     &u,
@@ -533,7 +544,10 @@ pub fn instance_intrinsic(
                 len as i32
             };
             let (a, b) = check_range(start, end, len)?;
-            Value::Obj(crate::intrinsics::alloc_string(vm, string_text(&u[a..b])?)?)
+            Value::Obj(crate::intrinsics::alloc_string(
+                vm,
+                String::from_utf16_lossy(&u[a..b]),
+            )?)
         }
         "getChars" => {
             let (a, b) = check_range(int(args, 0), int(args, 1), len)?;
@@ -564,9 +578,16 @@ pub fn instance_intrinsic(
         "isEmpty" => Value::Int((len == 0) as i32),
         "capacity" => Value::Int((len + 16) as i32),
         "ensureCapacity" | "trimToSize" => Value::Null,
-        "toString" => Value::Obj(crate::intrinsics::alloc_string(vm, string_text(&u)?)?),
+        // Preserve the upstream String materialization contract. The builder's
+        // managed char[] remains lossless; the current UTF-8 String heap replaces
+        // isolated surrogates here, as upstream does. Full Android UTF-16 String
+        // identity/operations remain a documented limitation of both runtimes.
+        "toString" => Value::Obj(crate::intrinsics::alloc_string(
+            vm,
+            String::from_utf16_lossy(&u),
+        )?),
         "compareTo" => {
-            let other = text_of(vm, args.first())?;
+            let other = required_text(vm, args.first())?;
             Value::Int(match u.cmp(&other) {
                 core::cmp::Ordering::Less => -1,
                 core::cmp::Ordering::Equal => 0,

@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use RustyDroid, cite it with this metadata."
+title: RustyDroid
+abstract: >-
+  Rust-native Android runtime that executes real APKs on Linux x86_64 without a
+  VM, KVM or a guest kernel. Parses APK/AXML/ARSC/DEX, runs Dalvik bytecode in a
+  Rust VM, implements android.* APIs natively, renders headless, and exposes an
+  MCP control plane built for AI agents. Calibrated against a Moto E5 floor
+  (API 26→36).
+type: software
+license:
+  - MIT
+  - Apache-2.0
+repository-code: "https://github.com/nadabgfccvd/RustyDroid"
+url: "https://github.com/nadabgfccvd/RustyDroid"
+version: 0.9.0
+keywords:
+  - android
+  - rust
+  - runtime
+  - dalvik
+  - apk
+  - mcp
+  - ai-agents
+  - headless
+authors:
+  - alias: nadabgfccvd
+    name: RustyDroid contributors

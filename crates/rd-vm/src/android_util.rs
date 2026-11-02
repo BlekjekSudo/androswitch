@@ -158,13 +158,39 @@ fn sparse(
             Value::Null
         }
         "toString" => {
-            let s = format!(
-                "{{{}}}",
-                m.iter()
-                    .map(|(k, v)| format!("{k}={v:?}"))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
+            let entries: Vec<(i64, Value)> = m.iter().map(|(k, v)| (*k, v.clone())).collect();
+            if entries.is_empty() {
+                return Ok(Some(Value::Obj(crate::intrinsics::alloc_string(
+                    vm,
+                    "{}".to_string(),
+                )?)));
+            }
+            let mut parts = Vec::with_capacity(entries.len());
+            for (k, v) in entries {
+                let key_s = if class == "Landroid/util/LongSparseArray;" {
+                    k.to_string()
+                } else {
+                    (k as i32).to_string()
+                };
+                let val_s = match class {
+                    "Landroid/util/SparseIntArray;" => v.as_int().unwrap_or(0).to_string(),
+                    "Landroid/util/SparseBooleanArray;" => {
+                        if v.as_int().unwrap_or(0) != 0 {
+                            "true".to_string()
+                        } else {
+                            "false".to_string()
+                        }
+                    }
+                    "Landroid/util/SparseLongArray;" => match v {
+                        Value::Long(l) => l.to_string(),
+                        Value::Int(i) => i.to_string(),
+                        _ => "0".to_string(),
+                    },
+                    _ => util_format_value(vm, &v, Some(recv))?,
+                };
+                parts.push(format!("{key_s}={val_s}"));
+            }
+            let s = format!("{{{}}}", parts.join(", "));
             Value::Obj(crate::intrinsics::alloc_string(vm, s)?)
         }
         _ => return Ok(None),
@@ -1081,6 +1107,11 @@ const B64_STREAM_PENDING_1: &str = "rd_b64_pending_1";
 const B64_STREAM_COLUMN: &str = "rd_b64_column";
 const B64_STREAM_DECODED: &str = "rd_b64_decoded";
 const B64_STREAM_POS: &str = "rd_b64_pos";
+const B64_STREAM_EOF: &str = "rd_b64_eof";
+const B64_STREAM_STATE: &str = "rd_b64_state";
+const B64_STREAM_ACC: &str = "rd_b64_acc";
+const B64_STREAM_SCRATCH: &str = "rd_b64_scratch";
+const B64_CHUNK_BYTES: usize = 2048;
 
 fn b64_stream_throw(class: &str, message: impl Into<String>) -> VmExit {
     VmExit::Exception(Throwable::new(class, message.into()))
@@ -1289,50 +1320,164 @@ fn base64_output_stream(
     Ok(Some(Value::Null))
 }
 
-fn base64_input_load(vm: &mut Engine, recv: ObjRef) -> Result<Vec<u8>, VmExit> {
-    if let Value::Obj(decoded) = get(vm, recv, B64_STREAM_DECODED) {
-        return b64_stream_array_bytes(vm, Some(&Value::Obj(decoded)));
+fn base64_feed_chunk(
+    input: &[u8],
+    flags: i32,
+    eof: bool,
+    state: &mut i32,
+    accumulator: &mut u32,
+) -> Result<Vec<u8>, VmExit> {
+    let web_safe = flags & BASE64_URL_SAFE != 0;
+    let mut output = Vec::with_capacity(input.len() * 3 / 4 + 3);
+    for &byte in input {
+        if byte == b'=' {
+            match *state {
+                2 => *state = 4,
+                3 => {
+                    output.push((*accumulator >> 10) as u8);
+                    output.push((*accumulator >> 2) as u8);
+                    *state = 5;
+                }
+                4 => {
+                    output.push((*accumulator >> 4) as u8);
+                    *state = 5;
+                }
+                _ => return Err(base64_bad()),
+            }
+            continue;
+        }
+        let sextet = match byte {
+            b'A'..=b'Z' => u32::from(byte - b'A'),
+            b'a'..=b'z' => u32::from(byte - b'a' + 26),
+            b'0'..=b'9' => u32::from(byte - b'0' + 52),
+            b'+' if !web_safe => 62,
+            b'/' if !web_safe => 63,
+            b'-' if web_safe => 62,
+            b'_' if web_safe => 63,
+            _ => continue,
+        };
+        if !(0..=3).contains(state) {
+            return Err(base64_bad());
+        }
+        *accumulator = (*accumulator << 6) | sextet;
+        if *state == 3 {
+            output.push((*accumulator >> 16) as u8);
+            output.push((*accumulator >> 8) as u8);
+            output.push(*accumulator as u8);
+            *accumulator = 0;
+            *state = 0;
+        } else {
+            *state += 1;
+        }
     }
-    let input = b64_stream_wrapped(vm, recv, "in")?;
-    let scratch = crate::jlstring::byte_array(vm, &[0; 8192])?;
-    let Value::Obj(scratch_ref) = scratch else {
+    if eof {
+        match *state {
+            0 | 5 => {}
+            2 => {
+                output.push((*accumulator >> 4) as u8);
+                *state = 5;
+            }
+            3 => {
+                output.push((*accumulator >> 10) as u8);
+                output.push((*accumulator >> 2) as u8);
+                *state = 5;
+            }
+            _ => return Err(base64_bad()),
+        }
+    }
+    Ok(output)
+}
+
+fn base64_input_scratch(vm: &mut Engine, recv: ObjRef) -> Result<ObjRef, VmExit> {
+    if let Value::Obj(r) = get(vm, recv, B64_STREAM_SCRATCH) {
+        return Ok(r);
+    }
+    let val = crate::jlstring::byte_array(vm, &[0; B64_CHUNK_BYTES])?;
+    let Value::Obj(r) = val else {
         return Err(b64_stream_throw("Ljava/io/IOException;", "scratch buffer"));
     };
-    let mut encoded = Vec::new();
+    put(vm, recv, B64_STREAM_SCRATCH, val)?;
+    Ok(r)
+}
+
+/// Refills `B64_STREAM_DECODED` incrementally one bounded chunk (`2048 B`) at
+/// a time so reading a prefix of an unbounded/large `InputStream` never drains
+/// the entire stream into host memory outside `heap_budget`.
+fn base64_input_refill(vm: &mut Engine, recv: ObjRef) -> Result<Vec<u8>, VmExit> {
+    if let Value::Obj(decoded_ref) = get(vm, recv, B64_STREAM_DECODED) {
+        let pos = b64_stream_int(vm, recv, B64_STREAM_POS).max(0) as usize;
+        let cur = b64_stream_array_bytes(vm, Some(&Value::Obj(decoded_ref)))?;
+        if pos < cur.len() {
+            return Ok(cur);
+        }
+    }
+    if b64_stream_int(vm, recv, B64_STREAM_EOF) != 0 {
+        return Ok(Vec::new());
+    }
+    let input = b64_stream_wrapped(vm, recv, "in")?;
+    let scratch_ref = base64_input_scratch(vm, recv)?;
+    let flags = b64_stream_int(vm, recv, B64_STREAM_FLAGS);
+    let mut state = b64_stream_int(vm, recv, B64_STREAM_STATE);
+    let mut acc = b64_stream_int(vm, recv, B64_STREAM_ACC) as u32;
     let mut zero_reads = 0usize;
+
     loop {
         let n = vm
             .invoke_instance(
                 input,
                 "read",
                 "([BII)I",
-                &[scratch.clone(), Value::Int(0), Value::Int(8192)],
+                &[
+                    Value::Obj(scratch_ref),
+                    Value::Int(0),
+                    Value::Int(B64_CHUNK_BYTES as i32),
+                ],
             )?
             .as_int()
             .unwrap_or(-1);
         if n < 0 {
-            break;
+            let tail = base64_feed_chunk(&[], flags, true, &mut state, &mut acc)?;
+            b64_stream_set_int(vm, recv, B64_STREAM_EOF, 1)?;
+            b64_stream_set_int(vm, recv, B64_STREAM_STATE, state)?;
+            b64_stream_set_int(vm, recv, B64_STREAM_ACC, acc as i32)?;
+            let val = crate::jlstring::byte_array(vm, &tail)?;
+            put(vm, recv, B64_STREAM_DECODED, val)?;
+            b64_stream_set_int(vm, recv, B64_STREAM_POS, 0)?;
+            return Ok(tail);
         }
         if n == 0 {
             zero_reads += 1;
             if zero_reads > 100 {
-                break;
+                let tail = base64_feed_chunk(&[], flags, true, &mut state, &mut acc)?;
+                b64_stream_set_int(vm, recv, B64_STREAM_EOF, 1)?;
+                b64_stream_set_int(vm, recv, B64_STREAM_STATE, state)?;
+                b64_stream_set_int(vm, recv, B64_STREAM_ACC, acc as i32)?;
+                let val = crate::jlstring::byte_array(vm, &tail)?;
+                put(vm, recv, B64_STREAM_DECODED, val)?;
+                b64_stream_set_int(vm, recv, B64_STREAM_POS, 0)?;
+                return Ok(tail);
             }
             continue;
         }
         zero_reads = 0;
-        let bytes = vm.heap.as_array_elems(scratch_ref)?.0;
-        let take = (n as usize).min(bytes.len());
-        encoded.extend(
-            bytes[..take]
+        let raw_chunk: Vec<u8> = {
+            let elems = vm.heap.as_array_elems(scratch_ref)?.0;
+            let take = (n as usize).min(elems.len());
+            elems[..take]
                 .iter()
-                .map(|value| value.as_int().unwrap_or(0) as u8),
-        );
+                .map(|v| v.as_int().unwrap_or(0) as u8)
+                .collect()
+        };
+        let chunk = base64_feed_chunk(&raw_chunk, flags, false, &mut state, &mut acc)?;
+        b64_stream_set_int(vm, recv, B64_STREAM_STATE, state)?;
+        b64_stream_set_int(vm, recv, B64_STREAM_ACC, acc as i32)?;
+        if !chunk.is_empty() {
+            let val = crate::jlstring::byte_array(vm, &chunk)?;
+            put(vm, recv, B64_STREAM_DECODED, val)?;
+            b64_stream_set_int(vm, recv, B64_STREAM_POS, 0)?;
+            return Ok(chunk);
+        }
     }
-    let decoded = base64_decode(&encoded, b64_stream_int(vm, recv, B64_STREAM_FLAGS))?;
-    let decoded_value = crate::jlstring::byte_array(vm, &decoded)?;
-    put(vm, recv, B64_STREAM_DECODED, decoded_value)?;
-    Ok(decoded)
 }
 
 fn base64_input_stream(
@@ -1354,14 +1499,18 @@ fn base64_input_stream(
             b64_stream_set_int(vm, recv, B64_STREAM_FLAGS, base64_flags(args))?;
             b64_stream_set_int(vm, recv, B64_STREAM_CLOSED, 0)?;
             b64_stream_set_int(vm, recv, B64_STREAM_POS, 0)?;
+            b64_stream_set_int(vm, recv, B64_STREAM_EOF, 0)?;
+            b64_stream_set_int(vm, recv, B64_STREAM_STATE, 0)?;
+            b64_stream_set_int(vm, recv, B64_STREAM_ACC, 0)?;
             put(vm, recv, B64_STREAM_DECODED, Value::Null)?;
+            put(vm, recv, B64_STREAM_SCRATCH, Value::Null)?;
             Ok(Some(Value::Null))
         }
         ("read", "()I") => {
             if b64_stream_int(vm, recv, B64_STREAM_CLOSED) != 0 {
                 return Ok(Some(Value::Int(-1)));
             }
-            let decoded = base64_input_load(vm, recv)?;
+            let decoded = base64_input_refill(vm, recv)?;
             let pos = b64_stream_int(vm, recv, B64_STREAM_POS).max(0) as usize;
             let Some(byte) = decoded.get(pos) else {
                 return Ok(Some(Value::Int(-1)));
@@ -1413,34 +1562,55 @@ fn base64_input_stream(
             if b64_stream_int(vm, recv, B64_STREAM_CLOSED) != 0 {
                 return Ok(Some(Value::Int(-1)));
             }
-            let decoded = base64_input_load(vm, recv)?;
-            let pos = b64_stream_int(vm, recv, B64_STREAM_POS).max(0) as usize;
-            if pos >= decoded.len() {
-                return Ok(Some(Value::Int(-1)));
-            }
-            let count = len.min(decoded.len() - pos);
-            {
-                let elems = vm.heap.array_elems_mut(*array)?;
-                for (index, byte) in decoded[pos..pos + count].iter().enumerate() {
-                    elems[offset + index] = Value::Int(i32::from(*byte as i8));
+            let mut copied = 0usize;
+            while copied < len {
+                let decoded = base64_input_refill(vm, recv)?;
+                let pos = b64_stream_int(vm, recv, B64_STREAM_POS).max(0) as usize;
+                if pos >= decoded.len() {
+                    break;
                 }
+                let take = (len - copied).min(decoded.len() - pos);
+                {
+                    let elems = vm.heap.array_elems_mut(*array)?;
+                    for (index, byte) in decoded[pos..pos + take].iter().enumerate() {
+                        elems[offset + copied + index] = Value::Int(i32::from(*byte as i8));
+                    }
+                }
+                b64_stream_set_int(vm, recv, B64_STREAM_POS, (pos + take) as i32)?;
+                copied += take;
             }
-            b64_stream_set_int(vm, recv, B64_STREAM_POS, (pos + count) as i32)?;
-            Ok(Some(Value::Int(count as i32)))
+            if copied == 0 {
+                Ok(Some(Value::Int(-1)))
+            } else {
+                Ok(Some(Value::Int(copied as i32)))
+            }
         }
         ("available", "()I") => {
-            if let Value::Obj(decoded_ref) = get(vm, recv, B64_STREAM_DECODED) {
-                let decoded = b64_stream_array_bytes(vm, Some(&Value::Obj(decoded_ref)))?;
-                let pos = b64_stream_int(vm, recv, B64_STREAM_POS).max(0) as usize;
-                return Ok(Some(Value::Int(decoded.len().saturating_sub(pos) as i32)));
+            if b64_stream_int(vm, recv, B64_STREAM_CLOSED) != 0 {
+                return Err(b64_stream_throw("Ljava/io/IOException;", "Stream closed"));
             }
-            let input = b64_stream_wrapped(vm, recv, "in")?;
-            let encoded_available = vm
-                .invoke_instance(input, "available", "()I", &[])?
-                .as_int()
-                .unwrap_or(0)
-                .max(0);
-            Ok(Some(Value::Int((encoded_available * 3) / 4)))
+            let buffered = match get(vm, recv, B64_STREAM_DECODED) {
+                Value::Obj(decoded_ref) => {
+                    let total = vm.heap.as_array_elems(decoded_ref)?.0.len();
+                    let pos = b64_stream_int(vm, recv, B64_STREAM_POS).max(0) as usize;
+                    total.saturating_sub(pos) as i64
+                }
+                _ => 0,
+            };
+            let more = if b64_stream_int(vm, recv, B64_STREAM_EOF) != 0 {
+                0
+            } else {
+                let input = b64_stream_wrapped(vm, recv, "in")?;
+                let encoded_available = vm
+                    .invoke_instance(input, "available", "()I", &[])?
+                    .as_int()
+                    .unwrap_or(0)
+                    .max(0);
+                (i64::from(encoded_available) * 3) / 4
+            };
+            Ok(Some(Value::Int(
+                buffered.saturating_add(more).min(i64::from(i32::MAX)) as i32,
+            )))
         }
         ("close", "()V") => {
             if b64_stream_int(vm, recv, B64_STREAM_CLOSED) != 0 {
@@ -1478,6 +1648,20 @@ pub(crate) fn host_static(
                 entries: Vec::new(),
             },
         );
+        return Ok(Some(Value::Obj(r)));
+    }
+    if class == "Landroid/util/Rational;" {
+        let (n, d) = match name {
+            "NaN" => (0, 0),
+            "POSITIVE_INFINITY" => (1, 0),
+            "NEGATIVE_INFINITY" => (-1, 0),
+            "ZERO" => (0, 1),
+            _ => return Ok(None),
+        };
+        let r = vm
+            .heap
+            .alloc_instance("Landroid/util/Rational;".to_string(), Vec::new())?;
+        store_rational(vm, r, i64::from(n), i64::from(d))?;
         return Ok(Some(Value::Obj(r)));
     }
     if class != BASE64 {
@@ -1922,7 +2106,15 @@ pub(crate) fn instance_intrinsic(
             | "evictionCount"
             | "snapshot"
     );
-    if mref_class == LRU_CACHE || (lru_final_method && vm.cp.is_subtype(recv_class, LRU_CACHE)) {
+    if mref_class == LRU_CACHE
+        || recv_class == LRU_CACHE
+        || (lru_final_method && vm.cp.is_subtype(recv_class, LRU_CACHE))
+        || (name == "toString"
+            && sig == "()Ljava/lang/String;"
+            && vm.cp.find_class(recv_class).is_some()
+            && vm.cp.is_subtype(recv_class, LRU_CACHE)
+            && vm.cp.resolve_method(recv_class, name, sig).is_none())
+    {
         return lru_cache(vm, name, sig, recv, args);
     }
     if matches!(mref_class, ARRAY_MAP | SIMPLE_ARRAY_MAP)
@@ -2026,55 +2218,37 @@ pub(crate) fn instance_intrinsic(
             return base64_output_stream(vm, name, sig, recv, args);
         }
     }
-    if !mref_class.starts_with("Landroid/util/") {
+    let target_class = if mref_class.starts_with("Landroid/util/") {
+        mref_class
+    } else if recv_class.starts_with("Landroid/util/") {
+        recv_class
+    } else {
         return Ok(None);
-    }
-    if let Some(c) = SPARSE.iter().find(|c| **c == mref_class) {
+    };
+    if let Some(c) = SPARSE.iter().find(|c| **c == target_class) {
         return sparse(vm, c, name, recv, args);
     }
     let a = |i: usize| args.get(i).cloned().unwrap_or(Value::Null);
-    let fields: &[&str] = match mref_class {
+    let fields: &[&str] = match target_class {
         "Landroid/util/Size;" | "Landroid/util/SizeF;" => &["rd_w", "rd_h"],
         "Landroid/util/Pair;" => &["first", "second"],
         "Landroid/util/Range;" => &["rd_lower", "rd_upper"],
         "Landroid/util/Rational;" => &["rd_num", "rd_den"],
         _ => return Ok(None),
     };
-    let same = |vm: &Engine, o: &Value| -> bool {
-        match o {
-            Value::Obj(o) => {
-                vm.heap.class_of(*o).ok() == vm.heap.class_of(recv).ok()
-                    && fields.iter().all(|f| get(vm, *o, f) == get(vm, recv, f))
-            }
-            _ => false,
-        }
-    };
-    let hash = |vm: &Engine| -> i32 {
-        fields.iter().fold(0i32, |h, f| {
-            let x = match get(vm, recv, f) {
-                Value::Int(i) => i,
-                Value::Float(x) => x.to_bits() as i32,
-                Value::Obj(r) => r as i32,
-                _ => 0,
-            };
-            h.wrapping_mul(31).wrapping_add(x)
-        })
-    };
     Ok(Some(match name {
         "<init>" => {
-            let (mut x, mut y) = (a(0), a(1));
-            if mref_class == "Landroid/util/Rational;" {
-                // AOSP normalizes by gcd and keeps the sign on the numerator
-                if let (Value::Int(n), Value::Int(d)) = (&x, &y) {
-                    let (mut n, mut d) = (*n as i64, *d as i64);
-                    if d < 0 {
-                        n = -n;
-                        d = -d;
-                    }
-                    let g = gcd(n.abs(), d.abs()).max(1);
-                    x = Value::Int((n / g) as i32);
-                    y = Value::Int((d / g) as i32);
-                }
+            let (x, y) = (a(0), a(1));
+            if target_class == "Landroid/util/Rational;" {
+                let (Value::Int(n), Value::Int(d)) = (&x, &y) else {
+                    return Err(array_throw(
+                        "Ljava/lang/IllegalArgumentException;",
+                        "Rational numerator/denominator must be int",
+                    ));
+                };
+                let (rn, rd) = normalize_rational(*n, *d);
+                store_rational(vm, recv, rn, rd)?;
+                return Ok(Some(Value::Null));
             }
             put(vm, recv, fields[0], x)?;
             put(vm, recv, fields[1], y)?;
@@ -2086,17 +2260,100 @@ pub(crate) fn instance_intrinsic(
         "getUpper" => get(vm, recv, "rd_upper"),
         "getNumerator" => get(vm, recv, "rd_num"),
         "getDenominator" => get(vm, recv, "rd_den"),
-        "doubleValue" | "floatValue" | "intValue" | "longValue" => {
-            let (n, d) = (num(&get(vm, recv, "rd_num")), num(&get(vm, recv, "rd_den")));
-            let v = if d == 0.0 { f64::NAN } else { n / d };
+        "isNaN" if target_class == "Landroid/util/Rational;" => {
+            let (rn, rd) = rational_parts(vm, recv);
+            Value::Int((rn == 0 && rd == 0) as i32)
+        }
+        "isInfinite" if target_class == "Landroid/util/Rational;" => {
+            let (rn, rd) = rational_parts(vm, recv);
+            Value::Int((rn != 0 && rd == 0) as i32)
+        }
+        "isFinite" if target_class == "Landroid/util/Rational;" => {
+            let (_, rd) = rational_parts(vm, recv);
+            Value::Int((rd != 0) as i32)
+        }
+        "isZero" if target_class == "Landroid/util/Rational;" => {
+            let (rn, rd) = rational_parts(vm, recv);
+            Value::Int((rn == 0 && rd != 0) as i32)
+        }
+        "doubleValue" | "floatValue" | "intValue" | "longValue" | "shortValue" | "byteValue"
+            if target_class == "Landroid/util/Rational;" =>
+        {
+            let (rn, rd) = rational_parts(vm, recv);
+            let v = rational_f64(rn, rd);
             match name {
                 "doubleValue" => Value::Double(v),
                 "floatValue" => Value::Float(v as f32),
-                "intValue" => Value::Int(v as i32),
-                _ => Value::Long(v as i64),
+                "intValue" => Value::Int(if rd == 0 {
+                    if rn > 0 {
+                        i32::MAX
+                    } else if rn < 0 {
+                        i32::MIN
+                    } else {
+                        0
+                    }
+                } else {
+                    (rn / rd).clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
+                }),
+                "longValue" => Value::Long(if rd == 0 {
+                    if rn > 0 {
+                        i64::MAX
+                    } else if rn < 0 {
+                        i64::MIN
+                    } else {
+                        0
+                    }
+                } else {
+                    rn / rd
+                }),
+                "shortValue" => {
+                    let iv = if rd == 0 {
+                        if rn > 0 {
+                            i32::MAX
+                        } else if rn < 0 {
+                            i32::MIN
+                        } else {
+                            0
+                        }
+                    } else {
+                        (rn / rd).clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
+                    };
+                    Value::Int(i32::from(iv as i16))
+                }
+                _ => {
+                    let iv = if rd == 0 {
+                        if rn > 0 {
+                            i32::MAX
+                        } else if rn < 0 {
+                            i32::MIN
+                        } else {
+                            0
+                        }
+                    } else {
+                        (rn / rd).clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
+                    };
+                    Value::Int(i32::from(iv as i8))
+                }
             }
         }
-        "contains" | "clamp" if mref_class == "Landroid/util/Range;" => {
+        "compareTo" if target_class == "Landroid/util/Rational;" => {
+            let Some(Value::Obj(other)) = args.first() else {
+                return Err(array_throw(
+                    "Ljava/lang/NullPointerException;",
+                    "another must not be null",
+                ));
+            };
+            if vm.heap.class_of(*other).ok() != Some("Landroid/util/Rational;") {
+                return Err(array_throw(
+                    "Ljava/lang/ClassCastException;",
+                    "expected android.util.Rational",
+                ));
+            }
+            let (an, ad) = rational_parts(vm, recv);
+            let (bn, bd) = rational_parts(vm, *other);
+            Value::Int(rational_cmp(an, ad, bn, bd))
+        }
+        "contains" | "clamp" if target_class == "Landroid/util/Range;" => {
             let (lo, hi, v) = (get(vm, recv, "rd_lower"), get(vm, recv, "rd_upper"), a(0));
             let c_lo = compare(vm, &v, &lo)?;
             let c_hi = compare(vm, &v, &hi)?;
@@ -2110,28 +2367,99 @@ pub(crate) fn instance_intrinsic(
                 v
             }
         }
-        "equals" => Value::Int(same(vm, &a(0)) as i32),
-        "hashCode" => Value::Int(hash(vm)),
+        "equals" => {
+            let other = a(0);
+            let eq = match other {
+                Value::Obj(o) if vm.heap.class_of(o).ok() == vm.heap.class_of(recv).ok() => {
+                    if target_class == "Landroid/util/Rational;" {
+                        rational_parts(vm, recv) == rational_parts(vm, o)
+                    } else {
+                        let mut all_eq = true;
+                        for f in fields {
+                            let va = get(vm, recv, f);
+                            let vb = get(vm, o, f);
+                            if !util_obj_equals(vm, &va, &vb)? {
+                                all_eq = false;
+                                break;
+                            }
+                        }
+                        all_eq
+                    }
+                }
+                _ => false,
+            };
+            Value::Int(eq as i32)
+        }
+        "hashCode" => {
+            let h = match target_class {
+                "Landroid/util/Pair;" => {
+                    let h0 = util_obj_hash(vm, &get(vm, recv, "first"))?;
+                    let h1 = util_obj_hash(vm, &get(vm, recv, "second"))?;
+                    h0 ^ h1
+                }
+                "Landroid/util/Rational;" => {
+                    let (rn, rd) = rational_parts(vm, recv);
+                    let n = (rn ^ (rn >> 32)) as i32;
+                    let d = (rd ^ (rd >> 32)) as i32;
+                    let n_flipped = (n << 16) | ((n as u32 >> 16) as i32);
+                    d ^ n_flipped
+                }
+                _ => {
+                    let mut acc = 1i32;
+                    for f in fields {
+                        let fh = util_obj_hash(vm, &get(vm, recv, f))?;
+                        acc = acc.wrapping_mul(31).wrapping_add(fh);
+                    }
+                    acc
+                }
+            };
+            Value::Int(h)
+        }
         "clone" => {
-            let r = vm.heap.alloc_instance(mref_class.to_string(), Vec::new())?;
+            let r = vm
+                .heap
+                .alloc_instance(target_class.to_string(), Vec::new())?;
             for f in fields {
                 let v = get(vm, recv, f);
                 put(vm, r, f, v)?;
             }
+            if target_class == "Landroid/util/Rational;" {
+                let (rn, rd) = rational_parts(vm, recv);
+                store_rational(vm, r, rn, rd)?;
+            }
             Value::Obj(r)
         }
         "toString" => {
-            let s = match mref_class {
+            let s = match target_class {
                 "Landroid/util/Size;" | "Landroid/util/SizeF;" => format!(
                     "{}x{}",
                     fmt(&get(vm, recv, "rd_w")),
                     fmt(&get(vm, recv, "rd_h"))
                 ),
-                "Landroid/util/Rational;" => format!(
-                    "{}/{}",
-                    fmt(&get(vm, recv, "rd_num")),
-                    fmt(&get(vm, recv, "rd_den"))
-                ),
+                "Landroid/util/Rational;" => {
+                    let (rn, rd) = rational_parts(vm, recv);
+                    if rd == 0 {
+                        if rn > 0 {
+                            "Infinity".to_string()
+                        } else if rn < 0 {
+                            "-Infinity".to_string()
+                        } else {
+                            "NaN".to_string()
+                        }
+                    } else {
+                        format!("{rn}/{rd}")
+                    }
+                }
+                "Landroid/util/Pair;" => {
+                    let f0 = util_format_value(vm, &get(vm, recv, "first"), None)?;
+                    let f1 = util_format_value(vm, &get(vm, recv, "second"), None)?;
+                    format!("Pair{{{f0} {f1}}}")
+                }
+                "Landroid/util/Range;" => {
+                    let lo = util_format_value(vm, &get(vm, recv, "rd_lower"), None)?;
+                    let hi = util_format_value(vm, &get(vm, recv, "rd_upper"), None)?;
+                    format!("[{lo}, {hi}]")
+                }
                 _ => return Ok(None),
             };
             Value::Obj(crate::intrinsics::alloc_string(vm, s)?)
@@ -2141,6 +2469,166 @@ pub(crate) fn instance_intrinsic(
             return Ok(None);
         }
     }))
+}
+
+const RAT_NUM_WIDE: &str = "rd_num_wide";
+const RAT_DEN_WIDE: &str = "rd_den_wide";
+
+fn normalize_rational(n: i32, d: i32) -> (i64, i64) {
+    let (mut n, mut d) = (i64::from(n), i64::from(d));
+    if d < 0 {
+        n = -n;
+        d = -d;
+    }
+    if d == 0 {
+        if n > 0 {
+            (1, 0)
+        } else if n < 0 {
+            (-1, 0)
+        } else {
+            (0, 0)
+        }
+    } else if n == 0 {
+        (0, 1)
+    } else {
+        let g = gcd(n.abs(), d.abs()).max(1);
+        (n / g, d / g)
+    }
+}
+
+fn store_rational(vm: &mut Engine, recv: ObjRef, rn: i64, rd: i64) -> Result<(), VmExit> {
+    let n32 = rn.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
+    let d32 = rd.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
+    put(vm, recv, "rd_num", Value::Int(n32))?;
+    put(vm, recv, "rd_den", Value::Int(d32))?;
+    put(vm, recv, RAT_NUM_WIDE, Value::Long(rn))?;
+    put(vm, recv, RAT_DEN_WIDE, Value::Long(rd))
+}
+
+fn rational_parts(vm: &Engine, recv: ObjRef) -> (i64, i64) {
+    if let (Ok(Value::Long(rn)), Ok(Value::Long(rd))) = (
+        vm.heap.get_field(recv, RAT_NUM_WIDE),
+        vm.heap.get_field(recv, RAT_DEN_WIDE),
+    ) {
+        return (rn, rd);
+    }
+    let n = get(vm, recv, "rd_num").as_int().unwrap_or(0);
+    let d = get(vm, recv, "rd_den").as_int().unwrap_or(1);
+    normalize_rational(n, d)
+}
+
+fn rational_f64(rn: i64, rd: i64) -> f64 {
+    if rd == 0 {
+        if rn > 0 {
+            f64::INFINITY
+        } else if rn < 0 {
+            f64::NEG_INFINITY
+        } else {
+            f64::NAN
+        }
+    } else {
+        (rn as f64) / (rd as f64)
+    }
+}
+
+fn rational_cmp(an: i64, ad: i64, bn: i64, bd: i64) -> i32 {
+    if an == bn && ad == bd {
+        return 0;
+    }
+    if an == 0 && ad == 0 {
+        return 1; // AOSP: NaN sorts after everything else
+    }
+    if bn == 0 && bd == 0 {
+        return -1;
+    }
+    if (an > 0 && ad == 0) || (bn < 0 && bd == 0) {
+        return 1;
+    }
+    if (an < 0 && ad == 0) || (bn > 0 && bd == 0) {
+        return -1;
+    }
+    let lhs = i128::from(an) * i128::from(bd);
+    let rhs = i128::from(bn) * i128::from(ad);
+    lhs.cmp(&rhs) as i32
+}
+
+fn util_format_value(
+    vm: &mut Engine,
+    v: &Value,
+    self_map: Option<ObjRef>,
+) -> Result<String, VmExit> {
+    match v {
+        Value::Null => Ok("null".to_string()),
+        Value::Obj(r) if self_map == Some(*r) => Ok("(this Map)".to_string()),
+        Value::Obj(r) => crate::intrinsics::object_to_string(vm, *r),
+        Value::Int(i) => Ok(i.to_string()),
+        Value::Long(l) => Ok(l.to_string()),
+        Value::Float(f) => Ok(f.to_string()),
+        Value::Double(d) => Ok(d.to_string()),
+        _ => Ok("null".to_string()),
+    }
+}
+
+fn util_obj_equals(vm: &mut Engine, a: &Value, b: &Value) -> Result<bool, VmExit> {
+    if crate::intrinsics::values_equal(&vm.heap, a, b)? {
+        return Ok(true);
+    }
+    if let (Value::Float(fa), Value::Float(fb)) = (a, b) {
+        return Ok((fa.is_nan() && fb.is_nan()) || fa == fb);
+    }
+    if let (Value::Double(da), Value::Double(db)) = (a, b) {
+        return Ok((da.is_nan() && db.is_nan()) || da == db);
+    }
+    let (Value::Obj(ra), Value::Obj(_)) = (a, b) else {
+        return Ok(false);
+    };
+    Ok(vm
+        .invoke_instance(
+            *ra,
+            "equals",
+            "(Ljava/lang/Object;)Z",
+            std::slice::from_ref(b),
+        )?
+        .as_int()
+        .unwrap_or(0)
+        != 0)
+}
+
+fn util_obj_hash(vm: &mut Engine, v: &Value) -> Result<i32, VmExit> {
+    match v {
+        Value::Null => Ok(0),
+        Value::Int(i) => Ok(*i),
+        Value::Long(l) => Ok((*l ^ ((*l as u64) >> 32) as i64) as i32),
+        Value::Float(x) => Ok(if x.is_nan() {
+            0x7fc0_0000
+        } else if *x == 0.0 {
+            0
+        } else {
+            x.to_bits() as i32
+        }),
+        Value::Double(d) => {
+            let bits = if d.is_nan() {
+                0x7ff8_0000_0000_0000u64
+            } else if *d == 0.0 {
+                0
+            } else {
+                d.to_bits()
+            };
+            Ok(((bits ^ (bits >> 32)) & 0xffff_ffff) as u32 as i32)
+        }
+        Value::Obj(r) => {
+            if let Ok(s) = vm.heap.as_str(*r) {
+                return Ok(s
+                    .encode_utf16()
+                    .fold(0i32, |h, c| h.wrapping_mul(31).wrapping_add(c as i32)));
+            }
+            Ok(vm
+                .invoke_instance(*r, "hashCode", "()I", &[])?
+                .as_int()
+                .unwrap_or(0))
+        }
+        _ => Ok(0),
+    }
 }
 
 fn gcd(a: i64, b: i64) -> i64 {

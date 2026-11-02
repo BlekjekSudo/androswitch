@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub mod shot;
 pub mod ui_dump;
 
-pub use shot::{render_snapshot, Framebuffer, VIEW_H, VIEW_W};
+pub use shot::{render_snapshot, render_snapshot_sized, Framebuffer, VIEW_H, VIEW_W};
 pub use ui_dump::uiautomator_xml;
 
 pub const MODULE_ID: &str = "rd-render";

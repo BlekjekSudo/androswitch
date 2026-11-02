@@ -24,7 +24,8 @@ regex = { workspace = true, optional = true }
 
 rd-ndk = { path = "../rd-ndk", optional = true }
 rd-jni = { path = "../rd-jni", optional = true }
-fancy-regex = { version = "=0.13.0", optional = true }
+fancy-regex = { version = "=0.20.0", optional = true }
+rd-engine-wasm = { path = "../rd-engine-wasm", optional = true }
 
 [dev-dependencies]
 rd-jni = { path = "../rd-jni" }
@@ -43,5 +44,7 @@ std = ["serde/std", "dep:serde_json", "rd-dex/std", "rd-apk/std", "dep:regex", "
 advanced-components = ["std", "virtual-devices"]
 virtual-devices = ["std"]
 native = ["desktop-runtime", "dep:rd-ndk", "dep:rd-jni", "rd-ndk/native"]
+# Original optional WASM engine; no desktop backend is selected implicitly.
+wasm-engine = ["upstream-runtime", "dep:rd-engine-wasm"]
 
 jit = ["desktop-runtime", "dep:rd-jni", "rd-jni/jit"]

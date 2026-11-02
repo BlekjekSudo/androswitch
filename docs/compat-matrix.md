@@ -8,10 +8,10 @@
 | Fase | Entrega | Status |
 |---|---|---|
 | M0 | Workspace + CI + rd-apk + permissions.toml + devices.toml (moto-e5) + behavior-switches.toml + motor de permissões | **✅ implementado** |
-| M1 | rd-dex 100% + disassembler | **✅ implementado** |
+| M1 | rd-dex 100% + disassembler | ⚠️ **parcial** |
 | M2 | VM Dalvik mínima | **✅ implementado** |
 | M3 | Framework essencial | **✅ implementado** |
-| M4 | Render+dump | **✅ implementado** |
+| M4 | Render+dump | ⚠️ **parcial** |
 | M5 | Agente MCP v1 (30 tools + controles) | **✅ implementado** |
 | M6 | Executor de testes | **✅ implementado** |
 | M7 | Performance + gate piso E5 | ⬜ |
@@ -36,6 +36,7 @@
 | `rd-jni` | M9 | mangling JNI (curto/sobrecarga), descritores, MUTF-8, frames de refs locais/globais |
 | `rd-ndk` | M9 | parser ELF32/64 limitado (x86_64/AArch64/ARM) + runtime `native` em worker Unicorn isolado (ADR 004) |
 | `rd-engine-registry` | Apêndice G | registro/detecção dos 28 itens; features/contratos; NÃO executa engines |
+| `rd-engine-wasm` | M11 S1 | interpretador WASM MVP i32/i64 (ADR 013): parser + validador + interpretador com fuel e limites; bridge WasmBridge atrás da feature wasm-engine (golden de VM); golden de APK em golden/engines/wasm/ (rd test) + adaptador `wasm` do registro atrás da feature wasm-execution (M11 S1c, `rd engine run wasm`, AVAILABLE_BOUNDED) |
 
 ## Suítes automatizadas (`rd test`, M6)
 
@@ -80,7 +81,7 @@ Executar: `rd test tests/suites/<arquivo>.json --junit <saida>.xml` (formato em 
 | 25 | Qt / QML (C++) | libQt*.so; QML assets/recursos | LANG-09 | Qt headless + JNI futuros | Registro ✅; runtime NOT_IMPLEMENTED |
 | 26 | Avalonia (C#) | assemblies Avalonia; runtime managed | LANG-07 | Mono + render próprio futuros | Registro ✅; runtime NOT_IMPLEMENTED |
 | 27 | B4X / App Inventor / Thunkable | classes*.dex | LANG-01+LANG-11 | VM DEX; fixtures específicas futuras | Registro ✅; runtime DEX parcial |
-| 28 | WebAssembly in-app | assets/*.wasm (ou containers opacos) | LANG-12 | Runtime WASM + bridge JNI/JS futuros | Registro ✅; runtime NOT_IMPLEMENTED |
+| 28 | WebAssembly in-app | assets/*.wasm (ou containers opacos) | LANG-12 | Runtime WASM + bridge JNI/JS futuros | Registro ✅; runtime WASM parcial (WasmBridge) |
 
 Regras, dependências e limites em [engine-registry.md](engine-registry.md); fonte: `data/engines.toml`.
 

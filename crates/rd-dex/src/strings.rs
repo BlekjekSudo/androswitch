@@ -188,7 +188,7 @@ impl Strings {
         let mut total_bytes = 0usize;
         let mut offsets = Vec::with_capacity(count);
         let mut values = Vec::with_capacity(count.min(1 << 16));
-        for (i, chunk) in window.chunks_exact(4).enumerate() {
+        for (i, chunk) in window.as_chunks::<4>().0.iter().enumerate() {
             let abs = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
             let raw = read_string_slice(data, abs as usize)
                 .map_err(|e| RdError::parse(format!("string #{i} @ 0x{abs:x}: {}", e.cause)))?;
@@ -224,7 +224,7 @@ impl Strings {
         let count = count as usize;
         let data_len = data.len();
         let mut offsets = Vec::with_capacity(count);
-        for (i, chunk) in window.chunks_exact(4).enumerate() {
+        for (i, chunk) in window.as_chunks::<4>().0.iter().enumerate() {
             let abs = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
             if abs as usize >= data_len {
                 return Err(RdError::parse(format!(

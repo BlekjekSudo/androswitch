@@ -967,6 +967,81 @@ pub(crate) fn instance_intrinsic(
     };
     let a = |i: usize| int(args.get(i));
     Ok(Some(match (name, sig) {
+        // ── View hierarchy state (issue #228) ───────────────────────────────
+        // Virtual entries: a DEX override of the very same method wins through
+        // normal resolution (the resolve-gate returns None here); the host
+        // default below mirrors AOSP. `dispatchSaveInstanceState` /
+        // `dispatchRestoreInstanceState` host-default arms are also the
+        // invoke-super landing via the inherited walk (framework.rs arms do
+        // the same for the Landroid/ branch).
+        ("saveHierarchyState", SIG_STATE_CONTAINER) => {
+            let container = match args.first() {
+                Some(Value::Obj(container)) => *container,
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "saveHierarchyState: container is null",
+                    )))
+                }
+            };
+            let recv_class = vm.heap.class_of(recv)?.to_string();
+            if vm.cp.resolve_method(&recv_class, name, sig).is_some() {
+                return Ok(None);
+            }
+            save_hierarchy_state(vm, recv, container)?;
+            Value::Null
+        }
+        ("restoreHierarchyState", SIG_STATE_CONTAINER) => {
+            let container = match args.first() {
+                Some(Value::Obj(container)) => *container,
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "restoreHierarchyState: container is null",
+                    )))
+                }
+            };
+            let recv_class = vm.heap.class_of(recv)?.to_string();
+            if vm.cp.resolve_method(&recv_class, name, sig).is_some() {
+                return Ok(None);
+            }
+            restore_hierarchy_state(vm, recv, container)?;
+            Value::Null
+        }
+        ("dispatchSaveInstanceState", SIG_STATE_CONTAINER) => {
+            let container = match args.first() {
+                Some(Value::Obj(container)) => *container,
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "dispatchSaveInstanceState: container is null",
+                    )))
+                }
+            };
+            let recv_class = vm.heap.class_of(recv)?.to_string();
+            if vm.cp.resolve_method(&recv_class, name, sig).is_some() {
+                return Ok(None);
+            }
+            dispatch_save_instance_state(vm, recv, container)?;
+            Value::Null
+        }
+        ("dispatchRestoreInstanceState", SIG_STATE_CONTAINER) => {
+            let container = match args.first() {
+                Some(Value::Obj(container)) => *container,
+                _ => {
+                    return Err(VmExit::Exception(Throwable::new(
+                        "Ljava/lang/NullPointerException;",
+                        "dispatchRestoreInstanceState: container is null",
+                    )))
+                }
+            };
+            let recv_class = vm.heap.class_of(recv)?.to_string();
+            if vm.cp.resolve_method(&recv_class, name, sig).is_some() {
+                return Ok(None);
+            }
+            dispatch_restore_instance_state(vm, recv, container)?;
+            Value::Null
+        }
         ("measure", "(II)V") => {
             measure(vm, recv, a(0), a(1))?;
             Value::Null
@@ -1568,7 +1643,7 @@ impl Engine {
         let Some(content) = self.window_content_of(activity) else {
             return Ok(0);
         };
-        let (fw_, fh_) = (crate::graphics::FB_W as i32, crate::graphics::FB_H as i32);
+        let (fw_, fh_) = self.viewport_px();
         // 1. measure/layout top-most DEX views
         let mut dex_roots = Vec::new();
         self.collect_dex_roots(content, &mut dex_roots, 0);
@@ -1622,7 +1697,7 @@ impl Engine {
         dex_roots: &[ObjRef],
         dialogs: &[(ObjRef, ObjRef)],
     ) -> Result<(), VmExit> {
-        let (fw_, fh_) = (crate::graphics::FB_W as i32, crate::graphics::FB_H as i32);
+        let (fw_, fh_) = self.viewport_px();
         for v in dex_roots {
             let Some((x, y, w, h, _)) = bounds(self, *v) else {
                 continue;
@@ -1659,7 +1734,7 @@ impl Engine {
     /// the window LayoutParams size (MATCH_PARENT → screen, WRAP_CONTENT →
     /// AT_MOST screen, px → EXACTLY), centered on screen (Gravity.CENTER).
     fn layout_dialog_window(&mut self, dialog: ObjRef, root: ObjRef) -> Result<(), VmExit> {
-        let (fw_, fh_) = (crate::graphics::FB_W as i32, crate::graphics::FB_H as i32);
+        let (fw_, fh_) = self.viewport_px();
         let (lw, lh) = crate::m8::dialog_window_size(self, dialog);
         let spec = |want: i32, max: i32| match want {
             -1 => EXACTLY | max,
@@ -2011,6 +2086,210 @@ fn view_post(vm: &mut Engine, r: ObjRef, delay_ms: u64) -> Result<(), VmExit> {
             is_message: false,
             token: None,
         });
+    }
+    Ok(())
+}
+
+// ── View hierarchy state (issue #228) ──────────────────────────────────────
+// AOSP `View.saveHierarchyState`/`restoreHierarchyState` and the protected
+// dispatch pair. `FragmentStateManager.saveViewState`/`restoreViewState`
+// (androidx) drive exactly these: a `SparseArray<Parcelable>` keyed by
+// `View.getId()` filled through the recursive
+// `dispatchSaveInstanceState`/`dispatchRestoreInstanceState` walk, with the
+// per-view state produced/consumed by the (overridable) virtual pair
+// `onSaveInstanceState`/`onRestoreInstanceState`.
+//
+// Dispatch rules mirrored from AOSP:
+// - DEX overrides win at every virtual point: `saveHierarchyState` calls
+//   `dispatchSaveInstanceState` through `guest_call` first (a DEX override of
+//   the dispatch — custom ViewGroups — takes over), and the View/ViewGroup
+//   default asks each view for `onSaveInstanceState` the same way before
+//   falling back to `AbsSavedState.EMPTY_STATE`.
+// - `dispatchSaveInstanceState` itself is host-default-only here: the arm is
+//   also the landing spot of `invoke-super` from DEX overrides, where
+//   re-resolving the DEX method would loop. The virtual-entry gate lives in
+//   `instance_intrinsic` (resolve-gate → DEX resolution wins).
+// - A view stores state only when `mID != NO_ID` and `isSaveEnabled()`; a
+//   child is walked only when `isSaveFromParentEnabled()` (AOSP
+//   PARENT_SAVE_DISABLED).
+const SIG_STATE_CONTAINER: &str = "(Landroid/util/SparseArray;)V";
+const SIG_STATE_PARCELABLE: &str = "()Landroid/os/Parcelable;";
+const NO_ID: i32 = -1;
+
+fn view_id(vm: &Engine, v: ObjRef) -> i32 {
+    match vm.fw.get(v) {
+        Some(HostObj::View { id, .. }) => *id,
+        _ => NO_ID,
+    }
+}
+
+fn child_views(vm: &Engine, v: ObjRef) -> Vec<ObjRef> {
+    match vm.fw.get(v) {
+        Some(HostObj::View { children, .. }) => children.clone(),
+        _ => Vec::new(),
+    }
+}
+
+fn is_save_enabled(vm: &Engine, v: ObjRef) -> bool {
+    match vm.view_props.get(&(v, "SaveEnabled".to_string())) {
+        Some(Value::Int(i)) => *i != 0,
+        _ => true,
+    }
+}
+
+fn is_save_from_parent_enabled(vm: &Engine, v: ObjRef) -> bool {
+    match vm.view_props.get(&(v, "SaveFromParentEnabled".to_string())) {
+        Some(Value::Int(i)) => *i != 0,
+        _ => true,
+    }
+}
+
+/// `SparseArray.put(id, state)` on the guest container (the host storage is
+/// the same `Engine::sparse` map `android_util` maintains).
+fn state_container_put(
+    vm: &mut Engine,
+    container: ObjRef,
+    id: i32,
+    state: Value,
+) -> Result<(), VmExit> {
+    vm.sparse
+        .entry(container)
+        .or_default()
+        .insert(id as i64, state);
+    Ok(())
+}
+
+fn state_container_get(vm: &mut Engine, container: ObjRef, id: i32) -> Option<Value> {
+    vm.sparse.get(&container)?.get(&(id as i64)).cloned()
+}
+
+/// AOSP `View.saveHierarchyState(SparseArray)`: virtual
+/// `dispatchSaveInstanceState(container)` (DEX override first), then the
+/// framework default walk.
+pub(crate) fn save_hierarchy_state(
+    vm: &mut Engine,
+    v: ObjRef,
+    container: ObjRef,
+) -> Result<(), VmExit> {
+    if crate::jcollections::guest_call(
+        vm,
+        v,
+        "dispatchSaveInstanceState",
+        SIG_STATE_CONTAINER,
+        &[Value::Obj(container)],
+    )?
+    .is_none()
+    {
+        dispatch_save_instance_state(vm, v, container)?;
+    }
+    Ok(())
+}
+
+/// AOSP `View`/`ViewGroup.dispatchSaveInstanceState` default: store
+/// `onSaveInstanceState()` under this view's id (id != NO_ID, save enabled),
+/// then walk save-from-parent-enabled children through their (virtual)
+/// dispatch.
+pub(crate) fn dispatch_save_instance_state(
+    vm: &mut Engine,
+    v: ObjRef,
+    container: ObjRef,
+) -> Result<(), VmExit> {
+    let id = view_id(vm, v);
+    if id != NO_ID && is_save_enabled(vm, v) {
+        let state = match crate::jcollections::guest_call(
+            vm,
+            v,
+            "onSaveInstanceState",
+            SIG_STATE_PARCELABLE,
+            &[],
+        )? {
+            Some(state) => Some(state),
+            None => Some(Value::Obj(crate::platform_base::empty_state(vm)?)),
+        };
+        if let Some(Value::Obj(state)) = state {
+            state_container_put(vm, container, id, Value::Obj(state))?;
+        }
+    }
+    for child in child_views(vm, v) {
+        if !is_save_from_parent_enabled(vm, child) {
+            continue;
+        }
+        if crate::jcollections::guest_call(
+            vm,
+            child,
+            "dispatchSaveInstanceState",
+            SIG_STATE_CONTAINER,
+            &[Value::Obj(container)],
+        )?
+        .is_none()
+        {
+            dispatch_save_instance_state(vm, child, container)?;
+        }
+    }
+    Ok(())
+}
+
+/// AOSP `View.restoreHierarchyState(SparseArray)`: virtual
+/// `dispatchRestoreInstanceState(container)` (DEX override first).
+pub(crate) fn restore_hierarchy_state(
+    vm: &mut Engine,
+    v: ObjRef,
+    container: ObjRef,
+) -> Result<(), VmExit> {
+    if crate::jcollections::guest_call(
+        vm,
+        v,
+        "dispatchRestoreInstanceState",
+        SIG_STATE_CONTAINER,
+        &[Value::Obj(container)],
+    )?
+    .is_none()
+    {
+        dispatch_restore_instance_state(vm, v, container)?;
+    }
+    Ok(())
+}
+
+/// AOSP `View`/`ViewGroup.dispatchRestoreInstanceState` default: hand
+/// `container.get(id)` to the (virtual) `onRestoreInstanceState` when the
+/// view has an entry, then walk the children.
+pub(crate) fn dispatch_restore_instance_state(
+    vm: &mut Engine,
+    v: ObjRef,
+    container: ObjRef,
+) -> Result<(), VmExit> {
+    let id = view_id(vm, v);
+    if id != NO_ID {
+        // AOSP: `Parcelable state = container.get(mID); if (state != null)`.
+        // Uma entrada null (p.ex. put(id, null) vindo de um override DEX) não
+        // dispara callback (ajuste do pre-audit 404-Agent).
+        if let Some(Value::Obj(state)) = state_container_get(vm, container, id) {
+            // AOSP View.onRestoreInstanceState ignores EMPTY_STATE; a DEX
+            // override receives the Parcelable as-is.
+            crate::jcollections::guest_call(
+                vm,
+                v,
+                "onRestoreInstanceState",
+                "(Landroid/os/Parcelable;)V",
+                &[Value::Obj(state)],
+            )?;
+        }
+    }
+    for child in child_views(vm, v) {
+        if !is_save_from_parent_enabled(vm, child) {
+            continue;
+        }
+        if crate::jcollections::guest_call(
+            vm,
+            child,
+            "dispatchRestoreInstanceState",
+            SIG_STATE_CONTAINER,
+            &[Value::Obj(container)],
+        )?
+        .is_none()
+        {
+            dispatch_restore_instance_state(vm, child, container)?;
+        }
     }
     Ok(())
 }

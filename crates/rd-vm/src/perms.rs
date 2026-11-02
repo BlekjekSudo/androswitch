@@ -40,7 +40,7 @@ impl Engine {
     pub(crate) fn permission_granted(&self, name: &str) -> bool {
         self.granted_permissions
             .as_ref()
-            .map_or(true, |g| g.contains(name))
+            .is_none_or(|g| g.contains(name))
     }
 }
 

@@ -3814,7 +3814,7 @@ fn storage_instance(
                         path.replace('/', "%2F")
                     );
                     let uri = alloc(vm, ANDROID_URI)?;
-                    vm.fw.m8.uris.insert(uri, url);
+                    crate::android_uri::remember_uri(vm, uri, url)?;
                     Value::Obj(completed_task(vm, Value::Obj(uri))?)
                 }
             }

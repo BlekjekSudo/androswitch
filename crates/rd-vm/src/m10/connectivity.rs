@@ -288,8 +288,20 @@ pub(super) fn static_call(
             Ok(Some(Value::Obj(system_service_singleton(vm, BT_ADAPTER)?)))
         }
         (BT_ADAPTER, "checkBluetoothAddress") => {
+            // AOSP BluetoothAdapter.checkBluetoothAddress: 17 chars,
+            // uppercase hex pairs separated by ':' (lowercase rejected).
             let ok = opt_str_arg(vm, args, 0)?
-                .map(|a| a.len() == 17 && a.split(':').count() == 6)
+                .map(|a| {
+                    let chars: Vec<char> = a.chars().collect();
+                    chars.len() == 17
+                        && chars.iter().enumerate().all(|(i, c)| {
+                            if i % 3 == 2 {
+                                *c == ':'
+                            } else {
+                                c.is_ascii_digit() || ('A'..='F').contains(c)
+                            }
+                        })
+                })
                 .unwrap_or(false);
             Ok(Some(Value::Int(i32::from(ok))))
         }

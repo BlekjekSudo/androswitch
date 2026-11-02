@@ -91,6 +91,35 @@ mod tests {
         assert!(reopened.query("SELECT 1; DELETE FROM notes", &[]).is_err());
     }
     #[test]
+    fn guest_authorization_applies_to_prepare_query_and_restored_connections() {
+        let first = Connection::open(None).unwrap();
+        first.query("CREATE TABLE notes(value TEXT)", &[]).unwrap();
+        let image = first.snapshot().unwrap();
+        for db in [first, Connection::open(Some(&image)).unwrap()] {
+            for sql in [
+                "PRAGMA writable_schema=ON",
+                "PRAGMA main.\"WrItAbLe_ScHeMa\"(1)",
+                "PRAGMA writable_schema",
+                "ATTACH DATABASE ':memory:' AS other",
+                "DETACH DATABASE other",
+            ] {
+                assert_eq!(db.statement_info(sql).unwrap_err().code, 23, "{sql}");
+                assert_eq!(db.query(sql, &[]).unwrap_err().code, 23, "{sql}");
+            }
+            db.query("PRAGMA user_version=7", &[]).unwrap();
+            assert_eq!(
+                db.query("PRAGMA user_version", &[]).unwrap().values[0][0],
+                Value::Integer(7)
+            );
+            db.query("INSERT INTO notes VALUES('still usable')", &[])
+                .unwrap();
+            assert_eq!(
+                db.query("SELECT COUNT(*) FROM notes", &[]).unwrap().values[0][0],
+                Value::Integer(1)
+            );
+        }
+    }
+    #[test]
     fn invalid_snapshots_and_unbounded_queries_have_named_errors() {
         assert!(Connection::open(Some(&alloc::vec![0; MAX_DATABASE_BYTES+1])).is_err());
         let db = Connection::open(None).unwrap();

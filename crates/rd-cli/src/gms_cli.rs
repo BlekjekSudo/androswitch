@@ -44,8 +44,8 @@ pub(super) fn run(sub: &GmsSub, dd: &DataDir) -> RdResult<()> {
             let services: Vec<_> = table
                 .service
                 .iter()
-                .filter(|s| category.as_deref().map_or(true, |c| s.category == c))
-                .filter(|s| wanted_status.map_or(true, |st| s.status == st))
+                .filter(|s| category.as_deref().is_none_or(|c| s.category == c))
+                .filter(|s| wanted_status.is_none_or(|st| s.status == st))
                 .collect();
             if *json {
                 println!(

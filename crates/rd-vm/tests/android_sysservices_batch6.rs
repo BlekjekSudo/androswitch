@@ -239,6 +239,26 @@ fn gesture_geometry_clones_ids_and_obb_follow_aosp() {
         call(&mut engine, fractional, "getLength", "()F", &[]),
         Value::Float(2.0)
     );
+
+    // Deep audit: isotropic covariance has equal eigenvalues, so AOSP
+    // reports a -90-degree orientation and skips the rotation entirely.
+    let square = stroke(
+        &mut engine,
+        &[(0.0, 0.0, 0), (2.0, 0.0, 1), (2.0, 2.0, 2), (0.0, 2.0, 3)],
+    );
+    let square_obb = object(call(
+        &mut engine,
+        square,
+        "computeOrientedBoundingBox",
+        "()Landroid/gesture/OrientedBoundingBox;",
+        &[],
+    ));
+    assert_eq!(float_field(&engine, square_obb, "orientation"), -90.0);
+    assert_eq!(float_field(&engine, square_obb, "centerX"), 1.0);
+    assert_eq!(float_field(&engine, square_obb, "centerY"), 1.0);
+    assert_eq!(float_field(&engine, square_obb, "width"), 2.0);
+    assert_eq!(float_field(&engine, square_obb, "height"), 2.0);
+    assert_eq!(float_field(&engine, square_obb, "squareness"), 1.0);
 }
 
 const CONTEXT: &str = "Landroid/content/Context;";

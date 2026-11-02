@@ -186,7 +186,7 @@ fn formatter_and_android_date_format_use_aosp_rounding_and_patterns() {
             "(Ljava/lang/CharSequence;J)Ljava/lang/CharSequence;",
             &[pattern, Value::Long(0)],
         ),
-        "Thu Jan 1 1970 12:00 AM UTC"
+        "Thu Jan 1 1970 12:00 AM +0000"
     );
     let order_pattern = text(&mut engine, "dd/MM/yyyy");
     let order_value = call_static(
@@ -233,9 +233,80 @@ fn formatter_and_android_date_format_use_aosp_rounding_and_patterns() {
             DATE_FORMAT,
             "is24HourFormat",
             "(Landroid/content/Context;)Z",
-            &[context],
+            std::slice::from_ref(&context),
         ),
         Value::Int(0)
+    );
+
+    // Deep audit (CTS parity): AOSP formats sizes through an ICU
+    // NumberFormat set to ROUND_HALF_UP, so exact decimal halves go
+    // up where Rust's half-even float formatting would go down.
+    assert_eq!(
+        call_static_string(
+            &mut engine,
+            FORMATTER,
+            "formatShortFileSize",
+            format_short_file_size,
+            &[context.clone(), Value::Long(12_500)],
+        ),
+        "13 kB"
+    );
+    assert_eq!(
+        call_static_string(
+            &mut engine,
+            FORMATTER,
+            "formatFileSize",
+            format_file_size,
+            &[context.clone(), Value::Long(1125)],
+        ),
+        "1.13 kB"
+    );
+    // AOSP computed roundedBytes with Math.round(float), i.e.
+    // floor(x + 0.5), so a negative half rounds toward zero.
+    let resources = Value::Obj(instance(&mut engine, "Landroid/content/res/Resources;"));
+    let negative = object(call_static(
+        &mut engine,
+        FORMATTER,
+        "formatBytes",
+        "(Landroid/content/res/Resources;JI)Landroid/text/format/Formatter$BytesResult;",
+        &[resources, Value::Long(-1125), Value::Int(2 | 4)],
+    ));
+    assert_eq!(
+        engine.heap.get_field(negative, "roundedBytes").unwrap(),
+        Value::Long(-1120)
+    );
+
+    // DateFormat: 'EEEE' is the wide weekday and single 'y' is the
+    // two-digit year; 'S' is not an Android designator and stays
+    // literal (AOSP has no millisecond letter here).
+    let pattern = text(&mut engine, "EEEE y S zz");
+    assert_eq!(
+        call_static_string(
+            &mut engine,
+            DATE_FORMAT,
+            "format",
+            "(Ljava/lang/CharSequence;J)Ljava/lang/CharSequence;",
+            &[pattern, Value::Long(0)],
+        ),
+        "Thursday 70 S UTC"
+    );
+    // AOSP's getDateFormatOrder resume offset skips the character
+    // immediately after a quoted run, so the 'd' here is never seen.
+    let skip_pattern = text(&mut engine, "'x'dMy");
+    let skip_value = call_static(
+        &mut engine,
+        DATE_FORMAT,
+        "getDateFormatOrder",
+        "(Ljava/lang/String;)[C",
+        &[skip_pattern],
+    );
+    assert_eq!(
+        array_values(&engine, &skip_value),
+        vec![
+            Value::Int('M' as i32),
+            Value::Int('y' as i32),
+            Value::Int(0)
+        ]
     );
 }
 

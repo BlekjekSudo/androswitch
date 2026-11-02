@@ -65,7 +65,12 @@ pub(crate) fn decode_proto_id(b: &[u8]) -> ProtoId {
 
 pub fn parse_proto_ids(data: &[u8], count: u32, off: u32) -> RdResult<Vec<ProtoId>> {
     let window = validate_proto_window(data, count, off)?;
-    Ok(window.chunks_exact(12).map(decode_proto_id).collect())
+    Ok(window
+        .as_chunks::<12>()
+        .0
+        .iter()
+        .map(|b| decode_proto_id(b))
+        .collect())
 }
 
 #[cfg(test)]

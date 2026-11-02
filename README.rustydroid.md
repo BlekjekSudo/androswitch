@@ -19,7 +19,7 @@
 </p>
 
 ---
-
+## Under development, Mostly incomplete
 ## ✨ What is RustyDroid?
 
 RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android OS
@@ -28,7 +28,7 @@ RustyDroid is a **"Wine for Android"**: instead of emulating an entire Android O
 - 📦 **Parses** the APK (ZIP, binary `AndroidManifest.xml`, `resources.arsc`, `classes.dex`)
 - ⚙️ **Executes** Dalvik bytecode in a **Rust VM** (interpreter → Cranelift JIT later)
 - 🧩 **Implements** `android.*` framework APIs natively in Rust
-- 🎨 **Renders** the UI in software (tiny-skia): headless PNG, desktop window, web canvas
+- 🎨 **Renders** the UI in software: headless PNG today (own rasterizer, pre-rendered DejaVu Sans atlas, no shaping); tiny-skia + shaping are the spec target, pending [ADR 019](docs/adr/019-renderer-tiny-skia-pendente.md)
 - 🤖 **Drives everything through MCP** — built for AI agents from day one
 
 ### Why it's different
@@ -112,8 +112,8 @@ See [the automation guide](docs/mcp-automation.md) for structured host-view sele
 | **M11** | ⬜ **PLANNED** — Engines, in the order accepted by [ADR 013](docs/adr/013-m11-engine-execution-strategy.md): WASM → React Native → Mono → Flutter (one real app each in a golden flow; detection alone never counts) |
 | **M12** | Full GitHub ecosystem: docs site, live compat matrix, releases → **v1.0** |
 
-**Compatibility floor:** `minSdkVersion 26` (Android 8.0 Oreo) · **ceiling:** latest stable (`targetSdk 36`).
-APKs below the floor are inspected fine and reported with a structured `BELOW_FLOOR` finding — never a crash. (Known gap, 2026-10-25: `rd app run` does not yet refuse below-floor APKs; the fix is in progress.)
+**Compatibility floor:** `minSdkVersion 9` for execution ([ADR 016](docs/adr/016-api-floor-9.md); API 9–25 is the best-effort tier T0, 26–36 the full tiers) · **ceiling:** latest stable (`targetSdk 36`). The hardware floor (Moto E5, factory API 26) is unchanged.
+APKs below the floor are inspected fine and every execution surface (`rd app run` and MCP) answers with a structured `BELOW_FLOOR` — never a crash.
 
 ---
 
@@ -123,7 +123,7 @@ The foundation is **real, tested code** — verified end-to-end against the F-Dr
 
 - ✅ `rd inspect <apk>` — full manifest decode: identity, SDKs + **API-floor check** (`BELOW_FLOOR`), features, all 4 component types + intent filters, resolved labels (chained resource refs), signing schemes v1/v2/v3, dex/native/asset inventory
 - ✅ **Permission engine** over versioned data: **175 permissions** (12 dangerous groups, 15 special-access, 36 signature…), install → grant/deny/revoke state machine + static audit (`exported` without guard, debuggable, cleartext…)
-- ✅ **Device profiles** incl. the contractual **`moto-e5` hardware floor** (RSS ≤ 512 MB, app heap ≤ 256 MB, 25% single-thread)
+- ✅ **Device profiles** incl. the contractual **`moto-e5` hardware floor** (RSS ≤ 1024 MB, app heap ≤ 256 MB, 25% single-thread)
 - ✅ **Behavior switches** per targetSdk 26→36 (25 entries, PRF-07)
 - ✅ Structured errors everywhere: `{code, cause, suggestion, module_id}` — never a silent failure (unimplemented modules answer `NOT_IMPLEMENTED`). **Exit codes (contrato público para agents): 0 ok · 1 erro · 2 NOT_IMPLEMENTED · 4 erro VM (`rd vm exec`) · 64 usage.**
 - ✅ **`rd dex` (M1)** — 100% DEX parser (header/map/MUTF-8 strings/types/protos/fields/methods/classes/code/debug/annotations/call-sites/method-handles) + **smali disassembler validated against baksmali 2.5.2: 24.913 classes across 3 golden APKs, 100% identical instruction sequences** + fuzz targets for every binary parser (ZIP/AXML/ARSC/DEX)

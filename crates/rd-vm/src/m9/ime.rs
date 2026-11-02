@@ -323,6 +323,16 @@ pub(super) fn instance_call(
     // ClipboardManager: one primary clip per device, kept on the service
     // object (setPrimaryClip → getPrimaryClip/hasPrimaryClip read it back)
     if class == "Landroid/content/ClipboardManager;" {
+        #[cfg(feature = "virtual-devices")]
+        if matches!(
+            name,
+            "setPrimaryClip"
+                | "clearPrimaryClip"
+                | "addPrimaryClipChangedListener"
+                | "removePrimaryClipChangedListener"
+        ) {
+            return crate::m10::call_instance(vm, class, name, sig, recv, args);
+        }
         let clip = match vm.heap.get_field(recv, "rd_primary_clip") {
             Ok(Value::Obj(c)) if c != 0 => Some(c),
             _ => None,

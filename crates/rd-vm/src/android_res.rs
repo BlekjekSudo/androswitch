@@ -171,7 +171,7 @@ fn asset_manager(vm: &mut Engine) -> Result<ObjRef, VmExit> {
 /// segments, `.`/`..` traversal and backslashes. Keeping this check on THIS
 /// side of the zip lookup means an app can never pivot `assets/…` into an
 /// arbitrary ZIP entry.
-fn asset_path_is_hostile(file: &str) -> bool {
+pub(crate) fn asset_path_is_hostile(file: &str) -> bool {
     file.is_empty()
         || file.starts_with('/')
         || file.contains('\\')
@@ -321,6 +321,71 @@ fn default_locale(vm: &mut Engine) -> Result<ObjRef, VmExit> {
     Ok(r)
 }
 
+/// Constantes estáticas de `java.util.Locale` (issue #330). O JDK predefine
+/// 21 constantes públicas em `Locale.java`; cada uma materializa aqui uma
+/// instância canônica via `new_locale` (antes: `sget-object Locale.US`
+/// devolvia `Value::Null` — NPE em `<clinit>` de APKs reais, ex.
+/// org.primftpd_71.apk com `DateTimeFormatter.ofPattern(p, Locale.US)`).
+///
+/// Aliases do JDK compartilham UMA instância (`CHINA = SIMPLIFIED_CHINESE`,
+/// `PRC = CHINA`, `TAIWAN = TRADITIONAL_CHINESE` — atribuições diretas em
+/// Locale.java): o lookup confere todas as chaves do grupo antes de alocar,
+/// então `Locale.PRC == Locale.CHINA` por identidade, enquanto instâncias
+/// construídas pelo guest (`new Locale("zh","CN")`) seguem objetos distintos,
+/// exatamente como no JVM.
+pub(crate) fn host_static(
+    vm: &mut Engine,
+    owner: &str,
+    field: &str,
+) -> Result<Option<Value>, VmExit> {
+    if owner != LOCALE {
+        return Ok(None);
+    }
+    let (canonical, lang, country) = match field {
+        "ROOT" => ("ROOT", "", ""),
+        "ENGLISH" => ("ENGLISH", "en", ""),
+        "FRENCH" => ("FRENCH", "fr", ""),
+        "GERMAN" => ("GERMAN", "de", ""),
+        "ITALIAN" => ("ITALIAN", "it", ""),
+        "JAPANESE" => ("JAPANESE", "ja", ""),
+        "KOREAN" => ("KOREAN", "ko", ""),
+        "CHINESE" => ("CHINESE", "zh", ""),
+        // Locale.java: CHINA = SIMPLIFIED_CHINESE; PRC = CHINA
+        "SIMPLIFIED_CHINESE" | "CHINA" | "PRC" => ("SIMPLIFIED_CHINESE", "zh", "CN"),
+        // Locale.java: TAIWAN = TRADITIONAL_CHINESE
+        "TRADITIONAL_CHINESE" | "TAIWAN" => ("TRADITIONAL_CHINESE", "zh", "TW"),
+        "FRANCE" => ("FRANCE", "fr", "FR"),
+        "GERMANY" => ("GERMANY", "de", "DE"),
+        "ITALY" => ("ITALY", "it", "IT"),
+        "JAPAN" => ("JAPAN", "ja", "JP"),
+        "KOREA" => ("KOREA", "ko", "KR"),
+        "UK" => ("UK", "en", "GB"),
+        "US" => ("US", "en", "US"),
+        "CANADA" => ("CANADA", "en", "CA"),
+        "CANADA_FRENCH" => ("CANADA_FRENCH", "fr", "CA"),
+        _ => return Ok(None),
+    };
+    let group: &[&str] = match canonical {
+        "SIMPLIFIED_CHINESE" => &["SIMPLIFIED_CHINESE", "CHINA", "PRC"],
+        "TRADITIONAL_CHINESE" => &["TRADITIONAL_CHINESE", "TAIWAN"],
+        // MSRV 1.76 (E0716): `&[canonical]` criava um temporário que morria
+        // no fim do statement. `from_ref` empresta a variável local, que vive
+        // até o fim da função.
+        _ => std::slice::from_ref(&canonical),
+    };
+    for name in group {
+        if let Some(v) = vm
+            .statics
+            .get(&(LOCALE.to_string(), (*name).to_string()))
+            .cloned()
+        {
+            return Ok(Some(v));
+        }
+    }
+    let r = new_locale(vm, lang, country, "")?;
+    Ok(Some(Value::Obj(r)))
+}
+
 fn locale_parts(vm: &Engine, r: ObjRef) -> (String, String, String) {
     let f = |n: &str| str_of(vm, &get(vm, r, n)).unwrap_or_default();
     (f("rd_lang"), f("rd_country"), f("rd_variant"))
@@ -432,9 +497,9 @@ fn identifier(vm: &Engine, name: &str, def_type: Option<&str>, def_pkg: Option<&
         {
             continue;
         }
-        for id in p.entries.keys() {
-            if p.resolve_name(*id).as_deref() == Some(want.as_str()) {
-                return *id as i32;
+        for id in p.resource_ids() {
+            if p.resolve_name(id).as_deref() == Some(want.as_str()) {
+                return id as i32;
             }
         }
     }

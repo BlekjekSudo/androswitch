@@ -91,7 +91,7 @@ fn resource(apk: &Apk, id: u32, density: i32, depth: usize) -> Result<Option<(St
         .arsc
         .as_ref()
         .and_then(|table| table.package_for(id))
-        .and_then(|package| package.entries.get(&id))
+        .and_then(|package| package.entries_for(id))
     else {
         return Ok(None);
     };

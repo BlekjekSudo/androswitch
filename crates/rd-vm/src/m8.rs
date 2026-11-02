@@ -337,7 +337,7 @@ fn call_m8_static_rooted(
                 return Err(npe("Uri.parse(null)"));
             };
             let r = alloc(vm, URI)?;
-            vm.fw.m8.uris.insert(r, s);
+            crate::android_uri::remember_uri(vm, r, s)?;
             Ok(Some(Value::Obj(r)))
         }
         (WORK_MANAGER, "getInstance") => {
@@ -1322,12 +1322,18 @@ fn parse_create(sql: &str) -> Option<(String, Vec<String>)> {
     }
     let open = sql.find('(')?;
     let close = sql.rfind(')')?;
+    if close <= open {
+        return None;
+    }
     let head = &sql[..open];
     let table = head
         .split_whitespace()
         .last()?
         .trim_matches(|c| c == '`' || c == '"' || c == '\'')
         .to_string();
+    if table.is_empty() {
+        return None;
+    }
     let cols: Vec<String> = sql[open + 1..close]
         .split(',')
         .map(|c| {
@@ -1966,6 +1972,28 @@ fn ax_fragment_manager(
         _ => Ok(None),
     }
 }
+fn ax_fragment_tx_kinds(vm: &Engine, recv: ObjRef) -> String {
+    match vm.heap.get_field(recv, "rd_tx_kinds") {
+        Ok(Value::Obj(s)) => vm.heap.as_str(s).unwrap_or("").to_string(),
+        _ => String::new(),
+    }
+}
+
+fn ax_apply_committed_tx_ops(vm: &mut Engine, recv: ObjRef) {
+    let ops = vm.fw.m8.ax_frag_txs.remove(&recv).unwrap_or_default();
+    let kinds = ax_fragment_tx_kinds(vm, recv);
+    let _ = vm.heap.put_field(recv, "rd_tx_kinds", Value::Null);
+    for (idx, (f, cid, tag)) in ops.into_iter().enumerate() {
+        if kinds.as_bytes().get(idx) == Some(&b'r') && cid != 0 {
+            vm.fw
+                .m8
+                .ax_fragments
+                .retain(|(_, existing_cid, _)| *existing_cid != cid);
+        }
+        vm.fw.m8.ax_fragments.push((f, cid, tag));
+    }
+}
+
 fn ax_fragment_tx(
     vm: &mut Engine,
     name: &str,
@@ -1976,7 +2004,11 @@ fn ax_fragment_tx(
         "add" | "replace" => {
             let frag = args.iter().find_map(|v| {
                 if let Value::Obj(o) = v {
-                    Some(*o)
+                    if vm.heap.as_str(*o).is_err() {
+                        Some(*o)
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }
@@ -1992,6 +2024,10 @@ fn ax_fragment_tx(
             let Some(f) = frag else {
                 return Err(npe("FragmentTransaction.add com fragment null"));
             };
+            let mut kinds = ax_fragment_tx_kinds(vm, recv);
+            kinds.push(if name == "replace" { 'r' } else { 'a' });
+            let kinds_obj = astr(vm, kinds)?;
+            crate::err::put_field_result(vm.heap.put_field(recv, "rd_tx_kinds", kinds_obj))?;
             vm.fw
                 .m8
                 .ax_frag_txs
@@ -2008,19 +2044,11 @@ fn ax_fragment_tx(
         }
         "addToBackStack" | "setReorderingAllowed" | "runOnCommit" => Ok(Some(Value::Obj(recv))),
         "commit" | "commitAllowingStateLoss" => {
-            let ops = vm.fw.m8.ax_frag_txs.remove(&recv).unwrap_or_default();
-            // replace já aplicado acima nas ops pendentes? Não: ops foram guardadas;
-            // replace precisa limpar o container no commit.
-            for (f, cid, tag) in ops {
-                vm.fw.m8.ax_fragments.push((f, cid, tag));
-            }
+            ax_apply_committed_tx_ops(vm, recv);
             Ok(Some(Value::Int(0)))
         }
         "commitNow" | "commitNowAllowingStateLoss" => {
-            let ops = vm.fw.m8.ax_frag_txs.remove(&recv).unwrap_or_default();
-            for (f, cid, tag) in ops {
-                vm.fw.m8.ax_fragments.push((f, cid, tag));
-            }
+            ax_apply_committed_tx_ops(vm, recv);
             Ok(Some(Value::Null))
         }
         _ => Ok(None),

@@ -3,8 +3,8 @@
 AndroSwitch is a history-preserving fork of **RustyDroid by nadabgfccvd and
 the RustyDroid contributors**. The original fork point is
 `6388281f66d254c8e01a0fdc7a5a9a30239bc762`. The synchronization target is now
-[`4489813db513b42c531979b079397c50edd54e25`](https://github.com/nadabgfccvd/RustyDroid/commit/4489813db513b42c531979b079397c50edd54e25),
-the latest upstream main checked on 2026-10-28. Its new commit only removes the desktop rd-sentinel tool; runtime/API source is unchanged from 3761815. Both histories are retained;
+[`33e76456643e157458d97087d2626045498725db`](https://github.com/nadabgfccvd/RustyDroid/commit/33e76456643e157458d97087d2626045498725db),
+the latest upstream main checked for this update on 2026-11-02. This update includes lazy ARSC/string pools, interpreter stack guards, typed host-state GC, bounded I/O/regex/XML/SQL, lifecycle/dispatch fixes and the optional WASM engine. Both histories are retained;
 this is a merge, not a source dump without attribution. See [credits](../CREDITS.md)
 and [notice](../NOTICE.md).
 
@@ -21,7 +21,7 @@ disconnected Android environment inside the Switch runner.
 in the upstream Git tree, rather than selected class families. Each entry has
 the original Git blob ID. A changed file also records its reviewed adaptation
 reason and canonical SHA-256. Text canonicalization only normalizes CRLF to LF.
-The 49 added core files, including extracted shared helpers, have their own
+The 50 added core files, including extracted shared helpers, have their own
 reviewed hashes and provenance where applicable. Missing files, duplicate
 entries, an incomplete manifest, an unreviewed change,
 or drift after review fail the gate.
@@ -36,7 +36,7 @@ python -X utf8 scripts/check-upstream-sync.py --require-device-parity
 The last command is **expected to fail** while device parity is unverified.
 
 The shipping source selector uses the real `std` profile independently of the
-desktop execution backend. Current shared collections/text/collector work leaves 81
+desktop execution backend. The current source-selection audit lists 83
 original VM sources outside the default product profile. See the
 [collection/text boundary record](UPSTREAM_COLLECTIONS_TEXT.md) and the
 [shared original collector integration](UPSTREAM_GC_SHARED.md). Source selection
@@ -114,7 +114,7 @@ approach to missing APIs. `as-vm/upstream-runtime` compiles the original framewo
 dependency closure on the pinned Horizon std target. The earlier `core + alloc`
 compile proof remains historical evidence.
 Its original dispatcher and GC are shared; 13 module tables in eight original
-modules now belong to the Engine. All 50 original integration suites use their
+modules now belong to the Engine. All 95 original integration suites use their
 original source paths and builders, with an isolated host renderer. CI executes
 the portable reference corpus. No original native/JIT zero-case suite is counted
 as a working Horizon backend.

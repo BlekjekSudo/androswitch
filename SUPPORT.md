@@ -58,7 +58,7 @@ pick the matching form:
 |---|---|---|
 | Missing `android.*` / AndroidX / GMS method or behavioral divergence (`NOT_IMPLEMENTED`) | **Compat gap** ([`compat_gap.yml`](./.github/ISSUE_TEMPLATE/compat_gap.yml)) | `compat-gap` |
 | Incorrect bytecode execution, parser failure on valid APK, wrong UI render, CLI/MCP bug | **Bug report** ([`bug_report.yml`](./.github/ISSUE_TEMPLATE/bug_report.yml)) | `bug` |
-| Cold/warm startup, RSS (`VmHWM`), or heap regression against the `moto-e5` floor | **Performance regression** ([`perf_regression.yml`](./.github/ISSUE_TEMPLATE/perf_regression.yml)) | `perf-regression` |
+| Cold/warm startup, RSS (`VmHWM`), or heap regression against the `moto-e5` floor | **Performance regression** ([`perf-regression.yml`](./.github/ISSUE_TEMPLATE/perf-regression.yml)) | `perf-regression` |
 | New CLI command, MCP capability, virtual device feature, or developer tooling | **Feature request** ([`feature_request.yml`](./.github/ISSUE_TEMPLATE/feature_request.yml)) | `enhancement` |
 
 ## 3. What to Include for Fast Triage
@@ -110,7 +110,7 @@ canal privado documentado em [`SECURITY.md`](./SECURITY.md).
 - **Bug funcional em parser, VM, renderizador, CLI ou MCP:**
   [`bug_report.yml`](./.github/ISSUE_TEMPLATE/bug_report.yml) (`bug`)
 - **Regressão de performance ou memória contra o piso `moto-e5`:**
-  [`perf_regression.yml`](./.github/ISSUE_TEMPLATE/perf_regression.yml) (`perf-regression`)
+  [`perf-regression.yml`](./.github/ISSUE_TEMPLATE/perf-regression.yml) (`perf-regression`)
 - **Sugestão de funcionalidade ou ferramenta:**
   [`feature_request.yml`](./.github/ISSUE_TEMPLATE/feature_request.yml) (`enhancement`)
 

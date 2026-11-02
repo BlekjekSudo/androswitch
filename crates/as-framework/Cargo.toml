@@ -12,7 +12,7 @@ rd-vm = { package = "as-vm", path = "../as-vm" }
 rd-apk = { path = "../rd-apk", default-features = false }
 as-platform = { path = "../as-platform", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
-libm = "=0.2.15"
+libm = "=0.2.16"
 miniz_oxide = { version = "=0.9.1", default-features = false, features = ["with-alloc"] }
 rd-dex = { path = "../rd-dex", default-features = false }
 serde_json = { version = "1.0", optional = true }

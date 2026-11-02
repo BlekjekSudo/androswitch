@@ -118,8 +118,8 @@ impl ViewQuery {
     fn matches(&self, n: &UiNode, visible: bool, enabled: bool) -> bool {
         self.resource_id
             .as_ref()
-            .map_or(true, |s| n.resource_id.as_ref() == Some(s))
-            && self.text.as_ref().map_or(true, |s| {
+            .is_none_or(|s| n.resource_id.as_ref() == Some(s))
+            && self.text.as_ref().is_none_or(|s| {
                 if self.contains {
                     n.text.contains(s)
                 } else {
@@ -129,9 +129,9 @@ impl ViewQuery {
             && self
                 .class
                 .as_ref()
-                .map_or(true, |s| class_matches(&n.class, s))
-            && self.enabled.map_or(true, |v| v == enabled)
-            && self.clickable.map_or(true, |v| v == n.clickable)
+                .is_none_or(|s| class_matches(&n.class, s))
+            && self.enabled.is_none_or(|v| v == enabled)
+            && self.clickable.is_none_or(|v| v == n.clickable)
             && self.visible.unwrap_or(true) == visible
     }
 }
@@ -351,7 +351,7 @@ impl AgentSession {
         let px = ((left + right) / 2) as i32;
         let py = ((top + bottom) / 2) as i32;
         let actual = self.require_engine()?.view_at_point(px, py);
-        if actual.as_ref().map_or(true, |hit| {
+        if actual.as_ref().is_none_or(|hit| {
             hit.enabled != n.enabled
                 || hit.clickable != n.clickable
                 || hit.visibility != n.visibility

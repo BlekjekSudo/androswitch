@@ -117,6 +117,7 @@ pub(crate) fn object_to_string(vm: &mut Engine, r: crate::heap::ObjRef) -> Resul
         return Ok(s.clone());
     }
     crate::value_recursion::with(vm, crate::value_recursion::Key::String(r), |vm| {
+        vm.check_native_stack()?;
         crate::arrays::with_host_reentrant(vm, |vm| {
             let cls = vm.heap.class_of(r)?.to_string();
             let mut result = crate::intrinsics::call_instance_intrinsic_mref(

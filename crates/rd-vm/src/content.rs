@@ -85,7 +85,7 @@ fn new_str(vm: &mut Engine, s: String) -> Result<Value, VmExit> {
 
 pub(crate) fn new_uri(vm: &mut Engine, s: String) -> Result<ObjRef, VmExit> {
     let r = vm.heap.alloc_instance(URI.to_string(), Vec::new())?;
-    vm.fw.m8.uris.insert(r, s);
+    crate::android_uri::remember_uri(vm, r, s)?;
     Ok(r)
 }
 

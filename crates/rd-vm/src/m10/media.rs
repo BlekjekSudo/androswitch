@@ -946,7 +946,7 @@ fn audio_record_call(
             let off = off_raw as usize;
             let count = count_raw as usize;
             let arr_len = array_len(vm, dst)?;
-            if off.checked_add(count).map_or(true, |end| end > arr_len) {
+            if off.checked_add(count).is_none_or(|end| end > arr_len) {
                 return Ok(Some(Value::Int(-2)));
             }
             if cls == "[S" {
@@ -1062,8 +1062,15 @@ fn audio_track_call(
                 if let Some(Value::Obj(arr)) = get_field(vm, src, "rd_buf") {
                     let bytes = read_byte_array(vm, arr)?;
                     let limit_raw = get_int_field(vm, src, "rd_limit", bytes.len() as i32);
-                    let pos = (pos_raw.max(0) as usize).min(bytes.len());
-                    let lim = (limit_raw.max(0) as usize).min(bytes.len()).max(pos);
+                    if pos_raw < 0
+                        || limit_raw < pos_raw
+                        || (pos_raw as usize) > bytes.len()
+                        || (limit_raw as usize) > bytes.len()
+                    {
+                        return Ok(Some(Value::Int(-2)));
+                    }
+                    let pos = pos_raw as usize;
+                    let lim = limit_raw as usize;
                     let end = pos.saturating_add(req).min(lim);
                     actual = end.saturating_sub(pos);
                     let prev_end = end.min(pos.saturating_add(64));
@@ -1084,7 +1091,7 @@ fn audio_track_call(
             let off = off_raw as usize;
             let count = count_raw as usize;
             let arr_len = array_len(vm, src)?;
-            if off.checked_add(count).map_or(true, |end| end > arr_len) {
+            if off.checked_add(count).is_none_or(|end| end > arr_len) {
                 return Ok(Some(Value::Int(-2)));
             }
             let bytes_written = if cls == "[S" {

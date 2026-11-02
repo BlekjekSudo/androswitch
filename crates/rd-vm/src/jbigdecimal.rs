@@ -63,6 +63,10 @@ fn mul(a: i128, b: i128) -> Result<i128, VmExit> {
 
 /// `u × 10^k` (k ≥ 0).
 fn upscale(u: i128, k: i64) -> Result<i128, VmExit> {
+    if u == 0 {
+        // 0 × 10^k is 0 for every k, so never build the power (#375).
+        return Ok(0);
+    }
     if k <= 0 {
         return Ok(u);
     }
@@ -147,6 +151,36 @@ fn align(a: (i128, i32), b: (i128, i32)) -> Result<(i128, i128, i32), VmExit> {
     ))
 }
 
+/// Exact numeric comparison of `ua × 10^-sa` and `ub × 10^-sb` without rescaling
+/// either side, so it cannot overflow for distant scales (#375).
+fn cmp_decimal(a: (i128, i32), b: (i128, i32)) -> std::cmp::Ordering {
+    use std::cmp::Ordering::Equal;
+    let (sa, sb) = (a.0.signum(), b.0.signum());
+    if sa != sb {
+        return sa.cmp(&sb);
+    }
+    if sa == 0 {
+        return Equal;
+    }
+    let da = a.0.unsigned_abs().to_string();
+    let db = b.0.unsigned_abs().to_string();
+    // Adjusted exponent: position of the most significant digit.
+    let adj_a = da.len() as i64 - 1 - a.1 as i64;
+    let adj_b = db.len() as i64 - 1 - b.1 as i64;
+    let mag = if adj_a != adj_b {
+        adj_a.cmp(&adj_b)
+    } else {
+        // Same leading position: right-pad with zeros and compare digit strings.
+        let n = da.len().max(db.len());
+        format!("{:0<w$}", da, w = n).cmp(&format!("{:0<w$}", db, w = n))
+    };
+    if sa < 0 {
+        mag.reverse()
+    } else {
+        mag
+    }
+}
+
 fn digits(u: i128) -> i32 {
     let mut n = u.unsigned_abs();
     let mut d = 1;
@@ -217,7 +251,7 @@ fn plain_string_checked(vm: &Engine, u: i128, s: i32) -> Result<String, VmExit> 
         .heap
         .used()
         .checked_add(requested)
-        .map_or(true, |n| n > vm.heap.budget())
+        .is_none_or(|n| n > vm.heap.budget())
     {
         return Err(crate::err::oom_throwable(crate::heap::OomError {
             requested,
@@ -675,12 +709,17 @@ pub fn instance_intrinsic(
                 Ok(Value::Int(p)) => p,
                 _ => 0,
             };
+            // The context's own RoundingMode (DECIMAL32/64/128 use HALF_EVEN, #375).
+            let mode = match vm.heap.get_field(*mc, "roundingMode") {
+                Ok(Value::Obj(r)) if r != 0 => mode_of(vm, Some(&Value::Obj(r)))?,
+                _ => "HALF_UP".to_string(),
+            };
             if prec <= 0 || digits(u) <= prec {
                 new_num(vm, BD, u, s)?
             } else {
                 let drop = digits(u) as i64 - prec as i64;
                 let ns = i32::try_from(s as i64 - drop).map_err(|_| overflow())?;
-                new_num(vm, BD, rescale(u, s, ns, "HALF_UP")?, ns)?
+                new_num(vm, BD, rescale(u, s, ns, &mode)?, ns)?
             }
         }
         ("movePointLeft", _) | ("movePointRight", _) | ("scaleByPowerOfTen", _) => {
@@ -713,8 +752,7 @@ pub fn instance_intrinsic(
         }
         ("compareTo", _) => {
             let o = num_of(vm, args.first())?;
-            let (a, b, _) = align((u, s), o)?;
-            Value::Int(a.cmp(&b) as i32)
+            Value::Int(cmp_decimal((u, s), o) as i32)
         }
         ("equals", "(Ljava/lang/Object;)Z") => {
             let same = match args.first() {

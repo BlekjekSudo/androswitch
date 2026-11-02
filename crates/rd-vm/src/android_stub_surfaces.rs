@@ -19562,6 +19562,9 @@ fn sysos_struct_string(
     recv: ObjRef,
     fields: &[&str],
 ) -> Result<Value, VmExit> {
+    // libcore.util.Objects.toString renders StructName[f=v,f=v]:
+    // square brackets, comma separators without spaces, String values
+    // double-quoted, and it NPEs on a null field via value.getClass().
     let simple = class
         .trim_start_matches('L')
         .trim_end_matches(';')
@@ -19570,12 +19573,18 @@ fn sysos_struct_string(
         .unwrap_or("Object");
     let mut rendered = Vec::new();
     for field in fields {
-        rendered.push(format!(
-            "{field}={}",
-            value_string(vm, &get(vm, recv, field))?
-        ));
+        let value = get(vm, recv, field);
+        let text = match &value {
+            Value::Null => return Err(npe("")),
+            Value::Obj(_) => match opt_str(vm, Some(&value)) {
+                Some(text) => format!("\"{text}\""),
+                None => value_string(vm, &value)?,
+            },
+            _ => value_string(vm, &value)?,
+        };
+        rendered.push(format!("{field}={text}"));
     }
-    jstr(vm, format!("{simple}{{{}}}", rendered.join(", ")))
+    jstr(vm, format!("{simple}[{}]", rendered.join(",")))
 }
 
 fn android_system_instance(
@@ -19777,9 +19786,12 @@ fn android_system_instance(
                 vm,
                 class,
                 recv,
+                // Declared field order in libcore StructStat, including
+                // the seconds-only compatibility fields.
                 &[
                     "st_dev", "st_ino", "st_mode", "st_nlink", "st_uid", "st_gid", "st_rdev",
-                    "st_size", "st_atim", "st_mtim", "st_ctim", "st_blksize", "st_blocks",
+                    "st_size", "st_atime", "st_atim", "st_mtime", "st_mtim", "st_ctime", "st_ctim",
+                    "st_blksize", "st_blocks",
                 ],
             )?,
             _ => return Ok(None),
@@ -29766,15 +29778,51 @@ fn p49_tv_rating_from_values(
     rating: Value,
     sub_ratings: Value,
 ) -> Result<Value, VmExit> {
-    let domain_text = opt_str(vm, Some(&domain)).unwrap_or_default();
-    let system_text = opt_str(vm, Some(&rating_system)).unwrap_or_default();
-    let rating_text = opt_str(vm, Some(&rating)).unwrap_or_default();
-    let mut subs: Vec<String> = array_elems(vm, Some(&sub_ratings))
-        .iter()
-        .filter_map(|v| opt_str(vm, Some(v)))
-        .collect();
-    subs.sort();
-    p49_tv_rating_value(vm, &domain_text, &system_text, &rating_text, subs)
+    // The private constructor keeps the caller's Strings and varargs
+    // array: it sorts the array in place and retains the reference
+    // (null/empty becomes a null field).
+    let subs_value = match &sub_ratings {
+        Value::Obj(array_ref) => {
+            let values = array_elems(vm, Some(&sub_ratings));
+            if values.is_empty() {
+                Value::Null
+            } else {
+                // Arrays.sort on a String[] NPEs on null elements once
+                // a comparison happens (arrays of two or more).
+                let mut texts = Vec::with_capacity(values.len());
+                for value in &values {
+                    match opt_str(vm, Some(value)) {
+                        Some(text) => texts.push(text),
+                        None if values.len() >= 2 => return Err(npe("")),
+                        None => texts.push(String::new()),
+                    }
+                }
+                let mut order: Vec<usize> = (0..values.len()).collect();
+                order.sort_by(|&a, &b| texts[a].cmp(&texts[b]));
+                let sorted: Vec<Value> = order.iter().map(|&i| values[i].clone()).collect();
+                if let Ok(elems) = vm.heap.array_elems_mut(*array_ref) {
+                    *elems = sorted;
+                }
+                Value::Obj(*array_ref)
+            }
+        }
+        _ => Value::Null,
+    };
+    let base = p49_objects_hash(vm, &[domain.clone(), rating.clone()]);
+    let hash = base
+        .wrapping_mul(31)
+        .wrapping_add(p49_array_hash(vm, &subs_value));
+    p49_alloc_value(
+        vm,
+        P49_TV_RATING,
+        vec![
+            ("mDomain".to_string(), domain),
+            ("mRatingSystem".to_string(), rating_system),
+            ("mRating".to_string(), rating),
+            ("mSubRatings".to_string(), subs_value),
+            ("mHashCode".to_string(), Value::Int(hash)),
+        ],
+    )
 }
 
 fn p49_tv_rating_unflatten(vm: &mut Engine, text: &str) -> Result<Value, VmExit> {
@@ -30124,8 +30172,15 @@ fn p49_tv_instance(
             ("getMainRating", "()Ljava/lang/String;") => get(vm, recv, "mRating"),
             ("getSubRatings", "()Ljava/util/List;") => match get(vm, recv, "mSubRatings") {
                 Value::Obj(_) => {
+                    // AOSP: Collections.unmodifiableList(Arrays.asList(...))
                     let subs = array_elems(vm, Some(&get(vm, recv, "mSubRatings")));
-                    p49_list_value(vm, subs)?
+                    let list = p49_list_value(vm, subs)?;
+                    vm.invoke_static(
+                        "Ljava/util/Collections;",
+                        "unmodifiableList",
+                        "(Ljava/util/List;)Ljava/util/List;",
+                        &[list],
+                    )?
                 }
                 _ => Value::Null,
             },
@@ -32314,22 +32369,6 @@ pub(crate) fn partial49_static(
             if rating.as_deref().unwrap_or("").is_empty() {
                 return Err(iae("rating cannot be empty"));
             }
-            // TvContentRating's private constructor sorts the caller's
-            // varargs array in place and retains that same array.
-            if let Some(array_ref) = oarg(args, 3) {
-                let mut values = array_elems(vm, args.get(3));
-                let mut keys: Vec<String> = values
-                    .iter()
-                    .map(|value| opt_str(vm, Some(value)).unwrap_or_default())
-                    .collect();
-                let mut paired: Vec<(String, Value)> =
-                    keys.drain(..).zip(values.drain(..)).collect();
-                paired.sort_by(|a, b| a.0.cmp(&b.0));
-                let sorted: Vec<Value> = paired.into_iter().map(|(_, value)| value).collect();
-                if let Ok(elems) = vm.heap.array_elems_mut(array_ref) {
-                    *elems = sorted;
-                }
-            }
             p49_tv_rating_from_values(
                 vm,
                 args.first().cloned().unwrap_or(Value::Null),
@@ -33369,8 +33408,8 @@ fn p41_dream_instance(
     Ok(Some(value))
 }
 
-// Keep upstream/AOSP NaN behavior: replacing the paired comparisons with
-// !Range::contains rejects NaN and changes this API's observable contract.
+// NaN: as comparações explícitas são falsas para NaN, como no AOSP;
+// `contains` mudaria a semântica. Por isso o lint é aceito aqui.
 #[allow(clippy::manual_range_contains)]
 fn p41_chooser_instance(
     vm: &mut Engine,
@@ -38579,8 +38618,8 @@ fn p35c_location_convert_to_string(coordinate: f64, output_type: i32) -> Result<
     Ok(result)
 }
 
-// Keep upstream/AOSP NaN behavior: replacing the paired comparisons with
-// !Range::contains rejects NaN and changes this API's observable contract.
+// NaN: as comparações explícitas são falsas para NaN, como no AOSP;
+// `contains` mudaria a semântica. Por isso o lint é aceito aqui.
 #[allow(clippy::manual_range_contains)]
 fn p35c_location_convert_from_string(input: &str) -> Result<f64, VmExit> {
     let Some(first) = input.chars().next() else {
@@ -41661,9 +41700,31 @@ fn p36a_matrix_static(
         ("transposeM", "([FI[FI)V") => {
             let result = p36a_value(args, 0);
             let source = p36a_value(args, 2);
-            let input = p36a_read_matrix(vm, &source, iarg(args, 3), "", "", "", false)?;
-            let output = p36a_transpose(&input);
-            p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+            if matches!(&result, Value::Obj(_)) && obj(Some(&result)) == obj(Some(&source)) {
+                // AOSP's transposeM loop reads and writes through the
+                // arrays directly, so an in-place transposition
+                // partially overwrites its own input while running.
+                let trans_offset = iarg(args, 1);
+                let m_offset = iarg(args, 3);
+                p36a_array_bounds(vm, &source, m_offset, 16, "", "", "", false)?;
+                p36a_array_bounds(vm, &result, trans_offset, 16, "", "", "", false)?;
+                let mut values = float_values(vm, Some(&source));
+                let dst = trans_offset as usize;
+                for i in 0..4usize {
+                    let base = m_offset as usize + i * 4;
+                    values[dst + i] = values[base];
+                    values[dst + 4 + i] = values[base + 1];
+                    values[dst + 8 + i] = values[base + 2];
+                    values[dst + 12 + i] = values[base + 3];
+                }
+                let mut output = [0.0f32; 16];
+                output.copy_from_slice(&values[dst..dst + 16]);
+                p36a_write_matrix_implicit(vm, &result, trans_offset, &output)?
+            } else {
+                let input = p36a_read_matrix(vm, &source, iarg(args, 3), "", "", "", false)?;
+                let output = p36a_transpose(&input);
+                p36a_write_matrix_implicit(vm, &result, iarg(args, 1), &output)?
+            }
         }
         ("invertM", "([FI[FI)Z") => {
             let result = p36a_value(args, 0);
@@ -41750,7 +41811,7 @@ fn p36a_matrix_static(
             let aspect = farg(args, 3);
             let z_near = farg(args, 4);
             let z_far = farg(args, 5);
-            let f = (1.0f64 / (fovy as f64 * (core::f64::consts::PI / 360.0)).tan()) as f32;
+            let f = 1.0f32 / ((fovy as f64 * (core::f64::consts::PI / 360.0)).tan() as f32);
             let range_reciprocal = 1.0 / (z_near - z_far);
             let mut output = [0.0f32; 16];
             output[0] = f / aspect;
@@ -51355,18 +51416,23 @@ fn p36h_hex_encode(bytes: &[u8]) -> String {
 
 fn p36h_hex_decode(text: &str) -> Result<Vec<u8>, VmExit> {
     let chars: Vec<char> = text.chars().collect();
-    if chars.len() % 2 != 0 {
-        return Err(iae("Odd number of hex characters".to_string()));
+    if !chars.len().is_multiple_of(2) {
+        return Err(iae(format!("Invalid input length: {}", chars.len())));
     }
     let mut out = Vec::with_capacity(chars.len() / 2);
     let mut i = 0;
     while i < chars.len() {
-        let hi = chars[i].to_digit(16);
-        let lo = chars[i + 1].to_digit(16);
-        match (hi, lo) {
-            (Some(h), Some(l)) => out.push((h * 16 + l) as u8),
-            _ => return Err(iae("Invalid hex character".to_string())),
-        }
+        let hi = chars[i]
+            .to_digit(16)
+            .ok_or_else(|| iae(format!("Illegal char: {} at offset {}", chars[i], i)))?;
+        let lo = chars[i + 1].to_digit(16).ok_or_else(|| {
+            iae(format!(
+                "Illegal char: {} at offset {}",
+                chars[i + 1],
+                i + 1
+            ))
+        })?;
+        out.push((hi * 16 + lo) as u8);
         i += 2;
     }
     Ok(out)
@@ -51451,18 +51517,19 @@ fn partial36h_wifi_static(
         // WifiManager pure statics.
         (P36H_WIFI_MANAGER, "calculateSignalLevel", "(II)I") => {
             let rssi = iarg(args, 0);
-            let levels = iarg(args, 1);
-            // MIN_RSSI=-100, MAX_RSSI=-55 (AOSP WifiManager).
+            let output_range = iarg(args, 1).wrapping_sub(1);
+            // MIN_RSSI=-100, MAX_RSSI=-55 (AOSP WifiManager); the AOSP
+            // computation is done in float, not integer arithmetic.
             Value::Int(if rssi <= -100 {
                 0
             } else if rssi >= -55 {
-                levels - 1
+                output_range
             } else {
-                (rssi + 100) * (levels - 1) / 45
+                ((rssi + 100) as f32 * output_range as f32 / 45.0) as i32
             })
         }
         (P36H_WIFI_MANAGER, "compareSignalLevel", "(II)I") => {
-            Value::Int(iarg(args, 0) - iarg(args, 1))
+            Value::Int(iarg(args, 0).wrapping_sub(iarg(args, 1)))
         }
         (P36H_WIFI_MANAGER, "getMaxNumberOfNetworkSuggestionsPerApp", "(Z)I") => {
             Value::Int(if iarg(args, 0) != 0 { 256 } else { 1024 })
@@ -51689,15 +51756,25 @@ fn partial36h_wifi_instance(
             Value::Int(1024)
         }
         (P36H_WIFI_MANAGER, "calculateSignalLevel", "(I)I") => {
-            // Deprecated instance form uses RSSI_LEVELS=5.
+            // The instance form delegates to the Wi-Fi service, which
+            // compares against R.array.config_wifiRssiLevelThresholds
+            // (AOSP defaults -88/-77/-66/-55) via RssiUtil.
             let rssi = iarg(args, 0);
-            Value::Int(if rssi <= -100 {
+            Value::Int(if rssi < -88 {
                 0
-            } else if rssi >= -55 {
-                4
+            } else if rssi < -77 {
+                1
+            } else if rssi < -66 {
+                2
+            } else if rssi < -55 {
+                3
             } else {
-                (rssi + 100) * 4 / 45
+                4
             })
+        }
+        (P36H_WIFI_MANAGER, "getMaxSignalLevel", "()I") => {
+            // AOSP: calculateSignalLevel(Integer.MAX_VALUE).
+            Value::Int(4)
         }
         // WifiInfo default construction + getters.
         (P36H_WIFI_INFO, "<init>", "()V") => {
@@ -51714,12 +51791,19 @@ fn partial36h_wifi_instance(
             Value::Null
         }
         (P36H_WIFI_INFO, "getSSID", "()Ljava/lang/String;") => {
+            // AOSP returns mWifiSsid.toString() when non-empty: the
+            // quoted UTF-8 text, or lowercase hex for non-UTF-8 bytes.
             let text = match field_obj(vm, recv, "mWifiSsid") {
                 Some(ssid) => {
                     let bytes = p36h_bytes(vm, Some(&get(vm, ssid, "mBytes")));
-                    match p36h_ssid_utf8_text(&bytes) {
+                    let rendered = match p36h_ssid_utf8_text(&bytes) {
                         Some(t) if !t.is_empty() => format!("\"{t}\""),
-                        _ => "<unknown ssid>".to_string(),
+                        _ => p36h_hex_encode(&bytes),
+                    };
+                    if rendered.is_empty() {
+                        "<unknown ssid>".to_string()
+                    } else {
+                        rendered
                     }
                 }
                 None => "<unknown ssid>".to_string(),

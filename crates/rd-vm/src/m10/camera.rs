@@ -687,6 +687,7 @@ pub(super) fn instance_call(
                     },
                 );
                 if let Some(cb_ref) = cb {
+                    put_field(vm, session, "rd_state_cb", Value::Obj(cb_ref))?;
                     let _ = call_dex(
                         vm,
                         cb_ref,
@@ -920,7 +921,19 @@ pub(super) fn instance_call(
                 Ok(Some(Value::Null))
             }
             "close" => {
-                vm.fw.vdev.camera_sessions.remove(&recv);
+                if vm.fw.vdev.camera_sessions.remove(&recv).is_some() {
+                    if let Some(Value::Obj(cb_ref)) = get_field(vm, recv, "rd_state_cb") {
+                        if cb_ref != 0 {
+                            let _ = call_dex(
+                                vm,
+                                cb_ref,
+                                "onClosed",
+                                "(Landroid/hardware/camera2/CameraCaptureSession;)V",
+                                vec![Value::Obj(recv)],
+                            )?;
+                        }
+                    }
+                }
                 Ok(Some(Value::Null))
             }
             _ => Ok(None),

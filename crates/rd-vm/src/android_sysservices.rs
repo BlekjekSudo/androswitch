@@ -359,14 +359,31 @@ fn rounded_bytes(size_bytes: i64, flags: i32) -> (f32, &'static str, usize, i64)
     let rounded = if flags & FLAG_CALCULATE_ROUNDED == 0 {
         0
     } else {
-        ((result * round_factor as f32).round() as i64) * mult / round_factor
+        // java.lang.Math.round(float) is (int) floor(value + 0.5f),
+        // not round-half-away-from-zero.
+        (((result * round_factor as f32 + 0.5).floor() as i32) as i64) * mult / round_factor
     };
     (result, units, round_digits, rounded)
 }
 
+/// Format a size value the way AOSP's ICU-backed NumberFormat does:
+/// the digits of the float value rounded HALF_UP at `digits` fraction
+/// digits (Rust's float formatting would round half-to-even).
+fn format_half_up(value: f32, digits: usize) -> String {
+    let factor = 10f64.powi(digits as i32);
+    let scaled = ((value as f64).abs() * factor + 0.5).floor() as u64;
+    let sign = if value.is_sign_negative() { "-" } else { "" };
+    if digits == 0 {
+        format!("{sign}{scaled}")
+    } else {
+        let pow = 10u64.pow(digits as u32);
+        format!("{sign}{}.{:0>digits$}", scaled / pow, scaled % pow)
+    }
+}
+
 fn format_size(size_bytes: i64, flags: i32) -> String {
     let (value, units, digits, _) = rounded_bytes(size_bytes, flags);
-    format!("{value:.digits$} {units}")
+    format!("{} {units}", format_half_up(value, digits))
 }
 
 fn formatter_static(
@@ -405,7 +422,7 @@ fn formatter_static(
                 return Err(npe("Formatter.formatBytes resources == null"));
             }
             let (value, units, digits, rounded) = rounded_bytes(larg(args, 1), iarg(args, 2));
-            let value = jstr(vm, format!("{value:.digits$}"))?;
+            let value = jstr(vm, format_half_up(value, digits))?;
             let units = jstr(vm, units.to_string())?;
             Value::Obj(alloc_obj(
                 vm,
@@ -513,14 +530,64 @@ fn android_date_pattern(pattern: &str, ms: i64) -> String {
         }
         match c {
             'A' => out.push_str(&"a".repeat(n)),
-            'c' => out.push_str(&"E".repeat(n)),
+            'c' | 'E' => {
+                // AOSP: count 4 is the wide weekday, 5 is narrow, and
+                // every other count is abbreviated.
+                let dow = (ms.div_euclid(86_400_000) + 4).rem_euclid(7) as usize;
+                let name = match n {
+                    4 => [
+                        "Sunday",
+                        "Monday",
+                        "Tuesday",
+                        "Wednesday",
+                        "Thursday",
+                        "Friday",
+                        "Saturday",
+                    ][dow],
+                    5 => ["S", "M", "T", "W", "T", "F", "S"][dow],
+                    _ => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dow],
+                };
+                out.push('\'');
+                out.push_str(name);
+                out.push('\'');
+            }
             'k' => out.push_str(&"H".repeat(n)),
             'K' => out.push_str(&format!("'{:0width$}'", hour0_11, width = n)),
-            'z' => out.push_str(if n >= 4 {
-                "'Coordinated Universal Time'"
-            } else {
-                "'UTC'"
-            }),
+            'M' | 'L' if n >= 5 => {
+                let month = crate::jtime::format_pattern("M", "en", ms)
+                    .parse::<usize>()
+                    .unwrap_or(1);
+                if n == 5 {
+                    let narrow =
+                        ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"][month - 1];
+                    out.push('\'');
+                    out.push_str(narrow);
+                    out.push('\'');
+                } else {
+                    // AOSP falls back to the zero-padded month number.
+                    out.push_str(&format!("'{month:0n$}'"));
+                }
+            }
+            'S' | 'u' => {
+                // Not android.text.format.DateFormat designators; AOSP
+                // passes them through literally.
+                out.push('\'');
+                out.push_str(&c.to_string().repeat(n));
+                out.push('\'');
+            }
+            'y' => {
+                if n <= 2 {
+                    // AOSP always uses the two-digit year for count <= 2.
+                    out.push_str("yy");
+                } else {
+                    // AOSP prints the plain year for count >= 3 (no padding).
+                    let year = crate::jtime::format_pattern("y", "en", ms);
+                    out.push('\'');
+                    out.push_str(&year);
+                    out.push('\'');
+                }
+            }
+            'z' => out.push_str(if n == 1 { "'+0000'" } else { "'UTC'" }),
             _ => out.push_str(&c.to_string().repeat(n)),
         }
         i += n;
@@ -562,7 +629,9 @@ fn date_format_order(pattern: &str) -> Result<[u16; 3], VmExit> {
                     let Some(end) = chars.iter().skip(i + 1).position(|c| *c == '\'') else {
                         return Err(iae(format!("Bad quoting in {pattern}")));
                     };
-                    i += end + 2;
+                    // AOSP resumes two positions past the closing quote,
+                    // skipping the character right after it.
+                    i += end + 3;
                     continue;
                 }
             }
@@ -2077,7 +2146,7 @@ fn gesture_obb_object(
 fn compute_gesture_obb(vm: &mut Engine, original: &[f32]) -> Result<Value, VmExit> {
     let centroid = gesture_centroid(original)?;
     let mut points = original.to_vec();
-    for pair in points.chunks_exact_mut(2) {
+    for pair in points.as_chunks_mut::<2>().0.iter_mut() {
         pair[0] -= centroid[0];
         pair[1] -= centroid[1];
     }
@@ -2088,7 +2157,7 @@ fn compute_gesture_obb(vm: &mut Engine, original: &[f32]) -> Result<Value, VmExi
         let angle = f64::from(target[1]).atan2(f64::from(target[0])) as f32;
         let cos = f64::from(-angle).cos() as f32;
         let sin = f64::from(-angle).sin() as f32;
-        for pair in points.chunks_exact_mut(2) {
+        for pair in points.as_chunks_mut::<2>().0.iter_mut() {
             let (x, y) = (pair[0], pair[1]);
             pair[0] = x * cos - y * sin;
             pair[1] = x * sin + y * cos;
@@ -2100,7 +2169,7 @@ fn compute_gesture_obb(vm: &mut Engine, original: &[f32]) -> Result<Value, VmExi
     // Java Float.MIN_VALUE is the smallest positive subnormal, not -MAX.
     let mut max_x = f32::from_bits(1);
     let mut max_y = f32::from_bits(1);
-    for pair in points.chunks_exact(2) {
+    for pair in points.as_chunks::<2>().0.iter() {
         if pair[0] < min_x {
             min_x = pair[0];
         }
@@ -2116,7 +2185,8 @@ fn compute_gesture_obb(vm: &mut Engine, original: &[f32]) -> Result<Value, VmExi
     }
     Ok(Value::Obj(gesture_obb_object(
         vm,
-        (f64::from(angle) * 180.0 / core::f64::consts::PI) as f32,
+        // AOSP evaluates `angle * 180` in float before dividing by PI.
+        (f64::from(angle * 180.0) / core::f64::consts::PI) as f32,
         centroid[0],
         centroid[1],
         max_x - min_x,

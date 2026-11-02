@@ -1,5 +1,26 @@
 //! Original tiny binary resource tables exercise identity independently of APKs.
-use rd_apk::arsc::{identifier_name, identifier_number, Arsc, ResourceName};
+use rd_apk::arsc::{identifier_name, identifier_number, Arsc, Package, ResEntry, ResourceName};
+use std::collections::BTreeMap;
+
+// The upstream lazy package owns immutable bytes. Deliberately malformed test
+// tables use its explicit synthetic constructor instead of mutating a cache.
+fn edit_package(package: &mut Package, edit: impl FnOnce(&mut BTreeMap<u32, Vec<ResEntry>>)) {
+    let mut entries = package
+        .resource_ids()
+        .into_iter()
+        .map(|id| (id, package.entries_for(id).unwrap().as_ref().clone()))
+        .collect();
+    edit(&mut entries);
+    let offset = package.type_id_offset;
+    *package = Package::synthetic(
+        package.id,
+        package.name.clone(),
+        package.type_strings.clone(),
+        package.key_strings.clone(),
+        entries,
+    );
+    package.type_id_offset = offset;
+}
 fn put16(data: &mut [u8], at: usize, value: u16) {
     data[at..at + 2].copy_from_slice(&value.to_le_bytes());
 }
@@ -22,7 +43,7 @@ fn pool(strings: &[&str]) -> Vec<u8> {
         data.extend(text.as_bytes());
         data.push(0);
     }
-    while data.len() % 4 != 0 {
+    while !data.len().is_multiple_of(4) {
         data.push(0);
     }
     let size = data.len() as u32;
@@ -125,16 +146,16 @@ fn unknown_ids_missing_keys_and_ambiguous_packages_do_not_invent_names() {
         assert_eq!(arsc.resource_name(id), None);
     }
     let mut damaged = arsc.clone();
-    damaged.packages[0].entries.get_mut(&0x7f010000).unwrap()[0].key_idx = 99;
+    edit_package(&mut damaged.packages[0], |entries| {
+        entries.get_mut(&0x7f010000).unwrap()[0].key_idx = 99
+    });
     assert_eq!(damaged.resource_name(0x7f010000), None);
     let mut inconsistent = arsc.clone();
-    let mut variant = inconsistent.packages[0].entries[&0x7f010000][0].clone();
+    let mut variant = inconsistent.packages[0].entries_for(0x7f010000).unwrap()[0].clone();
     variant.key_idx = 1;
-    inconsistent.packages[0]
-        .entries
-        .get_mut(&0x7f010000)
-        .unwrap()
-        .push(variant);
+    edit_package(&mut inconsistent.packages[0], |entries| {
+        entries.get_mut(&0x7f010000).unwrap().push(variant)
+    });
     assert_eq!(inconsistent.resource_name(0x7f010000), None);
     let mut duplicate = arsc.clone();
     duplicate.packages.push(duplicate.packages[0].clone());
@@ -192,13 +213,21 @@ fn reverse_lookup_uses_package_fragments_type_offset_and_high_ids() {
 fn reverse_lookup_distinguishes_absence_from_malformed_or_ambiguous_identity() {
     let original = Arsc::parse(&table(0x7f, 0, false, 1)).unwrap();
     let mut duplicate = original.clone();
-    let entry = duplicate.packages[0].entries[&0x7f010000].clone();
-    duplicate.packages[0].entries.insert(0x7f010001, entry);
+    let entry = duplicate.packages[0]
+        .entries_for(0x7f010000)
+        .unwrap()
+        .as_ref()
+        .clone();
+    edit_package(&mut duplicate.packages[0], |entries| {
+        entries.insert(0x7f010001, entry);
+    });
     assert_eq!(
         duplicate.find_identifier(owned()).unwrap_err().code,
         "AMBIGUOUS_RESOURCE_NAME"
     );
-    duplicate.packages[0].entries.get_mut(&0x7f010001).unwrap()[0].key_idx = 1;
+    edit_package(&mut duplicate.packages[0], |entries| {
+        entries.get_mut(&0x7f010001).unwrap()[0].key_idx = 1
+    });
     assert_eq!(
         duplicate.find_identifier(owned()).unwrap(),
         Some(0x7f010000)
@@ -213,7 +242,9 @@ fn reverse_lookup_distinguishes_absence_from_malformed_or_ambiguous_identity() {
         Some(0x7f010001)
     );
     let mut damaged = original.clone();
-    damaged.packages[0].entries.get_mut(&0x7f010000).unwrap()[0].key_idx = 99;
+    edit_package(&mut damaged.packages[0], |entries| {
+        entries.get_mut(&0x7f010000).unwrap()[0].key_idx = 99
+    });
     assert!(damaged.find_identifier(owned()).is_err());
     let mut conflict = original.clone();
     conflict.packages.push(conflict.packages[0].clone());

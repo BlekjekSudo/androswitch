@@ -64,7 +64,7 @@ impl Data {
     pub(super) fn bytes(&self, offset: usize, length: usize) -> RdResult<Vec<u8>> {
         if offset
             .checked_add(length)
-            .map_or(true, |end| end > self.len())
+            .is_none_or(|end| end > self.len())
         {
             return Err(RdError::parse("zip: range outside container"));
         }
@@ -143,7 +143,7 @@ impl Zip {
             || size > limits.max_directory_bytes as u64
             || offset
                 .checked_add(size)
-                .map_or(true, |n| n > (tail_start + end) as u64)
+                .is_none_or(|n| n > (tail_start + end) as u64)
         {
             return Err(RdError::invalid_format(
                 "zip: directory exceeds extent/metadata budget",
@@ -159,7 +159,7 @@ impl Zip {
                 + u16_at(&directory, cursor + 32)? as usize;
             if cursor
                 .checked_add(stride)
-                .map_or(true, |n| n > directory.len())
+                .is_none_or(|n| n > directory.len())
             {
                 return Err(RdError::parse("zip: central entry outside directory"));
             }

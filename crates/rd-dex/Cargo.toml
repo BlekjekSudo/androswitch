@@ -22,3 +22,7 @@ serde_json.workspace = true
 [features]
 default = ["std"]
 std = ["serde/std"]
+
+[[bench]]
+name = "parse_tables"
+harness = false

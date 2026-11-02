@@ -74,6 +74,27 @@ const PY: &str = r#"
 import sys, json, sqlite3, base64, math
 dbs = {}
 DUMP_PREFIX = b"-- RustyDroid SQLite dump\n"
+# Per-statement result budget (issue #321 bug 2). The rows of a SELECT are kept
+# in the host, outside heap_budget, and the JSON line carries every value, so the
+# total is bounded here, row by row, before the host copies the rest.
+RESULT_ROWS = 100000
+RESULT_BYTES = 16 * 1024 * 1024
+def _sized(v):
+    if isinstance(v, (str, bytes, bytearray, memoryview)):
+        return len(v) + 8
+    return 8
+def fetch_rows(cur):
+    rows = []
+    total = 0
+    while True:
+        chunk = cur.fetchmany(256)
+        if not chunk:
+            return rows
+        for row in chunk:
+            total += sum(_sized(v) for v in row) + 16
+            if len(rows) >= RESULT_ROWS or total > RESULT_BYTES:
+                raise sqlite3.DataError("result set exceeds the statement budget")
+            rows.append([enc(v) for v in row])
 def enc(v):
     if isinstance(v, (bytes, bytearray, memoryview)):
         return {"b": base64.b64encode(bytes(v)).decode()}
@@ -89,13 +110,47 @@ def dec(v):
         if "f" in v:
             return float(v["f"])
     return v
+# Guest SQL runs on a host Python process. Confine it to the in-memory database:
+# no ATTACH/DETACH (VACUUM INTO also needs ATTACH), no writable_schema, no extension
+# loading, and a per-statement VDBE step budget so a runaway recursive CTE cannot
+# hang the VM past its fuel (issue #321).
+STEP_BUDGET = 50000  # progress callbacks per statement; one callback per 1000 VDBE ops
+VALUE_LIMIT = 16 * 1024 * 1024  # max bytes of one string/blob value
+steps = [0]
+def _progress():
+    steps[0] += 1
+    return 1 if steps[0] > STEP_BUDGET else 0
+def _authorize(action, arg1, arg2, dbname, source):
+    if action in (sqlite3.SQLITE_ATTACH, sqlite3.SQLITE_DETACH):
+        return sqlite3.SQLITE_DENY
+    if action == sqlite3.SQLITE_PRAGMA and str(arg1).lower() == "writable_schema":
+        return sqlite3.SQLITE_DENY
+    return sqlite3.SQLITE_OK
+def harden(db):
+    db.set_authorizer(_authorize)
+    db.set_progress_handler(_progress, 1000)
+    if hasattr(db, "enable_load_extension"):
+        db.enable_load_extension(False)
+    if hasattr(db, "setlimit") and hasattr(sqlite3, "SQLITE_LIMIT_ATTACHED"):
+        db.setlimit(sqlite3.SQLITE_LIMIT_ATTACHED, 0)
+    # The default LENGTH limit is 1e9 bytes: zeroblob(1000000000) would be encoded
+    # to a multi-GiB JSON line outside heap_budget (issue #321 bug 2). 16 MiB caps
+    # one value's size.
+    if hasattr(db, "setlimit") and hasattr(sqlite3, "SQLITE_LIMIT_LENGTH"):
+        db.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, VALUE_LIMIT)
 def load_db(db, data):
     if not data:
         return
     if data.startswith(DUMP_PREFIX):
         db.executescript(data[len(DUMP_PREFIX):].decode())
     elif hasattr(db, "deserialize"):
-        db.deserialize(data)
+        # Host-owned snapshot (never guest SQL). sqlite3_deserialize itself trips
+        # the authorizer, so lift it for this one call and restore it right after.
+        db.set_authorizer(None)
+        try:
+            db.deserialize(data)
+        finally:
+            db.set_authorizer(_authorize)
     else:
         raise sqlite3.DatabaseError("sqlite3.deserialize is unavailable")
 def dump_db(db):
@@ -109,7 +164,9 @@ for line in sys.stdin:
         db = dbs.get(name)
         if db is None:
             db = sqlite3.connect(":memory:", isolation_level=None, check_same_thread=False)
+            harden(db)
             dbs[name] = db
+        steps[0] = 0
         op = r["op"]
         if op == "close":
             db.close(); del dbs[name]; out = {}
@@ -120,7 +177,7 @@ for line in sys.stdin:
         else:
             cur = db.execute(r["sql"], [dec(a) for a in r.get("args", [])])
             cols = [d[0] for d in cur.description] if cur.description else []
-            rows = [[enc(v) for v in row] for row in cur.fetchall()] if cur.description else []
+            rows = fetch_rows(cur) if cur.description else []
             ch, last = db.execute("select changes(), last_insert_rowid()").fetchone()
             out = {"cols": cols, "rows": rows, "changes": ch, "last": last}
     except sqlite3.IntegrityError as e:
@@ -1638,6 +1695,25 @@ fn helper_open(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
     crate::err::put_field_result(vm.heap.put_field(recv, "rd_sqlx_db", Value::Obj(d)))?;
     let dbv = Value::Obj(d);
     let sig1 = "(Landroid/database/sqlite/SQLiteDatabase;)V";
+    // The handle is published before the callbacks so re-entrant calls see it.
+    // If the open fails (onConfigure/onCreate/onUpgrade throws), un-publish it so
+    // the next getWritableDatabase() retries instead of reusing a half-initialized DB (#321 bug 3).
+    let opened = open_steps(vm, recv, path, dbv.clone(), sig1);
+    if opened.is_err() {
+        let _ = vm.heap.put_field(recv, "rd_sqlx_db", Value::Null);
+    }
+    opened?;
+    Ok(dbv)
+}
+
+/// Runs the open lifecycle (`onConfigure`, `onCreate`/`onUpgrade`/`onDowngrade`, `onOpen`).
+fn open_steps(
+    vm: &mut Engine,
+    recv: ObjRef,
+    path: String,
+    dbv: Value,
+    sig1: &str,
+) -> Result<(), VmExit> {
     crate::m8::call_dex(vm, recv, "onConfigure", sig1, vec![dbv.clone()])?;
     let want = match vm.heap.get_field(recv, "rd_sqlx_version") {
         Ok(Value::Int(v)) => v as i64,
@@ -1698,7 +1774,7 @@ fn helper_open(vm: &mut Engine, recv: ObjRef) -> Result<Value, VmExit> {
         r?;
     }
     crate::m8::call_dex(vm, recv, "onOpen", sig1, vec![dbv.clone()])?;
-    Ok(dbv)
+    Ok(())
 }
 
 /// Dispatch for `android.database.sqlite`. `None` = not handled here (the

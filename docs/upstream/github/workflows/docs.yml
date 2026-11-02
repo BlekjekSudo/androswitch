@@ -1,0 +1,85 @@
+name: Docs site (mdBook)
+
+# Publishes docs/ as a static mdBook site on GitHub Pages (M12).
+# The book scaffold (docs/book.toml + docs/SUMMARY.md) is the one proposed in
+# the M12 governance PR; this workflow only builds and deploys it.
+#
+# Required one-time setting: Settings → Pages → Build and deployment →
+# Source: "GitHub Actions", plus the repository variable `PAGES_ENABLED=true`.
+#
+# Until that is done, this workflow still BUILDS the book on every docs change
+# (that is the real regression gate for broken SUMMARY.md/paths and it must
+# stay green), but it does not try to publish: `configure-pages` fails with
+# "Get Pages site failed" when Pages is not enabled, which used to turn every
+# docs commit on `main` red for a repository *setting* nobody had flipped.
+#
+# Sentinel notes (RD Sentinel `_workflow_findings`):
+# this job requests `pages: write` / `id-token: write`, so every action is
+# pinned to a full commit SHA (an unpinned ref next to a write permission is a
+# P1 finding). No `${{ }}` expression appears inside a `run:` script.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build book
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install mdBook (pinned)
+        run: cargo install mdbook --locked --version 0.5.4
+
+      - name: Build
+        run: mdbook build docs
+
+      - name: Fail if the book produced no index
+        run: test -f target/mdbook/index.html
+
+      # Always: proof that the book builds, downloadable from the run.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mdbook-site
+          path: target/mdbook
+
+      # Publish path only exists once a maintainer enables Pages and sets
+      # the `PAGES_ENABLED` repository variable. See the header comment.
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        if: vars.PAGES_ENABLED == 'true'
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: vars.PAGES_ENABLED == 'true'
+        with:
+          path: target/mdbook
+
+  deploy:
+    name: deploy
+    if: vars.PAGES_ENABLED == 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

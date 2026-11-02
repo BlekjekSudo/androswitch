@@ -163,6 +163,9 @@ impl SuiteReport {
     }
 }
 
+/// Sugestão para um arquivo de matriz de compatibilidade passado a `rd test` (#368).
+const MATRIX_HINT: &str = "parece uma matriz de compatibilidade (\"suites\"), que não é uma suíte de cenários; para rd test use uma suíte {\"name\", \"scenarios\"} (ex.: tests/suites/m8-compat.json)";
+
 fn invalid(cause: impl Into<String>, suggestion: &str) -> RdError {
     RdError::new(INVALID_SUITE, cause, MODULE_ID).with_suggestion(suggestion)
 }
@@ -181,12 +184,23 @@ pub fn parse_suite(text: &str) -> Result<Suite, RdError> {
             "use {\"name\": …, \"scenarios\": [...]}",
         )
     })?;
-    let name = obj
+    let name = match obj
         .get("name")
         .and_then(|n| n.as_str())
         .filter(|n| !n.trim().is_empty())
-        .ok_or_else(|| invalid("campo \"name\" ausente ou vazio", "dê um nome à suíte"))?
-        .to_string();
+    {
+        Some(n) => n.to_string(),
+        None => {
+            // A compatibility matrix (`{"schema_version", "suites": [...]}`) is not a
+            // scenario suite; point the user at the right runner (#368).
+            let hint = if obj.contains_key("suites") {
+                MATRIX_HINT
+            } else {
+                "dê um nome à suíte"
+            };
+            return Err(invalid("campo \"name\" ausente ou vazio", hint));
+        }
+    };
     let scen_arr = obj
         .get("scenarios")
         .and_then(|s| s.as_array())
@@ -405,7 +419,9 @@ fn attempt_step(
     let label = phase.label();
     let t0 = Instant::now();
     let args = resolve_args(&step.name, &step.arguments, base);
-    let r = session.call_tool(&step.name, &args);
+    // Issue #317: o CLI (`rd test`) também isola — panic de runtime
+    // vira passo falho tipado (INTERNAL_PANIC), não crash do processo.
+    let r = session.call_tool_isolated(&step.name, &args);
     let text = match r.content.first() {
         Some(ToolContent::Text(t)) => t.clone(),
         Some(ToolContent::Image { mime, .. }) => format!("<imagem {mime}>"),
@@ -1183,5 +1199,18 @@ mod tests {
         let text = to_human(&run_suite(&suite, Path::new(".")));
         assert!(text.contains("FAIL  c"));
         assert!(text.contains("0 passou, 1 falhou"));
+    }
+
+    #[test]
+    fn matrix_file_gets_a_runner_hint_and_keeps_the_error_code() {
+        let matrix = r#"{"schema_version": 1, "suites": [{"name": "a"}]}"#;
+        let e = parse_suite(matrix).expect_err("matrix is not a scenario suite");
+        assert_eq!(e.code, INVALID_SUITE);
+        let hint = e.suggestion.unwrap_or_default();
+        assert!(hint.contains("tests/suites/m8-compat.json"), "{hint}");
+        // A plain suite without name keeps the generic hint.
+        let plain = parse_suite(r#"{"scenarios": []}"#).expect_err("no name");
+        assert_eq!(plain.code, INVALID_SUITE);
+        assert!(!plain.suggestion.unwrap_or_default().contains("matriz"));
     }
 }

@@ -180,7 +180,7 @@ fn features_are_opt_in_and_transitive_but_never_runtime_claims() {
         assert_eq!(info.feature_enabled, info.disabled_modules.is_empty());
         assert_eq!(
             info.registry_adapter_status,
-            if rd_engine_registry::native_execution_available(&info.engine.id) {
+            if rd_engine_registry::execution_available(&info.engine.id) {
                 "AVAILABLE_BOUNDED"
             } else {
                 "NOT_IMPLEMENTED"
@@ -204,7 +204,7 @@ fn every_parse_event_and_syscall_returns_structured_not_implemented() {
     for e in r.engines() {
         let adapter = r.adapter(&e.id).unwrap();
         assert_eq!(adapter.descriptor().number, e.number);
-        if rd_engine_registry::native_execution_available(&e.id) {
+        if rd_engine_registry::execution_available(&e.id) {
             let bad = adapter
                 .parse(Artifact {
                     name: "bad.apk",

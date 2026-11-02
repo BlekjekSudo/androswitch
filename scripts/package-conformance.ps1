@@ -4,6 +4,14 @@ $repo=Split-Path -Parent $PSScriptRoot
 $evidence=(Get-Item -LiteralPath $EvidenceDirectory).FullName
 $summary=Get-Content (Join-Path $evidence 'conformance-summary.json') -Raw|ConvertFrom-Json
 $build=Get-Content "$repo/target/evidence/product-build.json" -Raw|ConvertFrom-Json
+$runtimeCommit=[string]$build.source_commit
+if($runtimeCommit -cnotmatch '^[0-9a-f]{40}$'){throw 'Expected a full runtime source commit for upstream provenance'}
+$upstreamSource=& git -c core.fsmonitor=false -C $repo show "${runtimeCommit}:data/rustydroid-upstream.json"
+if($LASTEXITCODE){throw 'Cannot read upstream provenance at the runtime build commit'}
+$upstreamLock=($upstreamSource -join "`n")|ConvertFrom-Json
+foreach($revision in @($upstreamLock.original_base,$upstreamLock.revision)){
+    if([string]$revision -cnotmatch '^[0-9a-f]{40}$'){throw 'Invalid frozen upstream revision'}
+}
 $fixture=[IO.Path]::GetFullPath($FixtureDirectory,$repo)
 $apkBuild=Get-Content "$fixture/build-receipt.json" -Raw|ConvertFrom-Json
 $nro="$repo/local-artifacts/product/androswitch.nro";$apk="$fixture/AndroSwitchConformance.apk"
@@ -86,7 +94,7 @@ $startPath=Join-Path $folder 'MULAI-DI-SINI.md'
 if($LASTEXITCODE){throw 'Packaged documentation link preparation failed'}
 $manifest=@{
     schema_version=1;kind='development_conformance_bundle';total_cases=$summary.total;acceptance_passed=[bool]$summary.acceptance_passed;diagnostic=[bool]$Diagnostic
-    source_commit=$build.source_commit;apk_source_commit=$apkBuild.source_commit;runtime_source_manifest_sha256=$build.source_manifest_sha256;upstream=@{project='RustyDroid';authors='nadabgfccvd and contributors';revision='6388281f66d254c8e01a0fdc7a5a9a30239bc762';synced_revision='3761815dc6a2a1427e9fc66b66e8471b78d1b170'}
+    source_commit=$build.source_commit;apk_source_commit=$apkBuild.source_commit;runtime_source_manifest_sha256=$build.source_manifest_sha256;upstream=@{project='RustyDroid';authors='nadabgfccvd and contributors';repository=$upstreamLock.repository;revision=$upstreamLock.original_base;synced_revision=$upstreamLock.revision}
     apk_sha256=$summary.apk_sha256;nro_sha256=$summary.nro_sha256;catalog_sha256=$summary.catalog_sha256
     emulator_counts=$summary.counts;emulator_acceptance_passed=[bool]$summary.acceptance_passed;hardware=if($hardwareMatches){$hardware.status}else{'not_run'};hardware_reported_counts=if($hardwareMatches){$hardware.reported_counts}else{$null};hardware_raw_journal_received=if($hardwareMatches){$hardware.verification_limits.raw_device_journal_received}else{$false};android_reference='not_run';m9_independent_game_gate='open'
     files=@(Get-ChildItem $folder -Recurse -File|ForEach-Object {@{path=[IO.Path]::GetRelativePath($folder,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}})

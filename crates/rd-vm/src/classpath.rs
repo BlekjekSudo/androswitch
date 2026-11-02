@@ -7,6 +7,7 @@ use alloc::{
     format,
     string::{String, ToString},
     sync::Arc,
+    vec,
     vec::Vec,
 };
 use rd_dex::classes::{ClassData, ClassDef};
@@ -485,12 +486,23 @@ impl Classpath {
             cur = super_desc;
         }
         // fase 2: default methods de interface — da classe mais derivada
-        // para a raiz (mesma ordem de visita da fase 1; issue #26)
+        // para a raiz (mesma ordem de visita da fase 1; issue #26 + #320)
+        let mut visited_ifaces: crate::maps::HashSet<String> = crate::maps::HashSet::new();
+        let mut iface_budget: usize = 128;
         for c in &chain {
             let ifaces = self.interfaces_of(c);
             for iface in ifaces {
-                if let Some(hit) = self.resolve_in_interface(&iface, name, proto, 0) {
+                if let Some(hit) = self.resolve_in_interface(
+                    &iface,
+                    name,
+                    proto,
+                    &mut visited_ifaces,
+                    &mut iface_budget,
+                ) {
                     return Some(hit);
+                }
+                if iface_budget == 0 {
+                    return None;
                 }
             }
         }
@@ -637,38 +649,53 @@ impl Classpath {
         None
     }
 
-    /// Busca um método em uma interface e nas suas superinterfaces (recursão
-    /// com guard de ciclo/cap — issue #26, métodos default incluídos).
+    /// Busca um método em uma interface e nas suas superinterfaces (DFS
+    /// iterativa com conjunto `visited` compartilhado + orçamento de nós —
+    /// issue #26 + #320, evita explosão exponencial `k^D` em DAGs diamante).
     fn resolve_in_interface(
         &mut self,
-        iface: &str,
+        start_iface: &str,
         name: &str,
         proto: &str,
-        depth: usize,
+        visited: &mut crate::maps::HashSet<String>,
+        budget: &mut usize,
     ) -> Option<(usize, ClassDef, rd_dex::methods::EncodedMethod)> {
-        if depth > 16 {
+        if *budget == 0 || visited.contains(start_iface) {
             return None;
         }
-        let (dex_idx, def) = self.find_class(iface)?;
-        let def = *def;
-        if let Some(data) = self.class_data(dex_idx, &def).ok().flatten() {
-            let found = data
-                .direct_methods
-                .iter()
-                .chain(&data.virtual_methods)
-                .find(|m| {
-                    m.method_idx != rd_dex::strings::NO_INDEX
-                        && self.method_name(dex_idx, m.method_idx) == Some(name)
-                        && self.method_proto(dex_idx, m.method_idx).as_deref() == Some(proto)
-                })
-                .cloned();
-            if let Some(m) = found {
-                return Some((dex_idx, def, m));
+        let mut stack: Vec<String> = vec![start_iface.to_string()];
+        while let Some(iface) = stack.pop() {
+            if *budget == 0 {
+                return None;
             }
-        }
-        for super_iface in self.interfaces_of(iface) {
-            if let Some(hit) = self.resolve_in_interface(&super_iface, name, proto, depth + 1) {
-                return Some(hit);
+            if !visited.insert(iface.clone()) {
+                continue;
+            }
+            *budget -= 1;
+            let Some((dex_idx, def)) = self.find_class(&iface) else {
+                continue;
+            };
+            let def = *def;
+            if let Some(data) = self.class_data(dex_idx, &def).ok().flatten() {
+                let found = data
+                    .direct_methods
+                    .iter()
+                    .chain(&data.virtual_methods)
+                    .find(|m| {
+                        m.method_idx != rd_dex::strings::NO_INDEX
+                            && self.method_name(dex_idx, m.method_idx) == Some(name)
+                            && self.method_proto(dex_idx, m.method_idx).as_deref() == Some(proto)
+                    })
+                    .cloned();
+                if let Some(m) = found {
+                    return Some((dex_idx, def, m));
+                }
+            }
+            let supers = self.interfaces_of(&iface);
+            for super_iface in supers.into_iter().rev() {
+                if !visited.contains(&super_iface) {
+                    stack.push(super_iface);
+                }
             }
         }
         None
@@ -750,6 +777,7 @@ impl Classpath {
     /// closure BFS por chamada, cap de orçamento). Interfaces de plataforma
     /// (CharSequence/Comparable/…) vêm da tabela builtin.
     pub fn is_subtype(&self, sub: &str, sup: &str) -> bool {
+        let (mut sub, mut sup) = (sub, sup);
         if sub == sup || sdk_subtype(sub, sup) {
             return true;
         }
@@ -758,26 +786,31 @@ impl Classpath {
         if sup == "Ljava/lang/Object;" && (sub.starts_with('L') || sub.starts_with('[')) {
             return true;
         }
-        // issue #42: subtipagem de ARRAYS (JLS 4.10.2/4.10.3) — antes arrays
-        // só casavam textualmente (ArrayStoreException espúria em código
-        // covariante idiomático, check-cast/instanceof falhos):
+        // issue #42 + #320: subtipagem iterativa de ARRAYS (JLS 4.10.2/4.10.3)
+        // em O(1) de pilha — descasca prefixos '[' casados sem recursão para
+        // evitar stack overflow do host em descritores '[[[...' profundos:
         //   · todo array <: Object, Cloneable, Serializable
-        //   · [LSub; <: [LSup; ⇔ Sub <: Sup (recursão no elemento)
+        //   · [LSub; <: [LSup; ⇔ Sub <: Sup
         //   · [X <: [LObject; ⇔ X é tipo de referência (primitivos invariantes)
-        if let Some(sub_elem) = sub.strip_prefix('[') {
-            if matches!(
-                sup,
-                "Ljava/lang/Object;" | "Ljava/lang/Cloneable;" | "Ljava/io/Serializable;"
-            ) {
+        if sub.starts_with('[') {
+            while let (Some(sub_elem), Some(sup_elem)) =
+                (sub.strip_prefix('['), sup.strip_prefix('['))
+            {
+                sub = sub_elem;
+                sup = sup_elem;
+            }
+            if sub == sup {
                 return true;
             }
-            if let Some(sup_elem) = sup.strip_prefix('[') {
-                if sup_elem == "Ljava/lang/Object;" {
-                    return !matches!(sub_elem, "B" | "C" | "D" | "F" | "I" | "J" | "S" | "Z");
-                }
-                return self.is_subtype(sub_elem, sup_elem);
+            if sub.starts_with('[') {
+                return matches!(
+                    sup,
+                    "Ljava/lang/Object;" | "Ljava/lang/Cloneable;" | "Ljava/io/Serializable;"
+                );
             }
-            return false; // array vs classe não-array (além de Object/…)
+            if !sup.starts_with('[') && sup == "Ljava/lang/Object;" {
+                return !matches!(sub, "B" | "C" | "D" | "F" | "I" | "J" | "S" | "Z");
+            }
         }
         // hierarquia mínima da plataforma conhecida pela VM (classes que não
         // estão no DEX mas fazem parte do contrato do interpretador M2)
@@ -1825,6 +1858,14 @@ pub(crate) fn builtin_hierarchy(class: &str) -> Option<&'static [&'static str]> 
         "Landroid/widget/AbsoluteLayout;" => Some(ABSOLUTE_LAYOUT),
         "Landroid/webkit/WebView;" => Some(WEB_VIEW),
         "Landroid/view/ViewStub;" => Some(VIEW),
+        // issue #228: view state — DEX SavedState subclasses extend the
+        // platform bases; AbsSavedState.getSuperState() and the
+        // `super(Parcelable)` ctor chain need the hierarchy for the
+        // inherited-walk dispatch (BaseSavedState → AbsSavedState).
+        "Landroid/view/View$BaseSavedState;" => {
+            Some(&["Landroid/view/AbsSavedState;", "Ljava/lang/Object;"])
+        }
+        "Landroid/view/AbsSavedState;" => Some(&["Ljava/lang/Object;"]),
         // ── M8: classes host do compat real (cadeia completa de ancestrais) ──
         "Ljava/util/AbstractCollection;" => Some(OBJECT),
         "Ljava/util/AbstractList;" => {
@@ -2868,6 +2909,12 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Ljava/lang/StringBuilder;" | "Ljava/lang/StringBuffer;" => Some(SB_IFACES),
         "Ljava/util/regex/Pattern;" => Some(&["Ljava/io/Serializable;"]),
         "Ljava/util/regex/Matcher;" => Some(&["Ljava/util/regex/MatchResult;"]),
+        // API 34: OnBackAnimationCallback estende OnBackInvokedCallback. Sem esta
+        // aresta, o check-cast de uma classe anônima do AndroidX (OnBackPressedDispatcher
+        // Api34Impl) falhava com ClassCastException (VolumeScroll 1.0.2).
+        "Landroid/window/OnBackAnimationCallback;" => {
+            Some(&["Landroid/window/OnBackInvokedCallback;"])
+        }
         "Ljava/text/Format;"
         | "Ljava/text/NumberFormat;"
         | "Ljava/text/DecimalFormat;"
@@ -2987,6 +3034,11 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Landroid/util/AttributeSet;",
             "Ljava/lang/AutoCloseable;",
         ]),
+        // camera2 & media AutoCloseable resources (m10/camera.rs, #315)
+        "Landroid/hardware/camera2/CameraDevice;"
+        | "Landroid/hardware/camera2/CameraCaptureSession;"
+        | "Landroid/media/ImageReader;"
+        | "Landroid/media/Image;" => Some(&["Ljava/lang/AutoCloseable;"]),
         // java.util time classes inherit these standard JDK interfaces.
         "Ljava/util/Calendar;" | "Ljava/util/GregorianCalendar;" => Some(CALENDAR_IFACES),
         "Ljava/util/TimeZone;" => Some(TIMEZONE_IFACES),
@@ -3048,15 +3100,22 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
             "Ljava/util/Collection;",
             "Ljava/lang/Iterable;",
         ]),
-        "Ljava/util/WeakHashMap;"
-        | "Ljava/util/IdentityHashMap;"
-        | "Ljava/util/LinkedHashMap;"
-        | "Ljava/util/concurrent/ConcurrentHashMap;" => Some(&[
+        // Only ConcurrentHashMap implements ConcurrentMap (#363).
+        "Ljava/util/WeakHashMap;" | "Ljava/util/IdentityHashMap;" | "Ljava/util/LinkedHashMap;" => {
+            Some(&[
+                "Ljava/util/Map;",
+                "Ljava/lang/Cloneable;",
+                "Ljava/io/Serializable;",
+            ])
+        }
+        "Ljava/util/concurrent/ConcurrentHashMap;" => Some(&[
             "Ljava/util/Map;",
             "Ljava/util/concurrent/ConcurrentMap;",
             "Ljava/lang/Cloneable;",
             "Ljava/io/Serializable;",
         ]),
+        // `Parcelable.ClassLoaderCreator` extends `Parcelable.Creator` (#363).
+        "Landroid/os/Parcelable$ClassLoaderCreator;" => Some(&["Landroid/os/Parcelable$Creator;"]),
         // Immutable views from java.util.Collections (intrinsics.rs markers).
         "Ljava/util/Collections$UnmodifiableSet;" => Some(&[
             "Ljava/util/Set;",

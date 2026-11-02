@@ -93,7 +93,7 @@ pub(super) fn run(sub: &EngineSub, dd: &DataDir) -> RdResult<()> {
         EngineSub::Run { id, path, json: _ } => {
             use std::io::Read;
             let adapter = registry.adapter(id)?;
-            if !rd_engine_registry::native_execution_available(id) {
+            if !rd_engine_registry::execution_available(id) {
                 adapter.parse(Artifact {
                     name: "unsupported",
                     bytes: &[],
@@ -145,7 +145,7 @@ pub(super) fn run(sub: &EngineSub, dd: &DataDir) -> RdResult<()> {
             Ok(())
         }
         EngineSub::Check { id, json: _ } => {
-            if rd_engine_registry::native_execution_available(id) {
+            if rd_engine_registry::execution_available(id) {
                 println!(
                     "{}",
                     crate::to_json(

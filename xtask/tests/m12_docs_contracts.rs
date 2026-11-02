@@ -82,8 +82,8 @@ fn m12_community_and_governance_files_exist_and_links_resolve() {
         .expect(".github/FUNDING.yml must exist");
     assert!(!funding.trim().is_empty());
 
-    let perf_tpl = fs::read_to_string(root.join(".github/ISSUE_TEMPLATE/perf_regression.yml"))
-        .expect(".github/ISSUE_TEMPLATE/perf_regression.yml must exist");
+    let perf_tpl = fs::read_to_string(root.join(".github/ISSUE_TEMPLATE/perf-regression.yml"))
+        .expect(".github/ISSUE_TEMPLATE/perf-regression.yml must exist");
     assert!(perf_tpl.contains("perf-regression"));
     assert!(perf_tpl.contains("moto-e5") || perf_tpl.contains("Moto E5"));
 
@@ -91,7 +91,7 @@ fn m12_community_and_governance_files_exist_and_links_resolve() {
         fs::read_to_string(root.join("docs/labels.json")).expect("docs/labels.json must exist");
     assert!(
         labels_json.contains("\"perf-regression\""),
-        "perf_regression.yml label must match docs/labels.json"
+        "perf-regression.yml label must match docs/labels.json"
     );
 }
 

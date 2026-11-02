@@ -45,7 +45,12 @@ pub(crate) fn decode_field_id(b: &[u8]) -> FieldId {
 
 pub fn parse_field_ids(data: &[u8], count: u32, off: u32) -> RdResult<Vec<FieldId>> {
     let window = validate_field_window(data, count, off)?;
-    Ok(window.chunks_exact(8).map(decode_field_id).collect())
+    Ok(window
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .map(|b| decode_field_id(b))
+        .collect())
 }
 
 /// encoded_field (class_data): field_idx_diff uleb + access_flags uleb.

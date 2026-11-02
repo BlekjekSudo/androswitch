@@ -101,6 +101,8 @@ pub(crate) struct WState {
     text: Vec<u16>,
     autoflush: bool,
     closed: bool,
+    /// Erro sinalizado para `checkError()` (JDK: PrintWriter/PrintStream não lançam, #366).
+    error: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -313,6 +315,17 @@ fn slice<T: Clone>(all: &[T], off: i32, len: i32) -> Result<Vec<T>, VmExit> {
     Ok(all[uoff..uoff + ulen].to_vec())
 }
 
+/// `ByteArrayInputStream(buf, off, len)` na JDK: `count = min(off + len, buf.length)`,
+/// sem exceção por estouro (#366). Offsets negativos continuam IOOBE.
+fn clamp_slice<T: Clone>(all: &[T], off: i32, len: i32) -> Result<Vec<T>, VmExit> {
+    if off < 0 || len < 0 {
+        return slice(all, off, len);
+    }
+    let start = (off as usize).min(all.len());
+    let end = (off as usize).saturating_add(len as usize).min(all.len());
+    Ok(all[start..end].to_vec())
+}
+
 /// Value printed by `print(x)` for the parameter type in `sig`, as UTF-16 units
 /// so surrogate `char` arguments survive paired `print(char)` calls.
 fn print_units(vm: &mut Engine, sig: &str, v: Option<&Value>) -> Result<Vec<u16>, VmExit> {
@@ -339,17 +352,26 @@ fn print_units(vm: &mut Engine, sig: &str, v: Option<&Value>) -> Result<Vec<u16>
 
 // ── writers ─────────────────────────────────────────────────────────────
 
-fn wget(vm: &Engine, r: ObjRef) -> Option<WState> {
-    vm.io_tables
-        .writers
-        .clone()
-        .with(|m| m.borrow().get(&r).cloned())
-}
 fn wput(vm: &Engine, r: ObjRef, st: WState) {
     vm.io_tables
         .writers
         .clone()
         .with(|m| m.borrow_mut().insert(r, st));
+}
+/// Leitura sem clonar o estado (o `text` pode ser grande). #366: clonar a cada
+/// `write` tornava a escrita O(N^2).
+fn wview<R>(vm: &Engine, r: ObjRef, f: impl FnOnce(&WState) -> R) -> Option<R> {
+    vm.io_tables
+        .writers
+        .clone()
+        .with(|m| m.borrow().get(&r).map(f))
+}
+/// Mutação in-place do estado (sem clone e sem reinserir).
+fn wmod<R>(vm: &Engine, r: ObjRef, f: impl FnOnce(&mut WState) -> R) -> Option<R> {
+    vm.io_tables
+        .writers
+        .clone()
+        .with(|m| m.borrow_mut().get_mut(&r).map(f))
 }
 
 fn flush_writer(
@@ -358,30 +380,31 @@ fn flush_writer(
     close: bool,
     hold_trailing_high: bool,
 ) -> Result<(), VmExit> {
-    let Some(mut st) = wget(vm, recv) else {
+    let Some((sink, units)) = wmod(vm, recv, |st| {
+        let units = if !close
+            && hold_trailing_high
+            && st
+                .pending
+                .last()
+                .is_some_and(|u| (0xD800..=0xDBFF).contains(u))
+        {
+            let keep = st.pending.pop();
+            let taken = core::mem::take(&mut st.pending);
+            if let Some(hi) = keep {
+                st.pending.push(hi);
+            }
+            taken
+        } else {
+            core::mem::take(&mut st.pending)
+        };
+        if close {
+            st.closed = true;
+        }
+        (st.sink.clone(), units)
+    }) else {
         return Ok(());
     };
-    let units = if !close
-        && hold_trailing_high
-        && st
-            .pending
-            .last()
-            .is_some_and(|u| (0xD800..=0xDBFF).contains(u))
-    {
-        let keep = st.pending.pop();
-        let taken = core::mem::take(&mut st.pending);
-        if let Some(hi) = keep {
-            st.pending.push(hi);
-        }
-        taken
-    } else {
-        core::mem::take(&mut st.pending)
-    };
-    if close {
-        st.closed = true;
-    }
-    wput(vm, recv, st.clone());
-    match &st.sink {
+    match &sink {
         Sink::Buffer => {}
         Sink::Writer(w) => {
             if !units.is_empty() {
@@ -421,18 +444,36 @@ fn flush_writer(
 }
 
 fn write_units(vm: &Engine, recv: ObjRef, units: &[u16]) -> Result<(), VmExit> {
-    let Some(mut st) = wget(vm, recv) else {
-        return Ok(());
-    };
-    if st.closed {
-        return Err(exc("Ljava/io/IOException;", "Stream closed"));
-    }
-    match st.sink {
-        Sink::Buffer => st.text.extend_from_slice(units),
-        _ => st.pending.extend_from_slice(units),
-    }
-    wput(vm, recv, st);
-    Ok(())
+    let (used, budget) = (vm.heap.used(), vm.heap.budget());
+    let res = wmod(vm, recv, |st| {
+        if st.closed {
+            // JDK: escrita após close() não lança; vira checkError() (#366).
+            st.error = true;
+            return Ok(());
+        }
+        // O buffer vive no host (u16). Cobrar o tamanho resultante contra o
+        // orçamento do heap antes de crescer, como em SpannableStringBuilder (#366).
+        let is_buffer = matches!(st.sink, Sink::Buffer);
+        let cur = if is_buffer {
+            st.text.len()
+        } else {
+            st.pending.len()
+        };
+        let cost = (cur + units.len()).saturating_mul(2).saturating_add(32);
+        if used.saturating_add(cost) > budget {
+            return Err(exc(
+                "Ljava/lang/OutOfMemoryError;",
+                format!("writer buffer of {cost} bytes exceeds heap of {budget} bytes"),
+            ));
+        }
+        if is_buffer {
+            st.text.extend_from_slice(units);
+        } else {
+            st.pending.extend_from_slice(units);
+        }
+        Ok(())
+    });
+    res.unwrap_or(Ok(()))
 }
 
 fn write_text(vm: &Engine, recv: ObjRef, s: &str) -> Result<(), VmExit> {
@@ -538,11 +579,12 @@ fn writer(
                 text: Vec::new(),
                 autoflush,
                 closed: false,
+                error: false,
             },
         );
         return Ok(Some(Value::Null));
     }
-    if wget(vm, recv).is_none() {
+    if wview(vm, recv, |_| ()).is_none() {
         return Ok(None);
     }
     let ret_self = sig.ends_with(")Ljava/io/Writer;")
@@ -559,11 +601,11 @@ fn writer(
                 slice(&all, int(args, 1), int(args, 2))?
             };
             flush_writer(vm, recv, false, false)?;
-            if let Some(WState {
-                sink: Sink::Stream(os, _),
-                closed: false,
-                ..
-            }) = wget(vm, recv)
+            if let Some(os) = wview(vm, recv, |w| match (&w.sink, w.closed) {
+                (Sink::Stream(os, _), false) => Some(*os),
+                _ => None,
+            })
+            .flatten()
             {
                 let b = crate::jlstring::byte_array(vm, &raw)?;
                 vm.invoke_instance(os, "write", "([B)V", &[b])?;
@@ -574,11 +616,11 @@ fn writer(
         "writeBytes" if class == PS => {
             let raw = require_byte_array(vm, args.first())?;
             flush_writer(vm, recv, false, false)?;
-            if let Some(WState {
-                sink: Sink::Stream(os, _),
-                closed: false,
-                ..
-            }) = wget(vm, recv)
+            if let Some(os) = wview(vm, recv, |w| match (&w.sink, w.closed) {
+                (Sink::Stream(os, _), false) => Some(*os),
+                _ => None,
+            })
+            .flatten()
             {
                 let b = crate::jlstring::byte_array(vm, &raw)?;
                 vm.invoke_instance(os, "write", "([B)V", &[b])?;
@@ -659,30 +701,27 @@ fn writer(
         "flush" => {
             // An encoding Writer retains a final high surrogate across flush;
             // close is the boundary that finally replaces incomplete input.
-            let encoding = wget(vm, recv).is_some_and(|w| matches!(w.sink, Sink::Stream(_, _)));
+            let encoding =
+                wview(vm, recv, |w| matches!(w.sink, Sink::Stream(_, _))).unwrap_or(false);
             flush_writer(vm, recv, false, encoding)?;
             Value::Null
         }
         "close" => {
-            if class != SW && !wget(vm, recv).is_some_and(|w| w.closed) {
+            if class != SW && !wview(vm, recv, |w| w.closed).unwrap_or(false) {
                 flush_writer(vm, recv, true, false)?;
             }
             Value::Null
         }
         "checkError" => {
             flush_writer(vm, recv, false, false)?;
-            Value::Int(0)
+            Value::Int(wview(vm, recv, |w| w.error).unwrap_or(false) as i32)
         }
         "toString" if class == SW => {
-            let t = wget(vm, recv)
-                .map(|w| String::from_utf16_lossy(&w.text))
-                .unwrap_or_default();
+            let t = wview(vm, recv, |w| String::from_utf16_lossy(&w.text)).unwrap_or_default();
             jstr(vm, t)?
         }
         "getBuffer" if class == SW => {
-            let t = wget(vm, recv)
-                .map(|w| String::from_utf16_lossy(&w.text))
-                .unwrap_or_default();
+            let t = wview(vm, recv, |w| String::from_utf16_lossy(&w.text)).unwrap_or_default();
             let sb = vm
                 .heap
                 .alloc_instance("Ljava/lang/StringBuffer;".to_string(), Vec::new())
@@ -699,7 +738,7 @@ fn writer(
             )?;
             Value::Obj(sb)
         }
-        "getEncoding" => match wget(vm, recv).map(|w| w.sink) {
+        "getEncoding" => match wview(vm, recv, |w| w.sink.clone()) {
             Some(Sink::Stream(_, cs)) => jstr(vm, cs.replace('-', ""))?,
             _ => Value::Null,
         },
@@ -712,7 +751,7 @@ fn writer(
         )
         && !matches!(sig, "([B)V" | "([BII)V");
     let printwriter_autoflush =
-        class == PW && name == "println" && wget(vm, recv).is_some_and(|w| w.autoflush);
+        class == PW && name == "println" && wview(vm, recv, |w| w.autoflush).unwrap_or(false);
     if stream_write || printwriter_autoflush {
         flush_writer(vm, recv, false, name != "println" && name != "newLine")?;
     }
@@ -782,7 +821,7 @@ fn load(vm: &mut Engine, recv: ObjRef) -> Result<RState, VmExit> {
                         .chars
                         .len()
                         .checked_add(take)
-                        .map_or(true, |total| total > MAX_STREAM_UNITS)
+                        .is_none_or(|total| total > MAX_STREAM_UNITS)
                     {
                         return Err(exc(
                             "Ljava/io/IOException;",
@@ -822,7 +861,7 @@ fn load(vm: &mut Engine, recv: ObjRef) -> Result<RState, VmExit> {
                 if bytes
                     .len()
                     .checked_add(take)
-                    .map_or(true, |total| total > MAX_STREAM_UNITS)
+                    .is_none_or(|total| total > MAX_STREAM_UNITS)
                 {
                     return Err(exc(
                         "Ljava/io/IOException;",
@@ -1072,6 +1111,27 @@ pub(crate) fn new_byte_input_stream(vm: &mut Engine, bytes: Vec<u8>) -> Result<V
     Ok(Value::Obj(r))
 }
 
+/// Acrescenta `data` ao buffer do BAOS in place. O buffer vive no host, então
+/// o crescimento é cobrado contra `heap_budget` antes (mesma regra de #369/#366).
+fn baos_append(vm: &Engine, recv: ObjRef, data: &[u8]) -> Result<(), VmExit> {
+    let (used, budget) = (vm.heap.used(), vm.heap.budget());
+    vm.io_tables.bytes.clone().with(|m| {
+        let mut m = m.borrow_mut();
+        let Some(st) = m.get_mut(&recv) else {
+            return Ok(());
+        };
+        let cost = st.bytes.len().saturating_add(data.len()).saturating_add(32);
+        if used.saturating_add(cost) > budget {
+            return Err(exc(
+                "Ljava/lang/OutOfMemoryError;",
+                format!("ByteArrayOutputStream of {cost} bytes exceeds heap of {budget} bytes"),
+            ));
+        }
+        st.bytes.extend_from_slice(data);
+        Ok(())
+    })
+}
+
 fn bytes_stream(
     vm: &mut Engine,
     class: &str,
@@ -1084,10 +1144,16 @@ fn bytes_stream(
     let get = || byte_states.with(|m| m.borrow().get(&recv).cloned());
     let set = |st: BState| byte_states.with(|m| m.borrow_mut().insert(recv, st));
     if name == "<init>" {
+        if class == BAOS && args.len() == 1 && int(args, 0) < 0 {
+            return Err(exc(
+                "Ljava/lang/IllegalArgumentException;",
+                format!("Negative initial size: {}", int(args, 0)),
+            ));
+        }
         let st = if class == BAIS {
             let all = require_byte_array(vm, args.first())?;
             let bytes = if args.len() == 3 {
-                slice(&all, int(args, 1), int(args, 2))?
+                clamp_slice(&all, int(args, 1), int(args, 2))?
             } else {
                 all
             };
@@ -1102,24 +1168,41 @@ fn bytes_stream(
         set(st);
         return Ok(Some(Value::Null));
     }
+    // BAOS: escritas e `size()` mexem no buffer in place. Clonar o buffer a cada
+    // chamada tornava N escritas O(N^2) (#366).
+    if class == BAOS {
+        match (name, sig) {
+            ("write", "(I)V")
+            | ("write", "([B)V")
+            | ("write", "([BII)V")
+            | ("writeBytes", "([B)V") => {
+                let data: Vec<u8> = match sig {
+                    "(I)V" => vec![int(args, 0) as u8],
+                    "([BII)V" => {
+                        let all = require_byte_array(vm, args.first())?;
+                        slice(&all, int(args, 1), int(args, 2))?
+                    }
+                    _ => require_byte_array(vm, args.first())?,
+                };
+                baos_append(vm, recv, &data)?;
+                return Ok(Some(Value::Null));
+            }
+            ("size", _) => {
+                if let Some(n) = vm
+                    .io_tables
+                    .bytes
+                    .clone()
+                    .with(|m| m.borrow().get(&recv).map(|s| s.bytes.len()))
+                {
+                    return Ok(Some(Value::Int(n as i32)));
+                }
+            }
+            _ => {}
+        }
+    }
     let Some(mut st) = get() else { return Ok(None) };
     let n = st.bytes.len();
     let out = match (class, name) {
-        (BAOS, "write") => {
-            match sig {
-                "(I)V" => st.bytes.push(int(args, 0) as u8),
-                "([B)V" => st.bytes.extend(require_byte_array(vm, args.first())?),
-                _ => {
-                    let all = require_byte_array(vm, args.first())?;
-                    st.bytes.extend(slice(&all, int(args, 1), int(args, 2))?);
-                }
-            }
-            Value::Null
-        }
-        (BAOS, "writeBytes") => {
-            st.bytes.extend(require_byte_array(vm, args.first())?);
-            Value::Null
-        }
         (BAOS, "toByteArray") => crate::jlstring::byte_array(vm, &st.bytes)?,
         (BAOS, "toString") => {
             let cs = if args.is_empty() {

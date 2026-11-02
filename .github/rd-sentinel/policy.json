@@ -15,7 +15,6 @@
   },
   "approvals": {
     "policy_label": "sentinel:policy-approved",
-    "dependency_major_label": "sentinel:dependency-major-approved",
     "baseline_label": "sentinel:baseline-approved",
     "deep_label": "sentinel:deep",
     "authorized_comment_associations": ["OWNER", "MEMBER", "COLLABORATOR"]

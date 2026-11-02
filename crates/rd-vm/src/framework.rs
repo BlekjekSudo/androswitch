@@ -62,6 +62,8 @@ pub const HANDLER: &str = "Landroid/os/Handler;";
 pub const LOOPER: &str = "Landroid/os/Looper;";
 /// M8: relógio host (relógio virtual determinístico — ver `call_host_static`).
 pub const SYSTEM_CLOCK: &str = "Landroid/os/SystemClock;";
+/// API 30+: `android.os.ext.SdkExtensions` (KeePassDX 4.5.6 chama na inicialização).
+pub const SDK_EXTENSIONS: &str = "Landroid/os/ext/SdkExtensions;";
 /// Android Environment over the per-VM emulated shared-storage root.
 pub const ENVIRONMENT: &str = "Landroid/os/Environment;";
 /// M8: Thread host — a VM é single-threaded: existe UMA thread sintética
@@ -1659,6 +1661,25 @@ impl Engine {
             )
             .into());
         }
+        // APK-Tester (rodada end-to-end do PR-Agent): a classe EXISTE no DEX
+        // mas não estende android.app.Activity (41 APKs de engines declaram
+        // MainActivity extends java.lang.Object). Sem esta checagem a VM
+        // alocava a instância, não executava onCreate algum e devolvia
+        // sucesso com tela vazia — falha silenciosa (Lei 1). No Android o
+        // launch morre com ClassCastException na instrumentação; aqui o
+        // contrato de borda é o erro estruturado (mesmo padrão do #82).
+        if !self.cp.is_subtype(activity_desc, "Landroid/app/Activity;") {
+            return Err(crate::err::with_suggestion(
+                crate::err::vm_error(
+                    "VM_TYPE_ERROR",
+                    format!(
+                        "classe {activity_desc} não estende android.app.Activity — não é uma activity lançável (no Android o launch falha com ClassCastException)"
+                    ),
+                ),
+                "declare a componente como subclasse de android.app.Activity ou lance a LAUNCHER do AndroidManifest.xml",
+            )
+            .into());
+        }
         self.fw.package_name = package_name.to_string();
         // M8 (38º gap real): Android cria a Application do processo ANTES
         // da activity e roda Application.onCreate — o DEX do app depende
@@ -2734,7 +2755,8 @@ impl Engine {
         // (match_parent implícito = None → slot). Clamp de defesa: o inflate
         // já valida ≤ WINDOW_W, mas a API host (addView em árvore
         // programática) também pode chegar aqui com valores hostis.
-        let w = own_w_explicit.map_or(slot_w, |ew| ew.clamp(0, WINDOW_W));
+        let vw = self.viewport_px().0;
+        let w = own_w_explicit.map_or(slot_w, |ew| ew.clamp(0, vw));
         let mut acc_y = y;
         let mut acc_x = x;
         let mut max_h = 0i32;
@@ -2755,7 +2777,9 @@ impl Engine {
             let explicit: i32 = visible
                 .iter()
                 .filter_map(|c| self.w_explicit_of(*c))
-                .fold(0i32, |acc, ew| acc.saturating_add(ew.clamp(0, WINDOW_W)));
+                .fold(0i32, |acc, ew| {
+                    acc.saturating_add(ew.clamp(0, self.viewport_px().0))
+                });
             let free = visible.len()
                 - visible
                     .iter()
@@ -2769,7 +2793,7 @@ impl Engine {
         };
         for c in &visible {
             let child_w = match self.w_explicit_of(*c) {
-                Some(ew) => ew.clamp(0, WINDOW_W),
+                Some(ew) => ew.clamp(0, self.viewport_px().0),
                 None => default_w,
             };
             let (cx, cy) = match orientation {
@@ -3030,6 +3054,10 @@ fn call_host_static_rooted(
             vm.drain_looper()?;
             Ok(Some(Value::Null))
         }
+        // SdkExtensions: o dispositivo virtual não publica extensões de SDK, então
+        // qualquer extensão responde 0 ("não fornecida"). Apps seguem o caminho de
+        // fallback em vez de receber uma versão inventada.
+        (SDK_EXTENSIONS, "getExtensionVersion") if _sig == "(I)I" => Ok(Some(Value::Int(0))),
         // ── M8: SystemClock (oitavo gap do launch real — org.primftpd) ────
         // O relógio é o VIRTUAL determinístico (`HostState.clock_ms`): mesmo
         // contrato do Looper/postDelayed — nada de tempo de parede (testes
@@ -4265,6 +4293,79 @@ fn call_host_instance_rooted(
             Ok(Some(Value::Null))
         }
         (VIEW, "onLayout") if sig == "(ZIIII)V" && is_view(vm) => Ok(Some(Value::Null)),
+        // ── View hierarchy state (issue #228) — invoke-super landing ────────
+        // DEX dispatch/state overrides calling `super.dispatchSave…` /
+        // `super.saveHierarchyState` reach the platform default through the
+        // inherited walk. Host default only: invoke-super semantics mean the
+        // DEX override was deliberately bypassed (the virtual entry with its
+        // DEX-override gate lives in view_layout::instance_intrinsic).
+        (VIEW, "saveHierarchyState") | (VIEWGROUP, "saveHierarchyState")
+            if sig == "(Landroid/util/SparseArray;)V" && is_view(vm) =>
+        {
+            match args.first() {
+                Some(Value::Obj(container)) => {
+                    crate::view_layout::save_hierarchy_state(vm, recv, *container)?;
+                    Ok(Some(Value::Null))
+                }
+                _ => Err(VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "saveHierarchyState: container is null",
+                ))),
+            }
+        }
+        (VIEW, "restoreHierarchyState") | (VIEWGROUP, "restoreHierarchyState")
+            if sig == "(Landroid/util/SparseArray;)V" && is_view(vm) =>
+        {
+            match args.first() {
+                Some(Value::Obj(container)) => {
+                    crate::view_layout::restore_hierarchy_state(vm, recv, *container)?;
+                    Ok(Some(Value::Null))
+                }
+                _ => Err(VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "restoreHierarchyState: container is null",
+                ))),
+            }
+        }
+        (VIEW, "dispatchSaveInstanceState") | (VIEWGROUP, "dispatchSaveInstanceState")
+            if sig == "(Landroid/util/SparseArray;)V" && is_view(vm) =>
+        {
+            match args.first() {
+                Some(Value::Obj(container)) => {
+                    crate::view_layout::dispatch_save_instance_state(vm, recv, *container)?;
+                    Ok(Some(Value::Null))
+                }
+                _ => Err(VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "dispatchSaveInstanceState: container is null",
+                ))),
+            }
+        }
+        (VIEW, "dispatchRestoreInstanceState") | (VIEWGROUP, "dispatchRestoreInstanceState")
+            if sig == "(Landroid/util/SparseArray;)V" && is_view(vm) =>
+        {
+            match args.first() {
+                Some(Value::Obj(container)) => {
+                    crate::view_layout::dispatch_restore_instance_state(vm, recv, *container)?;
+                    Ok(Some(Value::Null))
+                }
+                _ => Err(VmExit::Exception(crate::err::Throwable::new(
+                    "Ljava/lang/NullPointerException;",
+                    "dispatchRestoreInstanceState: container is null",
+                ))),
+            }
+        }
+        // super.onSaveInstanceState() from a DEX state subclass: AOSP View
+        // returns the shared EMPTY_STATE singleton (non-null — the subclass
+        // passes it as BaseSavedState superState, which must not be null).
+        (VIEW, "onSaveInstanceState") if sig == "()Landroid/os/Parcelable;" && is_view(vm) => {
+            Ok(Some(Value::Obj(crate::platform_base::empty_state(vm)?)))
+        }
+        // super.onRestoreInstanceState(state): the View default ignores
+        // EMPTY_STATE (and any default state) headless.
+        (VIEW, "onRestoreInstanceState") if sig == "(Landroid/os/Parcelable;)V" && is_view(vm) => {
+            Ok(Some(Value::Null))
+        }
         // ── ViewGroup/LinearLayout/FrameLayout ─────────────────────────────
         (
             FRAMELAYOUT | "Landroid/widget/HorizontalScrollView;" | "Landroid/widget/ScrollView;",
@@ -4937,8 +5038,8 @@ pub(crate) fn set_content_view(
     crate::window::on_content_set(vm, w, content)?;
     vm.fw.traversal_pending = true;
     // layout do root com as dimensões da window
-    vm.layout(content, 0, 0, WINDOW_W);
-    let _ = WINDOW_H;
+    let (vw, _) = vm.viewport_px();
+    vm.layout(content, 0, 0, vw);
     Ok(())
 }
 
@@ -5134,9 +5235,10 @@ pub(crate) fn host_add_view(
     }
     attach_child_at(vm, parent, child, index)?;
     if !prevent_request_layout {
+        let (vw, _) = vm.viewport_px();
         let (px, py, pw) = match vm.fw.get(parent) {
-            Some(HostObj::View { x, y, w, .. }) => (*x, *y, if *w == 0 { WINDOW_W } else { *w }),
-            _ => (0, 0, WINDOW_W),
+            Some(HostObj::View { x, y, w, .. }) => (*x, *y, if *w == 0 { vw } else { *w }),
+            _ => (0, 0, vw),
         };
         vm.layout(parent, px, py, pw);
     }

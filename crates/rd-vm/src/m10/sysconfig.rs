@@ -551,7 +551,7 @@ pub(super) fn instance_call(
             "acquire" => {
                 if let Some(wl) = vm.fw.vdev.wake_locks.get_mut(&recv) {
                     if wl.ref_counted {
-                        wl.count += 1;
+                        wl.count = wl.count.saturating_add(1);
                     } else {
                         wl.count = 1;
                     }
@@ -661,7 +661,21 @@ pub(super) fn instance_call(
                 }
                 Ok(Some(Value::Null))
             }
-            _ => Ok(None), // getPrimaryClip/hasPrimaryClip/clearPrimaryClip fall through to m9::ime
+            "clearPrimaryClip" => {
+                let had_clip = matches!(
+                    vm.heap.get_field(recv, "rd_primary_clip"),
+                    Ok(Value::Obj(c)) if c != 0
+                );
+                put_field(vm, recv, "rd_primary_clip", Value::Null)?;
+                if had_clip {
+                    let listeners = vm.fw.vdev.sysconfig.clipboard_listeners.clone();
+                    for l in listeners {
+                        let _ = call_dex(vm, l, "onPrimaryClipChanged", "()V", Vec::new())?;
+                    }
+                }
+                Ok(Some(Value::Null))
+            }
+            _ => Ok(None), // getPrimaryClip/hasPrimaryClip/getPrimaryClipDescription fall through to m9::ime
         },
         CLIP_DATA => match name {
             "<init>" => {
@@ -867,6 +881,7 @@ impl Engine {
             self.fw.vdev.sysconfig.width_px = max_d;
             self.fw.vdev.sysconfig.height_px = min_d;
         }
+        crate::window::resize_window_decors(self);
         self.with_host_roots(|vm| apply_sysconfig_to_vm(vm, true))
     }
 

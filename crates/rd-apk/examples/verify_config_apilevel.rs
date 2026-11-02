@@ -14,8 +14,10 @@ fn main() {
     let mut hist: BTreeMap<u16, usize> = BTreeMap::new();
     let mut total = 0usize;
     for pkg in &arsc.packages {
-        for entries in pkg.entries.values() {
-            for e in entries {
+        // ADR 014: snapshot materializado (diagnóstico) — mesmo resultado do
+        // eager, custo equivalente; caminho quente usa resolve_*/índice lazy.
+        for (_id, entries) in pkg.entries_snapshot() {
+            for e in &entries {
                 if let Some(api) = e.config.api_level {
                     *hist.entry(api).or_default() += 1;
                     total += 1;

@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/nadabgfccvd/RustyDroid/actions/workflows/ci.yml"><img src="https://github.com/nadabgfccvd/RustyDroid/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
   <img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue" alt="License: MIT OR Apache-2.0"/>
-  <img src="https://img.shields.io/badge/MSRV-1.76.0-orange" alt="MSRV 1.76.0"/>
+  <img src="https://img.shields.io/badge/MSRV-1.97.0-orange" alt="MSRV 1.97.0"/>
   <img src="https://img.shields.io/badge/API-26%20%E2%86%92%2036-brightgreen" alt="Android API 26→36"/>
   <img src="https://img.shields.io/badge/floor-Motorola%20Moto%20E5-informational" alt="Floor: Motorola Moto E5"/>
 </p>
@@ -40,8 +40,8 @@ for Android") built from day one for headless automation and AI agents:
   isolated Unicorn subprocess worker ([`docs/m9.md`](./docs/m9.md),
   [`docs/native-languages.md`](./docs/native-languages.md)) — guest native code
   never runs directly on the host CPU.
-- **Deterministic Software Rendering (`rd-render`):** Headless `tiny-skia`
-  rasterizer + reproducible PNG output + structured `uiautomator`-compatible UI
+- **Deterministic Software Rendering (`rd-render`):** Headless software
+  rasterizer (own, pre-rendered DejaVu Sans atlas, no shaping; `tiny-skia` is the spec target, see [ADR 019](docs/adr/019-renderer-tiny-skia-pendente.md)) + reproducible PNG output + structured `uiautomator`-compatible UI
   trees.
 - **AI-Agent Control Plane (`rd-agent`):** Zero-dependency JSON-RPC 2.0 MCP
   server (`rd mcp`) exposing **47 structured tools**, subscribable
@@ -58,7 +58,7 @@ for Android") built from day one for headless automation and AI agents:
 | **Error discipline (Law 1)** | Structured `RdError { code, cause, suggestion, module_id }` everywhere; unmodeled surfaces return `NOT_IMPLEMENTED` |
 | **Determinism (Law 4)** | Fuel budgets, virtual clock, deterministic GC, reproducible PNG frames |
 | **Memory safety** | `unsafe_code = "forbid"` across the workspace except audited boundaries in `rd-ndk` and `rd-jni` |
-| **Rust MSRV** | **1.76.0** (`cargo check --workspace --all-features --locked`) |
+| **Rust MSRV** | **1.97.0** (`cargo check --workspace --all-features --locked`) |
 | **License** | Dual-licensed [`LICENSE-MIT`](./LICENSE-MIT) OR [`LICENSE-APACHE`](./LICENSE-APACHE) |
 
 ## 3. Quickstart
@@ -102,13 +102,12 @@ cargo build --release -p rd-cli
 | `crates/rd-vm` | Dalvik VM, generational GC, Android/`androidx`/M8/M9/M10 host surfaces |
 | `crates/rd-jni` | Narrow JNI descriptors and optional Cranelift JIT compilation (`jit` feature) |
 | `crates/rd-ndk` | ELF32/64 loader + isolated Unicorn subprocess bridge (`native` feature) |
-| `crates/rd-render` | Headless `tiny-skia` software renderer & deterministic PNG encoder |
+| `crates/rd-render` | Headless software renderer (own rasterizer; `tiny-skia` is the spec target, see [ADR 019](docs/adr/019-renderer-tiny-skia-pendente.md)) & deterministic PNG encoder |
 | `crates/rd-engine-registry` | Appendix G 28-engine catalog, signature detector, and feature-gated contracts |
 | `crates/rd-agent` | 47-tool JSON-RPC 2.0 MCP server, `observe`, screen resources, `--live` viewer |
 | `crates/rd-cli` | `rd` command-line binary (`inspect`, `dex`, `vm`, `app`, `mcp`, `test`, `perf`, `device`, `engine`, `jetpack`, `gms`) |
 | `crates/rd-testsupport` | Deterministic synthetic APK, DEX, AXML, ARSC, and ELF builders for tests |
 | `xtask` | Official generator for `compat-matrix.md`, `api-coverage.md`, `engine-registry.md`, `jetpack.md`, and `gms.md` |
-| `tools/rd-sentinel` | Anti-regression gate auditing diff risk, invariants, fuzzing, and performance ([`docs/rd-sentinel.md`](./docs/rd-sentinel.md)) |
 
 ## 5. Generated Scoreboards & Documentation
 

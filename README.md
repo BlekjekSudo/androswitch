@@ -13,10 +13,12 @@ See [credits and provenance](CREDITS.md) and [NOTICE](NOTICE.md).
 
 ## Current status
 
-The latest RustyDroid source is merged at **`4489813`** with its history and
+The RustyDroid source checked on 2 November 2026 is merged at **`33e7645`** with its history and
 original tests. The [full source audit](docs/UPSTREAM_PORTING.md) tracks all
-427 upstream files, reviewed adaptations and original VM sources still excluded
+499 upstream files, reviewed adaptations and original VM sources still excluded
 from the device build. **Horizon behavior parity is not yet 1:1 with upstream.**
+See the [2 November integration record](docs/UPSTREAM_SYNC_20261102.md) for
+the latest merge decisions, new original tests and remaining gaps.
 The isolated `as-vm` package compiles the original RustyDroid source directly,
 so desktop Cargo features cannot switch the runner to desktop VM state.
 The device build now uses the real Rust standard library through a pinned
@@ -32,13 +34,13 @@ unrun. The user confirmed **219/219 on physical Switch for the prior std
 candidate**; its [receipt](reports/conformance-std-hardware-20261026.json) records
 the package context and missing raw device journal/hash. It does not qualify
 subsequent binaries, complete API parity or the independent-game first-screen gate.
-Latest upstream Arrays/BitSet code and lazy parser improvements now share the
+Upstream Arrays/BitSet code and lazy parser improvements share the
 portable path; source synchronization is kept separate from execution evidence.
 
 The complete framework dependency closure now has an experimental
 `as-vm/upstream-runtime` reference path using std, the inherited
 intrinsic dispatcher and GC, Engine-owned module tables, and native SQLite
-instead of a Python subprocess. All 50 original VM integration suites are
+instead of a Python subprocess. All 95 original VM integration suites are
 registered against that path. **It is not enabled in the shipping runner**:
 Horizon services and canonical framework/storage state still require integration.
 See the [complete port plan](docs/UPSTREAM_PARITY_PLAN.md) and
@@ -48,7 +50,7 @@ metadata is supplemental type information, not implementation coverage.
 The [shared collections/text port](docs/UPSTREAM_COLLECTIONS_TEXT.md) connects
 six inherited modules to the product's collection owner, shared heap and
 Engine-owned regex state. The duplicate product builder map was removed.
-Eighty-four original VM sources remain outside the default device profile;
+That historical checkpoint left 84 original VM sources outside the default device profile;
 this is a source inventory, not an API percentage.
 Its [checkpoint](reports/collections-text-20261026.json) records 706 reference
 tests, 995 product/desktop regressions and 135 JVM/DEX cases passing on host.

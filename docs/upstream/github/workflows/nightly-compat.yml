@@ -1,0 +1,121 @@
+name: Nightly compat
+
+# RustyDroid.md §3.2: "nightly-compat.yml | cron | roda golden APK suite →
+# publica compat-matrix.md + métricas".
+#
+# Scope decision: this run produces **evidence artifacts** (inspect JSON, JUnit
+# XML per suite, the regenerated compat-matrix) and a job summary. It does not
+# push or deploy anything — publishing to Pages is docs.yml's job, and a bot
+# that writes to the default branch would need a write token this workflow
+# deliberately does not have.
+#
+# Not included on purpose: `rd perf` on the fetched APK. The F-Droid client is
+# classified `below_floor_or_structured_result` in the Sentinel baseline, so a
+# perf gate on it would fail for the wrong reason. The M7 golden perf gate needs
+# a pinned, launchable APK (the primftpd fixture) — tracked as follow-up.
+
+on:
+  schedule:
+    - cron: "43 4 * * *" # 04:43 UTC, after the fuzz run
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-compat
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  compat:
+    name: golden APK suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable @ 2026-10-25
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Build rd
+        run: cargo build --release --locked -p rd-cli
+
+      - name: Fetch the golden APK suite
+        run: ./golden-apks/fetch.sh
+
+      - name: List what we actually have
+        run: |
+          set -euo pipefail
+          ls -l golden-apks/*.apk
+          ./target/release/rd --version || true
+
+      - name: Inspect every golden APK (structured evidence)
+        run: |
+          set -euo pipefail
+          mkdir -p reports/inspect
+          found=0
+          for apk in golden-apks/*.apk; do
+            [ -e "$apk" ] || continue
+            found=1
+            name="$(basename "$apk" .apk)"
+            ./target/release/rd inspect "$apk" --json > "reports/inspect/$name.json"
+            echo "inspected $name"
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::golden-apks/fetch.sh produced no APK; a missing corpus is not a pass"
+            exit 1
+          fi
+
+      - name: Run every committed suite (JUnit XML)
+        run: |
+          set -euo pipefail
+          mkdir -p reports/junit
+          for suite in tests/suites/*.json; do
+            name="$(basename "$suite" .json)"
+            ./target/release/rd test "$suite" --junit "reports/junit/$name.xml"
+          done
+
+      - name: Regenerate the official scoreboard
+        run: |
+          set -euo pipefail
+          cargo xtask compat-report reports/compat-matrix.md
+          if diff -u docs/compat-matrix.md reports/compat-matrix.md > reports/compat-matrix.diff; then
+            echo "scoreboard versionado == gerado"
+            rm -f reports/compat-matrix.diff
+          else
+            echo "::warning::the committed scoreboard drifted from the generated one; see reports/compat-matrix.diff"
+          fi
+
+      - name: Job summary
+        run: |
+          {
+            echo "## Nightly compat"
+            echo
+            echo "| artifact | files |"
+            echo "|---|---:|"
+            echo "| inspect JSON | $(find reports/inspect -type f | wc -l) |"
+            echo "| JUnit XML | $(find reports/junit -type f | wc -l) |"
+            echo
+            echo "<details><summary>scoreboard diff vs committed</summary>"
+            echo
+            echo '```'
+            if [ -f reports/compat-matrix.diff ]; then head -n 60 reports/compat-matrix.diff; else echo "no drift"; fi
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: nightly-compat-reports
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 14

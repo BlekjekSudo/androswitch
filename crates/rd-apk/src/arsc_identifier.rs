@@ -79,7 +79,7 @@ impl Arsc {
             .iter()
             .filter(|package| package.name == query.package)
         {
-            for &id in package.entries.keys() {
+            for id in package.resource_ids() {
                 let identity = package.resource_name(id).ok_or_else(|| {
                     RdError::invalid_format(format!("resource identity metadata for {id:#010x}"))
                 })?;

@@ -148,10 +148,10 @@ pub(super) fn call_static(
             || n < 0
             || (a as usize)
                 .checked_add(n as usize)
-                .map_or(true, |end| end > source_values.len())
+                .is_none_or(|end| end > source_values.len())
             || (b as usize)
                 .checked_add(n as usize)
-                .map_or(true, |end| end > target_values.len())
+                .is_none_or(|end| end > target_values.len())
         {
             return Err(exception(
                 "Ljava/lang/IndexOutOfBoundsException;",

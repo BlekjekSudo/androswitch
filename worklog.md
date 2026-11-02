@@ -30,7 +30,6 @@
 | `rd-engine-registry` | Apêndice G (engines) |
 | `rd-cli` | binário `rd` |
 | `xtask` | geradores de relatório (`cargo xtask …`) |
-| `tools/rd-sentinel` | bot anti-regressão (ADR 010) |
 
 As dependências só apontam para baixo (rd-apk → rd-dex → rd-vm → …). Não crie ciclos.
 
@@ -42,7 +41,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace            # ou -p <crate> durante o desenvolvimento
 ```
 
-- MSRV 1.76. Não use APIs mais novas.
+- MSRV 1.97 (era 1.76 até a subida feita para o #463). Não use APIs mais novas que 1.97.
 - Conventional Commits (`feat(vm): …`, `fix(agent): …`, `perf(rd-dex): …`).
 - Declare o uso de IA no PR e preencha o template.
 - O CI procura strings parecidas com tokens. **Nunca** faça commit de credenciais.
@@ -51,6 +50,8 @@ cargo test --workspace            # ou -p <crate> durante o desenvolvimento
   - `docs/compat-matrix.md`: `cargo xtask compat-report docs/compat-matrix.md`
   - `docs/mcp-tools.md`: `rd mcp --gen-docs docs/mcp-tools.md` (mudou tool ou descrição do MCP?)
 - O job Docs-integrity confere textos em `RustyDroid.md` (versão da especificação, piso minSdk, `moto-e5`). Não os quebre.
+
+- Gate `benches (rd-dex parse tables)` (push em main, limite 110%): o runner compartilhado varia até ~2x entre execuções do mesmo código (1,8k–3,6k ns em 2026-11-01). Antes de atribuir regressão a um PR, re-execute o job e compare com o histórico do gh-pages (`dev/bench/data.js`).
 
 ### RD Sentinel (o relatório fica no comentário `rd-sentinel-report` do PR)
 - **Não enfraqueça** `.github/rd-sentinel/policy.json` nem `baseline.json`.
@@ -61,7 +62,6 @@ cargo test --workspace            # ou -p <crate> durante o desenvolvimento
   - `unwrap`/`expect` novos em código de produção: troque por erro tipado.
   - "named test removed" / "public fn removed" num PR antigo: geralmente é a base desatualizada. Faça merge da `main` no branch.
   - Tamanho do binário: o gate por PR é +5% / +256 KiB. Mudança grande pede números de antes/depois.
-- A suíte do próprio Sentinel não roda no CI. Se mexer nele, rode `cd tools/rd-sentinel && python3 -m unittest discover -s tests`.
 
 ## 4. Regras de convivência
 
@@ -74,7 +74,21 @@ cargo test --workspace            # ou -p <crate> durante o desenvolvimento
 
 ## 5. Armadilhas conhecidas
 
+- Adaptador de engine novo (`*-execution`) tem de entrar em `execution_available` / `Registry::adapter` (contract.rs), no `engine check`/`engine run` da CLI e nos testes de contrato (`registry.rs`, `engine_cli.rs`). Os testes antigos usam `native_execution_available`, que só enxerga os adaptadores nativos e dá falso `NOT_IMPLEMENTED`. Depois de mudar `runtime_status` ou `notes` em `data/engines.toml`, regenere `cargo xtask engine-report` e `cargo xtask compat-report`.
+- `wasm-execution` e `native-execution` não entram no build padrão do `rd-cli`. Teste o caminho de execução com `--features wasm-engine` (ou `native-engines`). Os testes de CLI que dependem disso decidem o esperado pela própria `execution_available`.
+
 - `cargo build --release` com todas as features consome muita RAM. Em sandbox, use `CARGO_BUILD_JOBS=1` e o perfil `profiling`.
 - Não rode dois builds cargo ao mesmo tempo no mesmo target dir.
 - Patch em diff puro: use `git apply --index`. `git am` só aceita o formato mailbox.
 - Com PR empilhado, quando o PR de baixo é mergeado o GitHub não troca a base sozinho se o branch não foi apagado. Troque a base para `main` manualmente.
+- Dependabot copia só o diretório do manifesto e as dependências por `path`. Crates que herdam `edition`/`version` do workspace raiz (ex.: `rd-dex`, `rd-apk`, usados por `fuzz/`) falham com `dependency_file_not_resolvable`. Por isso `/crates/*/fuzz` não tem entrada no `dependabot.yml`; atualize `libfuzzer-sys` à mão.
+- Testes que chamam `gms::call_instance` / `m10::call_instance` direto pulam a ordem de despacho do bytecode (M10 → androidx → GMS) e não pegam bugs de precedência. Para simular o caminho de DEX, use `intrinsics::call_static_intrinsic` / `call_instance_intrinsic` com `vm.fw.vdev.virtual_hardware_enabled = true` (ver `tests/location_fused_229.rs`).
+- Gate de bench (`bench.yml`, `fail-on-alert: true`): compara cada push com a **última** amostra guardada no `gh-pages`, sem média. Uma única amostra rápida (ex.: 11,3 µs contra ~16,8 µs da série) faz `main` ficar vermelho. Antes de chamar de regressão, confira `dev/bench/data.js` no `gh-pages`. Rerun não resolve, porque a amostra ruim já está guardada. O próximo push com amostra normal resolve.
+- Adicionar uma ponte de host (`intrinsics`, `m8`, `androidx`, `gms`, `m10`) antes do `resolve_method` em `Engine::invoke_instance` exige o mesmo guarda de quadro de pilha (`enter_stack_frame(false)`) do fallback. Sem ele, ciclos de `toString`/`hashCode` em coleções estouram a pilha nativa (abort) em vez de lançar erro capturável (ver `arrays_303`).
+- Bump de dependência com `rust-version` acima do MSRV do workspace (ex.: cranelift 0.137 exige Rust 1.97 contra o MSRV 1.76) quebra o job `Rust MSRV` com `--all-features`. Leia o `rust-version` do crate antes de abrir o bump; se exceder o teto, é decisão de política, não de código.
+- Teste de limite de backtracking do regex: fancy-regex 0.20 memoiza padrões simples (`(?=a)(a+)+b` retorna `false` em vez de estourar o limite). Para testar o erro estruturado `REGEX_RUNTIME`, use um padrão que ainda estoure, como `(?=a)((a|aa)+)+\1c` com 40 `a`s.
+- Disco do sandbox: binários de teste com debuginfo ocupam vários GB e se acumulam entre execuções. Antes de `cargo test -p rd-vm`, limpe `target/debug/deps` e `target/debug/incremental`, e use `CARGO_PROFILE_DEV_DEBUG=0` com `CARGO_BUILD_JOBS=2`. Sem isso, o link falha com `ld terminated with signal 7`.
+- Limite de memória de um interpretador tem de somar a pilha de chamadas inteira, não só cada função. `rd-engine-wasm` permite 50 000 locais por função e 256 quadros; sem um orçamento global de locais, a recursão chega a ~200 MB, acima do alvo de RAM do moto-e5 (ADR 008/013). O teste `recursion_over_large_frames_hits_the_locals_budget` cobre o caso.
+- `apkfix::build_apk` grava os extras pelo nome literal. Para um asset que o `AssetManager` deve achar, o nome tem de começar com `assets/` (`assets/math/add.wasm`). Sem o prefixo, o erro é `MISSING_ENTRY` do `rd-apk`, e a bridge devolve `FileNotFoundException`. Um teste com `assets/` vazio parece verde, porque só checa a classe da exceção, não a mensagem. Confira a mensagem.
+- Gap de API do sistema: um método host que devolve valor inventado é pior que `NOT_FOUND`. `SdkExtensions.getExtensionVersion` responde `0` (extensão não fornecida) porque o dispositivo virtual não publica extensões. Apps seguem o caminho de fallback. Não devolva um número plausível para uma extensão que o runtime não modela.
+- `Context.getDrawable(I)` não tem atalho. O runtime não tem pipeline de Drawable (sem decodificação de PNG/XML e sem render). Devolver `null` ou um objeto vazio faz o app falhar longe da causa. Implementar exige decodificação e modelo de render; planeje como fase, não como gap pontual.

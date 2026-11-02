@@ -11,7 +11,7 @@ Date: 2026-10-26. Original scope: source-routing audit of the frozen RustyDroid 
 path. This is an initial family inventory, not an Android API coverage count or
 an execution claim.
 
-The latest upstream source was also inspected at
+The earlier upstream checkpoint was also inspected at
 [`4489813db513b42c531979b079397c50edd54e25`](https://github.com/nadabgfccvd/RustyDroid/commit/4489813db513b42c531979b079397c50edd54e25).
 It was initially fetched for comparison and is now merged; the original fork point remains in history. Neither that
 revision nor the frozen base implements EnumMap, EnumSet or sigaltstack. The

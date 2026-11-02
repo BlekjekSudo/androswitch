@@ -38,6 +38,10 @@ use crate::{Engine, Value};
 #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 use core::fmt::Write as _;
 
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+#[path = "gc_host_ephemerons.rs"]
+mod host_ephemerons;
+
 /// Class descriptor of a collected slot.
 pub const FREED_CLASS: &str = "Lrd/gc/Freed;";
 
@@ -222,18 +226,38 @@ impl Engine {
         for object in self.boxed_cache.values() {
             let _ = write!(s, "|{object}");
         }
-        // the parsed APK (zip, arsc, layouts) holds no heap refs: skip it
+        // the parsed APK (zip, arsc, layouts) holds no heap refs: skip it.
+        // Subsystem tables (`m8`, `m9`, `androidx`, `gms`) and `native` are
+        // traced precisely as strong roots + ephemerons rather than through
+        // `Debug` tokenization so scalar ints/IDs never false-pin heap slots.
         let objects = core::mem::take(&mut self.fw.objects);
         let resources = self.fw.resources.take();
-        let scan_framework = !framework_is_default(&self.fw);
-        if scan_framework {
+        let m8 = core::mem::take(&mut self.fw.m8);
+        #[cfg(feature = "advanced-components")]
+        let m9 = core::mem::take(&mut self.fw.m9);
+        let androidx = core::mem::take(&mut self.fw.androidx);
+        let gms = core::mem::take(&mut self.fw.gms);
+        if !framework_is_default(&self.fw) {
             let _ = write!(s, "{:?}", self.fw);
         }
         self.fw.objects = objects;
         self.fw.resources = resources;
+        self.fw.m8 = m8;
+        #[cfg(feature = "advanced-components")]
+        {
+            self.fw.m9 = m9;
+        }
+        self.fw.androidx = androidx;
+        self.fw.gms = gms;
+        // #304: `self.sparse` is deliberately NOT rendered here. Conservative
+        // Debug tokenization would turn every SparseArray key/value ObjRef into
+        // a strong root, so an unreachable SparseArray (and any scalar that
+        // happens to look like an ObjRef key) was pinned for the whole session.
+        // It is now traced precisely as an engine-level ephemeron map instead
+        // (see `ephem_keys` / `trace_ephemeron_owner` / `purge_dead` below).
         let _ = write!(
             s,
-            "|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+            "|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
             self.statics,
             self.threads,
             self.pending_permission_results,
@@ -243,7 +267,6 @@ impl Engine {
             self.attached_views,
             self.window_attached,
             self.window_token,
-            self.sparse,
         );
         let _ = write!(
             s,
@@ -259,10 +282,6 @@ impl Engine {
             self.intent_meta,
             self.content,
         );
-        #[cfg(feature = "native")]
-        {
-            let _ = write!(s, "|{:?}", self.native);
-        }
     }
 
     /// Full collection. Interpreter frames must have published roots; external
@@ -338,6 +357,15 @@ impl Engine {
             self.write_gc_roots(&mut scanner);
             scanner.finish()
         };
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+        host_ephemerons::collect_strong_roots(&self.fw, &mut cand);
+        #[cfg(feature = "native")]
+        if let Some(native) = &self.native {
+            native.collect_gc_roots(&mut cand);
+        }
+        for r in cand.drain(..) {
+            m.push(r);
+        }
         // Root phase now includes tokenization, rather than only formatting.
         #[cfg(feature = "desktop-runtime")]
         let t_roots = t0.elapsed();
@@ -355,6 +383,18 @@ impl Engine {
         crate::jstring_tokenizer::gc_keys(self, &mut module_keys);
         #[cfg(not(any(feature = "std", feature = "upstream-runtime")))]
         let module_keys: Vec<ObjRef> = Vec::new();
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+        let mut ephem_keys: Vec<ObjRef> = Vec::new();
+        #[cfg(not(any(feature = "desktop-runtime", feature = "upstream-runtime")))]
+        let ephem_keys: Vec<ObjRef> = Vec::new();
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+        host_ephemerons::collect_ephemeron_keys(&self.fw, &mut ephem_keys);
+        // #304: `Engine.sparse` (android.util.SparseArray) is an engine-level
+        // ephemeron map: it lives outside `fw`, so `collect_ephemeron_keys`
+        // cannot see it. Without this an unreachable SparseArray stays pinned
+        // forever by has_side bit 4 (and a minor GC never re-scans it).
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+        ephem_keys.extend(self.sparse.keys().copied());
         let mut has_side = vec![0u8; n + 1];
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         for &k in self.fw.objects.keys().chain(self.gfx.objs.keys()) {
@@ -374,6 +414,11 @@ impl Engine {
                 *b |= 2;
             }
         }
+        for k in ephem_keys {
+            if let Some(b) = has_side.get_mut(k as usize) {
+                *b |= 4;
+            }
+        }
         if minor {
             // Old side-state writes can introduce young refs without touching
             // Heap::get_mut. Scan these owners each minor; no missing barrier.
@@ -381,6 +426,20 @@ impl Engine {
             for r in 1..=n as ObjRef {
                 if !self.heap.is_young(r) && (has_side[r as usize] != 0 || platform_side_state) {
                     m.stack.push(r);
+                }
+            }
+        }
+        #[cfg(feature = "virtual-devices")]
+        {
+            let mut vdev_keys = Vec::new();
+            self.fw.vdev.gc_keys(&mut vdev_keys);
+            for k in vdev_keys {
+                if let Some(b) = has_side.get_mut(k as usize) {
+                    let was_zero = *b == 0;
+                    *b |= 8;
+                    if minor && was_zero && !self.heap.is_young(k) {
+                        m.stack.push(k);
+                    }
                 }
             }
         }
@@ -495,6 +554,10 @@ impl Engine {
                 None => {}
             }
             // module side tables keyed by object (Matcher, Spannable, Reader…)
+            #[cfg(feature = "virtual-devices")]
+            if side & 8 != 0 {
+                self.fw.vdev.gc_trace_entry(r, &mut cand);
+            }
             #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
             if side & 2 != 0 {
                 let mut scanner = RefScanner::new(n, |x| cand.push(x));
@@ -507,6 +570,19 @@ impl Engine {
                 let mut scanner = RefScanner::new(n, |x| cand.push(x));
                 let _ = write!(scanner, "{g:?}");
                 scanner.finish();
+            }
+            #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+            if side & 4 != 0 {
+                host_ephemerons::trace_ephemeron_owner(&self.fw, r, &mut cand);
+                // #304: values of an engine-level SparseArray are ephemeron
+                // referents: reachable only while the array itself is alive.
+                if let Some(map) = self.sparse.get(&r) {
+                    for v in map.values() {
+                        if let Value::Obj(x) = v {
+                            cand.push(*x);
+                        }
+                    }
+                }
             }
             for x in cand.drain(..) {
                 m.push(x);
@@ -599,6 +675,15 @@ impl Engine {
         self.bignums.retain(|r, _| alive(r));
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         self.break_iters.retain(|r, _| alive(r));
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+        host_ephemerons::purge_dead(&mut self.fw, &alive);
+        // #304: same for the engine-level SparseArray owners.
+        #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
+        self.sparse.retain(|r, _| alive(r));
+        #[cfg(feature = "native")]
+        if let Some(native) = &mut self.native {
+            cleared_weak += native.purge_dead_weak(&alive);
+        }
         let alive_ref = |r: ObjRef| alive(&r);
         #[cfg(any(feature = "std", feature = "upstream-runtime"))]
         crate::jregex::gc_purge(self, &alive_ref);
@@ -618,6 +703,8 @@ impl Engine {
         crate::android_uri::gc_purge(self, &alive_ref);
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         crate::jannotations::gc_purge(self, &alive_ref);
+        #[cfg(feature = "virtual-devices")]
+        self.fw.vdev.gc_purge(&alive);
         #[cfg(feature = "desktop-runtime")]
         if crate::port_env::var("RD_GC_TRACE").is_ok() {
             eprintln!(

@@ -21,7 +21,7 @@ pub fn crc32(data: &[u8]) -> u32 {
 }
 
 pub fn pad4(out: &mut Vec<u8>) {
-    while out.len() % 4 != 0 {
+    while !out.len().is_multiple_of(4) {
         out.push(0);
     }
 }
@@ -673,11 +673,22 @@ pub struct ArscEntry {
 pub struct ArscFix {
     values: Vec<String>,
     types: Vec<(&'static str, Vec<ArscEntry>)>,
+    /// Nome do pacote no cabeçalho do `resources.arsc` (`None` = `com.test`).
+    package: Option<String>,
 }
 
 impl ArscFix {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    /// Mesmo fixture, com o nome de pacote do cabeçalho do ARSC. Usado quando o
+    /// `resource_id` observado (`pkg:id/nome`) precisa bater com o manifest.
+    pub fn with_package(name: &str) -> Self {
+        ArscFix {
+            package: Some(name.to_string()),
+            ..Default::default()
+        }
     }
 
     fn slot(&mut self, t: &'static str) -> &mut Vec<ArscEntry> {
@@ -702,6 +713,21 @@ impl ArscFix {
         self.slot("layout").push(ArscEntry {
             name: name.to_string(),
             val: ArscVal::Int(0),
+            lang: None,
+        });
+        self.resid_of("layout", name)
+    }
+
+    /// Layout cuja entrada ARSC aponta para o arquivo `res/layout/<name>.xml`
+    /// (como o aapt emite), necessária para `Resources.getXml(id)`.
+    pub fn add_layout_file(&mut self, name: &str) -> u32 {
+        let path = format!("res/layout/{name}.xml");
+        if !self.values.contains(&path) {
+            self.values.push(path.clone());
+        }
+        self.slot("layout").push(ArscEntry {
+            name: name.to_string(),
+            val: ArscVal::Str(path),
             lang: None,
         });
         self.resid_of("layout", name)
@@ -878,7 +904,7 @@ impl ArscFix {
         pkg[2..4].copy_from_slice(&288u16.to_le_bytes());
         // size patcheado no fim
         pkg[8..12].copy_from_slice(&0x7Fu32.to_le_bytes()); // package id
-        let name = "com.test";
+        let name = self.package.as_deref().unwrap_or("com.test");
         for (i, u) in name.encode_utf16().chain(std::iter::once(0)).enumerate() {
             pkg[12 + i * 2..14 + i * 2].copy_from_slice(&u.to_le_bytes());
         }

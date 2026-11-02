@@ -49,19 +49,25 @@ const GREGORIAN_CALENDAR: &str = "Ljava/util/GregorianCalendar;";
 const SIMPLE_DATE_FORMAT: &str = "Ljava/text/SimpleDateFormat;";
 const DATE_FORMAT_SYMBOLS: &str = "Ljava/text/DateFormatSymbols;";
 const DAY_MS: i64 = 86_400_000;
+const MIN_YEAR: i64 = -999_999_999;
+const MAX_YEAR: i64 = 999_999_999;
+const MIN_EPOCH_DAY: i64 = -365_243_219_162; // -999999999-01-01
+const MAX_EPOCH_DAY: i64 = 365_241_780_471; // +999999999-12-31
 
 fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
+    let (y, m, d) = (i128::from(y), i128::from(m), i128::from(d));
     let y = if m <= 2 { y - 1 } else { y };
     let era = if y >= 0 { y } else { y - 399 } / 400;
     let yoe = y - era * 400;
     let mp = (m + 9) % 12;
     let doy = (153 * mp + 2) / 5 + d - 1;
     let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe - 719_468
+    let days = era * 146_097 + doe - 719_468;
+    days.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64
 }
 
 fn civil_from_days(z: i64) -> (i64, i64, i64) {
-    let z = z + 719_468;
+    let z = i128::from(z) + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
     let doe = z - era * 146_097;
     let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
@@ -69,7 +75,12 @@ fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let mp = (5 * doy + 2) / 153;
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    (yoe + era * 400 + i64::from(m <= 2), m, d)
+    let y = yoe + era * 400 + i128::from(m <= 2);
+    (
+        y.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64,
+        m as i64,
+        d as i64,
+    )
 }
 
 fn month_len(y: i64, m: i64) -> i64 {
@@ -113,18 +124,117 @@ fn class_of(vm: &Engine, v: &Value) -> Option<(ObjRef, String)> {
     }
 }
 
-/// Epoch milliseconds of any supported temporal (dates at start of day).
-fn temporal_ms(vm: &Engine, v: &Value) -> Option<i64> {
-    let (r, c) = class_of(vm, v)?;
+fn null_pointer_exception(message: &str) -> VmExit {
+    VmExit::Exception(crate::err::Throwable::new(
+        "Ljava/lang/NullPointerException;",
+        message.to_string(),
+    ))
+}
+
+fn arithmetic_exception(message: &str) -> VmExit {
+    VmExit::Exception(crate::err::Throwable::new(
+        "Ljava/lang/ArithmeticException;",
+        message.to_string(),
+    ))
+}
+
+fn class_cast_exception(message: String) -> VmExit {
+    VmExit::Exception(crate::err::Throwable::new(
+        "Ljava/lang/ClassCastException;",
+        message,
+    ))
+}
+
+/// Epoch milliseconds of any supported temporal (dates at start of day),
+/// checked against `i64` overflow so extreme `LocalDate` / `YearMonth` values
+/// raise `ArithmeticException` instead of panicking or wrapping sign.
+fn temporal_ms(vm: &Engine, v: &Value) -> Result<Option<i64>, VmExit> {
+    let Some((r, c)) = class_of(vm, v) else {
+        return Ok(None);
+    };
+    if vm.cp.is_subtype(&c, DATE) {
+        return Ok(Some(long_field(vm, r, "rd_ms")));
+    }
     match c.as_str() {
-        LD => Some(long_field(vm, r, "rd_day") * DAY_MS),
-        DATE | LDT | INST | ZDT | DUR => Some(long_field(vm, r, "rd_ms")),
+        LD => long_field(vm, r, "rd_day")
+            .checked_mul(DAY_MS)
+            .map(Some)
+            .ok_or_else(|| arithmetic_exception("long overflow")),
+        LDT | INST | ZDT | DUR => Ok(Some(long_field(vm, r, "rd_ms"))),
         YM => {
             let ym = long_field(vm, r, "rd_ym");
-            Some(days_from_civil(ym.div_euclid(12), ym.rem_euclid(12) + 1, 1) * DAY_MS)
+            days_from_civil(ym.div_euclid(12), ym.rem_euclid(12) + 1, 1)
+                .checked_mul(DAY_MS)
+                .map(Some)
+                .ok_or_else(|| arithmetic_exception("long overflow"))
         }
-        _ => None,
+        _ => Ok(None),
     }
+}
+
+fn validate_year(year: i64) -> Result<i64, VmExit> {
+    if !(MIN_YEAR..=MAX_YEAR).contains(&year) {
+        return Err(date_time_exception(format!(
+            "Invalid value for Year (valid values {MIN_YEAR} - {MAX_YEAR}): {year}"
+        )));
+    }
+    Ok(year)
+}
+
+fn validate_month(month: i64) -> Result<i64, VmExit> {
+    if !(1..=12).contains(&month) {
+        return Err(date_time_exception(format!(
+            "Invalid value for MonthOfYear (valid values 1 - 12): {month}"
+        )));
+    }
+    Ok(month)
+}
+
+fn validate_epoch_day(day: i64) -> Result<i64, VmExit> {
+    if !(MIN_EPOCH_DAY..=MAX_EPOCH_DAY).contains(&day) {
+        return Err(date_time_exception(format!(
+            "Invalid value for EpochDay (valid values {MIN_EPOCH_DAY} - {MAX_EPOCH_DAY}): {day}"
+        )));
+    }
+    Ok(day)
+}
+
+fn validate_ymd(year: i64, month: i64, day: i64) -> Result<i64, VmExit> {
+    validate_year(year)?;
+    validate_month(month)?;
+    if !(1..=31).contains(&day) {
+        return Err(date_time_exception(format!(
+            "Invalid value for DayOfMonth (valid values 1 - 28/31): {day}"
+        )));
+    }
+    let max_day = month_len(year, month);
+    if day > max_day {
+        if day == 29 && month == 2 {
+            return Err(date_time_exception(format!(
+                "Invalid date 'February 29' as '{year}' is not a leap year"
+            )));
+        }
+        return Err(date_time_exception(format!(
+            "Invalid date '{} {day}'",
+            MONTH_NAMES[(month - 1) as usize]
+        )));
+    }
+    Ok(days_from_civil(year, month, day))
+}
+
+fn checked_sub_i64(a: i64, b: i64) -> Result<i64, VmExit> {
+    a.checked_sub(b)
+        .ok_or_else(|| arithmetic_exception("long overflow"))
+}
+
+fn checked_add_i64(a: i64, b: i64) -> Result<i64, VmExit> {
+    a.checked_add(b)
+        .ok_or_else(|| arithmetic_exception("long overflow"))
+}
+
+fn checked_mul_i64(a: i64, b: i64) -> Result<i64, VmExit> {
+    a.checked_mul(b)
+        .ok_or_else(|| arithmetic_exception("long overflow"))
 }
 
 fn ld(vm: &mut Engine, day: i64) -> Result<Value, VmExit> {
@@ -310,11 +420,12 @@ fn compose_calendar_ms(
     second: i64,
     milli: i64,
 ) -> i64 {
-    days_from_civil(year, month, day) * DAY_MS
-        + hour * 3_600_000
-        + minute * 60_000
-        + second * 1000
-        + milli
+    let total = i128::from(days_from_civil(year, month, day)) * i128::from(DAY_MS)
+        + i128::from(hour) * 3_600_000
+        + i128::from(minute) * 60_000
+        + i128::from(second) * 1000
+        + i128::from(milli);
+    total.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64
 }
 
 fn calendar_set_field(ms: i64, field: i32, value: i32) -> Option<i64> {
@@ -328,6 +439,7 @@ fn calendar_set_field(ms: i64, field: i32, value: i32) -> Option<i64> {
         remainder / 1000 % 60,
         remainder % 1000,
     );
+    let clamp_ms = |v: i128| -> i64 { v.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64 };
     Some(match field {
         CAL_ERA => ms,
         CAL_YEAR => compose_calendar_ms(
@@ -340,48 +452,107 @@ fn calendar_set_field(ms: i64, field: i32, value: i32) -> Option<i64> {
             milli,
         ),
         CAL_MONTH => {
-            let month_index = year * 12 + value;
-            let y = month_index.div_euclid(12);
-            let m = month_index.rem_euclid(12) + 1;
+            let month_index = i128::from(year) * 12 + i128::from(value);
+            let y = month_index
+                .div_euclid(12)
+                .clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64;
+            let m = month_index.rem_euclid(12) as i64 + 1;
             compose_calendar_ms(y, m, day.min(month_len(y, m)), hour, minute, second, milli)
         }
-        CAL_WEEK_OF_YEAR => {
-            days_from_civil(year, 1, 1) * DAY_MS + (value - 1) * 7 * DAY_MS + remainder
-        }
-        CAL_WEEK_OF_MONTH => {
-            days_from_civil(year, month, 1) * DAY_MS + (value - 1) * 7 * DAY_MS + remainder
-        }
-        CAL_DAY_OF_YEAR => days_from_civil(year, 1, 1) * DAY_MS + (value - 1) * DAY_MS + remainder,
-        CAL_DAY_OF_MONTH => {
-            days_from_civil(year, month, 1) * DAY_MS + (value - 1) * DAY_MS + remainder
-        }
-        CAL_DAY_OF_WEEK | CAL_DAY_OF_WEEK_IN_MONTH => {
+        CAL_WEEK_OF_YEAR => clamp_ms(
+            i128::from(days_from_civil(year, 1, 1)) * i128::from(DAY_MS)
+                + i128::from(value - 1) * 7 * i128::from(DAY_MS)
+                + i128::from(remainder),
+        ),
+        CAL_WEEK_OF_MONTH => clamp_ms(
+            i128::from(days_from_civil(year, month, 1)) * i128::from(DAY_MS)
+                + i128::from(value - 1) * 7 * i128::from(DAY_MS)
+                + i128::from(remainder),
+        ),
+        CAL_DAY_OF_YEAR => clamp_ms(
+            i128::from(days_from_civil(year, 1, 1)) * i128::from(DAY_MS)
+                + i128::from(value - 1) * i128::from(DAY_MS)
+                + i128::from(remainder),
+        ),
+        CAL_DAY_OF_MONTH => clamp_ms(
+            i128::from(days_from_civil(year, month, 1)) * i128::from(DAY_MS)
+                + i128::from(value - 1) * i128::from(DAY_MS)
+                + i128::from(remainder),
+        ),
+        CAL_DAY_OF_WEEK => {
             let current_dow = dow_monday.rem_euclid(7) + 1;
-            day_epoch * DAY_MS + (value - current_dow) * DAY_MS + remainder
+            clamp_ms(
+                i128::from(day_epoch) * i128::from(DAY_MS)
+                    + i128::from(value - current_dow) * i128::from(DAY_MS)
+                    + i128::from(remainder),
+            )
+        }
+        CAL_DAY_OF_WEEK_IN_MONTH => {
+            // GregorianCalendar: select the `value`-th occurrence of the current
+            // DAY_OF_WEEK within `(year, month)` (`value < 0` counts backward
+            // from the end of the month, e.g. `-1` = last occurrence).
+            let current_dow = dow_monday.rem_euclid(7) + 1; // 1=Sun..7=Sat
+            let first_epoch = days_from_civil(year, month, 1);
+            let target_epoch = if value >= 0 {
+                let first_dow_mon = (first_epoch + 3).rem_euclid(7) + 1;
+                let first_dow = first_dow_mon.rem_euclid(7) + 1;
+                let first_dom = 1 + (current_dow - first_dow).rem_euclid(7);
+                i128::from(first_epoch) + i128::from(first_dom - 1) + i128::from(value - 1) * 7
+            } else {
+                let len = month_len(year, month);
+                let last_epoch = first_epoch + len - 1;
+                let last_dow_mon = (last_epoch + 3).rem_euclid(7) + 1;
+                let last_dow = last_dow_mon.rem_euclid(7) + 1;
+                let last_dom = len - (last_dow - current_dow).rem_euclid(7);
+                i128::from(first_epoch) + i128::from(last_dom - 1) + i128::from(value + 1) * 7
+            };
+            clamp_ms(target_epoch * i128::from(DAY_MS) + i128::from(remainder))
         }
         CAL_AM_PM => {
-            let new_hour = value * 12 + hour.rem_euclid(12);
-            day_epoch * DAY_MS + new_hour * 3_600_000 + minute * 60_000 + second * 1000 + milli
+            let new_hour = i128::from(value) * 12 + i128::from(hour.rem_euclid(12));
+            clamp_ms(
+                i128::from(day_epoch) * i128::from(DAY_MS)
+                    + new_hour * 3_600_000
+                    + i128::from(minute) * 60_000
+                    + i128::from(second) * 1000
+                    + i128::from(milli),
+            )
         }
-        CAL_HOUR => {
-            day_epoch * DAY_MS
-                + (hour - hour.rem_euclid(12) + value) * 3_600_000
-                + minute * 60_000
-                + second * 1000
-                + milli
-        }
-        CAL_HOUR_OF_DAY => {
-            day_epoch * DAY_MS + value * 3_600_000 + minute * 60_000 + second * 1000 + milli
-        }
-        CAL_MINUTE => {
-            day_epoch * DAY_MS + hour * 3_600_000 + value * 60_000 + second * 1000 + milli
-        }
-        CAL_SECOND => {
-            day_epoch * DAY_MS + hour * 3_600_000 + minute * 60_000 + value * 1000 + milli
-        }
-        CAL_MILLISECOND => {
-            day_epoch * DAY_MS + hour * 3_600_000 + minute * 60_000 + second * 1000 + value
-        }
+        CAL_HOUR => clamp_ms(
+            i128::from(day_epoch) * i128::from(DAY_MS)
+                + (i128::from(hour - hour.rem_euclid(12)) + i128::from(value)) * 3_600_000
+                + i128::from(minute) * 60_000
+                + i128::from(second) * 1000
+                + i128::from(milli),
+        ),
+        CAL_HOUR_OF_DAY => clamp_ms(
+            i128::from(day_epoch) * i128::from(DAY_MS)
+                + i128::from(value) * 3_600_000
+                + i128::from(minute) * 60_000
+                + i128::from(second) * 1000
+                + i128::from(milli),
+        ),
+        CAL_MINUTE => clamp_ms(
+            i128::from(day_epoch) * i128::from(DAY_MS)
+                + i128::from(hour) * 3_600_000
+                + i128::from(value) * 60_000
+                + i128::from(second) * 1000
+                + i128::from(milli),
+        ),
+        CAL_SECOND => clamp_ms(
+            i128::from(day_epoch) * i128::from(DAY_MS)
+                + i128::from(hour) * 3_600_000
+                + i128::from(minute) * 60_000
+                + i128::from(value) * 1000
+                + i128::from(milli),
+        ),
+        CAL_MILLISECOND => clamp_ms(
+            i128::from(day_epoch) * i128::from(DAY_MS)
+                + i128::from(hour) * 3_600_000
+                + i128::from(minute) * 60_000
+                + i128::from(second) * 1000
+                + i128::from(value),
+        ),
         _ => return None,
     })
 }
@@ -392,19 +563,25 @@ fn calendar_roll_field(ms: i64, field: i32, amount: i32) -> Option<i64> {
     Some(match field {
         CAL_MILLISECOND => {
             let next = (milli + amount).rem_euclid(1000);
-            ms + next - milli
+            ms.saturating_add(next - milli)
         }
         CAL_SECOND => {
             let next = (second + amount).rem_euclid(60);
-            ms + (next - second) * 1000
+            ms.saturating_add((next - second) * 1000)
         }
         CAL_MINUTE => {
             let next = (minute + amount).rem_euclid(60);
-            ms + (next - minute) * 60_000
+            ms.saturating_add((next - minute) * 60_000)
         }
-        CAL_HOUR | CAL_HOUR_OF_DAY => {
+        CAL_HOUR => {
+            // 12-hour clock roll: wrap within 0..11 while preserving AM/PM.
+            let am_pm_base = (hour / 12) * 12;
+            let next = am_pm_base + (hour.rem_euclid(12) + amount).rem_euclid(12);
+            ms.saturating_add((next - hour) * 3_600_000)
+        }
+        CAL_HOUR_OF_DAY => {
             let next = (hour + amount).rem_euclid(24);
-            ms + (next - hour) * 3_600_000
+            ms.saturating_add((next - hour) * 3_600_000)
         }
         CAL_DAY_OF_MONTH => {
             let len = month_len(year, month);
@@ -412,11 +589,13 @@ fn calendar_roll_field(ms: i64, field: i32, amount: i32) -> Option<i64> {
             compose_calendar_ms(year, month, next, hour, minute, second, milli)
         }
         CAL_DAY_OF_YEAR => {
-            let len = days_from_civil(year + 1, 1, 1) - days_from_civil(year, 1, 1);
+            let len = days_from_civil(year.saturating_add(1), 1, 1) - days_from_civil(year, 1, 1);
+            let len = len.max(1);
             let doy = days_from_civil(year, month, day) - days_from_civil(year, 1, 1);
-            days_from_civil(year, 1, 1) * DAY_MS
-                + (doy + amount).rem_euclid(len) * DAY_MS
-                + ms.rem_euclid(DAY_MS)
+            let total = i128::from(days_from_civil(year, 1, 1)) * i128::from(DAY_MS)
+                + i128::from((doy + amount).rem_euclid(len)) * i128::from(DAY_MS)
+                + i128::from(ms.rem_euclid(DAY_MS));
+            total.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64
         }
         CAL_MONTH => {
             let next_month = (month - 1 + amount).rem_euclid(12) + 1;
@@ -431,7 +610,7 @@ fn calendar_roll_field(ms: i64, field: i32, amount: i32) -> Option<i64> {
             )
         }
         CAL_YEAR => {
-            let next_year = year + amount;
+            let next_year = year.saturating_add(amount);
             compose_calendar_ms(
                 next_year,
                 month,
@@ -444,7 +623,8 @@ fn calendar_roll_field(ms: i64, field: i32, amount: i32) -> Option<i64> {
         }
         CAL_DAY_OF_WEEK | CAL_DAY_OF_WEEK_IN_MONTH => {
             let _ = dow_monday;
-            ms + amount * DAY_MS
+            let total = i128::from(ms) + i128::from(amount) * i128::from(DAY_MS);
+            total.clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64
         }
         _ => return None,
     })
@@ -453,24 +633,29 @@ fn calendar_roll_field(ms: i64, field: i32, amount: i32) -> Option<i64> {
 fn calendar_add_field(ms: i64, field: i32, amount: i32) -> Option<i64> {
     let amount = i64::from(amount);
     let (year, month, day, hour, minute, second, milli, _) = fields(ms);
+    let add_ms = |delta: i128| -> i64 {
+        (i128::from(ms) + delta).clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64
+    };
     Some(match field {
-        CAL_MILLISECOND => ms + amount,
-        CAL_SECOND => ms + amount * 1000,
-        CAL_MINUTE => ms + amount * 60_000,
-        CAL_HOUR | CAL_HOUR_OF_DAY => ms + amount * 3_600_000,
-        CAL_AM_PM => ms + amount * 12 * 3_600_000,
-        CAL_WEEK_OF_MONTH | CAL_WEEK_OF_YEAR => ms + amount * 7 * DAY_MS,
+        CAL_MILLISECOND => add_ms(i128::from(amount)),
+        CAL_SECOND => add_ms(i128::from(amount) * 1000),
+        CAL_MINUTE => add_ms(i128::from(amount) * 60_000),
+        CAL_HOUR | CAL_HOUR_OF_DAY => add_ms(i128::from(amount) * 3_600_000),
+        CAL_AM_PM => add_ms(i128::from(amount) * 12 * 3_600_000),
+        CAL_WEEK_OF_MONTH | CAL_WEEK_OF_YEAR => add_ms(i128::from(amount) * 7 * i128::from(DAY_MS)),
         CAL_DAY_OF_WEEK | CAL_DAY_OF_WEEK_IN_MONTH | CAL_DAY_OF_MONTH | CAL_DAY_OF_YEAR => {
-            ms + amount * DAY_MS
+            add_ms(i128::from(amount) * i128::from(DAY_MS))
         }
         CAL_MONTH => {
-            let month_index = year * 12 + month - 1 + amount;
-            let y = month_index.div_euclid(12);
-            let m = month_index.rem_euclid(12) + 1;
+            let month_index = i128::from(year) * 12 + i128::from(month - 1) + i128::from(amount);
+            let y = month_index
+                .div_euclid(12)
+                .clamp(i128::from(i64::MIN), i128::from(i64::MAX)) as i64;
+            let m = month_index.rem_euclid(12) as i64 + 1;
             compose_calendar_ms(y, m, day.min(month_len(y, m)), hour, minute, second, milli)
         }
         CAL_YEAR => {
-            let y = year + amount;
+            let y = year.saturating_add(amount);
             compose_calendar_ms(
                 y,
                 month,
@@ -704,13 +889,20 @@ fn calendar_instance(
         }
         ("getTime", "()Ljava/util/Date;") => ms_obj(vm, DATE, calendar_ms(vm, recv))?,
         ("setTime", "(Ljava/util/Date;)V") => {
-            let Some(ms) = args.first().and_then(|v| temporal_ms(vm, v)) else {
+            let Some(Value::Obj(date_ref)) = args.first() else {
+                return Err(null_pointer_exception("Calendar.setTime(date == null)"));
+            };
+            if !vm
+                .cp
+                .is_subtype(vm.heap.class_of(*date_ref).unwrap_or(""), DATE)
+            {
                 return Err(crate::err::Throwable::new(
                     "Ljava/lang/IllegalArgumentException;",
                     "Calendar.setTime requires a Date",
                 )
                 .into());
-            };
+            }
+            let ms = long_field(vm, *date_ref, "rd_ms");
             set_field(vm, recv, "rd$calendar_ms", Value::Long(ms))?;
             Value::Null
         }
@@ -860,8 +1052,19 @@ const EN_MON_FULL: [&str; 12] = [
 const PT_DOW: [&str; 7] = ["seg.", "ter.", "qua.", "qui.", "sex.", "sáb.", "dom."];
 const EN_DOW: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-pub(crate) fn format_pattern(pat: &str, lang: &str, ms: i64) -> String {
-    let (y, mo, d, h, mi, s, milli, dow) = fields(ms);
+#[allow(clippy::too_many_arguments)]
+fn format_pattern_parts(
+    pat: &str,
+    lang: &str,
+    y: i64,
+    mo: i64,
+    d: i64,
+    h: i64,
+    mi: i64,
+    s: i64,
+    milli: i64,
+    dow: i64,
+) -> String {
     let pt = lang == "pt";
     let chars: Vec<char> = pat.chars().collect();
     let mut out = String::new();
@@ -900,8 +1103,9 @@ pub(crate) fn format_pattern(pat: &str, lang: &str, ms: i64) -> String {
             n += 1;
         }
         let num = |v: i64, w: usize| format!("{:0w$}", v, w = w);
-        let mi0 = (mo - 1) as usize;
+        let mi0 = (mo - 1).clamp(0, 11) as usize;
         match c {
+            'G' => out.push_str(if y >= 1 { "AD" } else { "BC" }),
             'y' | 'u' => out.push_str(&if n == 2 {
                 num(y.rem_euclid(100), 2)
             } else {
@@ -922,13 +1126,26 @@ pub(crate) fn format_pattern(pat: &str, lang: &str, ms: i64) -> String {
             'h' => out.push_str(&num(if h % 12 == 0 { 12 } else { h % 12 }, n)),
             'm' => out.push_str(&num(mi, n)),
             's' => out.push_str(&num(s, n)),
-            'S' => out.push_str(&format!("{:03}", milli)[..n.min(3)]),
+            'S' => {
+                let ms3 = format!("{:03}", milli.clamp(0, 999));
+                out.push_str(&ms3[..n.min(3)]);
+                for _ in 3..n {
+                    out.push('0');
+                }
+            }
             'a' => out.push_str(if h < 12 { "AM" } else { "PM" }),
             'E' => out.push_str(if pt {
-                PT_DOW[(dow - 1) as usize]
+                PT_DOW[(dow - 1).clamp(0, 6) as usize]
             } else {
-                EN_DOW[(dow - 1) as usize]
+                EN_DOW[(dow - 1).clamp(0, 6) as usize]
             }),
+            'z' => out.push_str("UTC"),
+            'Z' => out.push_str(match n {
+                4 => "GMT+00:00",
+                5 => "+00:00",
+                _ => "+0000",
+            }),
+            'X' => out.push('Z'),
             _ => {
                 for _ in 0..n {
                     out.push(c)
@@ -938,6 +1155,80 @@ pub(crate) fn format_pattern(pat: &str, lang: &str, ms: i64) -> String {
         i += n;
     }
     out
+}
+
+pub(crate) fn format_pattern(pat: &str, lang: &str, ms: i64) -> String {
+    let (y, mo, d, h, mi, s, milli, dow) = fields(ms);
+    format_pattern_parts(pat, lang, y, mo, d, h, mi, s, milli, dow)
+}
+
+fn extract_date_or_number_ms(
+    vm: &mut Engine,
+    arg: Option<&Value>,
+    date_only: bool,
+) -> Result<i64, VmExit> {
+    let Some(val) = arg else {
+        return Err(null_pointer_exception("date == null"));
+    };
+    let Value::Obj(obj_ref) = val else {
+        if date_only {
+            return Err(null_pointer_exception("date == null"));
+        }
+        return Err(crate::err::Throwable::new(
+            "Ljava/lang/IllegalArgumentException;",
+            "Cannot format given Object as a Date",
+        )
+        .into());
+    };
+    let cls = vm.heap.class_of(*obj_ref).unwrap_or("").to_string();
+    if vm.cp.is_subtype(&cls, DATE) {
+        return Ok(long_field(vm, *obj_ref, "rd_ms"));
+    }
+    if !date_only && vm.cp.is_subtype(&cls, "Ljava/lang/Number;") {
+        return Ok(vm
+            .invoke_instance(*obj_ref, "longValue", "()J", &[])?
+            .as_long()
+            .unwrap_or(0));
+    }
+    Err(crate::err::Throwable::new(
+        "Ljava/lang/IllegalArgumentException;",
+        "SimpleDateFormat.format requires a Date",
+    )
+    .into())
+}
+
+fn locale_lang_from_obj(vm: &mut Engine, locale: ObjRef) -> String {
+    let lang = vm.heap.get_field(locale, "rd_lang").unwrap_or(Value::Null);
+    let mut tag = str_arg(vm, &lang);
+    if tag.is_empty() {
+        tag = crate::intrinsics::object_to_string(vm, locale).unwrap_or_default();
+    }
+    let normalized = tag
+        .split(['_', '-'])
+        .next()
+        .unwrap_or("en")
+        .to_ascii_lowercase();
+    if normalized.is_empty() {
+        "en".to_string()
+    } else {
+        normalized
+    }
+}
+
+fn default_vm_lang(vm: &mut Engine) -> String {
+    let k = ("Lrd/Resources;".to_string(), "locale".to_string());
+    if let Some(Value::Obj(loc)) = vm.statics.get(&k).cloned() {
+        return locale_lang_from_obj(vm, loc);
+    }
+    if let Ok(Value::Obj(loc)) = vm.invoke_static(
+        "Ljava/util/Locale;",
+        "getDefault",
+        "()Ljava/util/Locale;",
+        &[],
+    ) {
+        return locale_lang_from_obj(vm, loc);
+    }
+    "en".to_string()
 }
 
 fn set_field(vm: &mut Engine, recv: ObjRef, field: &str, value: Value) -> Result<(), VmExit> {
@@ -967,18 +1258,11 @@ fn simple_date_format_intrinsic(
             _ => "yyyy.MM.dd G 'at' HH:mm:ss z".to_string(),
         };
         let language = match args.get(1) {
-            Some(Value::Obj(locale)) => {
-                let lang = vm.heap.get_field(*locale, "rd_lang").unwrap_or(Value::Null);
-                let mut tag = str_arg(vm, &lang);
-                if tag.is_empty() {
-                    tag = crate::intrinsics::object_to_string(vm, *locale).unwrap_or_default();
-                }
-                tag.split(['_', '-'])
-                    .next()
-                    .unwrap_or("en")
-                    .to_ascii_lowercase()
+            Some(Value::Obj(locale)) => locale_lang_from_obj(vm, *locale),
+            Some(Value::Null) => {
+                return Err(null_pointer_exception("SimpleDateFormat locale == null"));
             }
-            _ => "en".to_string(),
+            _ => default_vm_lang(vm),
         };
         let pattern = crate::intrinsics::alloc_string(vm, pattern)?;
         let language = crate::intrinsics::alloc_string(vm, language)?;
@@ -1003,12 +1287,8 @@ fn simple_date_format_intrinsic(
     match (name, sig) {
         ("format", "(Ljava/util/Date;)Ljava/lang/String;")
         | ("format", "(Ljava/lang/Object;)Ljava/lang/String;") => {
-            let ms = args.first().and_then(|value| temporal_ms(vm, value)).ok_or_else(|| {
-                crate::err::Throwable::new(
-                    "Ljava/lang/IllegalArgumentException;",
-                    "SimpleDateFormat.format requires a Date",
-                )
-            })?;
+            let date_only = sig.starts_with("(Ljava/util/Date;");
+            let ms = extract_date_or_number_ms(vm, args.first(), date_only)?;
             Ok(Some(Value::Obj(crate::intrinsics::alloc_string(
                 vm,
                 format_pattern(&pattern, &language, ms),
@@ -1022,12 +1302,8 @@ fn simple_date_format_intrinsic(
             "format",
             "(Ljava/lang/Object;Ljava/lang/StringBuffer;Ljava/text/FieldPosition;)Ljava/lang/StringBuffer;",
         ) => {
-            let ms = args.first().and_then(|value| temporal_ms(vm, value)).ok_or_else(|| {
-                crate::err::Throwable::new(
-                    "Ljava/lang/IllegalArgumentException;",
-                    "SimpleDateFormat.format requires a Date",
-                )
-            })?;
+            let date_only = sig.starts_with("(Ljava/util/Date;");
+            let ms = extract_date_or_number_ms(vm, args.first(), date_only)?;
             let Some(Value::Obj(buffer)) = args.get(1) else {
                 return Err(crate::err::Throwable::new(
                     "Ljava/lang/NullPointerException;",
@@ -1098,10 +1374,10 @@ fn date_intrinsic(
             Ok(Some(Value::Null))
         }
         ("before", "(Ljava/util/Date;)Z") | ("after", "(Ljava/util/Date;)Z") => {
-            let other = args
-                .first()
-                .and_then(|value| temporal_ms(vm, value))
-                .unwrap_or(0);
+            let Some(Value::Obj(other_ref)) = args.first() else {
+                return Err(null_pointer_exception("when == null"));
+            };
+            let other = long_field(vm, *other_ref, "rd_ms");
             let this = long_field(vm, recv, "rd_ms");
             Ok(Some(Value::Int(if name == "before" {
                 (this < other) as i32
@@ -1109,11 +1385,17 @@ fn date_intrinsic(
                 (this > other) as i32
             })))
         }
-        ("compareTo", "(Ljava/util/Date;)I") => {
-            let other = args
-                .first()
-                .and_then(|value| temporal_ms(vm, value))
-                .unwrap_or(0);
+        ("compareTo", "(Ljava/util/Date;)I") | ("compareTo", "(Ljava/lang/Object;)I") => {
+            let Some(Value::Obj(other_ref)) = args.first() else {
+                return Err(null_pointer_exception("anotherDate == null"));
+            };
+            let other_cls = vm.heap.class_of(*other_ref).unwrap_or("");
+            if !vm.cp.is_subtype(other_cls, DATE) {
+                return Err(class_cast_exception(format!(
+                    "{other_cls} cannot be cast to {DATE}"
+                )));
+            }
+            let other = long_field(vm, *other_ref, "rd_ms");
             let ordering = long_field(vm, recv, "rd_ms").cmp(&other);
             Ok(Some(Value::Int(match ordering {
                 core::cmp::Ordering::Less => -1,
@@ -1123,8 +1405,14 @@ fn date_intrinsic(
         }
         ("equals", "(Ljava/lang/Object;)Z") => {
             let this = long_field(vm, recv, "rd_ms");
-            let other = args.first().and_then(|value| temporal_ms(vm, value));
-            Ok(Some(Value::Int((other == Some(this)) as i32)))
+            let eq = match args.first() {
+                Some(Value::Obj(other_ref)) => {
+                    let other_cls = vm.heap.class_of(*other_ref).unwrap_or("");
+                    vm.cp.is_subtype(other_cls, DATE) && long_field(vm, *other_ref, "rd_ms") == this
+                }
+                _ => false,
+            };
+            Ok(Some(Value::Int(eq as i32)))
         }
         ("hashCode", "()I") => {
             let ms = long_field(vm, recv, "rd_ms");
@@ -1151,9 +1439,19 @@ fn ld_hash(day: i64) -> i32 {
     (y & (0xFFFF_F800u32 as i32)) ^ ((y << 11) + (m << 6) + d)
 }
 
+fn iso_year(y: i64) -> String {
+    if (0..=9999).contains(&y) {
+        format!("{y:04}")
+    } else if y > 9999 {
+        format!("+{y}")
+    } else {
+        format!("-{:04}", y.unsigned_abs())
+    }
+}
+
 fn iso_ldt(ms: i64) -> String {
     let (y, m, d, h, mi, s, milli, _) = fields(ms);
-    let mut out = format!("{y:04}-{m:02}-{d:02}T{h:02}:{mi:02}");
+    let mut out = format!("{}-{m:02}-{d:02}T{h:02}:{mi:02}", iso_year(y));
     if s != 0 || milli != 0 {
         out.push_str(&format!(":{s:02}"));
         if milli != 0 {
@@ -1163,12 +1461,22 @@ fn iso_ldt(ms: i64) -> String {
     out
 }
 
-/// Materializes `ChronoUnit` enum constants on first `sget`.
+/// Materializes `ChronoUnit` enum constants and standard `java.time` static
+/// singletons (`LocalDate.MIN/MAX/EPOCH`, `Instant.EPOCH`, `Duration.ZERO`)
+/// on first `sget`.
 pub(crate) fn host_static(
     vm: &mut Engine,
     owner: &str,
     name: &str,
 ) -> Result<Option<Value>, VmExit> {
+    match (owner, name) {
+        (LD, "MIN") => return Ok(Some(ld(vm, MIN_EPOCH_DAY)?)),
+        (LD, "MAX") => return Ok(Some(ld(vm, MAX_EPOCH_DAY)?)),
+        (LD, "EPOCH") => return Ok(Some(ld(vm, 0)?)),
+        (INST, "EPOCH") => return Ok(Some(ms_obj(vm, INST, 0)?)),
+        (DUR, "ZERO") => return Ok(Some(ms_obj(vm, DUR, 0)?)),
+        _ => {}
+    }
     if owner != UNIT || unit_ms(name).is_none() {
         return Ok(None);
     }
@@ -1188,6 +1496,38 @@ fn unit_ms(name: &str) -> Option<i64> {
         "MONTHS" | "YEARS" => -1,
         _ => return None,
     })
+}
+
+fn temporal_ymd(vm: &Engine, v: Option<&Value>) -> Result<(i64, i64, i64), VmExit> {
+    let Some(val) = v else {
+        return Err(null_pointer_exception("temporal"));
+    };
+    if matches!(val, Value::Null) {
+        return Err(null_pointer_exception("temporal"));
+    }
+    let Some((r, c)) = class_of(vm, val) else {
+        return Err(date_time_exception(
+            "Unable to extract date from TemporalAccessor".into(),
+        ));
+    };
+    match c.as_str() {
+        LD => Ok(civil_from_days(long_field(vm, r, "rd_day"))),
+        YM => {
+            let ym = long_field(vm, r, "rd_ym");
+            Ok((ym.div_euclid(12), ym.rem_euclid(12) + 1, 1))
+        }
+        MD => {
+            let (m, d) = month_day_parts(vm, r);
+            Ok((1970, i64::from(m), i64::from(d)))
+        }
+        LDT | INST | ZDT => {
+            let (y, m, d, ..) = fields(long_field(vm, r, "rd_ms"));
+            Ok((y, m, d))
+        }
+        _ => Err(date_time_exception(format!(
+            "Unable to obtain temporal date from {c}"
+        ))),
+    }
 }
 
 pub fn static_intrinsic(
@@ -1216,30 +1556,88 @@ pub fn static_intrinsic(
     }
     let v = match (class, name) {
         (LDT, "now") => ms_obj(vm, LDT, now_ms(vm))?,
-        (LDT, "ofInstant") => ms_obj(vm, LDT, temporal_ms(vm, &args[0]).unwrap_or(0))?,
+        (LDT, "ofInstant") => {
+            let Some(Value::Obj(inst_ref)) = args.first() else {
+                return Err(null_pointer_exception("instant"));
+            };
+            if matches!(args.get(1), Some(Value::Null)) {
+                return Err(null_pointer_exception("zone"));
+            }
+            if vm.heap.class_of(*inst_ref).ok() != Some(INST) {
+                return Err(date_time_exception(
+                    "LocalDateTime.ofInstant requires Instant".into(),
+                ));
+            }
+            ms_obj(vm, LDT, long_field(vm, *inst_ref, "rd_ms"))?
+        }
         (LDT, "of") if args.len() >= 5 => {
-            let day = days_from_civil(arg_l(args, 0), arg_l(args, 1), arg_l(args, 2));
-            let ms = day * DAY_MS
-                + arg_l(args, 3) * 3_600_000
-                + arg_l(args, 4) * 60_000
-                + arg_l(args, 5) * 1000;
+            let day = validate_ymd(arg_l(args, 0), arg_l(args, 1), arg_l(args, 2))?;
+            let hour = arg_l(args, 3);
+            if !(0..=23).contains(&hour) {
+                return Err(date_time_exception(format!(
+                    "Invalid value for HourOfDay (valid values 0 - 23): {hour}"
+                )));
+            }
+            let minute = arg_l(args, 4);
+            if !(0..=59).contains(&minute) {
+                return Err(date_time_exception(format!(
+                    "Invalid value for MinuteOfHour (valid values 0 - 59): {minute}"
+                )));
+            }
+            let second = if args.len() >= 6 { arg_l(args, 5) } else { 0 };
+            if !(0..=59).contains(&second) {
+                return Err(date_time_exception(format!(
+                    "Invalid value for SecondOfMinute (valid values 0 - 59): {second}"
+                )));
+            }
+            let nano = if args.len() >= 7 { arg_l(args, 6) } else { 0 };
+            if !(0..=999_999_999).contains(&nano) {
+                return Err(date_time_exception(format!(
+                    "Invalid value for NanoOfSecond (valid values 0 - 999999999): {nano}"
+                )));
+            }
+            let sub_day_ms =
+                hour * 3_600_000 + minute * 60_000 + second * 1000 + (nano / 1_000_000);
+            let ms = checked_add_i64(checked_mul_i64(day, DAY_MS)?, sub_day_ms)?;
             ms_obj(vm, LDT, ms)?
         }
         (LD, "now") => ld(vm, now_ms(vm).div_euclid(DAY_MS))?,
-        (LD, "ofEpochDay") => ld(vm, arg_l(args, 0))?,
+        (LD, "ofEpochDay") => ld(vm, validate_epoch_day(arg_l(args, 0))?)?,
         (LD, "of") if sig == "(III)Ljava/time/LocalDate;" => ld(
             vm,
-            days_from_civil(arg_l(args, 0), arg_l(args, 1), arg_l(args, 2)),
+            validate_ymd(arg_l(args, 0), arg_l(args, 1), arg_l(args, 2))?,
         )?,
-        (ZONE, "systemDefault" | "of") => zone(vm)?,
+        (ZONE, "systemDefault" | "of") => {
+            if name == "of" && !matches!(args.first(), Some(Value::Obj(_))) {
+                return Err(null_pointer_exception("zoneId"));
+            }
+            zone(vm)?
+        }
         (INST, "ofEpochMilli") => ms_obj(vm, INST, arg_l(args, 0))?,
-        (INST, "ofEpochSecond") => ms_obj(vm, INST, arg_l(args, 0).saturating_mul(1000))?,
+        (INST, "ofEpochSecond") => {
+            let epoch_sec = arg_l(args, 0);
+            let nano_adj = if sig == "(JJ)Ljava/time/Instant;" || args.len() >= 2 {
+                arg_l(args, 1)
+            } else {
+                0
+            };
+            let extra_sec = nano_adj.div_euclid(1_000_000_000);
+            let rem_nano = nano_adj.rem_euclid(1_000_000_000);
+            let total_sec = checked_add_i64(epoch_sec, extra_sec)?;
+            let total_ms =
+                checked_add_i64(checked_mul_i64(total_sec, 1000)?, rem_nano / 1_000_000)?;
+            ms_obj(vm, INST, total_ms)?
+        }
         (INST, "now") => ms_obj(vm, INST, now_ms(vm))?,
         (YM, "now") => {
             let (y, m, ..) = fields(now_ms(vm));
             ym(vm, y * 12 + m - 1)?
         }
-        (YM, "of") => ym(vm, arg_l(args, 0) * 12 + arg_l(args, 1) - 1)?,
+        (YM, "of") => {
+            let y = validate_year(arg_l(args, 0))?;
+            let m = validate_month(arg_l(args, 1))?;
+            ym(vm, y * 12 + m - 1)?
+        }
         (MD, "of") if sig == "(II)Ljava/time/MonthDay;" => {
             month_day(vm, arg_l(args, 0), arg_l(args, 1))?
         }
@@ -1262,8 +1660,7 @@ pub fn static_intrinsic(
             month_day(vm, month, arg_l(args, 1))?
         }
         (MD, "from") if sig == "(Ljava/time/temporal/TemporalAccessor;)Ljava/time/MonthDay;" => {
-            let ms = temporal_ms(vm, &args[0]).unwrap_or(0);
-            let (_, m, d, ..) = fields(ms);
+            let (_, m, d) = temporal_ymd(vm, args.first())?;
             month_day(vm, m, d)?
         }
         (MD, "now") => {
@@ -1271,27 +1668,39 @@ pub fn static_intrinsic(
             month_day(vm, m, d)?
         }
         (YM, "from") => {
-            let ms = temporal_ms(vm, &args[0]).unwrap_or(0);
-            let (y, m, ..) = fields(ms);
+            if matches!(
+                args.first(),
+                Some(Value::Obj(r)) if vm.heap.class_of(*r).ok() == Some(MD)
+            ) {
+                return Err(date_time_exception(
+                    "Unable to obtain YearMonth from MonthDay".into(),
+                ));
+            }
+            let (y, m, _) = temporal_ymd(vm, args.first())?;
+            validate_year(y)?;
+            validate_month(m)?;
             ym(vm, y * 12 + m - 1)?
         }
         (DUR, "ofMillis") => ms_obj(vm, DUR, arg_l(args, 0))?,
-        (DUR, "ofSeconds") => ms_obj(vm, DUR, arg_l(args, 0).saturating_mul(1000))?,
-        (DUR, "ofMinutes") => ms_obj(vm, DUR, arg_l(args, 0).saturating_mul(60_000))?,
-        (DUR, "ofHours") => ms_obj(vm, DUR, arg_l(args, 0).saturating_mul(3_600_000))?,
-        (DUR, "ofDays") => ms_obj(vm, DUR, arg_l(args, 0).saturating_mul(DAY_MS))?,
+        (DUR, "ofSeconds") => ms_obj(vm, DUR, checked_mul_i64(arg_l(args, 0), 1000)?)?,
+        (DUR, "ofMinutes") => ms_obj(vm, DUR, checked_mul_i64(arg_l(args, 0), 60_000)?)?,
+        (DUR, "ofHours") => ms_obj(vm, DUR, checked_mul_i64(arg_l(args, 0), 3_600_000)?)?,
+        (DUR, "ofDays") => ms_obj(vm, DUR, checked_mul_i64(arg_l(args, 0), DAY_MS)?)?,
         (FMT, "ofPattern") => {
-            let pat = args.first().cloned().unwrap_or(Value::Null);
-            let lang = match args.get(1) {
-                Some(Value::Obj(l)) => {
-                    let lv = vm.heap.get_field(*l, "rd_lang").unwrap_or(Value::Null);
-                    str_arg(vm, &lv)
-                }
-                _ => crate::port_env::var("RD_LOCALE")
-                    .unwrap_or_else(|_| "en".into())
-                    .chars()
-                    .take(2)
-                    .collect(),
+            let Some(Value::Obj(pat_ref)) = args.first() else {
+                return Err(null_pointer_exception("pattern"));
+            };
+            let pat = Value::Obj(*pat_ref);
+            let lang = if sig
+                == "(Ljava/lang/String;Ljava/util/Locale;)Ljava/time/format/DateTimeFormatter;"
+                || args.len() >= 2
+            {
+                let Some(Value::Obj(loc_ref)) = args.get(1) else {
+                    return Err(null_pointer_exception("locale"));
+                };
+                locale_lang_from_obj(vm, *loc_ref)
+            } else {
+                default_vm_lang(vm)
             };
             let lang = crate::intrinsics::alloc_string(vm, lang)?;
             alloc(
@@ -1305,6 +1714,14 @@ pub fn static_intrinsic(
     Ok(Some(v))
 }
 
+fn scalar_key(vm: &Engine, expected_cls: &str, obj_ref: ObjRef) -> i64 {
+    match expected_cls {
+        LD => long_field(vm, obj_ref, "rd_day"),
+        YM => long_field(vm, obj_ref, "rd_ym"),
+        _ => long_field(vm, obj_ref, "rd_ms"),
+    }
+}
+
 pub fn instance_intrinsic(
     vm: &mut Engine,
     recv_class: &str,
@@ -1313,7 +1730,7 @@ pub fn instance_intrinsic(
     recv: ObjRef,
     args: &[Value],
 ) -> Result<Option<Value>, VmExit> {
-    if recv_class == DATE {
+    if vm.cp.is_subtype(recv_class, DATE) {
         return date_intrinsic(vm, name, sig, recv, args);
     }
     if recv_class == SIMPLE_DATE_FORMAT {
@@ -1335,11 +1752,14 @@ pub fn instance_intrinsic(
             ("getDayOfMonth", "()I") => Value::Int(day),
             ("isValidYear", "(I)Z") => {
                 let year = arg_l(args, 0);
+                if !(MIN_YEAR..=MAX_YEAR).contains(&year) {
+                    return Ok(Some(Value::Int(0)));
+                }
                 let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
                 Value::Int(i32::from(!(month == 2 && day == 29 && !leap)))
             }
             ("atYear", "(I)Ljava/time/LocalDate;") => {
-                let year = arg_l(args, 0);
+                let year = validate_year(arg_l(args, 0))?;
                 let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
                 let d = if month == 2 && day == 29 && !leap {
                     28
@@ -1356,19 +1776,25 @@ pub fn instance_intrinsic(
                 Value::Int(i32::from(eq))
             }
             ("hashCode", "()I") => Value::Int((month << 6) + day),
-            ("compareTo", "(Ljava/time/MonthDay;)I") => {
-                let (om, od) = match args.first() {
-                    Some(Value::Obj(o)) => month_day_parts(vm, *o),
-                    _ => (0, 0),
+            ("compareTo", "(Ljava/time/MonthDay;)I") | ("compareTo", "(Ljava/lang/Object;)I") => {
+                let Some(Value::Obj(o)) = args.first() else {
+                    return Err(null_pointer_exception("other == null"));
                 };
+                let other_cls = vm.heap.class_of(*o).unwrap_or("");
+                if other_cls != MD {
+                    return Err(class_cast_exception(format!(
+                        "{other_cls} cannot be cast to {MD}"
+                    )));
+                }
+                let (om, od) = month_day_parts(vm, *o);
                 let cmp = if month != om { month - om } else { day - od };
                 Value::Int(cmp)
             }
             ("isAfter", "(Ljava/time/MonthDay;)Z") | ("isBefore", "(Ljava/time/MonthDay;)Z") => {
-                let (om, od) = match args.first() {
-                    Some(Value::Obj(o)) => month_day_parts(vm, *o),
-                    _ => (0, 0),
+                let Some(Value::Obj(o)) = args.first() else {
+                    return Err(null_pointer_exception("other == null"));
                 };
+                let (om, od) = month_day_parts(vm, *o);
                 let mine = (month, day);
                 let other = (om, od);
                 Value::Int(i32::from(if name == "isAfter" {
@@ -1389,29 +1815,56 @@ pub fn instance_intrinsic(
         return Ok(None);
     }
     let this = Value::Obj(recv);
-    let same = |vm: &Engine, other: &Value| {
-        class_of(vm, other)
-            .map(|(_, c)| c == recv_class)
-            .unwrap_or(false)
-    };
-    // Shared comparisons on the scalar value.
-    let my = temporal_ms(vm, &this);
-    let cmp_other = args.first().and_then(|o| temporal_ms(vm, o));
-    match name {
-        "equals" if sig == "(Ljava/lang/Object;)Z" => {
-            let eq = same(vm, &args[0]) && my == cmp_other;
-            return Ok(Some(Value::Int(eq as i32)));
+    // Shared comparisons directly on the canonical type-specific scalar (`rd_day`,
+    // `rd_ym`, or `rd_ms`) so `LocalDate.MAX` never multiplies by `DAY_MS`.
+    if matches!(recv_class, LD | LDT | ZDT | INST | YM | DUR) {
+        match name {
+            "equals" if sig == "(Ljava/lang/Object;)Z" => {
+                let eq = match args.first().and_then(|v| class_of(vm, v)) {
+                    Some((other_ref, c)) if c == recv_class => {
+                        scalar_key(vm, recv_class, recv) == scalar_key(vm, recv_class, other_ref)
+                    }
+                    _ => false,
+                };
+                return Ok(Some(Value::Int(eq as i32)));
+            }
+            "isBefore" | "isAfter" | "isEqual" | "compareTo" if args.len() == 1 => {
+                let Some(Value::Obj(other_ref)) = args.first() else {
+                    return Err(null_pointer_exception("other == null"));
+                };
+                let other_cls = vm.heap.class_of(*other_ref).unwrap_or("");
+                let a = scalar_key(vm, recv_class, recv);
+                let b = if other_cls == recv_class {
+                    scalar_key(vm, recv_class, *other_ref)
+                } else if name == "compareTo" && matches!(recv_class, INST | YM | DUR) {
+                    return Err(class_cast_exception(format!(
+                        "{other_cls} cannot be cast to {recv_class}"
+                    )));
+                } else if recv_class == LD && other_cls == LD {
+                    long_field(vm, *other_ref, "rd_day")
+                } else if name == "compareTo" && sig == "(Ljava/lang/Object;)I" {
+                    return Err(class_cast_exception(format!(
+                        "{other_cls} cannot be cast to {recv_class}"
+                    )));
+                } else {
+                    match temporal_ms(vm, &args[0])? {
+                        Some(ms) => ms,
+                        None => {
+                            return Err(class_cast_exception(format!(
+                                "{other_cls} cannot be cast to {recv_class}"
+                            )));
+                        }
+                    }
+                };
+                return Ok(Some(Value::Int(match name {
+                    "isBefore" => (a < b) as i32,
+                    "isAfter" => (a > b) as i32,
+                    "isEqual" => (a == b) as i32,
+                    _ => a.cmp(&b) as i32,
+                })));
+            }
+            _ => {}
         }
-        "isBefore" | "isAfter" | "isEqual" | "compareTo" if args.len() == 1 => {
-            let (a, b) = (my.unwrap_or(0), cmp_other.unwrap_or(0));
-            return Ok(Some(Value::Int(match name {
-                "isBefore" => (a < b) as i32,
-                "isAfter" => (a > b) as i32,
-                "isEqual" => (a == b) as i32,
-                _ => a.cmp(&b) as i32,
-            })));
-        }
-        _ => {}
     }
     let v = match recv_class {
         LD => {
@@ -1424,28 +1877,45 @@ pub fn instance_intrinsic(
                 "getDayOfMonth" => Value::Int(d as i32),
                 "getDayOfYear" => Value::Int((day - days_from_civil(y, 1, 1) + 1) as i32),
                 "lengthOfMonth" => Value::Int(month_len(y, m) as i32),
-                "plusDays" => ld(vm, day + arg_l(args, 0))?,
-                "minusDays" => ld(vm, day - arg_l(args, 0))?,
-                "plusWeeks" => ld(vm, day + 7 * arg_l(args, 0))?,
-                "minusWeeks" => ld(vm, day - 7 * arg_l(args, 0))?,
+                "plusDays" => ld(
+                    vm,
+                    validate_epoch_day(checked_add_i64(day, arg_l(args, 0))?)?,
+                )?,
+                "minusDays" => ld(
+                    vm,
+                    validate_epoch_day(checked_sub_i64(day, arg_l(args, 0))?)?,
+                )?,
+                "plusWeeks" => {
+                    let delta = checked_mul_i64(7, arg_l(args, 0))?;
+                    ld(vm, validate_epoch_day(checked_add_i64(day, delta)?)?)?
+                }
+                "minusWeeks" => {
+                    let delta = checked_mul_i64(7, arg_l(args, 0))?;
+                    ld(vm, validate_epoch_day(checked_sub_i64(day, delta)?)?)?
+                }
                 "plusMonths" | "minusMonths" => {
-                    let k = if name == "plusMonths" {
-                        arg_l(args, 0)
+                    let amt = arg_l(args, 0);
+                    let cur = i128::from(y) * 12 + i128::from(m - 1);
+                    let t = if name == "plusMonths" {
+                        cur + i128::from(amt)
                     } else {
-                        -arg_l(args, 0)
+                        cur - i128::from(amt)
                     };
-                    let t = y * 12 + m - 1 + k;
-                    let (ny, nm) = (t.div_euclid(12), t.rem_euclid(12) + 1);
+                    let ny_128 = t.div_euclid(12);
+                    let ny = i64::try_from(ny_128)
+                        .map_err(|_| arithmetic_exception("year overflow"))
+                        .and_then(validate_year)?;
+                    let nm = t.rem_euclid(12) as i64 + 1;
                     ld(vm, days_from_civil(ny, nm, d.min(month_len(ny, nm))))?
                 }
-                "withDayOfMonth" => ld(vm, days_from_civil(y, m, arg_l(args, 0)))?,
-                "atStartOfDay" => ms_obj(vm, LDT, day * DAY_MS)?,
+                "withDayOfMonth" => ld(vm, validate_ymd(y, m, arg_l(args, 0))?)?,
+                "atStartOfDay" => ms_obj(vm, LDT, checked_mul_i64(day, DAY_MS)?)?,
                 "hashCode" => Value::Int(ld_hash(day)),
                 "toString" => Value::Obj(crate::intrinsics::alloc_string(
                     vm,
-                    format!("{y:04}-{m:02}-{d:02}"),
+                    format!("{}-{m:02}-{d:02}", iso_year(y)),
                 )?),
-                "format" => format_with(vm, &args[0], day * DAY_MS)?,
+                "format" => format_temporal_with(vm, args.first(), Some(&this))?,
                 _ => return Ok(None),
             }
         }
@@ -1456,7 +1926,12 @@ pub fn instance_intrinsic(
                 "toLocalDate" => ld(vm, ms.div_euclid(DAY_MS))?,
                 "toLocalDateTime" => ms_obj(vm, LDT, ms)?,
                 "toInstant" => ms_obj(vm, INST, ms)?,
-                "atZone" => ms_obj(vm, ZDT, ms)?,
+                "atZone" => {
+                    if matches!(args.first(), None | Some(Value::Null)) {
+                        return Err(null_pointer_exception("zone"));
+                    }
+                    ms_obj(vm, ZDT, ms)?
+                }
                 "toEpochMilli" => Value::Long(ms),
                 "getEpochSecond" => Value::Long(ms.div_euclid(1000)),
                 "toEpochSecond" => Value::Long(ms.div_euclid(1000)),
@@ -1467,12 +1942,27 @@ pub fn instance_intrinsic(
                 "getHour" => Value::Int(h as i32),
                 "getMinute" => Value::Int(mi as i32),
                 "getSecond" => Value::Int(s as i32),
-                "plusDays" => ms_obj(vm, recv_class, ms + arg_l(args, 0) * DAY_MS)?,
-                "minusDays" => ms_obj(vm, recv_class, ms - arg_l(args, 0) * DAY_MS)?,
-                "plusHours" => ms_obj(vm, recv_class, ms + arg_l(args, 0) * 3_600_000)?,
-                "plusMinutes" => ms_obj(vm, recv_class, ms + arg_l(args, 0) * 60_000)?,
-                "plusSeconds" => ms_obj(vm, recv_class, ms + arg_l(args, 0) * 1000)?,
-                "plusMillis" => ms_obj(vm, recv_class, ms + arg_l(args, 0))?,
+                "plusDays" => {
+                    let delta = checked_mul_i64(arg_l(args, 0), DAY_MS)?;
+                    ms_obj(vm, recv_class, checked_add_i64(ms, delta)?)?
+                }
+                "minusDays" => {
+                    let delta = checked_mul_i64(arg_l(args, 0), DAY_MS)?;
+                    ms_obj(vm, recv_class, checked_sub_i64(ms, delta)?)?
+                }
+                "plusHours" => {
+                    let delta = checked_mul_i64(arg_l(args, 0), 3_600_000)?;
+                    ms_obj(vm, recv_class, checked_add_i64(ms, delta)?)?
+                }
+                "plusMinutes" => {
+                    let delta = checked_mul_i64(arg_l(args, 0), 60_000)?;
+                    ms_obj(vm, recv_class, checked_add_i64(ms, delta)?)?
+                }
+                "plusSeconds" => {
+                    let delta = checked_mul_i64(arg_l(args, 0), 1000)?;
+                    ms_obj(vm, recv_class, checked_add_i64(ms, delta)?)?
+                }
+                "plusMillis" => ms_obj(vm, recv_class, checked_add_i64(ms, arg_l(args, 0))?)?,
                 "hashCode" => {
                     let day = ms.div_euclid(DAY_MS);
                     let nanos = ms.rem_euclid(DAY_MS) * 1_000_000;
@@ -1490,29 +1980,37 @@ pub fn instance_intrinsic(
                     };
                     Value::Obj(crate::intrinsics::alloc_string(vm, s)?)
                 }
-                "format" => format_with(vm, &args[0], ms)?,
+                "format" => format_temporal_with(vm, args.first(), Some(&this))?,
                 _ => return Ok(None),
             }
         }
         YM => {
             let t = long_field(vm, recv, "rd_ym");
             let (y, m) = (t.div_euclid(12), t.rem_euclid(12) + 1);
+            let checked_ym_offset = |delta: i128| -> Result<i64, VmExit> {
+                let next = i128::from(t) + delta;
+                let ny = i64::try_from(next.div_euclid(12))
+                    .map_err(|_| arithmetic_exception("year overflow"))
+                    .and_then(validate_year)?;
+                let nm = next.rem_euclid(12) as i64 + 1;
+                Ok(ny * 12 + nm - 1)
+            };
             match name {
-                "plusMonths" => ym(vm, t + arg_l(args, 0))?,
-                "minusMonths" => ym(vm, t - arg_l(args, 0))?,
-                "plusYears" => ym(vm, t + 12 * arg_l(args, 0))?,
-                "minusYears" => ym(vm, t - 12 * arg_l(args, 0))?,
+                "plusMonths" => ym(vm, checked_ym_offset(i128::from(arg_l(args, 0)))?)?,
+                "minusMonths" => ym(vm, checked_ym_offset(-i128::from(arg_l(args, 0)))?)?,
+                "plusYears" => ym(vm, checked_ym_offset(i128::from(arg_l(args, 0)) * 12)?)?,
+                "minusYears" => ym(vm, checked_ym_offset(-i128::from(arg_l(args, 0)) * 12)?)?,
                 "getYear" => Value::Int(y as i32),
                 "getMonthValue" => Value::Int(m as i32),
                 "lengthOfMonth" => Value::Int(month_len(y, m) as i32),
-                "atDay" => ld(vm, days_from_civil(y, m, arg_l(args, 0)))?,
+                "atDay" => ld(vm, validate_ymd(y, m, arg_l(args, 0))?)?,
                 "atEndOfMonth" => ld(vm, days_from_civil(y, m, month_len(y, m)))?,
                 "hashCode" => Value::Int((y as i32) ^ ((m as i32) << 27)),
                 "toString" => Value::Obj(crate::intrinsics::alloc_string(
                     vm,
-                    format!("{y:04}-{m:02}"),
+                    format!("{}-{m:02}", iso_year(y)),
                 )?),
-                "format" => format_with(vm, &args[0], days_from_civil(y, m, 1) * DAY_MS)?,
+                "format" => format_temporal_with(vm, args.first(), Some(&this))?,
                 _ => return Ok(None),
             }
         }
@@ -1531,20 +2029,14 @@ pub fn instance_intrinsic(
             }
         }
         FMT => match name {
-            "format" => {
-                let ms = temporal_ms(vm, &args[0]).unwrap_or(0);
-                format_with(vm, &this, ms)?
-            }
+            "format" => format_temporal_with(vm, Some(&this), args.first())?,
             "withLocale" => {
+                let Some(Value::Obj(loc_ref)) = args.first() else {
+                    return Err(null_pointer_exception("locale"));
+                };
                 let pat = vm.heap.get_field(recv, "rd_pat").unwrap_or(Value::Null);
                 let zone = vm.heap.get_field(recv, "rd_zone").unwrap_or(Value::Null);
-                let lang = match args.first() {
-                    Some(Value::Obj(l)) => {
-                        let lv = vm.heap.get_field(*l, "rd_lang").unwrap_or(Value::Null);
-                        str_arg(vm, &lv)
-                    }
-                    _ => String::new(),
-                };
+                let lang = locale_lang_from_obj(vm, *loc_ref);
                 let lang = crate::intrinsics::alloc_string(vm, lang)?;
                 alloc(
                     vm,
@@ -1583,27 +2075,70 @@ pub fn instance_intrinsic(
         },
         UNIT => match name {
             "between" => {
+                if matches!(args.first(), None | Some(Value::Null))
+                    || matches!(args.get(1), None | Some(Value::Null))
+                {
+                    return Err(null_pointer_exception("temporal"));
+                }
                 let n = vm.heap.get_field(recv, "name").unwrap_or(Value::Null);
                 let unit = str_arg(vm, &n);
-                let a = temporal_ms(vm, &args[0]).unwrap_or(0);
-                let b = temporal_ms(vm, &args[1]).unwrap_or(0);
+                let c0 = class_of(vm, &args[0]);
+                let c1 = class_of(vm, &args[1]);
+                if let (Some((r0, cls0)), Some((r1, cls1))) = (&c0, &c1) {
+                    if cls0 == LD && cls1 == LD {
+                        let d0 = long_field(vm, *r0, "rd_day");
+                        let d1 = long_field(vm, *r1, "rd_day");
+                        let diff = checked_sub_i64(d1, d0)?;
+                        match unit.as_str() {
+                            "DAYS" => return Ok(Some(Value::Long(diff))),
+                            "WEEKS" => return Ok(Some(Value::Long(diff / 7))),
+                            "MONTHS" | "YEARS" => {
+                                let (ya, ma, da) = civil_from_days(d0);
+                                let (yb, mb, db) = civil_from_days(d1);
+                                let mut months = (i128::from(yb) * 12 + i128::from(mb))
+                                    - (i128::from(ya) * 12 + i128::from(ma));
+                                if months > 0 && db < da {
+                                    months -= 1;
+                                } else if months < 0 && db > da {
+                                    months += 1;
+                                }
+                                let out = if unit == "YEARS" { months / 12 } else { months };
+                                let out = i64::try_from(out)
+                                    .map_err(|_| arithmetic_exception("long overflow"))?;
+                                return Ok(Some(Value::Long(out)));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
                 Value::Long(match unit_ms(&unit) {
                     Some(-1) => {
-                        let (ya, ma, da, ..) = fields(a);
-                        let (yb, mb, db, ..) = fields(b);
-                        let mut months = (yb * 12 + mb) - (ya * 12 + ma);
+                        let (ya, ma, da) = temporal_ymd(vm, args.first())?;
+                        let (yb, mb, db) = temporal_ymd(vm, args.get(1))?;
+                        let mut months = (i128::from(yb) * 12 + i128::from(mb))
+                            - (i128::from(ya) * 12 + i128::from(ma));
                         if months > 0 && db < da {
                             months -= 1;
                         } else if months < 0 && db > da {
                             months += 1;
                         }
-                        if unit == "YEARS" {
-                            months / 12
-                        } else {
-                            months
-                        }
+                        let out = if unit == "YEARS" { months / 12 } else { months };
+                        i64::try_from(out).map_err(|_| arithmetic_exception("long overflow"))?
                     }
-                    Some(u) => (b - a) / u,
+                    Some(u) => {
+                        let a = temporal_ms(vm, &args[0])?.ok_or_else(|| {
+                            date_time_exception(
+                                "Unsupported temporal for ChronoUnit.between".into(),
+                            )
+                        })?;
+                        let b = temporal_ms(vm, &args[1])?.ok_or_else(|| {
+                            date_time_exception(
+                                "Unsupported temporal for ChronoUnit.between".into(),
+                            )
+                        })?;
+                        let q = (i128::from(b) - i128::from(a)) / i128::from(u);
+                        i64::try_from(q).map_err(|_| arithmetic_exception("long overflow"))?
+                    }
                     None => return Ok(None),
                 })
             }
@@ -1620,16 +2155,61 @@ pub fn instance_intrinsic(
     Ok(Some(v))
 }
 
-fn format_with(vm: &mut Engine, fmt: &Value, ms: i64) -> Result<Value, VmExit> {
-    let Value::Obj(f) = fmt else {
+fn format_temporal_with(
+    vm: &mut Engine,
+    fmt: Option<&Value>,
+    temporal: Option<&Value>,
+) -> Result<Value, VmExit> {
+    let Some(Value::Obj(f)) = fmt else {
         return Err(
             crate::err::Throwable::new("Ljava/lang/NullPointerException;", "formatter").into(),
         );
     };
+    let Some(Value::Obj(t_ref)) = temporal else {
+        return Err(null_pointer_exception("temporal"));
+    };
     let p = vm.heap.get_field(*f, "rd_pat").unwrap_or(Value::Null);
+    if matches!(p, Value::Null) {
+        return Err(null_pointer_exception("pattern"));
+    }
     let l = vm.heap.get_field(*f, "rd_lang").unwrap_or(Value::Null);
     let (pat, lang) = (str_arg(vm, &p), str_arg(vm, &l));
-    let s = format_pattern(&pat, &lang, ms);
+    let cls = vm.heap.class_of(*t_ref).unwrap_or("").to_string();
+    let s = match cls.as_str() {
+        LD => {
+            let day = long_field(vm, *t_ref, "rd_day");
+            let (y, mo, d) = civil_from_days(day);
+            let dow = (day + 3).rem_euclid(7) + 1;
+            format_pattern_parts(&pat, &lang, y, mo, d, 0, 0, 0, 0, dow)
+        }
+        YM => {
+            let ym_val = long_field(vm, *t_ref, "rd_ym");
+            let (y, mo) = (ym_val.div_euclid(12), ym_val.rem_euclid(12) + 1);
+            let day = days_from_civil(y, mo, 1);
+            let dow = (day + 3).rem_euclid(7) + 1;
+            format_pattern_parts(&pat, &lang, y, mo, 1, 0, 0, 0, 0, dow)
+        }
+        MD => {
+            let (mo, d) = month_day_parts(vm, *t_ref);
+            format_pattern_parts(
+                &pat,
+                &lang,
+                1970,
+                i64::from(mo),
+                i64::from(d),
+                0,
+                0,
+                0,
+                0,
+                4,
+            )
+        }
+        _ => {
+            let ms = temporal_ms(vm, &Value::Obj(*t_ref))?
+                .ok_or_else(|| date_time_exception(format!("Unsupported temporal {cls}")))?;
+            format_pattern(&pat, &lang, ms)
+        }
+    };
     Ok(Value::Obj(crate::intrinsics::alloc_string(vm, s)?))
 }
 

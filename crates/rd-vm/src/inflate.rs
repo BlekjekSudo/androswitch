@@ -47,10 +47,11 @@ struct AxisCaps {
 }
 
 impl AxisCaps {
-    const VIEWPORT: Self = Self {
-        w: framework::WINDOW_W,
-        h: framework::WINDOW_H,
-    };
+    /// Active display (portrait 720x1440 by default; landscape swaps the axes).
+    fn viewport(vm: &Engine) -> Self {
+        let (w, h) = vm.viewport_px();
+        Self { w, h }
+    }
 }
 
 fn caps_for_desc(vm: &Engine, desc: &str, mut caps: AxisCaps) -> AxisCaps {
@@ -79,7 +80,7 @@ fn caps_for_desc(vm: &Engine, desc: &str, mut caps: AxisCaps) -> AxisCaps {
 }
 
 fn caps_for_parent_obj(vm: &Engine, parent: ObjRef) -> AxisCaps {
-    let mut caps = AxisCaps::VIEWPORT;
+    let mut caps = AxisCaps::viewport(vm);
     if let Ok(cls) = vm.heap.class_of(parent) {
         caps = caps_for_desc(vm, cls, caps);
     }
@@ -94,7 +95,14 @@ pub fn inflate_resource(vm: &mut Engine, layout_resid: u32) -> Result<ObjRef, Vm
     let context = vm.fw.current_activity;
     let doc = load_layout_document(vm, layout_resid)?;
     let mut count = 0usize;
-    inflate_element_depth(vm, &doc.root, 0, &mut count, context, AxisCaps::VIEWPORT)
+    inflate_element_depth(
+        vm,
+        &doc.root,
+        0,
+        &mut count,
+        context,
+        AxisCaps::viewport(vm),
+    )
 }
 
 /// Equivalente host de `LayoutInflater.inflate(resource, root, attachToRoot)`.
@@ -118,7 +126,7 @@ pub(crate) fn inflate_resource_into_with_context(
     context: Option<ObjRef>,
 ) -> Result<ObjRef, VmExit> {
     let doc = load_layout_document(vm, layout_resid)?;
-    let initial_caps = root.map_or(AxisCaps::VIEWPORT, |p| caps_for_parent_obj(vm, p));
+    let initial_caps = root.map_or(AxisCaps::viewport(vm), |p| caps_for_parent_obj(vm, p));
     let mut count = 0usize;
     if doc.root.name == "merge" {
         let Some(root) = root.filter(|_| attach_to_root) else {

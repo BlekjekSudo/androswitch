@@ -46,7 +46,7 @@ Rust/newlib/libnx original notices remain required for redistribution.
 See [CREDITS](CREDITS.md), [LICENSE-MIT](LICENSE-MIT) and
 [LICENSE-APACHE](LICENSE-APACHE).
 
-Latest synchronized RustyDroid source: `4489813db513b42c531979b079397c50edd54e25`.
+Latest synchronized RustyDroid source: `33e76456643e157458d97087d2626045498725db`.
 The merge retains upstream commits, authors, runtime source and tests. See
 [CREDITS.md](CREDITS.md) and [the source/porting audit](docs/UPSTREAM_PORTING.md).
 

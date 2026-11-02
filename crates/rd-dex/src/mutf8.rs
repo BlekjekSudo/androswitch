@@ -18,14 +18,14 @@ const HASH_SEED: u64 = 0x517c_c1b7_2722_0a95;
 /// Verifica em blocos de 8 bytes (SWAR) se `bytes` contém apenas ASCII `0x01..=0x7F`.
 #[inline]
 pub(crate) fn is_pure_ascii_non_nul(bytes: &[u8]) -> bool {
-    let mut chunks = bytes.chunks_exact(8);
-    for c in &mut chunks {
+    let (chunks, rem) = bytes.as_chunks::<8>();
+    for c in chunks {
         let w = u64::from_le_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]);
         if (w.wrapping_sub(0x0101_0101_0101_0101) | w) & 0x8080_8080_8080_8080 != 0 {
             return false;
         }
     }
-    chunks.remainder().iter().all(|&b| b.wrapping_sub(1) < 0x7F)
+    rem.iter().all(|&b| b.wrapping_sub(1) < 0x7F)
 }
 
 /// Hash determinístico 64-bit processando 8 bytes por iteração sobre bytes
@@ -34,13 +34,12 @@ pub(crate) fn is_pure_ascii_non_nul(bytes: &[u8]) -> bool {
 #[inline]
 pub fn hash_bytes_nonzero(bytes: &[u8]) -> u64 {
     let mut h = HASH_SEED ^ (bytes.len() as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15);
-    let mut chunks = bytes.chunks_exact(8);
-    for c in &mut chunks {
+    let (chunks, rem) = bytes.as_chunks::<8>();
+    for c in chunks {
         let w = u64::from_le_bytes([c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]);
         h = (h ^ w).wrapping_mul(HASH_SEED);
         h ^= h >> 32;
     }
-    let rem = chunks.remainder();
     if !rem.is_empty() {
         let mut tail = 0u64;
         for (shift, &b) in rem.iter().enumerate() {

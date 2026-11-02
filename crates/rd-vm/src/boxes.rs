@@ -247,6 +247,33 @@ pub fn host_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<V
         (DOUBLE, "NEGATIVE_INFINITY") => Value::Double(f64::NEG_INFINITY),
         (DOUBLE, "MAX_VALUE") => Value::Double(f64::MAX),
         (DOUBLE, "MIN_VALUE") => Value::Double(f64::from_bits(1)),
+        // issue #330: Byte/Short/Character MIN_VALUE/MAX_VALUE (+ SIZE/BYTES
+        // e radix) — `sget` de Kotlin/d8 não-inlinado e a reflexão devolviam 0.
+        // Tipos B/S/C vivem em registradores 32-bit (Int), como todo campo
+        // não-wide Dalvik.
+        (BYTE, "MIN_VALUE") => Value::Int(i8::MIN as i32),
+        (BYTE, "MAX_VALUE") => Value::Int(i8::MAX as i32),
+        (BYTE, "SIZE") => Value::Int(8),
+        (BYTE, "BYTES") => Value::Int(1),
+        (SHORT, "MIN_VALUE") => Value::Int(i16::MIN as i32),
+        (SHORT, "MAX_VALUE") => Value::Int(i16::MAX as i32),
+        (SHORT, "SIZE") => Value::Int(16),
+        (SHORT, "BYTES") => Value::Int(2),
+        // Character.MIN_VALUE = '\u0000', MAX_VALUE = '\uFFFF' (JLS 4.2)
+        (CHARACTER, "MIN_VALUE") => Value::Int(0),
+        (CHARACTER, "MAX_VALUE") => Value::Int(0xFFFF),
+        (CHARACTER, "MIN_RADIX") => Value::Int(2),
+        (CHARACTER, "MAX_RADIX") => Value::Int(36),
+        (CHARACTER, "SIZE") => Value::Int(16),
+        (CHARACTER, "BYTES") => Value::Int(2),
+        (INTEGER, "SIZE") => Value::Int(32),
+        (INTEGER, "BYTES") => Value::Int(4),
+        (LONG, "SIZE") => Value::Int(64),
+        (LONG, "BYTES") => Value::Int(8),
+        (FLOAT, "SIZE") => Value::Int(32),
+        (FLOAT, "BYTES") => Value::Int(4),
+        (DOUBLE, "SIZE") => Value::Int(64),
+        (DOUBLE, "BYTES") => Value::Int(8),
         // Integer.TYPE == int.class, …
         (c, "TYPE") if kind(c).is_some() => {
             let k = kind(c).unwrap_or('V').to_string();

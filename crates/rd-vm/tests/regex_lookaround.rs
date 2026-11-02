@@ -103,7 +103,10 @@ fn string_replacement_and_whole_match_use_same_engine() {
 #[test]
 fn pathological_backtracking_is_a_structured_error_not_false() {
     let mut e = Engine::new(vec![], VmConfig::default());
-    let m = matcher(&mut e, r"(?=a)(a+)+b", &"a".repeat(2000));
+    // fancy-regex 0.20 memoiza `(?=a)(a+)+b`: sem 'b' no texto a resposta
+    // correta é `false` e não há limite a estourar. Este padrão com
+    // backreference ainda estoura o limite (REGEX_RUNTIME) na 0.20.
+    let m = matcher(&mut e, r"(?=a)((a|aa)+)+\1c", &"a".repeat(40));
     let err = e.invoke_instance(m, "find", "()Z", &[]).unwrap_err();
     assert!(
         matches!(err, rd_vm::err::VmExit::Error(ref err) if err.code == "REGEX_RUNTIME"),

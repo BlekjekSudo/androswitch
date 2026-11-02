@@ -1,7 +1,7 @@
 # Complete RustyDroid API port
 
 The active requirement is behavior parity with every Android/Java/native API
-implemented by RustyDroid at `3761815dc6a2a1427e9fc66b66e8471b78d1b170`.
+implemented by RustyDroid at `33e76456643e157458d97087d2626045498725db`.
 External APK startup failures are integration evidence, not the porting backlog.
 RustyDroid remains the implementation source, credited in README, CREDITS,
 NOTICE, and the inherited licenses.
@@ -56,11 +56,15 @@ must be integrated before enabling the common runtime in the runner: a second
 in-memory filesystem cannot serve as device persistence. Portable native SQLite
 replaces Python transport; Java SQL operations and lifecycle remain upstream code.
 
-All 50 original integration suite files are registered with
+All 95 original integration suite files are registered with
 `as-vm/upstream-parity-tests`. The original fixture builders and host renderer
 use the isolated portable VM. Registration, compilation, and execution are
 different evidence. `as-vm-render-testsupport` is a host oracle outside the
 product dependency graph.
+
+The [33e7645 integration](UPSTREAM_SYNC_20261102.md) accounts for all 499
+upstream files. The default shipping profile still excludes 83 original VM
+files; this is a source-route count, not an API coverage percentage.
 
 `reports/upstream-sync-20261026.json` records the earlier NRO47 checkpoint. Its
 results predate this development path. Mekorama and Candy Crush first frames
@@ -158,9 +162,10 @@ no completed emulator or hardware qualification; the earlier hardware
 confirmation is not transferred. See the
 [actual checkpoint](../reports/collections-text-20261026.json).
 
-The source-route audit now evaluates the actual shipping `std` feature
+The source-route audit evaluates the actual shipping `std` feature
 declarations, including nested `all`/`any`/`not` guards. **81 original VM files
-remain excluded** in the default device profile. A compiled std source is still
+remained excluded at the collections/text checkpoint** in the default device
+profile; the current upstream inventory above supersedes that count. A compiled std source is still
 reported as behavior-unverified. This count is not an API percentage, and the
 full upstream dispatcher is still not enabled for the product's bound framework.
 

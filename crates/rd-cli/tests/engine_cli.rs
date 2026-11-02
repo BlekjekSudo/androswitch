@@ -85,7 +85,7 @@ fn embedded_catalog_is_complete_even_when_run_outside_the_repository() {
     for engine in v["engines"].as_array().unwrap() {
         assert_eq!(
             engine["registry_adapter_status"],
-            if rd_engine_registry::native_execution_available(engine["id"].as_str().unwrap()) {
+            if rd_engine_registry::execution_available(engine["id"].as_str().unwrap()) {
                 "AVAILABLE_BOUNDED"
             } else {
                 "NOT_IMPLEMENTED"
@@ -239,10 +239,16 @@ fn optional_engine_limit_does_not_break_basic_inspect() {
 fn engine_run_preserves_availability_and_file_error_precedence() {
     let t = Temp::new("run-unavailable");
     // LANG/feature selection must not turn an unavailable adapter into IO_ERROR.
+    // M11 S1c: with `wasm-execution` the adapter exists, so a missing APK is IO_ERROR.
+    let (exit, code) = if rd_engine_registry::execution_available("wasm") {
+        (1, "IO_ERROR")
+    } else {
+        (2, "NOT_IMPLEMENTED")
+    };
     error(
         &t.run(&["engine", "run", "wasm", "missing.apk", "--json"]),
-        2,
-        "NOT_IMPLEMENTED",
+        exit,
+        code,
     );
     for id in ["c-ndk", "cpp-ndk", "rust-ndk"] {
         // Use actual availability: Cargo may unify dependency features from

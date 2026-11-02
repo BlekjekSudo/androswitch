@@ -1,0 +1,28 @@
+# https://editorconfig.org — keeps diffs small across the many agent sessions.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{md,markdown}]
+# Markdown is hand-edited by humans and agents; trailing spaces stay meaningful.
+trim_trailing_whitespace = false
+max_line_length = off
+
+[*.{yml,yaml,json,jsonc,toml}]
+indent_size = 2
+
+[*.{sh,bash}]
+indent_size = 2
+switch_case_indent = true
+
+[*.rs]
+max_line_length = 100
+
+[Makefile]
+indent_style = tab

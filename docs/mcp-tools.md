@@ -22,7 +22,7 @@ Falhas de tool voltam com `isError: true` e o contrato estável `{code, cause, s
 
 ### `install`
 
-Instala um APK na sessão (abre, valida o piso API 26 e prepara o estado de permissões). Caminho PRECISA estar dentro do sandbox (RD_MCP_SANDBOX); URL é recusada; APK acima de RD_MCP_MAX_APK_MB (default 256) é recusado. Reinstalar o package EM EXECUÇÃO o encerra (sem estado inconsistente). Não executa o app.
+Instala um APK na sessão (abre, valida o piso API 9 e prepara o estado de permissões). Caminho PRECISA estar dentro do sandbox (RD_MCP_SANDBOX); URL é recusada; APK acima de RD_MCP_MAX_APK_MB (default 256) é recusado. Reinstalar o package EM EXECUÇÃO o encerra (sem estado inconsistente). Não executa o app.
 
 - Parâmetros: `apk` · obrigatórios: `apk`
 
@@ -34,7 +34,7 @@ Executa o app instalado: cria a activity (LAUNCHER ou `activity`) e roda o lifec
 
 ### `tap`
 
-Toque simulado nas coordenadas (px do viewport 720×1440). Retorna se algum listener foi acionado.
+Toque simulado nas coordenadas (px do viewport ativo: 720×1440 retrato, 1440×720 paisagem). Retorna se algum listener foi acionado.
 
 - Parâmetros: `observe, x, y` · obrigatórios: `x, y`
 
@@ -76,7 +76,7 @@ Dump da UI corrente: `xml` (uiautomator, formato dos seletores) ou `text` (árvo
 
 ### `screenshot`
 
-Screenshot PNG determinístico 720×1440. Com `path` escreve o arquivo (DENTRO do sandbox — RD_MCP_SANDBOX; symlink no destino é recusado: SYMLINK_NOT_ALLOWED, issue #67); sem, devolve o PNG em base64 (conteúdo image).
+Screenshot PNG determinístico do viewport ativo (720×1440 retrato, 1440×720 paisagem). Com `path` escreve o arquivo (DENTRO do sandbox — RD_MCP_SANDBOX; symlink no destino é recusado: SYMLINK_NOT_ALLOWED, issue #67); sem, devolve o PNG em base64 (conteúdo image).
 
 - Parâmetros: `path`
 
@@ -166,9 +166,9 @@ Auditoria estática do manifest (exported sem guarda, debuggable, cleartext, per
 
 ### `device_profile`
 
-Perfil de device corrente (piso contratual moto-e5, budgets e snapshot de periféricos virtuais M10) e controle determinístico AG-10 via `action` opcional (`get`, `location`, `sensor`, `battery`, `network`, `telephony`, `sms_receive`, `ble_advertisement`, `nfc_tag`, `camera_frame`, `biometric`, `audio_input`, `media_action`, `dark_mode`, `locale`, `font_scale`, `orientation`, `clipboard`).
+Perfil de device corrente (piso contratual moto-e5, budgets e snapshot de periféricos virtuais M10) e controle determinístico AG-10 via `action` opcional (`get`, `location`, `sensor`, `battery`, `network`, `telephony`, `sms_receive`, `ble_advertisement`, `nfc_tag`, `camera_frame`, `biometric`, `audio_input`, `media_action`, `dark_mode`, `locale`, `font_scale`, `orientation`, `clipboard`) + Apêndice E programável (`gms`: availability, conta/Sign-In fake, token/mensagem FCM, catálogo/resultado Billing, falha Ads, Integrity/SafetyNet, Fit, Cast; `gms_state`: snapshot capturado — analytics, compras, ads, crashes, maps). Sem rede: modo no-gms-honest.
 
-- Parâmetros: `accuracy, action, address, airplane_mode, altitude, bearing, bytes_hex, call_state, camera_id, carrier_name, charging, command, enabled, enrolled, format, hardware_present, height, id_hex, label, latitude, level, locale, longitude, metered, name, network_type, online, orientation, outcome, payload_hex, pcm_hex, persist, plugged, power_save_mode, roaming, route, rssi, scale, seek_ms, sender, sensor, sensor_type, sim_state, speed, step_route, temperature_tenths_c, text, transport, uri, values, width`
+- Parâmetros: `accuracy, action, address, ads_clear_failure, ads_failure_code, airplane_mode, altitude, attestation_jws, bearing, billing_error_code, billing_outcome, billing_sku, bytes_hex, call_state, camera_id, carrier_name, cast_device, cast_disconnect, charging, command, enabled, enrolled, fcm_body, fcm_data, fcm_from, fcm_title, fcm_token, firebase_strict_init, fit_steps, format, gms_account_email, gms_account_name, gms_availability, gms_signin, hardware_present, height, id_hex, integrity_token, label, latitude, level, locale, longitude, metered, name, network_type, online, orientation, outcome, payload_hex, pcm_hex, persist, plugged, power_save_mode, roaming, route, rssi, scale, seek_ms, sender, sensor, sensor_type, sim_state, speed, step_route, temperature_tenths_c, text, transport, uri, values, width`
 
 ### `behavior_switches`
 
@@ -184,7 +184,7 @@ Saúde do runtime: sessão, app em execução, activity, finished, clock virtual
 
 ### `compat_gaps`
 
-Catálogo HONESTO das lacunas de compatibilidade do runtime v1 (notificações M9, args String/array na sonda, foco, teclas, gestures, intent implícito, transporte HTTP) + sumário executável do Apêndice C (data/api-coverage.toml: domínios/status das superfícies android.*) — o agente consulta antes de planejar.
+Catálogo HONESTO das lacunas de compatibilidade do runtime v1 (notificações M9, args String/array na sonda, foco, teclas, gestures, intent implícito, transporte HTTP) + sumários executáveis dos Apêndices C (data/api-coverage.toml), D (data/jetpack.toml: AndroidX/Jetpack) e E (data/gms.toml: GMS/Firebase sem rede) + superfícies stub/not_implemented referenciadas pelo app activo (app_library_gaps) — o agente consulta antes de planejar.
 
 - Parâmetros: nenhum
 
@@ -196,7 +196,7 @@ Executa uma lista de chamadas [{name, arguments}] EM ORDEM, uma vez cada, com re
 
 ### `get_api_usage`
 
-AG-09 (metade estática): quais APIs android.* o app instalado REFERENCIA nos DEX — tipos (method_ids/field_ids/superclass/interfaces), métodos por classe, contagem por pacote e classificação Apêndice C (`api_coverage`: domínio funcional/status/gaps via data/api-coverage.toml). É análise ESTÁTICA do DEX; para coverage de EXECUÇÃO use get_coverage. Com `package` consulta outro app instalado; sem, o app ativo.
+AG-09 (metade estática): quais APIs android.* o app instalado REFERENCIA nos DEX — tipos (method_ids/field_ids/superclass/interfaces), métodos por classe, contagem por pacote e classificação Apêndice C (`api_coverage`: domínio funcional/status/gaps via data/api-coverage.toml), mais os tipos androidx.* contra o Apêndice D (`jetpack`, data/jetpack.toml) e com.google.android.gms.*/com.google.firebase.* contra o Apêndice E (`gms`, data/gms.toml, modo no-gms-honest: registro ≠ backend). É análise ESTÁTICA do DEX; para coverage de EXECUÇÃO use get_coverage. Com `package` consulta outro app instalado; sem, o app ativo.
 
 - Parâmetros: `package`
 

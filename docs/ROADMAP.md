@@ -5,20 +5,22 @@
 
 ## Status atual
 
+**Regra de status:** "concluído" só quando o DoD é reproduzível a partir do repositório e executado no CI ou em uma campanha documentada. Código presente, benchmark local não repetível ou uma nota no worklog não bastam, isoladamente. Fase com código presente mas DoD incompleto = ⚠️ **parcial**, com a lacuna explícita.
+
 | Fase | Entrega central | DoD (done quando…) | Status |
 |---|---|---|---|
 | **M0** | Workspace + CI + rd-apk + permissions.toml + devices.toml (moto-e5) + behavior-switches.toml + motor de permissões | inspect de APK real imprime componentes/permissões/features completos; CI verde | ✅ **implementado (2026-10)** |
-| M1 | rd-dex 100% + disassembler | idêntico ao baksmali em 3 APKs; fuzz 24h sem crash | ✅ |
+| M1 | rd-dex 100% + disassembler | idêntico ao baksmali em 3 APKs; fuzz 24h sem crash | ⚠️ **parcial** — fuzz 24 h nunca executado; comparador não versionado |
 | M2 | VM Dalvik mínima | métodos puros de APK real retornam valores corretos | ✅ **implementado (2026-10)** |
 | M3 | Framework essencial | app trivial (activity+botão+texto) roda headless ponta a ponta | ✅ **implementado (2026-10, rounds 1+2)** |
-| M4 | Render+dump | screenshot correto; get_ui_tree com ids certos | ✅ |
-| M5 | Agente MCP v1 (30 tools + controles) | LLM instala, navega e assera estado só com as tools | ✅ |
+| M4 | Render+dump | tiny-skia desenha; screenshot correto; get_ui_tree com ids certos | ⚠️ **parcial** — dump/screenshot ativos; sem `tiny-skia` nem shaping (ADR 019); sem golden de referência Android |
+| M5 | Agente MCP v1 (30 tools + controles) | LLM instala, navega e assera estado só com as tools | ✅ (provas e2e usam APK sintético, não APK real do corpus) |
 | M6 | Executor de testes | suíte JSON → JUnit XML; compat-matrix automatizada | ✅ **implementado (2026-10)** |
 | M7 | Performance + gate piso E5 | startup < 2 s app trivial; suíte golden passa nos budgets moto-e5 | 🟡 **parcial (2026-10)** — `rd perf` + gate de CI no app trivial (estimativa); golden pendente |
 | M8 | Compat real | app OSS médio navega funcional; v0.9 | ✅ **implementado (2026-10)** |
 | M9 | Componentes avançados + NDK | 5 APKs com .so rodando; widgets/IME/notificações ok | ✅ **implementado e revisado (2026-10)** — 5 APKs reais × 3 ABIs com chamadas JNI verificadas; aprovação humana registrada em 2026-10-21 |
-| M10 | Dispositivos virtuais | câmera/GPS/biometria programáveis pelo agente | ✅ **implementado (2026-10-25)** — [docs/m10.md](m10.md), [ADR 011](adr/011-m10-virtual-devices.md), PR #201 |
-| M11 | Engines | WASM → RN → Mono → Flutter (ordem do [ADR 013](adr/013-m11-engine-execution-strategy.md)): 1 app de cada em golden flow | ⬜ — ADR 013 aceito (2026-10-25); S1 (`rd-engine-wasm`) é o próximo passo |
+| M10 | Dispositivos virtuais | câmera/GPS/biometria programáveis pelo agente | ✅ **implementado (2026-10-25)** — [docs/m10.md](m10.md), [ADR 011](adr/011-m10-virtual-devices.md), PR #201. Viewport em paisagem: `Engine::viewport_px()` é a fonte única para layout, decor da janela, screenshots e `ScreenModel` (#252, PR #456) |
+| M11 | Engines | WASM → RN → Mono → Flutter (ordem do [ADR 013](adr/013-m11-engine-execution-strategy.md)): 1 app de cada em golden flow | 🟡 **parcial (S1 núcleo + S1b bridge em VM + S1c registro/CLI `rd engine run wasm`, 2026-11)** — interpretador i32/i64 + validador + limites + fuzz em `rd-engine-wasm` ([docs/m11-wasm.md](m11-wasm.md)) + bridge `io.rustydroid.wasm.WasmBridge` atrás da feature `wasm-engine` de `rd-vm`, com golden de VM (ciclo de vida de `Activity`) e APK de demonstração em `golden/engines/wasm/` (o `TextView` mostra `add(2, 3) = 5` via bridge, `wasm_demo_golden`). suíte `rd test golden/engines/wasm/suite.json` PASS no CI. S1c: adaptador `wasm` no registro atrás da feature `wasm-execution` (`partial_wasm`; `rd engine check wasm` = AVAILABLE_BOUNDED, `rd engine run wasm <apk>` executa o APK de demonstração e mostra `5`). Pendente: S2 React Native (estratégia proposta no [ADR 020](adr/020-m11-s2-react-native.md), aguarda decisão do dono sobre engine JS/Hermes), S3 Mono, S4 Flutter (golden flow de 1 app cada). |
 | M12 | Ecossistema GH | docs site, compat-matrix viva, releases; v1.0 | ⬜ |
 
 ## ✅ Apêndice G — registro e detecção completos (2026-10-14)
@@ -47,7 +49,7 @@ seleção de runtimes no spec/manifest permanecem inalterados.
 responde erro tipado. **DoD de execução NÃO entregue:** cada engine futura precisa
 crate/adaptador real, golden flow de APK OSS e gate Moto E5 (ADR 003).
 
-## O que o M0 entregou (verificado em APK real: F-Droid 2.0.1)
+## O que o M0 entregou (verificado em APK real: F-Droid 2.0.1; reverificado em 2026-11-01 com F-Droid 2.0.2 — `rd inspect` sai com 0 e imprime componentes, permissões, features e SDK)
 
 - **Workspace Cargo** com 9 crates + xtask, dependências só apontam para baixo,
   MSRV 1.76, perfil release calibrado para hardware fraco.
@@ -61,7 +63,7 @@ crate/adaptador real, golden flow de APK OSS e gate Moto E5 (ADR 003).
   (43 dangerous/12 grupos, 15 specials, 78 normais puras + 15 com flag special = 93 normal-level, 36 signature, 3 internal) +
   13 roles + 7 appops; estado instalável/mutável (grant/deny/revoke) e auditoria
   estática (exported sem guarda, debuggable, cleartext, desconhecidas).
-- **fd-devices**: 6 perfis de device; `moto-e5` é o piso contratual (512 MB RSS /
+- **fd-devices**: 6 perfis de device; `moto-e5` é o piso contratual (1024 MB RSS /
   256 MB heap / 25% single-thread / Adreno 308 fill-rate).
 - **fd-behavior**: 25 comutadores targetSdk 26→36 (PRF-07), consultáveis por target.
 - **CLI `rd`**: `inspect` (humano + `--json`), `perm list|info|audit`,
@@ -71,7 +73,9 @@ crate/adaptador real, golden flow de APK OSS e gate Moto E5 (ADR 003).
 - **CI**: fmt + clippy `-D warnings` + test + MSRV 1.76 + smoke do binário.
 - **Fixture GH-05**: `golden-apks/fetch.sh` baixa APKs OSS (nunca commitados).
 
-## ✅ M1 concluído — rd-dex (2026-10)
+## ⚠️ M1 parcial — rd-dex (2026-10)
+
+> **Auditoria (2026-10):** o DoD do M1 exige fuzz 24 h sem crash e comparação versionada com baksmali. A campanha de 24 h nunca foi executada e o comparador não está versionado. Até lá, M1 é ⚠️ parcial.
 
 1. ✅ Parser DEX 100% (header, maps, strings MUTF-8, types, protos, fields,
    methods, classes, code items, debug info, annotations, call sites,
@@ -158,7 +162,10 @@ crate/adaptador real, golden flow de APK OSS e gate Moto E5 (ADR 003).
 Na sequência do M3 (M4): render + UI dump rico (`get_ui_tree` com ids
 certos); configs específicas (land/locale/density) selecionáveis.
 
-## ✅ M4 concluído (2026-10) — rd-render real
+## ⚠️ M4 parcial (2026-10) — rd-render
+
+> **Auditoria (ver ADR 019):** o DoD diz "tiny-skia desenha" e a spec fixa `tiny-skia` + `rustybuzz`. Nenhum dos dois está nas dependências; o texto usa um atlas DejaVu Sans pré-rasterizado (32 px), sem shaping nem bidi. Não há ADR aprovado que substitua a decisão, e não há golden de referência Android.
+
 
 1. ✅ **`get_ui_tree` com ids certos**: `Engine::view_tree()` estruturada
    (class/resource-id `package:id/nome`/text/bounds/visibility/enabled/
@@ -167,8 +174,8 @@ certos); configs específicas (land/locale/density) selecionáveis.
 2. ✅ **Screenshot correto**: software renderer determinístico (framebuffer
    RGB 720×1440) + painter por classe/estado (contêiner/texto/botão/borda de
    clickable; INVISIBLE não pinta a subárvore) + encoder PNG sem
-   dependências (zlib STORED + crc32/adler32 próprios). Texto com glifos de
-   bloco 3×7 (fonte tipográfica real: M8/M9 — o Android real usa skia).
+   dependências (zlib STORED + crc32/adler32 próprios). Texto com atlas
+   DejaVu Sans pré-rasterizado (32 px, `scripts/gen_glyph_atlas.py`), sem shaping nem bidi (shaping real: ADR 019; o Android real usa skia).
 3. ✅ **CLI**: `rd app dump <apk>` (uiautomator XML | `--text` | `--json`) e
    `rd app shot <apk> --out FILE.png`; ações de script `xml` e `shot FILE`.
 4. ✅ Testes e2e contra fixture real: ids/bounds/clickable/text na árvore;
@@ -274,7 +281,7 @@ certos); configs específicas (land/locale/density) selecionáveis.
    via `/proc/self/task/*/schedstat`; RSS de pico via `VmHWM`. Exit `0` orçamentos
    ok · `1` orçamento falhou ou erro de execução (`PERF_FAILED`).
 2. ✅ **Orçamentos do perfil `moto-e5`** (Apêndice A2): startup cold emulado
-   `< 2000 ms` (DoD do M7) · RSS de pico `≤ 512 MB` (falha fechado fora do
+   `< 2000 ms` (DoD do M7) · RSS de pico `≤ 1024 MB` (ADR 015) (falha fechado fora do
    Linux) · heap do app `≤ 256 MB` (marca d'água da arena da VM,
    `runtime_health.heap_peak_bytes`, lida fora do cronômetro).
 3. ✅ **Gate de CI**: `crates/rd-cli/tests/perf_cli.rs` roda o binário sobre o
@@ -753,3 +760,15 @@ inicializa.
 
 MCP: catálogo 32 → 39 tools (`component_service`, `widgets`,
 `widget_screenshot`, `ime`, `accessibility`, `shortcuts`, `native_state`).
+
+## Apps alvo ponta a ponta (requisito do dono, 2026-11-01)
+
+- Lista de 17 apps que devem rodar de ponta a ponta, com o status real de cada um:
+  [docs/target-apps.md](target-apps.md). Nenhum deles está verificado como funcionando.
+- Política de aquisição (decidida pelo dono): APKs só para teste interno, nunca
+  commitados; ficam fora do git e entram por caminho em variável de ambiente.
+- Lucky Patcher: em andamento (dono aprovou prosseguir).
+- Decisão pendente do dono: escolha dos apps "a escolher" (GTA clone, photo manager,
+  password manager, auto-clicker, auto-scroll, contatos).
+- Suporte a Google Play Services (GMS): **um dos últimos itens**, depois dos golden
+  flows dos demais apps.

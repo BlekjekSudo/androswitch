@@ -858,58 +858,10 @@ fn class_supported(name: &str, sig: &str) -> bool {
 /// BigDecimal.ZERO, …) through the same host hooks `sget` uses; cached in
 /// `vm.statics`.
 fn platform_static(vm: &mut Engine, owner: &str, field: &str) -> Result<Option<Value>, VmExit> {
-    let key = (owner.to_string(), field.to_string());
-    if let Some(v) = vm.statics.get(&key) {
-        return Ok(Some(v.clone()));
-    }
-    let v = match crate::android_build::host_static(vm, owner, field)? {
-        Some(v) => Some(v),
-        None => match crate::android_env::host_static(vm, owner, field)? {
-            Some(v) => Some(v),
-            None => match crate::boxes::host_static(vm, owner, field)? {
-                Some(v) => Some(v),
-                None => match crate::jbigdecimal::host_static(vm, owner, field)? {
-                    Some(v) => Some(v),
-                    None => match crate::jnormalizer::host_static(vm, owner, field)? {
-                        Some(v) => Some(v),
-                        None => {
-                            #[cfg(feature = "virtual-devices")]
-                            let m10_val = if vm.fw.vdev.virtual_hardware_enabled {
-                                crate::m10::host_static(vm, owner, field)?
-                            } else {
-                                None
-                            };
-                            #[cfg(not(feature = "virtual-devices"))]
-                            let m10_val: Option<Value> = None;
-                            match m10_val {
-                                Some(v) => Some(v),
-                                None => {
-                                    match crate::android_sysservices::host_static(vm, owner, field)?
-                                    {
-                                        Some(v) => Some(v),
-                                        None => {
-                                            match crate::android_stub_surfaces::host_static(
-                                                vm, owner, field,
-                                            )? {
-                                                Some(v) => Some(v),
-                                                None => crate::android_util::host_static(
-                                                    vm, owner, field,
-                                                )?,
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                },
-            },
-        },
-    };
-    if let Some(v) = &v {
-        vm.statics.insert(key, v.clone());
-    }
-    Ok(v)
+    // #330: MESMA fonte canônica que os opcodes `sget*` usam. Antes este
+    // caminho mantinha uma cadeia de providers própria e divergente, então a
+    // reflexão enxergava campos que o bytecode lia como 0/Null e vice-versa.
+    vm.resolve_host_static(owner, field)
 }
 
 /// Field descriptor for a host static value (reflection metadata).
@@ -1800,7 +1752,7 @@ fn atomic_ref_array_intrinsic(
             .map_err(crate::err::oom_throwable)?;
         vm.heap
             .array_elems_mut(array)?
-            .extend(core::iter::repeat(Value::Null).take(len));
+            .extend(core::iter::repeat_n(Value::Null, len));
         crate::err::put_field_result(vm.heap.put_field(recv, "elements", Value::Obj(array)))?;
         return Ok(Some(Value::Null));
     }
@@ -2949,6 +2901,7 @@ fn deque_supported(name: &str, sig: &str) -> bool {
             | ("size", "()I")
             | ("isEmpty", "()Z")
             | ("clear", "()V")
+            | ("descendingIterator", "()Ljava/util/Iterator;")
     )
 }
 
@@ -3016,6 +2969,16 @@ fn deque_intrinsic(
             .insert(recv, HostObj::List { elems: Vec::new() });
     }
     match (name, sig) {
+        // descendingIterator(): snapshot invertido (frente = índice 0 ⇒ do fim ao
+        // início). Sem `jiterator::bind`: o remove() por índice não corresponde ao
+        // snapshot invertido, então o iterador é somente leitura.
+        ("descendingIterator", "()Ljava/util/Iterator;") => {
+            let mut elems = list_elems(vm, recv)?.clone();
+            elems.reverse();
+            let it = vm.heap.alloc_instance(ITERATOR.to_string(), vec![])?;
+            vm.fw.objects.insert(it, HostObj::Iter { elems, pos: 0 });
+            Ok(Some(Value::Obj(it)))
+        }
         ("addFirst", _) | ("push", _) | ("offerFirst", _) => {
             if matches!(args[0], Value::Null) {
                 return Err(deque_null_rejected());
@@ -3866,22 +3829,33 @@ fn instance_intrinsic_dispatch(
     {
         return Ok(Some(v));
     }
-    // ClassLoader.loadClass (jlsystem.rs)
-    if let Some(v) = crate::jlsystem::class_loader_intrinsic(
-        vm,
+    // ClassLoader.loadClass (jlsystem.rs) — Issue #271: guarda de
+    // descritor ANTES de montar os argumentos. A forma anterior alocava
+    // um Vec<Value> via .concat() em TODA invoke que chegava aqui, só
+    // para class_loader_intrinsic devolver None fora destes 5
+    // descritores (os únicos que ela trata; subclasses não listadas
+    // também recebiam None — semântica preservada).
+    if matches!(
         mref_class,
-        name,
-        sig,
-        &[&[Value::Obj(recv)][..], args].concat()[if matches!(
-            mref_class,
-            "Ljava/lang/Class;" | "Ljava/lang/Package;"
-        ) {
-            0
-        } else {
-            1
-        }..],
-    )? {
-        return Ok(Some(v));
+        "Ljava/lang/Class;"
+            | "Ljava/lang/Package;"
+            | "Ljava/lang/ClassLoader;"
+            | "Ldalvik/system/BaseDexClassLoader;"
+            | "Ldalvik/system/PathClassLoader;"
+    ) {
+        let full;
+        let call_args: &[Value] =
+            if matches!(mref_class, "Ljava/lang/Class;" | "Ljava/lang/Package;") {
+                full = [&[Value::Obj(recv)][..], args].concat();
+                &full
+            } else {
+                args
+            };
+        if let Some(v) =
+            crate::jlsystem::class_loader_intrinsic(vm, mref_class, name, sig, call_args)?
+        {
+            return Ok(Some(v));
+        }
     }
     // java.io.File + Context directory getters (jfile.rs)
     if let Some(v) = crate::juuid::instance_intrinsic(vm, recv_class, name, recv, args)? {
@@ -4052,9 +4026,21 @@ fn instance_intrinsic_dispatch(
     // Stateless platform base defaults are only reached when no DEX override
     // exists. Otherwise an invoke-virtual whose symbolic owner is the base
     // class (e.g. DataSetObserver.onChanged) must dispatch to the guest method.
-    let dex_virtual_override = vm.cp.resolve_method(recv_class, name, sig).is_some();
-    if !dex_virtual_override {
-        if let Some(v) = crate::platform_base::instance_intrinsic(mref_class, name, sig) {
+    // issue #228: AbsSavedState/BaseSavedState state is consulted BEFORE that
+    // gate — the `super(Parcelable)` ctor is invoke-direct on the platform
+    // base while the receiver class declares its own <init> (the gate would
+    // otherwise hide the superState storage).
+    if let Some(v) = crate::platform_base::saved_state_instance(
+        vm, recv_class, mref_class, name, sig, recv, args,
+    )? {
+        return Ok(Some(v));
+    }
+    // Issue #271: o match de platform_base é quase grátis; só pagamos a
+    // resolução DEX completa quando ele realmente casa. Antes,
+    // resolve_method rodava em TODA chamada que chegava aqui (~40k
+    // resoluções desperdiçadas num cold launch típico).
+    if let Some(v) = crate::platform_base::instance_intrinsic(mref_class, name, sig) {
+        if vm.cp.resolve_method(recv_class, name, sig).is_none() {
             return Ok(Some(v));
         }
     }
@@ -5447,7 +5433,7 @@ mod utf16_optimization_tests {
                 state ^= state << 13;
                 state ^= state >> 7;
                 state ^= state << 17;
-                let value = if state % 3 == 0 {
+                let value = if state.is_multiple_of(3) {
                     (state % 128) as u32
                 } else {
                     (state % 0x110000) as u32

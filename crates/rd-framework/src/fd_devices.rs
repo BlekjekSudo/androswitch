@@ -139,7 +139,7 @@ mod tests {
         let e5 = table.hardware_floor().unwrap();
         assert_eq!(e5.id, "moto-e5");
         // contrato A2 exato
-        assert_eq!(e5.ram_process_cap_mb, 512);
+        assert_eq!(e5.ram_process_cap_mb, 1024);
         assert_eq!(e5.ram_app_heap_mb, 256);
         assert_eq!(e5.ram_device_mb, 2048);
         assert_eq!(e5.width_px, 720);

@@ -87,7 +87,10 @@ fn issue_316_self_and_mutual_cycles_rejected_without_host_sigabrt_or_infinite_lo
         let _ = tx.send(());
     });
 
-    rx.recv_timeout(Duration::from_millis(250))
+    // Hang guard only: a debug build under parallel load can take well over
+    // 250 ms, so a tight bound made this test flaky (sentinel P0). A real
+    // infinite loop still fails at this bound.
+    rx.recv_timeout(Duration::from_secs(60))
         .expect("timed out: View cycle hung vto::root_of / getRootView");
 }
 

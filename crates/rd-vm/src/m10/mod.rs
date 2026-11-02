@@ -135,27 +135,10 @@ impl State {
         for reg in &self.location.listeners {
             r.push(reg.listener);
         }
-        r.extend(self.camera_devices.keys().copied());
-        for (&k, &v) in &self.camera_callbacks {
-            r.push(k);
-            r.push(v);
-        }
-        for (&k, sess) in &self.camera_sessions {
-            r.push(k);
-            r.push(sess.device);
-            r.extend(sess.surfaces.iter().copied());
-        }
         for (&k, ir) in &self.image_readers {
-            r.push(k);
-            r.push(ir.surface);
-            if let Some(l) = ir.listener {
-                r.push(l);
+            if ir.listener.is_some() {
+                r.push(k);
             }
-            r.extend(ir.queue.iter().copied());
-        }
-        for (&k, &v) in &self.surface_to_reader {
-            r.push(k);
-            r.push(v);
         }
         if let Some(p) = &self.biometrics.active_prompt {
             r.push(p.callback);
@@ -168,48 +151,105 @@ impl State {
                 r.push(l);
             }
         }
-        r.extend(self.audio_records.keys().copied());
-        r.extend(self.audio_tracks.keys().copied());
         for (&k, mp) in &self.media_players {
-            r.push(k);
-            if let Some(l) = mp.on_prepared {
-                r.push(l);
-            }
-            if let Some(l) = mp.on_completion {
-                r.push(l);
-            }
-            if let Some(l) = mp.on_seek_complete {
-                r.push(l);
-            }
-            if let Some(l) = mp.on_error {
-                r.push(l);
+            if mp.state == MediaPlayerState::Started
+                && (mp.on_completion.is_some()
+                    || mp.on_error.is_some()
+                    || mp.on_prepared.is_some()
+                    || mp.on_seek_complete.is_some())
+            {
+                r.push(k);
             }
         }
         for (&k, ms) in &self.media_sessions {
-            r.push(k);
-            if let Some(cb) = ms.callback {
-                r.push(cb);
+            if ms.active && ms.callback.is_some() {
+                r.push(k);
             }
-            if let Some(ps) = ms.playback_state {
-                r.push(ps);
-            }
-            if let Some(md) = ms.metadata {
-                r.push(md);
-            }
-        }
-        for (&k, pr) in &self.media_projections {
-            r.push(k);
-            r.extend(pr.callbacks.iter().copied());
-            r.extend(pr.displays.iter().copied());
         }
         r.extend(self.network_callbacks.iter().copied());
         r.extend(self.ble_scan_callbacks.iter().copied());
         if let Some(cb) = self.nfc_reader_callback {
             r.push(cb);
         }
-        r.extend(self.wake_locks.keys().copied());
         r.extend(self.sysconfig.clipboard_listeners.iter().copied());
         r
+    }
+
+    pub(crate) fn gc_keys(&self, out: &mut Vec<ObjRef>) {
+        out.extend(self.camera_devices.keys().copied());
+        out.extend(self.camera_callbacks.keys().copied());
+        out.extend(self.camera_sessions.keys().copied());
+        out.extend(self.image_readers.keys().copied());
+        out.extend(self.surface_to_reader.keys().copied());
+        out.extend(self.audio_records.keys().copied());
+        out.extend(self.audio_tracks.keys().copied());
+        out.extend(self.media_players.keys().copied());
+        out.extend(self.media_sessions.keys().copied());
+        out.extend(self.media_projections.keys().copied());
+        out.extend(self.wake_locks.keys().copied());
+    }
+
+    pub(crate) fn gc_trace_entry(&self, r: ObjRef, out: &mut Vec<ObjRef>) {
+        if let Some(&cb) = self.camera_callbacks.get(&r) {
+            out.push(cb);
+        }
+        if let Some(sess) = self.camera_sessions.get(&r) {
+            out.push(sess.device);
+            out.extend(sess.surfaces.iter().copied());
+        }
+        if let Some(ir) = self.image_readers.get(&r) {
+            out.push(ir.surface);
+            if let Some(l) = ir.listener {
+                out.push(l);
+            }
+            out.extend(ir.queue.iter().copied());
+        }
+        if let Some(&reader) = self.surface_to_reader.get(&r) {
+            out.push(reader);
+        }
+        if let Some(mp) = self.media_players.get(&r) {
+            if let Some(l) = mp.on_prepared {
+                out.push(l);
+            }
+            if let Some(l) = mp.on_completion {
+                out.push(l);
+            }
+            if let Some(l) = mp.on_seek_complete {
+                out.push(l);
+            }
+            if let Some(l) = mp.on_error {
+                out.push(l);
+            }
+        }
+        if let Some(ms) = self.media_sessions.get(&r) {
+            if let Some(cb) = ms.callback {
+                out.push(cb);
+            }
+            if let Some(ps) = ms.playback_state {
+                out.push(ps);
+            }
+            if let Some(md) = ms.metadata {
+                out.push(md);
+            }
+        }
+        if let Some(pr) = self.media_projections.get(&r) {
+            out.extend(pr.callbacks.iter().copied());
+            out.extend(pr.displays.iter().copied());
+        }
+    }
+
+    pub(crate) fn gc_purge(&mut self, alive: &impl Fn(&ObjRef) -> bool) {
+        self.camera_devices.retain(|r, _| alive(r));
+        self.camera_callbacks.retain(|r, cb| alive(r) && alive(cb));
+        self.camera_sessions.retain(|r, _| alive(r));
+        self.image_readers.retain(|r, _| alive(r));
+        self.surface_to_reader.retain(|s, r| alive(s) && alive(r));
+        self.audio_records.retain(|r, _| alive(r));
+        self.audio_tracks.retain(|r, _| alive(r));
+        self.media_players.retain(|r, _| alive(r));
+        self.media_sessions.retain(|r, _| alive(r));
+        self.media_projections.retain(|r, _| alive(r));
+        self.wake_locks.retain(|r, _| alive(r));
     }
 }
 

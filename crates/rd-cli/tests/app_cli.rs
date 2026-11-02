@@ -8,7 +8,7 @@
 
 use std::process::{Command, Stdio};
 
-use rd_testsupport::apkfix::{a, build_apk, build_axml, ArscFix, AxNode, AxVal};
+use rd_testsupport::apkfix::{a, build_apk_sdk, build_axml, ArscFix, AxNode, AxVal};
 use rd_testsupport::vm::{op10x, op21c, op35c, DexBuilder, ACC_PUBLIC};
 
 /// const/32 vAA, lit32 (helper local — resid de 32 bits não cabe em op21c).
@@ -22,7 +22,15 @@ fn op31i_local(op: u8, reg: u8, lit: i32) -> Vec<u16> {
 
 /// APK com Main.onCreate: System.out.println("hi do app") + setContentView.
 /// Layout: LinearLayout(vertical) { TextView @string/hello }.
+/// minSdk=26 (valor realista, acima do piso 9 do ADR 016): a fixture
+/// anterior (build_apk, min_sdk=1) só rodava porque o `rd app`
+/// ignorava o piso que o MCP já aplicava — e 1 segue abaixo do piso.
 fn build_app_apk() -> Vec<u8> {
+    build_app_apk_sdk(26)
+}
+
+/// Mesmo app, minSdk parametrizável (regressão BELOW_FLOOR do CLI).
+fn build_app_apk_sdk(min_sdk: i32) -> Vec<u8> {
     let mut arsc = ArscFix::new();
     let layout = arsc.add_layout("activity_main");
     let s_hello = arsc.add_string("hello", "Olá do e2e");
@@ -82,7 +90,7 @@ fn build_app_apk() -> Vec<u8> {
         })),
     );
 
-    build_apk(
+    build_apk_sdk(
         "com.test.e2e",
         "com.test.e2e.Main",
         arsc.build(),
@@ -90,6 +98,8 @@ fn build_app_apk() -> Vec<u8> {
             ("res/layout/activity_main.xml", build_axml(&layout_xml)),
             ("classes.dex", b.finish()),
         ],
+        min_sdk,
+        26,
     )
 }
 
@@ -285,4 +295,40 @@ fn app_run_fuel_exhaustion_is_a_structured_vm_error() {
         .unwrap_or_else(|e| panic!("invalid JSON error: {e}; stderr: {}", out.stderr));
     assert_eq!(error["code"], "VM_FUEL");
     assert_eq!(error["module_id"], "rd-vm");
+}
+
+/// APK-Tester (PR-Agent, item 5b): `rd app run` EXECUTAVA abaixo do piso
+/// silenciosamente, enquanto o MCP `install` recusava com BELOW_FLOOR. O
+/// piso de API é contrato de execução em todas as bordas: o CLI recusa com
+/// o mesmo código ANTES de qualquer código do app rodar. (O piso é 9
+/// desde o ADR 016 — a fixture usa 8, o degrau imediatamente abaixo.)
+#[test]
+fn app_run_refuses_below_floor() {
+    let tmp = tempfile_dir();
+    let path = tmp.join("below-floor.apk");
+    std::fs::write(&path, build_app_apk_sdk(8)).expect("apk fixture minSdk=8");
+    let out = Command::new(env!("CARGO_BIN_EXE_rd"))
+        .args(["app", "run", path.to_string_lossy().as_ref(), "--json"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .expect("spawn rd");
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "minSdk=8 recusa com exit 1. stdout: {stdout} stderr: {stderr}"
+    );
+    assert!(
+        !stderr.contains("hi do app"),
+        "nenhum código do app roda abaixo do piso: {stderr}"
+    );
+    let json_start = stderr
+        .find('{')
+        .unwrap_or_else(|| panic!("sem JSON de erro no stderr: {stderr:?}"));
+    let error: serde_json::Value = serde_json::from_str(&stderr[json_start..])
+        .unwrap_or_else(|e| panic!("erro em JSON: {e}; stderr: {stderr}"));
+    assert_eq!(error["code"], "BELOW_FLOOR", "erro: {error}");
+    assert_eq!(error["module_id"], "rd-cli", "erro: {error}");
 }

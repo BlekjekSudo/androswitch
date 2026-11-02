@@ -77,9 +77,11 @@ complete. Both states use normal heap tracing and budget checks. Reverse,
 appendCodePoint, codePointAt and setLength preserve Java code-unit semantics.
 Eleven independent JVM edit scenarios are compared on both builder classes;
 an OOM regression checks that failed growth preserves the previous buffer.
-Producing an actual String with an isolated surrogate is still explicitly
-unavailable pending the shared UTF-16 String representation. The ordinary host
-UI now completes all 17 I/O cases with the unchanged 274-case APK.
+At this checkpoint, producing an actual String with an isolated surrogate was
+explicitly unavailable pending the shared UTF-16 String representation. The
+[later upstream synchronization](UPSTREAM_SYNC_20261102.md) restores upstream's
+lossy String materialization while preserving raw builder units. The ordinary
+host UI completed all 17 I/O cases with the unchanged 274-case APK.
 
 ## Verification scope
 

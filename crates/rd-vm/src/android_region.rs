@@ -46,7 +46,9 @@ fn load(vm: &Engine, r: ObjRef) -> Vec<Rect> {
     if let Ok(Value::Obj(a)) = vm.heap.get_field(r, "rd$rects") {
         if let Ok((v, _)) = vm.heap.as_array_elems(a) {
             return v
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .map(|v| [int(&v[0]), int(&v[1]), int(&v[2]), int(&v[3])])
                 .collect();
         }

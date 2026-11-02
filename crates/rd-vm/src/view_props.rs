@@ -115,6 +115,7 @@ fn default_for(prop: &str, ret: &str) -> Option<Value> {
             // AOSP defaults that are true
             "Enabled"
             | "SaveEnabled"
+            | "SaveFromParentEnabled"
             | "SoundEffectsEnabled"
             | "HapticFeedbackEnabled"
             | "ClipChildren"
@@ -191,7 +192,11 @@ pub(crate) fn fallback(
             "V" => return Ok(Some(Value::Null)),
             "Z" => return Ok(Some(Value::Int(0))),
             "Landroid/os/Parcelable;" if name == "onSaveInstanceState" => {
-                return Ok(Some(Value::Null))
+                // AOSP View.onSaveInstanceState returns the shared
+                // AbsSavedState.EMPTY_STATE singleton (non-null): DEX state
+                // subclasses pass it as the BaseSavedState superState, which
+                // throws IllegalArgumentException on null (issue #228).
+                return Ok(Some(Value::Obj(crate::platform_base::empty_state(vm)?)));
             }
             _ => {}
         }

@@ -24,6 +24,9 @@ The older [2026-10-14 report](appendix-g-validation.md) is historical and its
   from the existing partial DEX and opt-in ELF/JNI routes. `partial_native`
   describes bounded existing ELF/JNI capability, not language attribution,
   Objective-C runtime availability, universal NDK or new engine execution.
+  `partial_wasm` (engine 28, M11 S1c) is the WebAssembly hosted by the VM through
+  the documented `WasmBridge` (i32 MVP), available only with `wasm-execution`;
+  it is not WASI, JS/JNI bridging or a standalone `.wasm` loader.
 - Optional engine analysis limits no longer break basic inspection. `inspect`/
   `app_info` return an explicit `not_analyzed` diagnostic; strict `engine detect`
   keeps its typed error. CLI/MCP tests use a 100,001-entry source-built ZIP64 APK.

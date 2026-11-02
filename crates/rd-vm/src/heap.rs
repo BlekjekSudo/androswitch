@@ -432,6 +432,28 @@ impl Heap {
         )
     }
 
+    /// Allocates an array whose runtime class is exactly `array_desc` (`[[I`,
+    /// `[Ljava/lang/String;`). Unlike `alloc_array`, the descriptor is not
+    /// reinterpreted, so nested arrays keep every dimension (#379).
+    pub fn alloc_array_exact(
+        &mut self,
+        elem: ElemKind,
+        len: usize,
+        array_desc: &str,
+    ) -> Result<ObjRef, OomError> {
+        let bytes = len
+            .saturating_mul(core::mem::size_of::<Value>())
+            .saturating_add(16);
+        self.alloc(
+            bytes,
+            HeapObj::Array {
+                elem,
+                elems: Vec::new(),
+                elem_class: array_desc.to_string(),
+            },
+        )
+    }
+
     pub fn alloc_instance(
         &mut self,
         class: String,
