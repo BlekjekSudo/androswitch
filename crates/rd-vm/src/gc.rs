@@ -173,7 +173,7 @@ impl<F: FnMut(ObjRef)> core::fmt::Write for RefScanner<F> {
 // formatter stream (no hashes and no large temporary copy); any change falls
 // back to the inherited conservative trace. Host-object ephemerons and the APK
 // are removed by the caller and are traced separately.
-#[cfg(all(not(feature = "desktop-runtime"), feature = "upstream-runtime"))]
+#[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
 fn framework_is_default(state: &crate::framework::HostState) -> bool {
     static DEFAULT: rd_dex::sync::OnceLock<String> = rd_dex::sync::OnceLock::new();
     struct Compare<'a> {
@@ -225,9 +225,6 @@ impl Engine {
         // the parsed APK (zip, arsc, layouts) holds no heap refs: skip it
         let objects = core::mem::take(&mut self.fw.objects);
         let resources = self.fw.resources.take();
-        #[cfg(feature = "desktop-runtime")]
-        let scan_framework = true;
-        #[cfg(not(feature = "desktop-runtime"))]
         let scan_framework = !framework_is_default(&self.fw);
         if scan_framework {
             let _ = write!(s, "{:?}", self.fw);
@@ -302,6 +299,9 @@ impl Engine {
         for r in self.literal_strings.values().copied() {
             m.push(r);
         }
+        for r in self.class_objects.values().copied() {
+            m.push(r);
+        }
         #[cfg(any(feature = "desktop-runtime", feature = "upstream-runtime"))]
         for r in self.gc_frames.iter().flatten().copied() {
             m.push(r);
@@ -311,7 +311,6 @@ impl Engine {
             for r in self
                 .execution_frames
                 .roots()
-                .chain(self.portable.classes.values().copied())
                 .chain(self.portable.monitors.roots())
                 .chain(self.boxed_cache.values().copied())
                 .chain(self.statics.values().filter_map(|value| match value {

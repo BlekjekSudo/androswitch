@@ -952,10 +952,6 @@ pub struct HostState {
     main_looper: Option<ObjRef>,
     /// M8: thread "main" sintética (VM single-threaded — ver `THREAD`)
     pub(crate) main_thread: Option<ObjRef>,
-    /// M8: objetos `Class` canônicos por descritor (getClass devolve sempre a
-    /// mesma referência para a mesma classe — identidade como na JVM).
-    #[cfg(feature = "desktop-runtime")]
-    class_objs: HashMap<String, ObjRef>,
     /// M8: ClassLoader canônico (um por VM — single-classloader; a distinção
     /// bootstrap=null do Java não se aplica ao runtime host).
     class_loader: Option<ObjRef>,
@@ -1291,35 +1287,7 @@ impl Engine {
     /// DESCRITOR (ex.: "Lcom/x/Y;"); os métodos de Class o convertem.
     #[cfg(feature = "desktop-runtime")]
     pub(crate) fn class_object_for(&mut self, desc: &str) -> Result<ObjRef, VmExit> {
-        if let Some(c) = self.fw.class_objs.get(desc) {
-            return Ok(*c);
-        }
-        let r = self
-            .heap
-            .alloc_instance(CLASS.to_string(), Vec::new())
-            .map_err(|e| {
-                VmExit::Exception(crate::err::Throwable::new(
-                    "Ljava/lang/OutOfMemoryError;",
-                    format!(
-                        "alocação de {} bytes excede o heap de {} bytes",
-                        e.requested, e.budget
-                    ),
-                ))
-            })?;
-        let name = self.heap.alloc_string(desc.to_string()).map_err(|e| {
-            VmExit::Exception(crate::err::Throwable::new(
-                "Ljava/lang/OutOfMemoryError;",
-                format!(
-                    "alocação de {} bytes excede o heap de {} bytes",
-                    e.requested, e.budget
-                ),
-            ))
-        })?;
-        crate::err::put_field_result(self.heap.put_field(r, "class_name", Value::Obj(name)))?;
-        // legacy field read by Intent(Context, Class)/setClass
-        crate::err::put_field_result(self.heap.put_field(r, "name", Value::Obj(name)))?;
-        self.fw.class_objs.insert(desc.to_string(), r);
-        Ok(r)
+        crate::java_values::class_object(self, desc)
     }
 
     /// M8: ClassLoader canônico da VM (lazy; identidade estável —

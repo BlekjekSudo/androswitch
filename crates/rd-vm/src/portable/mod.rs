@@ -4,7 +4,6 @@ use alloc::{
     boxed::Box,
     format,
     string::{String, ToString},
-    vec,
 };
 pub(crate) mod atomic;
 pub(crate) mod atomic_number;
@@ -82,7 +81,6 @@ pub(crate) struct FileState {
 pub(crate) struct State {
     pub host_depth: HashMap<u64, usize>,
     pub monitors: monitor::Monitors,
-    pub classes: HashMap<String, ObjRef>,
     pub filesystem: Option<Box<dyn as_platform::vfs::GuestFileSystem>>,
     pub files: HashMap<ObjRef, FileState>,
     pub package: String,
@@ -195,24 +193,6 @@ impl Engine {
     }
 
     pub(crate) fn class_object_for(&mut self, desc: &str) -> Result<ObjRef, VmExit> {
-        if let Some(object) = self.portable.classes.get(desc) {
-            return Ok(*object);
-        }
-        let name = self
-            .heap
-            .alloc_string(desc.to_string())
-            .map_err(err::oom_throwable)?;
-        let object = self
-            .heap
-            .alloc_instance(
-                "Ljava/lang/Class;".to_string(),
-                vec![
-                    ("class_name".to_string(), Value::Obj(name)),
-                    ("name".to_string(), Value::Obj(name)),
-                ],
-            )
-            .map_err(err::oom_throwable)?;
-        self.portable.classes.insert(desc.to_string(), object);
-        Ok(object)
+        crate::java_values::class_object(self, desc)
     }
 }

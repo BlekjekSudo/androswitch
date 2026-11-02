@@ -9,16 +9,39 @@ use alloc::{
 /// Original RustyDroid dynamic String allocation and catchable OOM contract.
 /// This does not intern or retain the result beyond the normal Java roots.
 pub(crate) fn alloc_string(vm: &mut Engine, text: String) -> Result<crate::ObjRef, VmExit> {
-    vm.heap.alloc_string(text).map_err(|oom| {
-        crate::Throwable::new(
-            "Ljava/lang/OutOfMemoryError;",
-            format!(
-                "alocação de {} bytes excede o heap de {} bytes",
-                oom.requested, oom.budget
-            ),
-        )
-        .into()
-    })
+    vm.heap.alloc_string(text).map_err(allocation_error)
+}
+
+fn allocation_error(oom: crate::heap::OomError) -> VmExit {
+    crate::Throwable::new(
+        "Ljava/lang/OutOfMemoryError;",
+        format!(
+            "alocação de {} bytes excede o heap de {} bytes",
+            oom.requested, oom.budget
+        ),
+    )
+    .into()
+}
+
+/// Original RustyDroid canonical Class factory and allocation/OOM behavior.
+/// The sole descriptor cache now belongs to Engine on every execution profile.
+pub(crate) fn class_object(vm: &mut Engine, desc: &str) -> Result<crate::ObjRef, VmExit> {
+    if let Some(object) = vm.class_objects.get(desc) {
+        return Ok(*object);
+    }
+    let object = vm
+        .heap
+        .alloc_instance("Ljava/lang/Class;".into(), vec![])
+        .map_err(allocation_error)?;
+    let descriptor = alloc_string(vm, desc.to_string())?;
+    crate::err::put_field_result(
+        vm.heap
+            .put_field(object, "class_name", Value::Obj(descriptor)),
+    )?;
+    // Retain the inherited alias consumed by Intent(Context, Class)/setClass.
+    crate::err::put_field_result(vm.heap.put_field(object, "name", Value::Obj(descriptor)))?;
+    vm.class_objects.insert(desc.to_string(), object);
+    Ok(object)
 }
 
 pub(crate) fn literal_string(vm: &mut Engine, text: String) -> Result<crate::ObjRef, VmExit> {
@@ -233,6 +256,59 @@ mod string_storage_tests {
             );
             assert_eq!(vm.heap.used(), 0);
             assert!(vm.literal_strings.is_empty());
+        }
+    }
+}
+
+#[cfg(test)]
+mod class_storage_tests {
+    use super::*;
+    use crate::VmConfig;
+
+    #[test]
+    fn class_identity_and_real_descriptor_graph_survive_minor_and_major_collection() {
+        let mut vm = Engine::new(vec![], VmConfig::default());
+        for desc in ["I", "[[Ljava/lang/String;", "Lexample/\u{4e2d};"] {
+            let first = class_object(&mut vm, desc).unwrap();
+            let descriptor = vm.heap.get_field(first, "class_name").unwrap();
+            assert_eq!(descriptor, vm.heap.get_field(first, "name").unwrap());
+            vm.gc_minor();
+            vm.gc();
+            assert_eq!(class_object(&mut vm, desc).unwrap(), first);
+            assert_eq!(
+                vm.heap
+                    .as_str(descriptor.as_ref().unwrap().unwrap())
+                    .unwrap(),
+                desc
+            );
+        }
+        assert_eq!(vm.class_objects.len(), 3);
+        let mut other = Engine::new(vec![], VmConfig::default());
+        other.heap.alloc_string("independent arena".into()).unwrap();
+        let separate = class_object(&mut other, "I").unwrap();
+        assert_ne!(class_object(&mut vm, "I").unwrap(), separate);
+        assert_eq!(other.class_objects.len(), 1);
+    }
+
+    #[test]
+    fn failed_class_creation_never_publishes_partial_objects_or_retains_garbage() {
+        for budget in [0, 32, 64, 96, 128, 192, 256] {
+            let mut vm = Engine::new(
+                vec![],
+                VmConfig {
+                    heap_budget: budget,
+                    ..Default::default()
+                },
+            );
+            let desc = format!("L{};", "long".repeat(256));
+            let error = class_object(&mut vm, &desc).unwrap_err();
+            assert!(
+                matches!(error,VmExit::Exception(ref e) if e.class=="Ljava/lang/OutOfMemoryError;"),
+                "{error:?}"
+            );
+            assert!(vm.class_objects.is_empty());
+            vm.gc();
+            assert_eq!(vm.heap.used(), 0);
         }
     }
 }

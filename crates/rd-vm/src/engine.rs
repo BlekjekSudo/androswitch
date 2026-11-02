@@ -88,6 +88,7 @@ pub struct Engine {
     /// Loaded DEX literals share identity for this Engine's classloader.
     /// Runtime-created Strings are ordinary collectible heap objects.
     pub(crate) literal_strings: HashMap<String, ObjRef>,
+    pub(crate) class_objects: HashMap<String, ObjRef>,
     clinit_done: HashSet<String>,
     #[cfg(feature = "desktop-runtime")]
     clinit_running: HashSet<String>,
@@ -250,6 +251,7 @@ impl Engine {
             statics: HashMap::new(),
             boxed_cache: HashMap::new(),
             literal_strings: HashMap::new(),
+            class_objects: HashMap::new(),
             collection_views: Default::default(),
             clinit_done: HashSet::new(),
             clinit_running: Default::default(),
