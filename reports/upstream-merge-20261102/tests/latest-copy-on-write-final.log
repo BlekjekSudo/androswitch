@@ -1,0 +1,26 @@
+   Compiling rd-apk v0.9.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\rd-apk)
+   Compiling rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\rd-dex)
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\as-vm)
+   Compiling as-package v0.1.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\as-package)
+   Compiling as-framework v0.1.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\as-framework)
+    Finished `test` profile [unoptimized] target(s) in 31.93s
+     Running tests\copy_on_write.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\copy_on_write-36e782bfb6404d27.exe)
+
+running 14 tests
+test builder_raw_edits_match_independent_jvm_rows_for_both_shared_classes ... ok
+test builder_scalar_overloads_keep_raw_units_until_a_surrogate_pair_is_complete ... ok
+test cow_set_reuses_list_generations_and_matches_twenty_jvm_cases_in_both_namespaces ... ok
+test element_and_retained_generation_budgets_fail_before_publication_and_release_after_gc ... ok
+test enum_map_reuses_map_storage_and_matches_jvm_before_and_after_gc ... ok
+test exact_metadata_and_unavailable_broad_operations_do_not_fake_mutations ... ok
+test expired_generation_registry_is_pruned_while_mutation_keeps_advancing ... ok
+test iterator_alone_retains_all_snapshot_values_but_does_not_retain_its_list ... ok
+test ordinary_arraylist_iterator_remains_fail_fast_and_is_not_a_cow_alias ... ok
+test private_monitor_preserves_owner_on_contention_and_is_reentrant_for_the_same_owner ... ok
+test shared_log_dispatch_records_actual_sdk_throwable_callbacks_in_the_file_sink ... ok
+test sixteen_cases_match_actual_jvm_in_renamed_namespaces_before_and_after_gc ... ok
+test standard_sdk_proof_uses_real_snapshot_mutation_gc_and_shared_vfs ... ok
+test virtual_equality_native_reentry_retains_the_snapshot_after_list_clear_and_gc ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.94s
+

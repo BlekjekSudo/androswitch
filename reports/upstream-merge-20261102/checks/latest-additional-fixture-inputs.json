@@ -1,0 +1,452 @@
+[
+  {
+    "path": "local-artifacts/m3/fixture/bridge.dll",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\bridge.dll",
+    "sha256": "7d420c82ee1d63ae5efc134f41422e80d3fe4dacd6225fce7d53ba5499221be3"
+  },
+  {
+    "path": "local-artifacts/m3/fixture/build-receipt.json",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\build-receipt.json",
+    "sha256": "3aafe69bd7199aa7e0c6cfd342f5ca78ac519d61279296a03c53a4b59c58ae25"
+  },
+  {
+    "path": "local-artifacts/m3/fixture/expected.json",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\expected.json",
+    "sha256": "ed8744d4fbd0ee31c35947cdc5d598ee7a394e5954ac5795922d5137e2c4eb2e"
+  },
+  {
+    "path": "local-artifacts/m3/fixture/libarithmetic.so",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\libarithmetic.so",
+    "sha256": "75496a32436a27349ccc29b6be15bf0287488b93da27e314d701ca53802e6feb"
+  },
+  {
+    "path": "local-artifacts/m3/fixture/libcalculation.so",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\libcalculation.so",
+    "sha256": "0a8da74ef79350d8bece2d432dfe7a6f50be91ade726457ccfc99908ef4f1e30"
+  },
+  {
+    "path": "local-artifacts/m3/fixture/libmissing.so",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\libmissing.so",
+    "sha256": "17caba297a027e7186936e11301ae5688bbb94dbcf761f52f35f36778e7ff384"
+  },
+  {
+    "path": "local-artifacts/m3/fixture/libsyscall.so",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\libsyscall.so",
+    "sha256": "d7553a63685de5a6bcdd72626298a287e7c7d280690bbb97bc5385a19265b217"
+  },
+  {
+    "path": "local-artifacts/m3/fixture/libthreadstate.so",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\libthreadstate.so",
+    "sha256": "c71005beecd4979e3541a155078582005a11c2145ee209350113f7b3cce21624"
+  },
+  {
+    "path": "local-artifacts/m3/fixture/native-loader.apk",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\native-loader.apk",
+    "sha256": "e74f2caaa1120be62607fe91277a9bb7350f837c8699ec9b180f7efb740aad75"
+  },
+  {
+    "path": "local-artifacts/m3/fixture/request.json",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m3\\fixture\\request.json",
+    "sha256": "459e8d96963c7c867461041958252cdee9161b84513d74948c312e9810bea11b"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/bridge-oracle.bin",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\bridge-oracle.bin",
+    "sha256": "baef9916bc98495ff750e5839cc249ba640cd32c46b79cccd39b72fbc379db24"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/bridge-oracle.elf",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\bridge-oracle.elf",
+    "sha256": "476223ef1b033b7ba6396439c0d63b1979c8955593936b7ae70e2cc3ffce8235"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/bridge-oracle.json",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\bridge-oracle.json",
+    "sha256": "a442fd6802dc4f57e40bd87c622ecf2c836b767ad4edb64c4367f8f80ffa38d5"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/contracts",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\contracts",
+    "sha256": "f876d4ba18cd0090e46344ff5cc6db54d8f4e90faff8f9fe312ddd189e3356d5"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/contracts-finalize",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\contracts-finalize",
+    "sha256": "818a429d5fd808f7eaef6255d3279c4049f90616c5001dd427ba20b230c96d66"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/contracts-reset",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\contracts-reset",
+    "sha256": "52fddb115668bf20e1b7e71ee746e6a9dc24c879605a4eca85096cfa4dcee097"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/cxx-reset-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\cxx-reset-windows-arm64.o",
+    "sha256": "4a5c5c13cf46e76e739995359f602271e6667286aeb4783dbc0d6c6d9a4c7aa6"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/descriptor-build.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\descriptor-build.o",
+    "sha256": "cab30fa32dae5a5c2d0a5bbd909725065cc977a884baf4d69a821bc077c91dd3"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/errno-oracle.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\errno-oracle.o",
+    "sha256": "f97b4ae157e106049689eaf1b92df8be1df6f198a412f1a571593e102dd482ba"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/finalization",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\finalization",
+    "sha256": "54600f0d97d2cba7ceecabdbb6cee7cfb1a7a5cdb7eda70d8245ed1594166ff9"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/finalize-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\finalize-windows-arm64.o",
+    "sha256": "7bd5ba9177e67e8bb21de61df2edd2e6f9b3b41ceaf72f19e171ddb1f08e2db6"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/keys-finalize-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\keys-finalize-windows-arm64.o",
+    "sha256": "afbc58f639a3f9bdb25367e3987331946a3390a0c15c4244a311ea764ca22a53"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/libc-multibyte-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\libc-multibyte-windows-arm64.o",
+    "sha256": "c7b6365fd810b79f7ea6f93f42c9536d85f9737f90c2f9e0631ac15e0f29bf59"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/libc-random-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\libc-random-windows-arm64.o",
+    "sha256": "845e25f4e2035b826d7d65dcf50d9e1e4c4f22e3a61c7af3136daa2048198f75"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/libliteral.so",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\libliteral.so",
+    "sha256": "966964ff0e253ed7a2a1409aa840c87fbf6264776c52677956e9ae5096d3ab84"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/libsyscall.so",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\libsyscall.so",
+    "sha256": "613404da5e776a2b29296e503a4a812a3aea05604de384375d68d2896d3062ec"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/locale-multibyte-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\locale-multibyte-windows-arm64.o",
+    "sha256": "bb95f90a5fc5a0454ff8bd02cc2b8e00271d14823d4a23a71b6fb7c8657d844e"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/locale-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\locale-windows-arm64.o",
+    "sha256": "454ef32a470e7967c955a5d399c4cd8f04f7a6ec13564d82c902a40a2c7b69cd"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/locales",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\locales",
+    "sha256": "3b1cd767ecdd58d4cbc5c89658c67427a7401b27904879c0c15e0f4135341f7d"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/multibyte",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\multibyte",
+    "sha256": "114022ffbd493d64d99135177b4d7c47fec1c6ea6e7d50d0a5d6a726ded5ac72"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/multibyte-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\multibyte-windows-arm64.o",
+    "sha256": "1abce96da07739a82594ee2670f0baaff94cd0ef24d4ee4a8f1313d97ac8cd5a"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/native-finalize-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\native-finalize-windows-arm64.o",
+    "sha256": "5dc2b5cb5cb9bff1ccd8fe6a6df9c956b8bcc58873a2777a89e4a3ccdc7687b5"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/native-reset-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\native-reset-windows-arm64.o",
+    "sha256": "1184392a802cdbb00e05a8e08eedeae56a19a9380ab7eaa0d9d1f48b8bf3a338"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/properties-contracts.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\properties-contracts.exe",
+    "sha256": "0422973979f2d60769a70cc1ff9c277e07c46130733efdedacc44989ee256058"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random",
+    "sha256": "06951a0f50d78e3be9940961ed938786079b699f12e7bc548ff3021efc9d46b8"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-oracle",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-oracle",
+    "sha256": "dc1dbd417a172e197791bbdcffd9ad22e4e0e6e81703bc0020de9d39d5eda1a4"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-windows-arm64.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-windows-arm64.o",
+    "sha256": "c25a3a3edb804a928a9511d6f03c873246cd3acd703a34a3f881ef831ddc3c1d"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/finalize-target/bionic_finalize.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\finalize-target\\bionic_finalize.o",
+    "sha256": "7e8a701aa4447d8163605ffec59d216fbf9e966838ca7e0be2e1fc5b3aa9dd4b"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/finalize-target/bionic_keys.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\finalize-target\\bionic_keys.o",
+    "sha256": "05f3f3424b6b0082870dad45d2eb882e8e513259e536c924e8a1aaab7c221197"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/finalize-target/native.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\finalize-target\\native.o",
+    "sha256": "24ecaae38784adb92f572c294dfe96f0f862eae3b20ecc11a905358832621346"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/anonymous-memory-build.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\anonymous-memory-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/anonymous-memory-run.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\anonymous-memory-run.log",
+    "sha256": "8c4a1eae7a5bd7ec339cffb075e917445127e41fd76cdf7d1061a2a2a9625dae"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/anonymous-memory.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\anonymous-memory.exe",
+    "sha256": "91c1520679e52502ae32741a6aa4389d20c375c30cf5f235191d6522019c4e58"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/arm64-bridge-oracle.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\arm64-bridge-oracle.log",
+    "sha256": "16936a61f591d5ebeed2d11f96a6cabba39b044a5f662908eac7cb99d08736a5"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/contracts-build.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\contracts-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/contracts-run.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\contracts-run.log",
+    "sha256": "f9f0f17a62e3e5c9590447e43e3ade7fa2fb224654efa323d4915601cbe0e495"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/contracts.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\contracts.exe",
+    "sha256": "b8c467b38b58e293ccfc27b64cdda3aa444410a01f00d438211699a5a47db49d"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/cpu-time-build.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\cpu-time-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/cpu-time-run.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\cpu-time-run.log",
+    "sha256": "abf4768c9f2de91b0e5e432958fcdceb256624a52c3de3605f43d5c2a2b9c443"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/cpu-time.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\cpu-time.exe",
+    "sha256": "91dc12e429f45febb9ec4b8ba14edc4490796cbef0696d670cf980b389ee0aae"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/dlfcn-build.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\dlfcn-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/dlfcn-run.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\dlfcn-run.log",
+    "sha256": "d3c70313dacefb11348d921579c03029e45cc257c7309987c29147bf79726339"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/dlfcn.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\dlfcn.exe",
+    "sha256": "d615d61641fbae18fa4328d776d23a2312a94f14e31e55a1216c37d18f7be7b8"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/elf-literal.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\elf-literal.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/elf-syscall.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\elf-syscall.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/finalization-build.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\finalization-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/finalization-run.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\finalization-run.log",
+    "sha256": "ac2fde458e3d6b012469d0f407e94b7cc749d1b53cc33a19fde9e4208661d5c1"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/finalization.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\finalization.exe",
+    "sha256": "26823dfeb641a5ca4d140aa2dac0904dc21349beedf095c7ff84415a341e753a"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/host-result.json",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\host-result.json",
+    "sha256": "c1e1c4ec9d72fdcfff5d29f8bcf5d58315407aa1cd3ddbecca3e790e18e8a6d8"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/locales-build.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\locales-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/locales-run.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\locales-run.log",
+    "sha256": "a1f0f17710d2ed421eaf12a9314e0c6f2025f2fbcce795bfcf6ba8c9074bee5a"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/locales.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\locales.exe",
+    "sha256": "3e84ad50b08da3d0714552987454a81ed029e44f323e49b2721b999d8e40c061"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/multibyte-build.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\multibyte-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/multibyte-run.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\multibyte-run.log",
+    "sha256": "d36047cbda401a5843dbed6cce78d2fe7a722ccb1d7792eb3106e09fea4d1d91"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/multibyte.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\multibyte.exe",
+    "sha256": "3d5312b47691471057c6938ba1ba4023db08fbb2f4c109b9733397c6074f47a5"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/random-build.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\random-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/random-run.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\random-run.log",
+    "sha256": "43e98ac87544b2a66cfa8b9a6f0472e113acac68b7977e614a3ac446e20e8187"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/random.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\random.exe",
+    "sha256": "e904ed17a977f2288e78074b477e7bbe15139ab498b574c0e7b3521805d84dc7"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/rust-loader.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\rust-loader.log",
+    "sha256": "608c7ee27db2846185f55eeb43d3ee3a67bf1b80c2769bbdd3a5c0e12f552b1f"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/sdk-compat-build.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\sdk-compat-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/sdk-compat-run.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\sdk-compat-run.log",
+    "sha256": "c03099a1697af405b395943b61a75e2a042cebd917b957eaa519c8ddc2187bab"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/sdk-compat.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\sdk-compat.exe",
+    "sha256": "00c98cd3b47bdecf8c431c783396336aeab4272bb74bda91994f83b13949fcee"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/sdk-futex-build.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\sdk-futex-build.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/sdk-futex-run.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\sdk-futex-run.log",
+    "sha256": "1a647826efc5e65d2467234aa1522470fba808da48d44c98447ea6f97c92b2ef"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/sdk-futex.exe",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\sdk-futex.exe",
+    "sha256": "d124f2710cef655a9ca09a33729c392f82934d2058cf080abbc71850a7fff7d1"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/msys/switch-errno-oracle.log",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\msys\\switch-errno-oracle.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-reference/namespace.h",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-reference\\namespace.h",
+    "sha256": "065119c61cae5dce6396ffdedfce408bbe62f5f12b1c1155c554d7fd1b98c4df"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-reference/random.c",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-reference\\random.c",
+    "sha256": "09d841bd15b11a4e3e5e084ac9f459ce085887b103dfbd25db92f23bb734265a"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-reference/random.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-reference\\random.o",
+    "sha256": "2d6820aba589735811057851c4f6edac1d8138a6d2ea81c9ccd57d467191e0ef"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-reference/rand_r.c",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-reference\\rand_r.c",
+    "sha256": "46f81bd3008b65a7935f01e85e7b6f758f2b3afc7bdcff05e9909798c601944a"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-reference/rand_r.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-reference\\rand_r.o",
+    "sha256": "84e5fab87d90c49cff4b33ec1a86e918739df3696e3e8cb6571991957a044a0a"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-reference/reentrant.h",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-reference\\reentrant.h",
+    "sha256": "42dcfd1e1199271dea2053b95641f8f40656ef1e364b6d7ac9f09bca3cdf1aab"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-reference/vectors",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-reference\\vectors",
+    "sha256": "5ff1460e19f3004424ea1d9242c3ca78e6217d44a36ecfc6a2c11391a84bf657"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-reference/vectors.c",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-reference\\vectors.c",
+    "sha256": "753af33d546f4c97aa7a7b63a1a4d2ce90394517a29784323186ef7cf43455af"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-target/bionic_libc.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-target\\bionic_libc.o",
+    "sha256": "3c21b00c81206b3b31b045c0122ae8ca0e296975cb4eb024b9befb2d52198dec"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/random-target/bionic_random.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\random-target\\bionic_random.o",
+    "sha256": "49dc396e6e747b7b8da85aeefccf1b9a6ee86735149059ffb57f514b095fbfe0"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/reset-target/bionic_cxx.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\reset-target\\bionic_cxx.o",
+    "sha256": "9ae04577a93fef41bff4d5408412af3c881e3aaf170627c11b20fcefebdeef28"
+  },
+  {
+    "path": "local-artifacts/m9/native-abi/reset-target/native.o",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\native-abi\\reset-target\\native.o",
+    "sha256": "885868474d9ee20ce2498e191623399a5c2a7d9c7a294806e35f14beb5117df4"
+  },
+  {
+    "path": "fixtures/cache/fdroid-classes.dex",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\cache\\fdroid-classes.dex",
+    "sha256": "a6aff7e100fb7e33b17fd11b2b594999016e4b099718c6ec393e462d269ac059"
+  },
+  {
+    "path": "fixtures/cache/org.fdroid.fdroid_2000052.apk",
+    "source": "D:\\Dev\\Switch\\AndroSwitch\\fixtures\\cache\\org.fdroid.fdroid_2000052.apk",
+    "sha256": "19d51fad482239f6df6a99120e34513667e9a86d136dafdc4a211a68c3327b52"
+  }
+]

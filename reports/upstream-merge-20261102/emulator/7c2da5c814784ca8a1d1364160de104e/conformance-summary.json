@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "acceptance_passed": false,
+  "remaining_cases": [
+    {
+      "id": "host.cpu.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.gpu.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "host.memory.clock_hz",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.shader-invalid",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.buffer-roundtrip",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "gles.texture-framebuffer",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.loader",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.instance",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.physical-device",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.queue-families",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.logical-device",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "vulkan.memory-heaps",
+      "status": "NOT_RUN"
+    }
+  ],
+  "status": "observed_catalog_not_compatibility_pass",
+  "catalog_completed": false,
+  "selected_group": null,
+  "selected_total": 309,
+  "selected_counts": {
+    "PASS": 297,
+    "NOT_RUN": 12
+  },
+  "selected_completed": false,
+  "selected_passed": false,
+  "backend": "Horizon via diagnostic Ryujinx; not physical hardware or stock Ryujinx",
+  "catalog_sha256": "01bbacf0059f6e5f94865831e00d1fd1b976a2339ddeeb77ad2c11cb2b842f7e",
+  "explicit_exclusions": [
+    "host.cpu.clock_hz",
+    "host.gpu.clock_hz",
+    "host.memory.clock_hz"
+  ],
+  "total": 309,
+  "counts": {
+    "PASS": 297,
+    "NOT_RUN": 12
+  },
+  "apk_sha256": "08d0fe0c382debd03abe6eb1d9b2c2a9e28a6af479b0ac29824850e453dff5ea",
+  "nro_sha256": "0ee266432eddc85762080464ee2624ce742056f7c8ba946dc75a45daab32f908",
+  "external_status": "blocked_runtime",
+  "original_sd_restore": "restored",
+  "launcher_completed": true,
+  "sessions": [
+    {
+      "session_id": "7c2da5c814784ca8a1d1364160de104e-1",
+      "status": "passed_execution",
+      "pending_case": null,
+      "error": null,
+      "raw_report": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\m9\\external-runs\\7c2da5c814784ca8a1d1364160de104e\\sessions\\7c2da5c814784ca8a1d1364160de104e-1\\session-report.json"
+    }
+  ],
+  "android_reference": "not_run",
+  "physical_hardware": "not_run",
+  "scope": "An interrupted case remains INTERRUPTED; matching raw runtime errors explain it without inventing success."
+}

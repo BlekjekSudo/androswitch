@@ -1,0 +1,60 @@
+{
+  "commands": [
+    {
+      "kind": "frame"
+    },
+    {
+      "key": "right",
+      "kind": "key"
+    },
+    {
+      "key": "accept",
+      "kind": "key"
+    },
+    {
+      "events": [
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "ms": 30000,
+          "kind": "wait"
+        },
+        {
+          "kind": "frame"
+        },
+        {
+          "ms": 2000,
+          "kind": "wait"
+        },
+        {
+          "kind": "return_to_launcher"
+        }
+      ],
+      "kind": "open"
+    },
+    {
+      "count": 60,
+      "kind": "frames"
+    }
+  ],
+  "session_id": "a8dea230ba9e4a0aac5d60d58de6c3ac",
+  "schema_version": 1
+}

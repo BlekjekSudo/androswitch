@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "kind": "diagnostic_bundle_verification",
+  "archive_filename": "androswitch-conformance-20261102-132434-7729a959.zip",
+  "archive_sha256": "0b81b2e9a60af493bbb30b4c3054cce937f1805a674137d073fdc441aa57f685",
+  "archive_bytes": 10673991,
+  "source_commit": "5d12467e573f38419e3ced627ec3f3cf9be4dd5d",
+  "upstream_revision": "33e76456643e157458d97087d2626045498725db",
+  "nro_sha256": "0ee266432eddc85762080464ee2624ce742056f7c8ba946dc75a45daab32f908",
+  "apk_sha256": "08d0fe0c382debd03abe6eb1d9b2c2a9e28a6af479b0ac29824850e453dff5ea",
+  "qualification_report": "reports/upstream-merge-20261102.json",
+  "qualification_report_sha256": "0deab6ab2778492230c563d8ffcf909275ee89af46c3c801420d9555c5a4dd73",
+  "files_verified": 136,
+  "retained_evidence_verified": 148,
+  "emulator_counts": {
+    "PASS": 306,
+    "NOT_RUN": 3
+  },
+  "full_acceptance_passed": false,
+  "hardware": "not_run",
+  "command": "./scripts/package-conformance.ps1 -Diagnostic -FixtureDirectory local-artifacts/conformance-tokenizer-qualified -EvidenceDirectory local-artifacts/m9/external-runs/0aabee1d29584648922d22aeea853429 -QualificationReport reports/upstream-merge-20261102.json"
+}

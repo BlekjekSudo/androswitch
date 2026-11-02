@@ -1,0 +1,16 @@
+{
+  "pixel_hashes_by_logical_rotation": {
+    "0": "73bbe1bf8bc0bd24",
+    "1": "95663f1ba4872ac2",
+    "2": "c84074daefda75d6",
+    "3": "44f2bbe5bfcaaf60"
+  },
+  "matches": [
+    {
+      "step": 11,
+      "frame_hash": "95663f1ba4872ac2",
+      "presented_hash": "73bbe1bf8bc0bd24"
+    }
+  ],
+  "scope": "Diagnostic hash reconstruction from preserved RGB capture with opaque alpha; original reports unchanged."
+}

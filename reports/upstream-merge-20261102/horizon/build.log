@@ -1,0 +1,85 @@
+{"url": "https://static.crates.io/crates/libc/libc-0.2.189.crate", "sha256": "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2", "source": "D:\\Dev\\Switch\\AndroSwitch\\local-artifacts\\horizon-std\\libc-0.2.189\\src\\unix\\newlib\\mod.rs", "adapted_sha256": "44e031cf8eea5166571be0e57b41706e8fc51e96764068e5a81b709975a33fb5", "scope": "Horizon std probe and product build-std graph; host dependencies unchanged"}
+{"compiler_commit": "787af2b8c80638c51a4fc8e44f84e6891f243ec7", "original_sysroot": "C:\\Users\\Administrator\\.rustup\\toolchains\\nightly-x86_64-pc-windows-gnu", "overlay_sysroot": "C:\\Users\\Administrator\\.cache\\androswitch\\horizon-std-toolchain-787af2b", "original_library_tree_sha256": "ced5aec7ddb3f4b4ad91e0d56872bc7a498f07b395df8d9867ce4993347439e8", "original_library_file_count": 3631, "files": [{"path": "std/src/sys/fs/unix.rs", "original_sha256": "a25c02ec631e41bc634d2eef5ffcc76689955b531f77a3159e492e9a006c8305", "adapted_sha256": "7bbe67712b2c9296d196fc4a7ab7aa975a4b1de98de532f49b6d2e977e48fc32"}, {"path": "std/src/sys/thread/unix.rs", "original_sha256": "93784ff17f94154d57299d568afb42bf77adce9d4f4a15efeed55716f601c2d0", "adapted_sha256": "30ed4928e0ed27a6b3faa355c5c8a5ffe70a5106ddd25e24726ade787bacca5b"}]}
+D:\Dev\Switch\AndroSwitch\local-artifacts\dependencies\sqlite\source-receipt.json
+warning: patch `libc v0.2.189 (D:\Dev\Switch\AndroSwitch\local-artifacts\horizon-std\libc-0.2.189)` was not used in the crate graph
+help: Check that the patched package version and available features are compatible
+      with the dependency requirements. If the patch has a different version from
+      what is locked in the Cargo.lock file, run `cargo update` to use the new
+      version. This may also occur with an optional dependency that is not enabled.
+    Updating crates.io index
+   Compiling compiler_builtins v0.1.160 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins)
+   Compiling core v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\core)
+   Compiling rustc-std-workspace-core v1.99.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\rustc-std-workspace-core)
+   Compiling alloc v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\alloc)
+   Compiling rustc-std-workspace-alloc v1.99.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\rustc-std-workspace-alloc)
+   Compiling libc v0.2.189 (D:\Dev\Switch\AndroSwitch\local-artifacts\horizon-std\libc-0.2.189)
+   Compiling object v0.39.1
+   Compiling unwind v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\unwind)
+   Compiling gimli v0.34.0
+   Compiling memchr v2.8.3
+   Compiling adler2 v2.0.1
+   Compiling std v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\std)
+   Compiling miniz_oxide v0.9.1
+   Compiling addr2line v0.27.1
+   Compiling panic_unwind v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\panic_unwind)
+   Compiling std_detect v0.1.5 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\std_detect)
+   Compiling hashbrown v0.17.1
+   Compiling panic_abort v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\panic_abort)
+   Compiling rustc-demangle v0.1.28
+   Compiling cfg-if v1.0.4
+   Compiling rustc-literal-escaper v0.0.8
+   Compiling proc_macro v0.0.0 (C:\Users\Administrator\.cache\androswitch\horizon-std-toolchain-787af2b\lib\rustlib\src\rust\library\proc_macro)
+   Compiling version_check v0.9.5
+   Compiling generic-array v0.14.7
+   Compiling zmij v1.0.23
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.229
+   Compiling syn v3.0.6
+   Compiling typenum v1.20.1
+   Compiling serde v1.0.229
+   Compiling serde_derive v1.0.229
+   Compiling cfg-if v1.0.5
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling crc32fast v1.5.2
+   Compiling serde_json v1.0.151
+   Compiling digest v0.10.7
+   Compiling simd-adler32 v0.3.10
+   Compiling cpufeatures v0.2.17
+   Compiling itoa v1.0.18
+   Compiling sha2 v0.10.9
+   Compiling spin v0.9.9
+   Compiling regex-syntax v0.8.11
+   Compiling regex-automata v0.4.18
+   Compiling flate2 v1.1.10
+   Compiling as-sqlite v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-sqlite)
+   Compiling as-platform v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-platform)
+   Compiling bit-vec v0.8.0
+   Compiling bit-set v0.8.0
+   Compiling rd-apk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-apk)
+   Compiling rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-dex)
+   Compiling libm v0.2.16
+   Compiling as-vm v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-vm)
+   Compiling fancy-regex v0.20.0
+   Compiling regex v1.13.1
+   Compiling xmlparser v0.13.6
+   Compiling as-storage v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-storage)
+   Compiling as-package v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-package)
+   Compiling as-framework v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-framework)
+   Compiling rd-ndk v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-ndk)
+   Compiling rd-jni v0.9.0 (D:\Dev\Switch\AndroSwitch\crates\rd-jni)
+   Compiling as-native v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-native)
+   Compiling as-launcher v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-launcher)
+   Compiling as-switch-smoke v0.1.0 (D:\Dev\Switch\AndroSwitch\crates\as-switch-smoke)
+    Finished `release` profile [optimized] target(s) in 4m 28s
+make: Entering directory 'D:/Dev/Switch/AndroSwitch/platform/androswitch'
+C:/devkitPro/devkitA64/bin/aarch64-none-elf-gcc -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -specs=C:/devkitPro/libnx/switch.specs -LD:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/mesa-link/lib -LC:/devkitPro/libnx/lib -LC:/devkitPro/portlibs/switch/lib D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/main.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/display.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/cpu_time.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/vulkan_bridge.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/memory.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/media.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/media_format.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/glsurface.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/workers.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/opensl.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/fs.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/resource_info.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/resource_extra.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/native.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/worker_admission.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/native_call.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/jni.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_io.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_sync.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_cxx.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_finalize.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_libc.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_memory.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_dlfcn.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_locale.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_multibyte.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_random.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_keys.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_log.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/bionic_vfs.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/missing_import.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/sqlite3.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/sqlite_memory.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/rust_std.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/sdk_futex.o D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/sdk_compat.o -Wl,--wrap=syscall,--wrap=getauxval,--wrap=posix_memalign,--wrap=__xpg_strerror_r,--wrap=open64,--wrap=fstat64,--wrap=stat64,--wrap=mmap64,--wrap=munmap,--wrap=dl_iterate_phdr,--wrap=writev,--wrap=vk_drm_syncobj_copy_payloads -Wl,--wrap=pthread_create,--wrap=pthread_join,--wrap=pthread_detach,--wrap=pthread_attr_init -Wl,--wrap=threadCreate,--wrap=threadClose -Wl,--start-group "C:/Users/Administrator/.cache/androswitch/37b5fa1d-switch-target/aarch64-androswitch-newlib/release/libas_switch_smoke.a" -lEGL -lGLESv2 -lglapi -lvulkan -lmesa_util_c11 -lblake3 -lmesa_util -lmesa_util_simd -lexpat -lzstd -lz -lpthread @D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/mesa-rust-libs.rsp -lstdc++ -lnx -lm -Wl,--end-group -o "D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/androswitch.elf"
+C:/devkitPro/tools/bin/elf2nro "D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/androswitch.elf" "D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/androswitch.nro" --nacp=D:/Dev/Switch/AndroSwitch/local-artifacts/product-mesa-std-windows/androswitch.nacp
+make: Leaving directory 'D:/Dev/Switch/AndroSwitch/platform/androswitch'
+
+Algorithm       Hash                                                                   Path
+---------       ----                                                                   ----
+SHA256          0EE266432EDDC85762080464EE2624CE742056F7C8BA946DC75A45DAAB32F908       D:\Dev\Switch\AndroSwitch\local-…
+

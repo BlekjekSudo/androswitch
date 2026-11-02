@@ -1,0 +1,155 @@
+[
+  {
+    "arguments": [
+      "test",
+      "-p",
+      "as-vm",
+      "--features",
+      "portable-test-support",
+      "--lib",
+      "--tests",
+      "--locked",
+      "--",
+      "--test-threads=1"
+    ],
+    "completed_utc": "2026-11-02T12:16:52.9471840Z",
+    "sha256": "dfbce4767c81de7e5173033d27495e825f253e00dcfb5cd733a6b18e9155fdc1",
+    "name": "shipping-final",
+    "started_utc": "2026-11-02T12:16:24.2502054Z",
+    "exit_code": 0,
+    "log": "local-artifacts/latest-shipping-final.log",
+    "program": "cargo"
+  },
+  {
+    "arguments": [
+      "test",
+      "-p",
+      "rd-apk",
+      "-p",
+      "rd-dex",
+      "-p",
+      "rd-engine-wasm",
+      "-p",
+      "as-native",
+      "-p",
+      "as-runtime",
+      "-p",
+      "as-sqlite",
+      "--lib",
+      "--tests",
+      "--locked",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=1",
+      "--include-ignored"
+    ],
+    "completed_utc": "2026-11-02T12:17:48.8640678Z",
+    "sha256": "4603030e50f9b8ec49104bad99434bf0bcab20dee369c35deeaa5b5899e9d245",
+    "name": "parsers-native-wasm-final",
+    "started_utc": "2026-11-02T12:16:53.0403466Z",
+    "exit_code": 0,
+    "log": "local-artifacts/latest-parsers-native-wasm-final.log",
+    "program": "cargo"
+  },
+  {
+    "arguments": [
+      "clippy",
+      "--workspace",
+      "--all-targets",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "completed_utc": "2026-11-02T12:19:45.5786293Z",
+    "sha256": "bd215c4032a28fb0f8b37bca3a7eeec446cf860fc11b87a970145130082aa965",
+    "name": "workspace-clippy-final",
+    "started_utc": "2026-11-02T12:17:48.8674476Z",
+    "exit_code": 0,
+    "log": "local-artifacts/latest-workspace-clippy-final.log",
+    "program": "cargo"
+  },
+  {
+    "arguments": [
+      "clippy",
+      "-p",
+      "as-vm",
+      "--features",
+      "upstream-parity-tests,wasm-engine",
+      "--lib",
+      "--tests",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "completed_utc": "2026-11-02T12:20:53.8864370Z",
+    "sha256": "11480c82de1d665f9ccd9282f031ff9d26a2deeaa26fe08d3a786f1b0dfed674",
+    "name": "reference-clippy-final",
+    "started_utc": "2026-11-02T12:19:45.5818894Z",
+    "exit_code": 0,
+    "log": "local-artifacts/latest-reference-clippy-final.log",
+    "program": "cargo"
+  },
+  {
+    "arguments": [
+      "clippy",
+      "-p",
+      "as-vm",
+      "-p",
+      "rd-apk",
+      "-p",
+      "rd-dex",
+      "--no-default-features",
+      "--lib",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "completed_utc": "2026-11-02T12:20:54.1839290Z",
+    "sha256": "db981bfd7034f1f0e68d4fb30ceb9ae0a0b949a8ab5bd0c59bd8f341e057c0d8",
+    "name": "core-clippy-final",
+    "started_utc": "2026-11-02T12:20:53.8893816Z",
+    "exit_code": 0,
+    "log": "local-artifacts/latest-core-clippy-final.log",
+    "program": "cargo"
+  },
+  {
+    "arguments": [
+      "clippy",
+      "-p",
+      "as-vm",
+      "--no-default-features",
+      "--features",
+      "wasm-engine",
+      "--lib",
+      "--locked",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "completed_utc": "2026-11-02T12:21:20.8197567Z",
+    "sha256": "2e8c1d0de591c5bdcd9dd447ebd392ea4d6f4eb85b1505b3a64599045ff37f82",
+    "name": "wasm-feature-clippy-final",
+    "started_utc": "2026-11-02T12:20:54.1856705Z",
+    "exit_code": 0,
+    "log": "local-artifacts/latest-wasm-feature-clippy-final.log",
+    "program": "cargo"
+  },
+  {
+    "arguments": [
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "completed_utc": "2026-11-02T12:21:26.9261035Z",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "name": "fmt-final",
+    "started_utc": "2026-11-02T12:21:20.8212618Z",
+    "exit_code": 0,
+    "log": "local-artifacts/latest-fmt-final.log",
+    "program": "cargo"
+  }
+]

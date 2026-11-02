@@ -70,10 +70,41 @@ remain explicit gaps, pending separate Horizon execution.
 Bundle provenance now reads the original base and synchronized upstream
 revision from the runtime build's Git commit, replacing a stale hard-coded pin.
 
-Final qualification is recorded separately from this source-integration scope.
-Host, NRO build, emulator and hardware evidence must name the exact source and
-binary. The earlier 219/219 physical-device result and older emulator runs do
-not qualify this update. Mekorama and Candy Crush first frames remain unproven.
+The [retained qualification report](../reports/upstream-merge-20261102.json)
+names source `5d12467e573f38419e3ced627ec3f3cf9be4dd5d`, the real Horizon std
+NRO, raw test logs, fixture hashes and individual emulator attempts. The NRO
+SHA-256 is `0ee266432eddc85762080464ee2624ce742056f7c8ba946dc75a45daab32f908`.
+The first emulator attempt passed 60 cases but hit the 15-second stop watchdog
+during Java lifecycle cleanup. An isolated 60-second diagnostic build returned
+successfully, with Java cleanup taking about 1.5 seconds; it does not establish
+that increasing the production deadline is a fix. The original unchanged NRO
+subsequently completed a resumed launcher workflow with 120 passing cases and
+Java cleanup taking about 0.86 seconds. The earlier timeout remains unexplained.
+Diagnostic and product results are kept separate, and each session's SD was
+restored.
+
+The final product resume (`0aabee1d29584648922d22aeea853429`) completes the
+declared baseline with **306 PASS and 3 NOT_RUN**, a completed launcher workflow,
+restored SD and visual inspection of the conformance screen. The three explicit
+exclusions are CPU, GPU and memory clock queries. Full catalog acceptance is
+therefore false. These observations were accumulated through the same NRO and
+APK's ordinary persistent journal, not across the diagnostic NRO.
+
+An earlier portrait session returned safely but failed the frame-hash gate:
+the C readback is hashed in physical scan order while the VM hashes its logical
+raster. Reconstructing the preserved image in rotation 1 yields the VM's exact
+hash (`95663f1ba4872ac2`); physical scan order yields the recorded readback hash
+(`73bbe1bf8bc0bd24`). The original reports remain unchanged. Normalizing this
+verification contract remains open; the final unrotated session does not close
+that gap. The development package includes these qualification limits and is
+explicitly diagnostic, not a v0.1 or whole-Android compatibility release.
+
+The [bundle verification receipt](../reports/upstream-merge-20261102/package.json)
+records the ZIP hash and all 136 packaged file checks. It includes the exact NRO,
+unchanged conformance APK, runtime qualification report and RustyDroid credits.
+
+The earlier 219/219 physical-device result and older emulator runs do not
+qualify this update. Mekorama and Candy Crush first frames remain unproven.
 
 Remaining work includes canonical framework/VFS/database/lifecycle state,
 thread/TLS ownership across all inherited families, metadata/reflection,

@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$EvidenceDirectory, [switch]$Diagnostic, [string]$FixtureDirectory='local-artifacts/conformance')
+param([Parameter(Mandatory)][string]$EvidenceDirectory, [switch]$Diagnostic, [string]$FixtureDirectory='local-artifacts/conformance', [string]$QualificationReport='')
 $ErrorActionPreference='Stop'
 $repo=Split-Path -Parent $PSScriptRoot
 $evidence=(Get-Item -LiteralPath $EvidenceDirectory).FullName
@@ -20,6 +20,12 @@ if($summary.apk_sha256 -cne (Get-FileHash $apk).Hash.ToLowerInvariant()){throw '
 if($summary.catalog_sha256 -cne (Get-FileHash "$fixture/catalog.json").Hash.ToLowerInvariant()){throw 'Catalog differs from observed evidence'}
 if($summary.original_sd_restore -cne 'restored' -or -not $summary.launcher_completed){throw 'Completed launcher workflow and restored SD required for this test bundle'}
 if(-not $Diagnostic -and -not $summary.acceptance_passed){throw 'Catalog acceptance is incomplete. Use -Diagnostic only for an explicitly unfinished hardware/debug test bundle.'}
+$qualification=$null
+if($QualificationReport){
+    $QualificationReport=(Get-Item -LiteralPath $QualificationReport).FullName
+    $qualification=Get-Content -LiteralPath $QualificationReport -Raw|ConvertFrom-Json
+    if($qualification.implementation_commit -cne $build.source_commit -or $qualification.horizon.nro_sha256 -cne $summary.nro_sha256){throw 'Runtime qualification report does not match this build'}
+}
 $id=[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8)
 $folder=Join-Path $repo "local-artifacts/releases/androswitch-conformance-$id"
 $sd=Join-Path $folder 'switch/androswitch'
@@ -52,6 +58,7 @@ if($build.mesa_sdk){
     Copy-Item -LiteralPath "$repo/local-artifacts/dependencies/mesa-switch-0ff52079/receipt.json" -Destination "$folder/evidence/mesa-sdk.json"
 }
 foreach($name in @('conformance-report.json','conformance-summary.json','verification.json')){Copy-Item -LiteralPath (Join-Path $evidence $name) -Destination (Join-Path "$folder/evidence" $name)}
+if($qualification){Copy-Item -LiteralPath $QualificationReport -Destination "$folder/evidence/runtime-qualification.json"}
 & "$PSScriptRoot/collect-product-licenses.ps1" -OutputRoot "$folder/licenses/dependencies"|Out-Null
 foreach($name in @('fonts/DejaVu.LICENSE','so_util.LICENSE','libnx-framebuffer.LICENSE')){Copy-Item -LiteralPath "$repo/third_party/$name" -Destination (Join-Path "$folder/licenses" ([IO.Path]::GetFileName($name)))}
 @'
@@ -90,6 +97,10 @@ $hardwareMatches=$hardware -and $hardware.status -ceq 'passed_user_reported' -an
 $hardwareText=if($hardwareMatches){'Pengguna mengonfirmasi suite ini 219/219 PASS pada Switch fisik; laporan agregat dan identitas paket ada di reports/conformance-hardware-20261025.json. Raw journal perangkat belum diarsipkan.'}else{'Build ini belum memiliki hasil pengujian Switch fisik dengan identitas paket yang cocok.'}
 $startPath=Join-Path $folder 'MULAI-DI-SINI.md'
 [IO.File]::WriteAllText($startPath,([IO.File]::ReadAllText($startPath)).Replace('__HARDWARE_STATUS__',$hardwareText).Replace('__CASE_COUNT__',[string]$summary.total),[Text.UTF8Encoding]::new($false))
+if($qualification){
+    Add-Content -LiteralPath $startPath -Encoding utf8NoBOM -Value "`nCatatan runtime dan percobaan sebelumnya: lihat evidence/runtime-qualification.json."
+    if($qualification.horizon.known_runtime_issue){Add-Content -LiteralPath $startPath -Encoding utf8NoBOM -Value ([string]$qualification.horizon.known_runtime_issue)}
+}
 & python -X utf8 "$PSScriptRoot/prepare-package-docs.py" $folder $build.source_commit
 if($LASTEXITCODE){throw 'Packaged documentation link preparation failed'}
 $manifest=@{

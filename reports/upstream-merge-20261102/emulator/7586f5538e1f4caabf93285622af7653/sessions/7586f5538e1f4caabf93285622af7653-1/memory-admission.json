@@ -1,0 +1,13 @@
+{
+  "allocator_available_after_load": 1600040528,
+  "allocator_available_before_load": 1601103808,
+  "estimated_parser_bytes": 1425152,
+  "package": "org.androswitch.conformance",
+  "parser_budget_bytes": 268435456,
+  "raw_dex_bytes": 89968,
+  "revision": 1,
+  "schema_version": 1,
+  "scope": "parser estimate is admission accounting, not an allocator measurement; memory.log contains allocator snapshots",
+  "session_id": "7586f5538e1f4caabf93285622af7653-1",
+  "status": "vm_ready"
+}

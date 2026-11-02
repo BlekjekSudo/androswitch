@@ -1,0 +1,372 @@
+   Compiling rd-apk v0.9.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\rd-apk)
+   Compiling as-package v0.1.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\as-package)
+   Compiling rd-jni v0.9.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\rd-jni)
+   Compiling as-native v0.1.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\as-native)
+   Compiling as-runtime v0.1.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\as-runtime)
+   Compiling rd-engine-wasm v0.9.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\rd-engine-wasm)
+   Compiling rd-dex v0.9.0 (D:\Dev\Switch\AndroSwitch\local-artifacts\worktrees\upstream-numerics\crates\rd-dex)
+    Finished `test` profile [unoptimized] target(s) in 22.40s
+     Running unittests src\lib.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\as_native-126dcbc338e3728e.exe)
+
+running 2 tests
+test jni_refs::tests::thread_frames_globals_ids_and_gc_roots ... ok
+test staging_tests::oversized_staging_returns_required_bytes_instead_of_aborting ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\loader.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\loader-9ffa1eceaa7ce0b6.exe)
+
+running 6 tests
+test lazy_failure_binding_is_explicit_and_never_weak_data_or_ambiguous ... ok
+test library_provider_extracts_only_requested_dependency_graph ... ok
+test missing_dependency_and_symbol_have_required_names ... ok
+test scalar_calling_convention_keeps_integer_float_banks_and_spill_order ... ok
+test stripped_dependencies_relocations_constructors_and_tls_use_one_loader ... ok
+test symbol_kinds_and_instruction_shaped_data_use_validated_elf_metadata ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src\lib.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\as_runtime-501be2a61e3ddaff.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\inspection.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\inspection-fd97a1d6f4192ecc.exe)
+
+running 8 tests
+test invalid_apk_returns_structured_parser_error ... ok
+test legacy_min_sdk_and_higher_target_are_allowed_without_claiming_execution ... ok
+test multiple_dex_files_are_preserved_as_inventory_not_execution_evidence ... ok
+test native_preflight_selects_arm64_without_requiring_every_abi ... ok
+test newer_min_sdk_is_a_preflight_blocker_but_inspection_succeeds ... ok
+test package_renaming_does_not_change_runtime_policy ... ok
+test real_fdroid_apk_is_inspected_without_upstream_min_sdk_floor ... ok
+test split_markers_are_reported_for_split_base_and_required_split_metadata ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running unittests src\lib.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\as_sqlite-ff270e2279292732.exe)
+
+running 3 tests
+test tests::guest_authorization_applies_to_prepare_query_and_restored_connections ... ok
+test tests::invalid_snapshots_and_unbounded_queries_have_named_errors ... ok
+test tests::sqlite_executes_bindings_transactions_and_roundtrips_its_real_file_format ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\rd_apk-628566499e1568c2.exe)
+
+running 54 tests
+test arsc::tests::bitmap_consumers_can_detect_unmodeled_raw_resource_qualifiers ... ok
+test arsc::tests::config_api_level_is_sdk_version_u16_at_offset_24 ... ok
+test arsc::tests::issue_246_package_string_pools_cannot_read_past_package_end ... ok
+test arsc::tests::issue_246_type_tables_and_entries_cannot_cross_chunk_bounds ... ok
+test arsc::tests::issue_331_aliased_entries_hit_materialization_budget ... ok
+test arsc::tests::lazy_index_resolves_like_eager ... ok
+test arsc::tests::runtime_resource_selects_newest_eligible_sdk_without_changing_inspection ... ok
+test arsc::tests::style_attributes_follow_parent_and_theme_attribute_aliases ... ok
+test arsc::tests::zero_size_chunk_is_typed_error_not_hang ... ok
+test axml::depth_tests::deep_xml_element_drops_without_stack_overflow ... ok
+test axml::tests::complex_to_float_matches_aosp_examples ... ok
+test axml::tests::parses_handcrafted_manifest_axml ... ok
+test axml::tests::rejects_non_axml ... ok
+test error::tests::display_is_human_readable ... ok
+test error::tests::serializes_to_agent_contract_shape ... ok
+test manifest::tests::absent_target_sdk_defaults_to_the_effective_minimum ... ok
+test manifest::tests::application_level_meta_data_is_collected ... ok
+test manifest::tests::explicit_exported_declaration_wins ... ok
+test manifest::tests::exported_default_is_any_intent_filter_not_only_launcher ... ok
+test manifest::tests::gl_es_version_reference_is_not_decoded_as_a_version ... ok
+test manifest::tests::protection_level_is_decoded_and_keeps_the_raw_value ... ok
+test paged::tests::declared_sizes_above_budget_refused_before_reading ... ok
+test paged::tests::near_max_local_header_offset_is_typed_error_not_panic ... ok
+test paged::tests::paged_open_handles_sparse_multigigabyte_container ... ok
+test paged::tests::paged_open_reads_entries_without_whole_file ... ok
+test paged::tests::truncated_zip64_extra_is_typed_error_not_panic ... ok
+test pool::tests::clone_resets_cache_but_keeps_content ... ok
+test pool::tests::empty_string_is_legitimate ... ok
+test pool::tests::issue_331_chunk_off_near_usize_max_is_typed_not_panic ... ok
+test pool::tests::issue_331_offset_aliasing_hits_decoded_budget ... ok
+test pool::tests::issue_331_utf16_string_cannot_read_past_chunk_end ... ok
+test pool::tests::iter_decodes_on_demand ... ok
+test pool::tests::lazy_decodes_once_and_memoizes ... ok
+test pool::tests::malformed_string_yields_none_not_panic ... ok
+test pool::tests::parses_handcrafted_utf8_pool ... ok
+test pool::tests::rejects_garbage_type ... ok
+test pool::tests::rejects_out_of_bounds_chunk ... ok
+test tests::apk_open_over_wholefile_cap_routes_paged ... ok
+test zip::tests::crc32_known_vector ... ok
+test zip::tests::crc_corruption_is_detected ... ok
+test zip::tests::decompression_bomb_is_typed_error_not_oom ... ok
+test zip::tests::duplicate_entry_names_are_reported_not_silently_picked ... ok
+test zip::tests::explicit_entry_budget_is_enforced_before_read_and_preserves_crc_validation ... ok
+test zip::tests::inflate_is_capped_by_global_budget_not_attacker_declared_size ... ok
+test zip::tests::issue_331_cd_walk_stays_inside_cd_end ... ok
+test zip::tests::issue_331_zip64_lho_max_read_is_typed_error ... ok
+test zip::tests::issue_331_zip64_locator_offset_overflow_is_typed_error ... ok
+test zip::tests::legit_deflate_entry_still_inflates ... ok
+test zip::tests::open_paged_matches_whole_parse ... ok
+test zip::tests::open_paged_sparse_above_wholefile_cap ... ok
+test zip::tests::parses_handcrafted_stored_zip_and_verifies_crc ... ok
+test zip::tests::positional_sources_match_resident_zip_and_enforce_metadata_budgets ... ok
+test zip::tests::rejects_non_zip ... ok
+test zip::tests::streamed_assets_chunk_seek_and_corruption ... ok
+
+test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.17s
+
+     Running tests\arsc_resource_names.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\arsc_resource_names-6951c27cda9de385.exe)
+
+running 9 tests
+test legacy_header_defaults_offset_to_zero_and_high_package_ids_are_real ... ok
+test numeric_names_are_signed_decimal_raw_ids_with_checked_overflow ... ok
+test reverse_lookup_distinguishes_absence_from_malformed_or_ambiguous_identity ... ok
+test reverse_lookup_uses_package_fragments_type_offset_and_high_ids ... ok
+test reverse_name_syntax_requires_real_defaults_and_preserves_explicit_components ... ok
+test string_pools_cannot_escape_the_owning_package_chunk ... ok
+test type_package_and_entry_index_overflow_are_rejected_instead_of_masked ... ok
+test unknown_ids_missing_keys_and_ambiguous_packages_do_not_invent_names ... ok
+test zero_and_nonzero_type_offsets_preserve_actual_table_identity ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\axml_manifest_253_254.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\axml_manifest_253_254-80c9e357f9dd852e.exe)
+
+running 5 tests
+test issue_253_iterative_clone_preserves_order_and_handles_200k_levels ... ok
+test issue_253_rejects_attribute_table_reading_past_start_element_chunk ... ok
+test issue_253_rejects_unclosed_element_opened_after_root_closes_and_excess_depth ... ok
+test issue_253_rejects_zero_attribute_size_amplification_without_oom ... ok
+test issue_254_gles_version_decodes_major_minor_and_merges_multiple_queries_blocks ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests\integration_apk.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\integration_apk-122517aca779863c.exe)
+
+running 3 tests
+test real_apk_inspect_end_to_end ... ok
+test real_apk_label_resolves_via_arsc ... ok
+test real_apk_manifest_raw_preserves_everything ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\signing_264.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\signing_264-428355121d382e70.exe)
+
+running 4 tests
+test issue_264_rejects_block_size_below_minimum_24 ... ok
+test issue_264_rejects_mismatched_initial_and_trailing_size_of_block ... ok
+test issue_264_rejects_pair_invading_trailing_size_of_block_footer_and_u64_wrap ... ok
+test valid_v2_v3_v31_sig_block_is_detected ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\rd_dex-da725f67e0925a26.exe)
+
+running 103 tests
+test annotations::tests::annotation_item_visibility_and_elements ... ok
+test annotations::tests::annotation_set_and_directory_walk ... ok
+test annotations::tests::array_with_mixed_elements ... ok
+test annotations::tests::char_is_zero_extended_u16 ... ok
+test annotations::tests::deep_nesting_is_typed_error_not_stack_overflow ... ok
+test annotations::tests::float_double_zero_pad_low_order_bytes ... ok
+test annotations::tests::index_sized_types ... ok
+test annotations::tests::integers_are_right_shifted_sign_extended_not_zigzag ... ok
+test annotations::tests::malformed_values_are_typed_errors ... ok
+test annotations::tests::nested_annotation_with_name_idx ... ok
+test annotations::tests::null_and_boolean_use_value_arg ... ok
+test annotations::tests::parse_encoded_array_static_values_shape ... ok
+test annotations::tests::type_code_covers_all_variants ... ok
+test annotations::tests::visibility_roundtrip_and_names ... ok
+test classes::tests::count_overflow_is_typed_error ... ok
+test classes::tests::parses_synthetic_class_data ... ok
+test classes::tests::zero_offset_is_empty ... ok
+test code::tests::all_256_opcodes_decode_without_panic ... ok
+test code::tests::branch_target_computation ... ok
+test code::tests::cmp_float_is_all_narrow ... ok
+test code::tests::code_item_catch_all_and_multiple_typed ... ok
+test code::tests::code_item_roundtrip_and_catch ... ok
+test code::tests::conversion_wide_dest_at_boundary_is_invalid ... ok
+test code::tests::decodes_11n_const4_negative ... ok
+test code::tests::decodes_12x_move ... ok
+test code::tests::decodes_21h_high16 ... ok
+test code::tests::decodes_35c_invoke ... ok
+test code::tests::decodes_51l_const_wide ... ok
+test code::tests::decodes_fill_array_payload_with_padding ... ok
+test code::tests::decodes_packed_switch_payload ... ok
+test code::tests::decodes_sparse_switch_payload ... ok
+test code::tests::fill_array_data_padded_u32_wrap_is_typed_error ... ok
+test code::tests::fill_array_data_payload_beyond_method_is_invalid ... ok
+test code::tests::ins_size_greater_than_registers_size_is_invalid ... ok
+test code::tests::invoke_range_beyond_registers_size_is_invalid ... ok
+test code::tests::long_shift_count_is_narrow_operand ... ok
+test code::tests::register_index_beyond_registers_size_is_invalid ... ok
+test code::tests::truncated_instruction_is_typed_error ... ok
+test code::tests::try_beyond_stream_is_invalid ... ok
+test code::tests::wide_pair_at_last_register_is_invalid ... ok
+test debug::tests::advance_pc_and_line ... ok
+test debug::tests::line_map_skips_local_only_entries ... ok
+test debug::tests::locals_and_prologue_state_machine ... ok
+test debug::tests::set_file_and_restart ... ok
+test debug::tests::special_opcode_advances_addr_and_line ... ok
+test debug::tests::special_opcode_arithmetic ... ok
+test debug::tests::start_local_extended_with_signature ... ok
+test debug::tests::unterminated_sequence_hits_guard ... ok
+test dex::tests::adler32_known_vector ... ok
+test dex::tests::map_list_roundtrip ... ok
+test dex::tests::map_type_names_and_codes ... ok
+test dex::tests::parses_minimal_dex ... ok
+test dex::tests::rejects_bad_magic ... ok
+test dex::tests::rejects_big_endian ... ok
+test dex::tests::rejects_truncated ... ok
+test disasm::tests::annotation_rendering_class_level ... ok
+test disasm::tests::const_family_literals ... ok
+test disasm::tests::goto_and_cond_labels ... ok
+test disasm::tests::interfaces_no_source_and_unused_opcode ... ok
+test disasm::tests::local_directives_from_debug_events ... ok
+test disasm::tests::p_register_math_and_param_directives ... ok
+test disasm::tests::packed_switch_payload_and_labels ... ok
+test disasm::tests::render_method_extraction_and_typed_errors ... ok
+test disasm::tests::renders_class_layout_fields_and_static_values ... ok
+test disasm::tests::roundtrip_structural_invariants ... ok
+test disasm::tests::smali_file_mapping ... ok
+test disasm::tests::sparse_switch_and_array_data_payloads ... ok
+test disasm::tests::string_escaping_in_const_string ... ok
+test disasm::tests::try_catch_rendering ... ok
+test error::tests::display_is_human_readable ... ok
+test error::tests::serializes_to_agent_contract_shape ... ok
+test fields::tests::flag_ordering_matches_dexlib2 ... ok
+test fields::tests::parses_field_ids_table ... ok
+test methods::tests::method_handle_names ... ok
+test methods::tests::parses_method_handles ... ok
+test methods::tests::parses_method_ids_table ... ok
+test mutf8::tests::ascii_roundtrip ... ok
+test mutf8::tests::bmp_roundtrip ... ok
+test mutf8::tests::encode_matches_java_mutf8_reference ... ok
+test mutf8::tests::escape_char_uses_single_quotes ... ok
+test mutf8::tests::escape_string_baksmali_conventions ... ok
+test mutf8::tests::invalid_bytes_are_lossy_not_panic ... ok
+test mutf8::tests::nul_is_c0_80 ... ok
+test mutf8::tests::supplementary_is_surrogate_pair ... ok
+test opcode::tests::format_sizes ... ok
+test opcode::tests::payload_kinds ... ok
+test opcode::tests::spot_checks ... ok
+test opcode::tests::table_is_complete_and_indexed ... ok
+test opcode::tests::unused_ranges ... ok
+test protos::tests::parses_protos_and_type_list ... ok
+test protos::tests::truncated_type_list_is_typed_error ... ok
+test read::tests::bounds_checked_reads ... ok
+test read::tests::sleb128_vectors ... ok
+test read::tests::uleb128_rejects_overflow_and_loop ... ok
+test read::tests::uleb128_vectors ... ok
+test read::tests::uleb128p1_maps_zero_to_no_index ... ok
+test strings::tests::malformed_mutf8_bytes_decode_lossy_without_rejecting ... ok
+test strings::tests::missing_terminator_is_typed_error ... ok
+test strings::tests::out_of_bounds_table_is_typed_error ... ok
+test strings::tests::parses_synthetic_table ... ok
+test strings::tests::utf16_len_mismatch_is_tolerated_lossy ... ok
+test types::tests::descriptors ... ok
+test types::tests::parses_synthetic_table ... ok
+
+test result: ok. 103 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\dex_security_332.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\dex_security_332-5175bf23f999da75.exe)
+
+running 5 tests
+test disasm_render_class_charges_proto_sig_steps_and_validates_method_type_u16_332 ... ok
+test lazy_dex_and_lazy_strings_enforce_decoded_byte_budget_and_memoize_class_index_332 ... ok
+test map_list_rejects_duplicate_sections_and_clamps_to_header_file_size_332 ... ok
+test read_encoded_value_caps_total_nodes_and_nested_preallocation_332 ... ok
+test sleb128_rejects_5th_byte_continuation_and_sign_overflow_and_code_try_range_overflow_332 ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\fuzz_dos_285.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\fuzz_dos_285-72a85f5b5802bf90.exe)
+
+running 4 tests
+test aliased_and_overlapping_string_data_off_rejected_fast ... ok
+test code_item_aliased_catch_handler_off_rejected_while_valid_shared_finally_passes ... ok
+test disasm_render_class_blocks_annotation_and_method_dag_amplification ... ok
+test disasm_render_class_caps_repeated_large_const_string_output ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\integration_dex.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\integration_dex-c7bb43a0c3df8473.exe)
+
+running 3 tests
+test real_dex_all_classes_code_roundtrip_and_annotations ... ok
+test real_dex_disasm_contract_renders_smali ... ok
+test real_dex_header_and_map_coverage ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\lazy_dex.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\lazy_dex-f44eef3381316fde.exe)
+
+running 4 tests
+test lazy_dex_mount_and_section_parity_with_eager_dex ... ok
+test lazy_strings_decode_only_touched_pages ... ok
+test malformed_lazy_inputs_return_structured_rd_error ... ok
+test raw_class_index_preserves_first_definition_wins_and_unicode ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\memory_budget.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\memory_budget-d4725ffe76abd305.exe)
+
+running 2 tests
+test budgeted_parser_rejects_expansion_and_malformed_offsets_before_decode ... ok
+test budgeted_parser_validates_integrity_before_decoded_allocation ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\portable_index.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\portable_index-89862e68410baa09.exe)
+
+running 1 test
+test real_dex_class_index_preserves_definition_lookup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running unittests src\lib.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\rd_engine_wasm-6eaedb5175eccf82.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\fuzz_smoke.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\fuzz_smoke-de5ab91854766ab2.exe)
+
+running 3 tests
+test mutated_modules_never_panic ... ok
+test random_inputs_never_panic ... ok
+test seed_module_is_valid_and_runs ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests\wasm_mvp.rs (C:/Users/Administrator/.cache/androswitch/upstream-numerics-host\debug\deps\wasm_mvp-d3186868255bdb58.exe)
+
+running 25 tests
+test add_returns_result_and_counts_instructions_as_fuel ... ok
+test br_table_selects_the_right_label_and_default ... ok
+test call_depth_is_bounded ... ok
+test custom_sections_are_skipped ... ok
+test data_segments_must_fit_memory ... ok
+test execution_is_deterministic ... ok
+test exports_are_validated ... ok
+test floats_simd_imports_tables_and_multivalue_are_not_implemented ... ok
+test fuel_bounds_infinite_loops_and_is_accounted ... ok
+test globals_persist_across_calls_and_start_runs_at_instantiation ... ok
+test i32_arithmetic_wraps_and_i64_multiplies ... ok
+test i64_paths_and_conversions ... ok
+test if_else_and_block_result_carry_values ... ok
+test invoke_checks_name_arity_types_and_argument_count ... ok
+test limits_are_enforced_at_parse_time ... ok
+test loop_with_br_if_sums_to_expected_value ... ok
+test malformed_headers_and_sections_are_rejected ... ok
+test memory_grow_is_bounded_by_declared_maximum ... ok
+test memory_round_trip_and_sign_extension ... ok
+test overlong_leb128_is_rejected ... ok
+test recursion_over_large_frames_hits_the_locals_budget ... ok
+test recursive_fibonacci_is_correct ... ok
+test runtime_traps_are_structured_errors ... ok
+test type_errors_and_stack_errors_are_invalid_format ... ok
+test unreachable_code_is_validated_polymorphically ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

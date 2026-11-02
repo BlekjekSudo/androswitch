@@ -1,0 +1,417 @@
+[
+  {
+    "path": ".gitattributes",
+    "sha256": "23b7407dbc8b4e87531ef5705e0ec02adb65519755c37a2444493b1802f4570f",
+    "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained. Reviewed narrow raw-evidence rule for reports/collections-text-20261026: preserve byte hashes through Git checkout and exempt original log whitespace, without changing source policies. Reviewed the same narrow immutable-evidence byte policy for reports/gc-pressure-20261027; source normalization is unchanged. Reviewed the same narrow raw-evidence policy for reports/gc-shared-20261027; runtime source normalization stays unchanged. Reviewed against pinned RustyDroid and previous adaptation: Narrow raw-byte evidence policy for reports/shared-io-20261027, matching the prior immutable checkpoint rules; source normalization and source whitespace policies remain unchanged. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim. Reviewed one additional immutable-evidence path for reports/shared-jdk-20261028: preserve captured bytes and SHA-256 values through Git checkout, without altering other paths or runtime source. The frozen runtime source inventory and pre-policy qualification are retained separately. Review at 33e7645: Add the same narrow immutable raw-evidence byte policy for reports/upstream-merge-20261102; source normalization and other paths are unchanged."
+  },
+  {
+    "path": ".github/workflows/ci.yml",
+    "sha256": "6da46d1c2667c11d2613b84fee96eca395656f549c514b416df42bcf0fd8fc50",
+    "reason": "AndroSwitch workspace/branding/repository/CI/asset policy; upstream attribution and original runtime history retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "Cargo.lock",
+    "sha256": "f9bd8806c9de7c1c624d42e2bd3a5668f25e3b66623f9be746fc11e08be85f8a",
+    "reason": "Lock portable regex/fancy-regex/libm/siphasher and existing native SQLite dependencies; desktop transports remain isolated from device builds. Horizon build-std uses separately pinned/adapted libc 0.2.189; the normal host dependency graph remains locked. Cargo records this build-only patch as unused in the normal graph. Review at 33e7645: Resolve the original Cranelift 0.137 and fancy-regex 0.20/WASM dependency changes together with frozen product dependencies; preserve separate VM package identities and optional desktop dependencies. libm 0.2.16 satisfies the new shared constraint. Retain the prior unused libc 0.2.189 lock record required by the pinned Horizon std patch; it does not change the host dependency graph."
+  },
+  {
+    "path": "Cargo.toml",
+    "sha256": "c86ac26b32c390997d2a919d8e37faff4d7fb902a7bf306659b456cbc1251d64",
+    "reason": "Register the isolated portable reference renderer alongside existing workspace packages; original runtime history and desktop packages retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-apk/Cargo.toml",
+    "sha256": "b02f431274799d07c41da593af5c308ba76e1aeb73a5de5f44c8b7a7037f1ba8",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: Keep alloc/serde/streaming profiles and add parser-only spin cache synchronization for the retained core profile; std uses standard Mutex/OnceLock."
+  },
+  {
+    "path": "crates/rd-apk/src/arsc.rs",
+    "sha256": "34f734e388009cbf071a1632eae861a12dc870de2d42c0defb94b994e00373d7",
+    "reason": "Latest upstream bounds/materialization budgets plus owning-package resource names, legacy 284-byte headers and typeIdOffset support. Review at 33e7645: Integrate original lazy resource indexing and budgeted caches. Preserve legacy package headers, type-id offsets, owning resource names, API qualifiers and strict subchunk validation; migrate value access to entries_for and synthetic test construction."
+  },
+  {
+    "path": "crates/rd-apk/src/axml.rs",
+    "sha256": "a64aa5d12e0a8751e3e112966fa05f8e94b1d3fc47ef9be8e418146e06d26a19",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-apk/src/lib.rs",
+    "sha256": "2f60dbaad2fbe62818e106531fdbe45882f02e71ad86f3d76acac82570ec27d4",
+    "reason": "Portable APK source constructor, one signing path and positional ZIP; legacy CLI floor policy retained. Review at 33e7645: Declare parser cache synchronization without changing streaming/materialization interfaces."
+  },
+  {
+    "path": "crates/rd-apk/src/pool.rs",
+    "sha256": "89574cfc3f8b845d7aae98ffb6d433932e66780f3d8d2c362889f9a5ce9923ae",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: Original lazy pool uses alloc Arc and core atomics with the std/core cache adapter; decoding/budget logic is retained."
+  },
+  {
+    "path": "crates/rd-apk/src/zip.rs",
+    "sha256": "5d192340970cdf74d909cb68b4fd81039b4a311b9dbbacc83b65292fc680ceb3",
+    "reason": "One portable ReadAt/streaming source for Horizon and desktop paging, checked ZIP64/CRC/budgets; raw_bytes retains checked Result semantics. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-dex/Cargo.toml",
+    "sha256": "27f7b2cc1ab11609e59de592685a63996c097ae8bcf73a6026fe7c7e7f2b51a8",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-dex/src/classes.rs",
+    "sha256": "a8294cf76b2396b89e6e96b03ffa32575fd48d294654eed8201cedf53ffc18f8",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-dex/src/fields.rs",
+    "sha256": "071bb998d8a2cde7a4bd2e766c6d2a47c32a61a15836cf1be105432a02f04c85",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-dex/src/methods.rs",
+    "sha256": "396ffbece52c416cec7f07af3bd2455b97199b4ccecbdcca999b234b3aa66de7",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-dex/src/mutf8.rs",
+    "sha256": "53858acd3f5b049421619ead4bc48a2a19b0b8be147baec5df2dc58518ca625f",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-dex/src/protos.rs",
+    "sha256": "afddee523ceaaee906f37fc72c0a0a48810c80ee839fd86f4667aca6b94a0317",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-dex/src/strings.rs",
+    "sha256": "1280bbbbe231ee716d7f8f7e012cc9b51c7a829d7b6bb85ebf8b32f001245996",
+    "reason": "Latest lazy paged string cache retains decoding/bounds with alloc/core and synchronized portable OnceLock. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-dex/src/types.rs",
+    "sha256": "3216334c9e8d7cd1263e067bd6d547ffa3f55359917f33dde8689b8191267c80",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-jni/Cargo.toml",
+    "sha256": "76c7c976fd5dfb9ef77fb9494bbea9d238d7be346eb63003a959c20a7a0b766e",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: Use original Cranelift 0.137 dependencies while retaining optional JIT/std boundaries and test-only serde_json."
+  },
+  {
+    "path": "crates/rd-ndk/src/elf.rs",
+    "sha256": "1728301ed013b54fb7f7dabb2cf7e43c3832a80b9e713639c2d120b96ff2a119",
+    "reason": "Latest hardening plus portable program headers, finalizers and executable ranges. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-ndk/src/runtime.rs",
+    "sha256": "bdbcb1321cacea0e3cc9754187e2e63b5f3bff63cddde58145bf95e22da2d499",
+    "reason": "Portable alloc/core imports, feature/error or FFI boundary adapters; inherited behavior/tests retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-testsupport/src/vm.rs",
+    "sha256": "d83058a2d42870945927e66835745fcecdff878504152d5fa45e8bdb342feea5",
+    "reason": " Shared String storage review against the pinned original and prior adaptation: Reviewed synthetic DEX fixture correction: encode string_data as modified UTF-8 over UTF-16 units, including NUL and supplementary pairs. The former plain UTF-8 writer made the new jumbo/non-BMP fixture invalid. Original test routes/builders remain in place; this does not modify external APKs or runtime decoding. See docs/UPSTREAM_STRING_STORAGE.md; no complete API parity claim. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/Cargo.toml",
+    "sha256": "04cba11a3796a73091a92139a26b5b59a444347a65694eba0bf5914202c8157d",
+    "reason": "Recognize the shared upstream-runtime cfg as a desktop std reference feature; the actual no_std full build is the isolated as-vm package. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Review at 33e7645: Preserve isolated shipping/reference/desktop profiles; retain optional original WASM bridge with its required upstream resources/dispatch closure, update fancy-regex to upstream 0.20, no implicit desktop backend."
+  },
+  {
+    "path": "crates/rd-vm/src/android_json.rs",
+    "sha256": "fe16aa0398774cb0cd795cbc82ad5bbc652f8c0899b92c269c6dcfa3738d14d7",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/android_pm.rs",
+    "sha256": "6c74432e8a8a2adcc01c10f714793fc26176521247a9ee950e7f408b84f2a16c",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/android_region.rs",
+    "sha256": "23a75a14fac64a92dec2218ddf4dfbe42a7dee51df278e59fab1ac7fba1b19d9",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/android_res.rs",
+    "sha256": "36ffdba3b5f61c959aeb35e73ca02454ee88b0dd3ff91ee9cb8f333145305f86",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/android_spannable.rs",
+    "sha256": "cb326999a4569bd01e5bc4acc5e6c5bd78a36603ccff688ce764a335d5174bca",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/android_stub_surfaces.rs",
+    "sha256": "de34eba0b497574e4aea1d236f73f4d9b853c9092a4eebe862d0443138af4a42",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Review at 33e7645: Keep existing Engine-owned module tables and core imports. Accept upstream NaN/GLU precision corrections; remove equivalent previous local lint exceptions now present upstream."
+  },
+  {
+    "path": "crates/rd-vm/src/android_sysservices.rs",
+    "sha256": "eb5d4d4dfded8ae8c2110138a6bde8d6221bfccc3fb23885bd440d0c58c4dedc",
+    "reason": "Core/alloc reference compilation and shared private Throwable detail-message state; ordinary message-bearing objects keep their existing fields. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/android_text.rs",
+    "sha256": "bb99b551906b1690888b85bcffc501f692f3adfacf7aa7e10e228bcb506cd979",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/android_uri.rs",
+    "sha256": "597520212f5a28b68bd1e360f21a64305e311f84a05dd4aa89a7323924ca435b",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/android_util.rs",
+    "sha256": "c72b5c90589ceb29699b155fa4c7b4cefd51915b0b6f61d0725a14ece4e15a2c",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/androidx.rs",
+    "sha256": "98fd9e69dfcd8a5df1c1d9e2f14c3e2b9323cb498112a002aec4b236e0f6de8b",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/arrays.rs",
+    "sha256": "d492e3252d83ced9acb3c0129166f3ef031a9506cb0df2f13d23e37cfc5626b1",
+    "reason": "Shared latest upstream family with exact overload metadata, owner-scoped callbacks, precise snapshot pins, array-store checks and extracted value/format helpers. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/boxes.rs",
+    "sha256": "f0060912840c0a5bb97bdef638c0c881c882b8a41b3ab0f319f5def4a640efcc",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/bundle.rs",
+    "sha256": "5ec23d4c7abc1d4ad0a0213e163984561a69668b79d1b3cc312afcda478206eb",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/classpath.rs",
+    "sha256": "6de483b1addd1864311025a3889a72ea03aabf753dcb1e54676035d6b290c866",
+    "reason": "Retain original builtin/Dex hierarchy as authoritative and supplement missing public type/interface/modifier facts with hash-pinned SDK declaration metadata; metadata does not implement Android methods. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Review at 33e7645: Retain checked metadata/JNI/SDK declaration adapters while accepting new dispatch/array hierarchy algorithms; new traversal sets use the common map abstraction and alloc vec."
+  },
+  {
+    "path": "crates/rd-vm/src/content.rs",
+    "sha256": "09abce8965063f34eb80b8c1b6673872b6eb54aae1f09991398fa5c800caf7f5",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/engine.rs",
+    "sha256": "0f5e1b0aab359e6e7abe1a0f96ad1d813d238e9fb77dfbdcf4fce5a067afe04e",
+    "reason": "Compile original framework/GC fields in the experimental no_std reference path, own module/output/reference-VFS tables per Engine, preserve real execution-owner scopes, and use one private Throwable detail-message slot. Default shipping framework integration remains pending. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: Engine-owned character/byte-stream tables and a session temp-file sequence; original VM, heap and execution-owner state retained. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim. Shared String storage review against the pinned original and prior adaptation: One Engine-owned literal table for loaded DEX strings on every profile. Encoded static String values use the same pool; dynamic strings remain ordinary heap allocations. See docs/UPSTREAM_STRING_STORAGE.md; no complete API parity claim. StringTokenizer review against pinned upstream and prior adaptation: Add the one typed tokenizer table on std and upstream-runtime. No framework fallback, duplicated input byte buffers or process-global state. See docs/UPSTREAM_TOKENIZER.md; no whole-runtime parity claim. Canonical Class owner review against the pinned original factory and prior adaptation: One Engine-owned descriptor-to-Class cache is shared by both profiles. It replaces two older owners; no platform service or alternate class namespace is fabricated. See docs/UPSTREAM_CLASS_OWNER.md; full Class/reflection/loader API parity is not claimed. Review at 33e7645: Integrate original stack guards, constructor entry and static-provider chain. Native stack anchors/depth follow actual execution owner and unwind on errors; preserve synchronized methods, native bridge and GC scopes. Optional launch telemetry uses std clocks; core profile reports no trace. Bound framework state remains authoritative. Horizon stack-size discovery is not yet verified."
+  },
+  {
+    "path": "crates/rd-vm/src/framework.rs",
+    "sha256": "a7c9a69c593e5c9c68db645bddb10b543775c4379d4bf6c6fa557f92020ea4c4",
+    "reason": "Compile original framework algorithms with core/alloc and module state, retain the portable canonical Class cache, and route diagnostic output through the platform log transport; shipping lifecycle/view state integration remains pending. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. StringTokenizer review against pinned upstream and prior adaptation: Remove only the obsolete StringTokenizer HostObj variant; its state now has the same typed Engine owner on both profiles. Other inherited HostObj variants are preserved. See docs/UPSTREAM_TOKENIZER.md; no whole-runtime parity claim. Canonical Class owner review against the pinned original factory and prior adaptation: Extract the complete original canonical Class allocation, descriptor/name alias and catchable OOM body to existing java_values. Remove HostState.class_objs and retain a delegating wrapper; other framework ownership is unchanged. See docs/UPSTREAM_CLASS_OWNER.md; full Class/reflection/loader API parity is not claimed. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/gc.rs",
+    "sha256": "39af01018df041b08eb80b16e979a5688a20ded68cf547d4bfce86cc32daf5ea",
+    "reason": "Port original collector to core/alloc; add actual execution-owner, canonical cache, framework/native roots and platform collection hooks. Preserve inherited conservative side-state scanning; exclude an exactly default reference-free framework from scalar-ID false roots. Clock availability is explicit. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. GC pressure integration: extract the pinned upstream byte/slot adaptive pressure calculation into gc_policy, consumed by both collectors; preserve actual execution-owner roots and host temporary cutoffs. A pressure watermark collected with active frames is rechecked once with a full collection after the callback unwinds; real live heaps retain backoff. Added before/after pressure and unpinned-boundary regression contracts. Reviewed gc.rs against upstream 3761815 plus prior adaptation; full collector state integration remains open. Shared collector integration: shipping std/core and reference profiles now compile the same original gc.rs mark/sweep, generational barriers, weak-reference clearing/queue and adaptive collection algorithms. Framework/native roots and exact product regex edges use the active platform owner; reference-only HostState/graphics scanners remain profile adapters. Old platform side-state owners are conservatively revisited during minor GC until exact dirty-owner keys exist. Removed the separate product collector. Five original heap/DEX/weak scenarios are extracted without body changes into shared test helpers and exercised on the shipping profile; original suite routes and scenarios remain. Source selection and these focused tests do not establish complete upstream API parity; full host/NRO qualification remains required. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: include original character-stream keys on std, trace typed Reader/Writer sink/source ephemerons on both profiles, and purge dead keys. Existing original collector/generations and platform roots retained. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim. Shared String storage review against the pinned original and prior adaptation: Trace actual common literal-table ObjRefs on both collectors/profiles and remove the old product-wide dynamic String cache root. Other root/state traversal remains intact. See docs/UPSTREAM_STRING_STORAGE.md; no complete API parity claim. StringTokenizer review against pinned upstream and prior adaptation: Add tokenizer keys, typed source/delimiter edges, old-owner minor traversal through the existing side-state bitmap, and dead-owner purge before slot reuse. Scalar cursor values are not traced. See docs/UPSTREAM_TOKENIZER.md; no whole-runtime parity claim. Canonical Class owner review against the pinned original factory and prior adaptation: Trace the shared Engine Class cache through actual heap edges on every profile; remove the old product-only cache root chain. No scalar/debug fallback is used for these Class roots. See docs/UPSTREAM_CLASS_OWNER.md; full Class/reflection/loader API parity is not claimed. Canonical Class owner review against the pinned original factory and prior adaptation: Trace the shared Engine Class cache through actual heap edges on every profile; remove the old product-only cache root chain. No scalar/debug fallback is used for these Class roots. Extend the existing exact-default HostState guard to desktop as well as upstream-runtime: a default constructed without a heap has no actual references, and numeric profile constants must not retain unrelated heap objects. Non-default framework state retains the inherited conservative scan; object ephemerons and resources are handled separately. See docs/UPSTREAM_CLASS_OWNER.md; full Class/reflection/loader API parity is not claimed. Review at 33e7645: Integrate original typed host ephemerons, strong roots and purge into the shared collector. Keep actual platform/frame/native roots, Engine-owned regex/I/O/tokenizer tables, Class/literal roots and default-state false-root guard."
+  },
+  {
+    "path": "crates/rd-vm/src/gc_host_ephemerons.rs",
+    "sha256": "d46657fab47180a9fbc3093234891ffe4e11406adf1ceb5cfc653a1277a3c077",
+    "reason": " Review at 33e7645: Retain original typed host-state tracing with alloc Vec import; reference/desktop feature boundary remains explicit."
+  },
+  {
+    "path": "crates/rd-vm/src/gms.rs",
+    "sha256": "c6c7b4b116ca62e6285ea1da12e45f711348c238aaf00ddfc807deb29a59154e",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/heap.rs",
+    "sha256": "11edb5967ec1c24f24282b4b2dcdc3cce014691cc123e5203b8c0eab32df6105",
+    "reason": "Make inherited generational metadata available to the shared collector and bridge nested upstream host scopes to actual execution-owner scopes; no cross-owner or guest-boundary temporary promotion. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Shared collector integration: shipping std/core and reference profiles now compile the same original gc.rs mark/sweep, generational barriers, weak-reference clearing/queue and adaptive collection algorithms. Framework/native roots and exact product regex edges use the active platform owner; reference-only HostState/graphics scanners remain profile adapters. Old platform side-state owners are conservatively revisited during minor GC until exact dirty-owner keys exist. Removed the separate product collector. Five original heap/DEX/weak scenarios are extracted without body changes into shared test helpers and exercised on the shipping profile; original suite routes and scenarios remain. Source selection and these focused tests do not establish complete upstream API parity; full host/NRO qualification remains required. Review at 33e7645: Keep real allocation accounting, array descriptors, execution-owner scopes and String initialization; new exact-array allocator uses core size_of."
+  },
+  {
+    "path": "crates/rd-vm/src/inflate.rs",
+    "sha256": "8f571f93f320850935faede0f34e2f69471460612c15012322d544c563bbacb8",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/interp.rs",
+    "sha256": "8f8ec56bbfcd49f712d9a414d7c53f2fc0010be44099eefc1d5fa4b317f31559",
+    "reason": "Enable inherited framework dispatch and statics in the experimental reference path, preserve real owner frames and portable exception dispatch, and use the shared private Throwable message state. This is not yet the bound Horizon framework path. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Shared String storage review against the pinned original and prior adaptation: Normal and jumbo const-string opcodes use the same Engine literal pool, retaining identity across DEX files and collections without changing dynamic APIs. See docs/UPSTREAM_STRING_STORAGE.md; no complete API parity claim. StringTokenizer review against pinned upstream and prior adaptation: Extend the existing platform invoke-super lookup-start handling to the non-final StringTokenizer API so DEX overrides can call their inherited base without recursion. Virtual overrides still execute first. See docs/UPSTREAM_TOKENIZER.md; no whole-runtime parity claim. Review at 33e7645: Accept upstream leaf/invoke refactoring and shared static-provider resolution. Preserve exact wide slots, class-init/exception/GC behavior, portable field checks and framework dispatch. Bound framework misses remain unavailable; no disconnected host-shim fallback."
+  },
+  {
+    "path": "crates/rd-vm/src/intrinsics.rs",
+    "sha256": "911ccd1ff3bc923f19aaa6e14d701eb15eaf71bf5ec03743dceebe129c652b11",
+    "reason": "Reuse the original rooted dispatcher on the no_std reference path; per-Engine output, common object-value helpers and a private shared Throwable detail-message slot replace desktop globals/duplicated state. Keep runtime items before test modules for strict clippy; PrintStream output shares one implementation across reference variants. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: reference dispatch also calls the common java_io scope/template adapter around original jio_chars; DEX subclass constructors remain declared-class calls. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim. Reviewed against the pinned original: Numeric family extraction: original Math base arms and scalar helpers move into the inherited numerics module. The reference dispatcher retains its existing numerics call and original fallback order; no extra object store. See docs/UPSTREAM_NUMERICS.md; no whole-runtime behavior parity claim. Shared String storage review against the pinned original and prior adaptation: Move the original dynamic alloc_string body and catchable OOM formatting to existing java_values, retaining the original public wrapper for all callers. See docs/UPSTREAM_STRING_STORAGE.md; no complete API parity claim. StringTokenizer review against pinned upstream and prior adaptation: Pass actual receiver and declaring lookup classes to the same shared tokenizer dispatcher; original reference suite route remains unchanged. See docs/UPSTREAM_TOKENIZER.md; no whole-runtime parity claim. Review at 33e7645: Keep shared value/collection/output extractions; native-stack check lives in shared java_values, and new repeated-array initialization uses core repeat_n."
+  },
+  {
+    "path": "crates/rd-vm/src/jbigdecimal.rs",
+    "sha256": "7180649f6da392b69ded54c18a6bea92efc730962c46a288ac313e3bda51c3ed",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/jio_chars.rs",
+    "sha256": "483140ee9f3ee1e001c81e80005727f5713412a3b66186a314ffd14f45534f67",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: same Reader/Writer/byte algorithms and limits with Engine.io_tables on std, common stream constructors, typed GC edges and shared float formatting. Correct incomplete encoding input across flush and forward raw UTF-16 char arrays to Writer callbacks; JVM/DEX cases expose these general defects. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim. Review at 33e7645: Use upstream in-place bounded Writer/BAOS updates with Engine-owned tables. Preserve lossless char-array callbacks, cross-flush surrogate state and common file stream backend."
+  },
+  {
+    "path": "crates/rd-vm/src/jlstring.rs",
+    "sha256": "10900800d60e8b34fed2579970cf2d3b4ada99a2ae60f4f3502d26af89a2ccfc",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Review at 33e7645: Integrate upstream bounded regex replacement with Engine-owned compiled regex cache; keep actual collection joins and inherited String algorithms."
+  },
+  {
+    "path": "crates/rd-vm/src/jrandom.rs",
+    "sha256": "10b76828976a2bf9a6d8587cdccdf0b074b36e80a4110b616bc340b4a7c64431",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/jregex.rs",
+    "sha256": "16b77df94c1bbae4f25bedcd467108bfcd6acb61dc2095034dd46b25588932e0",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Shared collector integration: shipping std/core and reference profiles now compile the same original gc.rs mark/sweep, generational barriers, weak-reference clearing/queue and adaptive collection algorithms. Framework/native roots and exact product regex edges use the active platform owner; reference-only HostState/graphics scanners remain profile adapters. Old platform side-state owners are conservatively revisited during minor GC until exact dirty-owner keys exist. Removed the separate product collector. Five original heap/DEX/weak scenarios are extracted without body changes into shared test helpers and exercised on the shipping profile; original suite routes and scenarios remain. Source selection and these focused tests do not establish complete upstream API parity; full host/NRO qualification remains required. Review at 33e7645: Preserve Engine-owned regex tables and trace/purge; integrate upstream bounded replacement/input accounting and pass new limit in retained tests."
+  },
+  {
+    "path": "crates/rd-vm/src/jsb.rs",
+    "sha256": "eff32915635c9c36308704a75af83110eebb77f05c4357ff6c12e833db766d64",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Reviewed against pinned RustyDroid and previous adaptation: Shared builder UTF-16 review: preserve raw/unpaired code units in the original managed buf field using a heap char array, with ordinary GC edges and preallocation heap-budget checks. Correct reverse, codePointAt, appendCodePoint and setLength without lossy conversion; independent JVM edits and unchanged APK UI reproduce the integration defect. An unpaired-surrogate String result remains explicitly unavailable pending the UTF-16 String heap. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim. Review at 33e7645: Preserve managed raw UTF-16 builder storage, reverse/code-unit behavior and exact overload metadata. Integrate upstream null/code-point fixes and original lossy String materialization. Isolated-surrogate String identity remains unsupported by the UTF-8 heap; document the upstream limitation instead of claiming full Android semantics."
+  },
+  {
+    "path": "crates/rd-vm/src/jsqlite.rs",
+    "sha256": "9c58be7c0330be39cc39792aae138ff34df43b60c2624f241e629f79f4120b28",
+    "reason": "Preserve upstream Java SQL/lifecycle algorithms; no_std uses existing native as-sqlite transport instead of a Python subprocess, with per-Engine connections and shared codecs/errors. Device persistence/resource-limit integration is unverified. Keep runtime items before test modules for strict clippy. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/jtext_format.rs",
+    "sha256": "22c988d8402641e1538ad2eb678340aa54da5519b8848a37be2c78cdd75a1ce2",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/jtime.rs",
+    "sha256": "c68a0873e0e7195fb1d8c4525286da22b1a264d99b709b9277436a612d3def0f",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: Retain alloc/core profile adapters; latest upstream no longer uses the old environment locale branch."
+  },
+  {
+    "path": "crates/rd-vm/src/jxml.rs",
+    "sha256": "38bf82538f1a2a5cd576f1ee9d809f8b9b4f8c4e7a2adcc0374e23aac8ab36d0",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/lib.rs",
+    "sha256": "f13b42b2f94ff699371ec6fca69063cd8259a6c22a27627c7288ed3c1ece64d9",
+    "reason": "Register the entire original framework dependency closure behind explicit experimental features, keep desktop native/JIT backends separate, share original intrinsics/GC plus core/alloc helpers, and retain default portable dispatch until state integration is complete. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Embedded VM ordered-index policy is preserved independently of std; std activation must not replace every small VM index with randomized TLS-seeded maps. Only the two map-module cfg guards and their policy comment change; original container algorithms remain shared. Collections state integration: reviewed extraction of immutable factories from original intrinsics into one shared implementation; existing reference/product stores are selected through an explicit adapter, never fallback. Descriptor catalog, GC roots and null-zero arguments are tested. Sorted factories remain reference-only due inherited plain Set/Map marker types. See docs/UPSTREAM_PARITY_PLAN.md. Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained. GC pressure integration: extract the pinned upstream byte/slot adaptive pressure calculation into gc_policy, consumed by both collectors; preserve actual execution-owner roots and host temporary cutoffs. A pressure watermark collected with active frames is rechecked once with a full collection after the callback unwinds; real live heaps retain backoff. Added before/after pressure and unpinned-boundary regression contracts. Reviewed gc.rs against upstream 3761815 plus prior adaptation; full collector state integration remains open. Shared collector integration: shipping std/core and reference profiles now compile the same original gc.rs mark/sweep, generational barriers, weak-reference clearing/queue and adaptive collection algorithms. Framework/native roots and exact product regex edges use the active platform owner; reference-only HostState/graphics scanners remain profile adapters. Old platform side-state owners are conservatively revisited during minor GC until exact dirty-owner keys exist. Removed the separate product collector. Five original heap/DEX/weak scenarios are extracted without body changes into shared test helpers and exercised on the shipping profile; original suite routes and scenarios remain. Source selection and these focused tests do not establish complete upstream API parity; full host/NRO qualification remains required. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: select original jio_chars on the shipping std profile and declare extracted common File/stream/AtomicFile/metadata adapters. Full reference runtime remains opt-in. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim. Reviewed against the pinned original: Select inherited numerics on std independently of the reference runtime; export its exact metadata catalog for the product/JNI adapter. See docs/UPSTREAM_NUMERICS.md; no whole-runtime behavior parity claim. StringTokenizer review against pinned upstream and prior adaptation: Select and export the original tokenizer module on shipping std, retaining the upstream-runtime selection and one implementation tree. See docs/UPSTREAM_TOKENIZER.md; no whole-runtime parity claim. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/m10/camera.rs",
+    "sha256": "84d77a7880dc44fb72fe07bce54ae331b88e30d7a42af111bd7e7081e6bc8bf0",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/m10/connectivity.rs",
+    "sha256": "82ab89342eb06e9727f426fee8781c340da85bf8c79885399f2bb2cb08b86c6d",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/m10/location.rs",
+    "sha256": "00be347e7dc4493516dfac5578cfe627c3922f9ff65653488e6e66ce5fa0c665",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/m10/media.rs",
+    "sha256": "9c3f58bda30518bffe35ad0829b4b505e8906d74707aa63d9f7892af7d742560",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/m10/mod.rs",
+    "sha256": "15463b93fc3a7d5a0c1560e8255705f0fd9abe8218302902231fd1fec33dc7d9",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/m10/sysconfig.rs",
+    "sha256": "8df898acec5aa4bc4786f1f6f5a1242f9d58fd4b6bd25e517be2fa6d2d58615f",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/m8.rs",
+    "sha256": "d638a4f703446c14f2f80308036f4acbd7a7eb7fafbee6ef2e0826d23dbc773c",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/m9/ime.rs",
+    "sha256": "bd79a8bafa5620b4379627d262b0b8f89b8d42b29cc70dee5e1ce6c2061d1018",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/parcel.rs",
+    "sha256": "540029766bf8ea01a6c1e613d763a333fc82e98e5ee2001784be5b81624ed71c",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/perms.rs",
+    "sha256": "aad9d3956093a3dd99266e996309ee246822f2513915400b21fc74ee3f135943",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/platform_base.rs",
+    "sha256": "a493910bc43c883f8dea4a7c687536874a0bdbe69367e546e0a163d3cf8e0e40",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/screen_model.rs",
+    "sha256": "7be300e4edccfdbdbc6ad31ab29d5e435362adc77609d06a30849bc4550aeaef",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/view_layout.rs",
+    "sha256": "1a1fc627528d46fcc844d22584242c1ef97d12dd080e84b059cc5a5565a31f6b",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/view_props.rs",
+    "sha256": "ac94cc054c6849d40bf98f6d88626370c86848e6d86e40492a932dae321677a0",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/window.rs",
+    "sha256": "98a3b04e9a83c7b0b8e5c8b31cf8156583b0994f2c798e7fbeaf1c6828cfccae",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: Keep upstream virtual orientation/viewport state when the optional virtual-devices feature is enabled. Without it, retain the reference 720x1440 viewport so standalone upstream-runtime/WASM profiles compile; this is not the bound Horizon renderer or a physical capability claim."
+  },
+  {
+    "path": "crates/rd-vm/src/xml_res.rs",
+    "sha256": "174b7477678e730295488ff96522b6e514122d8bece0108177d12a14b0665e1b",
+    "reason": "Port original module to core/alloc in the experimental upstream-runtime dependency closure; preserve API algorithms and whole inherited test suites. Replace TLS with explicit Engine-owned module tables so heaps cannot inherit another Engine’s object state. Horizon service/state integration remains unverified; compilation is not behavior parity. Review at 33e7645: Integrate upstream iterative parser, END_DOCUMENT/nextText/close contracts and parser cost limits with Engine-owned parser/array/cost state. Preserve real object refs and per-Engine purge; aggregate VM side-memory remains open."
+  },
+  {
+    "path": "crates/rd-vm/tests/vm_exec.rs",
+    "sha256": "a3a3c6c859d284bcefcbbb9e3853e828d17d4c97f24f952542423266ecddc44b",
+    "reason": "Keep upstream execution assertions unchanged; portable println captures the explicit per-Engine AppOutput sink instead of desktop stdout. Horizon std migration: Rust std library services are independent of desktop-runtime execution; preserve embedded owner/JNI/GC/VFS/native SQLite routes, original algorithms and tests. cfg split and rustfmt reviewed against previous adaptation; see docs/HORIZON_STD_MIGRATION.md. Review at 33e7645: the previous adaptation patch is unchanged against the new original file; upstream changes are retained."
+  },
+  {
+    "path": "crates/rd-vm/src/java_values.rs",
+    "sha256": "0da2e018dccd8d7247490d9a8b0674909a3e452077e3c7eab0d8aed8a4ae2211",
+    "scope": "Shared object_to_string invokes original native stack guard before recursive callbacks; common Class factory and roots retained. Not a device behavior parity claim.",
+    "derived_from": "crates/rd-vm/src/intrinsics.rs",
+    "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. General value-callback cycle guard: detect repeated built-in collection string/hash/equals operations per execution owner, suspend detection across concrete guest overrides, and release on error. Preserves catchable StackOverflowError without exhausting the native stack; upstream arrays_303 and product unwind tests retained. Shared String storage review against the pinned original and prior adaptation: Original dynamic String allocation/OOM body shared by both profiles, plus a classloader-scoped literal lookup. Shared GC/identity/low-budget churn contracts; no second heap or dynamic intern cache. See docs/UPSTREAM_STRING_STORAGE.md; no complete API parity claim. Canonical Class owner review against the pinned original factory and prior adaptation: Reuse the original Class factory and original String/Class OOM formatting with one typed cache. Publish only fully initialized objects, preserve the inherited Intent alias, and add shared GC/identity/isolation and OOM cleanup contracts. See docs/UPSTREAM_CLASS_OWNER.md; full Class/reflection/loader API parity is not claimed."
+  },
+  {
+    "path": "crates/rd-vm/src/module_tables.rs",
+    "sha256": "ab94e89ae581fb0750dd27cd3e65612c331180d24a79023e19a8ec2e55376c57",
+    "scope": "XML parser host-cost counter follows the same Engine owner as its parser table; no new thread-local globals. Not a device behavior parity claim.",
+    "derived_from": "RustyDroid pinned source and AndroSwitch core/alloc platform adaptation",
+    "reason": " Active-owner collections/text port: original jcollections/jiterator/Collections and jlstring/jsb/jregex algorithms now use the product collection adapter or shared heap/Engine-owned tables; reference store is retained only when no framework is bound. Added scoped callback roots, inherited template dispatch, sublist GC edges, exact descriptor metadata and StringBuffer monitor admission. Reviewed against pinned upstream plus prior adaptation; see docs/UPSTREAM_PARITY_PLAN.md. Compilation and scoped tests do not prove complete API parity. Reviewed against pinned RustyDroid and previous adaptation: Shared I/O: relocate the original three character/byte tables to Engine.io_tables, shared by std and reference; remove former duplicate declarations/defaults. See docs/UPSTREAM_SHARED_IO.md; no complete behavior parity claim."
+  },
+  {
+    "path": "crates/rd-vm/src/portable/text_contracts.rs",
+    "sha256": "bc53e36866458d1f25f8e69de952b238159f79ab3026fbab24028dd62cc8fa4f",
+    "scope": "Reviewed equivalent Option::is_none_or array-copy bounds checks after the upstream MSRV increase; overflow and exception behavior unchanged. Not a device behavior parity claim.",
+    "reason": " Reviewed against the pinned original: Shipping std numeric calls use inherited numerics; earlier limited scalar/Math fallback is retained only for the isolated core-only profile. Other text and array contracts remain intact. See docs/UPSTREAM_NUMERICS.md; no whole-runtime behavior parity claim."
+  },
+  {
+    "path": "crates/rd-apk/src/arsc_identifier.rs",
+    "sha256": "787904abdf348af98b8c00ce77d2e3077bfc13fc7ee1379400d157b780a1cbc9",
+    "scope": "Name lookup iterates original lazy resource_ids and entries_for, preserving owning-package/name agreement. Not a device behavior parity claim."
+  },
+  {
+    "path": "crates/rd-apk/src/sync.rs",
+    "sha256": "c149c2145678e1ca91919d8a30f9d909bbd82a048aa2aaedb2786c7b00c40ac2",
+    "scope": "Parser-only std Mutex/OnceLock and core spin wrappers; no guest callbacks inside locked immutable parser initialization. Not a device behavior parity claim."
+  },
+  {
+    "path": "crates/rd-apk/src/zip_source.rs",
+    "sha256": "79a8f85e4937d0d909333166489ee22b2a6bd2b9fa32fb3076d18dec5d874cd3",
+    "scope": "Reviewed equivalent Option::is_none_or bounds checks after the upstream MSRV increase; checked-add overflow and extent rejection unchanged. Not a device behavior parity claim."
+  }
+]

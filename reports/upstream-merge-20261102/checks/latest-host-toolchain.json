@@ -1,0 +1,9 @@
+{
+  "host": "Microsoft Windows NT 10.0.22631.0",
+  "source_check_exit": 0,
+  "build_jobs": 1,
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\r\nbinary: rustc\r\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\r\ncommit-date: 2026-07-14\r\nhost: x86_64-pc-windows-gnu\r\nrelease: 1.97.1\r\nLLVM version: 22.1.6",
+  "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+  "debug_info": 0,
+  "incremental": false
+}
