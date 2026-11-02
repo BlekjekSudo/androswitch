@@ -70,7 +70,7 @@ Legenda: ⬜ não iniciado · 🟡 parcial, com evidência · ⛔ bloqueado por 
 ## Próximos passos
 
 0. Launch medido (`rd app run`, sem app verificado como funcionando): Gallery, Contacts, KeePassDX, VolumeScroll e Klick'r chegam ao primeiro bloqueio de runtime acima. `Context.getDrawable(I)` é o bloqueio comum a Contacts, KeePassDX e VolumeScroll, e precisa de um modelo de Drawable (decodificação e render), que ainda não existe. Esse é o próximo bloqueio transversal.
-1. Lucky Patcher: falta o APK `com.dimonvideo.luckypatcher` (os instaladores de `chelpus.com` não o contêm; ver linha 7). Aguarda o dono fornecer o APK com SHA-256 ou aprovar a fonte; depois, primeiro launch.
+1. Lucky Patcher: falta o APK `com.dimonvideo.luckypatcher` (os instaladores de `chelpus.com` não o contêm; ver linha 7). Fonte aprovada pelo dono (`luckypatchers.com/pt/lucky-patcher-todas-as-versoes-baixar-gratis/`) checada: oferece só o "LP Installer" 12.10.8 (já rejeitado no PR #479) e versões antigas que devolvem 404 (ex.: 12.0.8). Nenhum APK `com.dimonvideo.luckypatcher` foi obtido. Próximo passo: o dono fornece o APK com SHA-256 ou outra fonte aprovada; depois, primeiro launch.
 2. Dono escolhe os apps concretos para os itens "a escolher".
 3. Para cada app com APK acessível, criar o golden flow (suíte `rd test`) e registrar
    o status com evidência.
