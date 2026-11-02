@@ -2741,3 +2741,20 @@ fn cyclic_nonplatform_hierarchy_fails_closed() {
         matches!(e.invoke_instance(r,"unrecognizedCall","()V",&[]),Err(VmExit::Error(e)) if e.code=="NOT_FOUND")
     );
 }
+
+/// API 34: `OnBackAnimationCallback extends OnBackInvokedCallback`. O AndroidX
+/// (OnBackPressedDispatcher$Api34Impl) faz check-cast de uma classe anônima que
+/// implementa só o subtipo; sem a aresta, o VolumeScroll 1.0.2 falhava com
+/// ClassCastException no launch.
+#[test]
+fn on_back_animation_callback_is_an_on_back_invoked_callback() {
+    let e = engine_of(&DexBuilder::new());
+    assert!(e.cp.is_subtype(
+        "Landroid/window/OnBackAnimationCallback;",
+        "Landroid/window/OnBackInvokedCallback;"
+    ));
+    assert!(!e.cp.is_subtype(
+        "Landroid/window/OnBackInvokedCallback;",
+        "Landroid/window/OnBackAnimationCallback;"
+    ));
+}

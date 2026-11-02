@@ -2517,6 +2517,12 @@ fn builtin_interfaces(class: &str) -> Option<&'static [&'static str]> {
         "Ljava/lang/StringBuilder;" | "Ljava/lang/StringBuffer;" => Some(SB_IFACES),
         "Ljava/util/regex/Pattern;" => Some(&["Ljava/io/Serializable;"]),
         "Ljava/util/regex/Matcher;" => Some(&["Ljava/util/regex/MatchResult;"]),
+        // API 34: OnBackAnimationCallback estende OnBackInvokedCallback. Sem esta
+        // aresta, o check-cast de uma classe anônima do AndroidX (OnBackPressedDispatcher
+        // Api34Impl) falhava com ClassCastException (VolumeScroll 1.0.2).
+        "Landroid/window/OnBackAnimationCallback;" => {
+            Some(&["Landroid/window/OnBackInvokedCallback;"])
+        }
         "Ljava/text/Format;"
         | "Ljava/text/NumberFormat;"
         | "Ljava/text/DecimalFormat;"

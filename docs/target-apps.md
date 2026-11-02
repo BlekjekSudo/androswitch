@@ -47,8 +47,8 @@ Para cada app, o DoD é reproduzível a partir do repositório, no formato do M6
 | 11 | Zombie Tsunami | Play Store (proprietário) | jogo com render GPU; serviços Google | ⬜ não iniciado |
 | 12 | Play Store | Google (proprietário) | Google Play Services e login de conta; Play Integrity. Há shims parciais de GMS (`rd-vm`, `gms`). **Suporte a Google Play Services é um dos últimos itens** (ver a seção "Apps alvo" do ROADMAP) | ⬜ último item (depende de M9–M10 e dos apps acima) |
 | 13 | Comprix | https://github.com/nadabgfccvd/Comprix (app do dono) | launch termina antes do primeiro frame com erro tipado; ver [comprix-e2e.md](comprix-e2e.md) | 🟡 launch parcial |
-| 14 | Auto-clicker | a escolher (OSS, a confirmar) | AccessibilityService (`dispatchGesture`) e overlay; M9 accessibility parcial | ⬜ app a escolher |
-| 15 | Auto-scroll | a escolher (OSS, a confirmar) | AccessibilityService; overlay; mesmo caso do auto-clicker | ⬜ app a escolher |
+| 14 | Auto-clicker | a escolher (candidato OSS: Klick'r 4.0.5, `com.buzbuz.smartautoclicker`, F-Droid, GPL, a confirmar) | AccessibilityService (`dispatchGesture`) e overlay; M9 accessibility parcial | ⬜ não verificado. `rd app run` (sem `--activity`) para em `Class.getEnclosingMethod()` (`NOT_FOUND`; falta modelo de `EnclosingMethod`) |
+| 15 | Auto-scroll | a escolher (candidato OSS: VolumeScroll 1.0.2, `com.yeapguy.volumescroll`, F-Droid, MIT, a confirmar; rola página a página com os botões de volume) | AccessibilityService; overlay; mesmo caso do auto-clicker | ⬜ não verificado. A `ClassCastException` de `OnBackAnimationCallback` foi corrigida (rd-vm). O próximo bloqueio é `Context.getDrawable(I)` |
 | 16 | RAR | Play Store (proprietário) | file I/O e formatos de arquivo; código nativo a verificar | ⬜ não iniciado |
 | 17 | Organizador de contatos | a escolher (candidato OSS: Fossify Contacts 1.6.0, `org.fossify.contacts`, F-Droid, a confirmar) | ContactsContract e ContentProvider no dispositivo virtual | ⬜ não verificado. `rd app run` (com `--activity` do splash) para em `Context.getDrawable(I)` (`NOT_FOUND`) em `SplashActivity` |
 
@@ -69,7 +69,7 @@ Legenda: ⬜ não iniciado · 🟡 parcial, com evidência · ⛔ bloqueado por 
 
 ## Próximos passos
 
-0. Launch medido (`rd app run`, sem app verificado como funcionando): Gallery, Contacts e KeePassDX chegam ao primeiro bloqueio de runtime acima. `Context.getDrawable(I)` é o bloqueio comum a Contacts e KeePassDX e precisa de um modelo de Drawable (decodificação e render), que ainda não existe. Esse é o próximo bloqueio transversal.
+0. Launch medido (`rd app run`, sem app verificado como funcionando): Gallery, Contacts, KeePassDX, VolumeScroll e Klick'r chegam ao primeiro bloqueio de runtime acima. `Context.getDrawable(I)` é o bloqueio comum a Contacts, KeePassDX e VolumeScroll, e precisa de um modelo de Drawable (decodificação e render), que ainda não existe. Esse é o próximo bloqueio transversal.
 1. Lucky Patcher: falta o APK `com.dimonvideo.luckypatcher` (os instaladores de `chelpus.com` não o contêm; ver linha 7). Aguarda o dono fornecer o APK com SHA-256 ou aprovar a fonte; depois, primeiro launch.
 2. Dono escolhe os apps concretos para os itens "a escolher".
 3. Para cada app com APK acessível, criar o golden flow (suíte `rd test`) e registrar
